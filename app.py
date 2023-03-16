@@ -2,13 +2,14 @@ import os
 
 import openai
 from flask import Flask, redirect, render_template, request, url_for
+from flask.typing import ResponseReturnValue
 
 app = Flask(__name__)
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
 @app.route("/", methods=("GET", "POST"))
-def index():
+def index() -> ResponseReturnValue:
     if request.method == "POST":
         animal = request.form["animal"]
         response = openai.Completion.create(
@@ -22,7 +23,7 @@ def index():
     return render_template("index.html", result=result)
 
 
-def generate_prompt(animal):
+def generate_prompt(animal: str) -> str:
     return """Suggest three names for an animal that is a superhero.
 
 Animal: Cat
