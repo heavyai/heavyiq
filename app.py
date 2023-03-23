@@ -1,6 +1,5 @@
 from functools import lru_cache
 import os
-import re
 from typing import NamedTuple, Literal
 
 import openai
@@ -37,8 +36,9 @@ class PromptBuilder:
 
     _prompt_parts: list[PromptPart]
 
-    def __init__(self):
+    def __init__(self, delimiter: str = "\n\n"):
         self._prompt_parts = []
+        self.delimiter = delimiter
 
     def add_part(self, label: str, content: str):
         self._prompt_parts.append(PromptPart(label, content))
@@ -47,7 +47,7 @@ class PromptBuilder:
         return [part.label for part in self._prompt_parts]
 
     def build(self) -> str:
-        return "\n\n".join([part.content for part in self._prompt_parts])
+        return self.delimiter.join([part.content for part in self._prompt_parts])
 
 
 ChatMessageRole = Literal["system", "assistant", "user"]
@@ -65,8 +65,13 @@ class ChatManager:
         self._messages.append(ChatMessage(role, content))
 
     def prompt_ai(self) -> str:
+        app.logger.info("==== Prompting OpenAI ====")
+        for message in self._messages:
+            app.logger.debug(f"[{message.role}] {message.content}")
         response = openai.ChatCompletion.create(model=self.model, messages=self.messages)
+        app.logger.info("==== OpenAI Response Received ====")
         content = response["choices"][0]["message"]["content"]
+        app.logger.debug(f"Response: {content}")
         self.add_message("assistant", content)
         return content
 
@@ -119,15 +124,19 @@ def build_chatgpt_system_ask_prompt(table_name: str) -> str:
     system_prompt.add_part("schema", get_table_schema(table_name))
     system_prompt.add_part(
         "instruction",
-        """Translate the following instruction into a SQL query on this table. Strong preference to return a single row with the answer. Exclude null values from the results.
-Only output a SQL query and nothing else.""",
+        """Translate the following instruction into a SQL query on this table. Strong preference to return a single row with the answer. Exclude null values from the results. Do not use reserved SQL keywords as aliases.
+Only output a SQL query and nothing else. Do not apologize for your mistakes; just try again if presented with an error message.""",
     )
     return system_prompt.build()
 
 
 def clean_gpt_sql_statement(stmt: str) -> str:
-    stmt = stmt.replace("\n", " ").replace("\r", " ")
-    return re.sub(".*(SELECT.*;).*", r"\1", stmt, count=0, flags=0)
+    stmt = stmt.replace("\n", " ").replace("\r", " ").replace("```", "")
+    if not stmt.startswith("SELECT"):
+        # trim apology :roll_eye:
+        parts = stmt.partition("SELECT")
+        stmt = parts[1] + parts[2]
+    return stmt
 
 
 def verify_and_attempt_fix_sql(
@@ -141,7 +150,9 @@ def verify_and_attempt_fix_sql(
         if remaining_tries <= 0:
             raise error
         app.logger.info("Trying again...")
-        chat_manager.add_message("user", str(error))
+        chat_manager.add_message(
+            "user", f"{str(error)}\nTry again. Do not apologize for the error. Output only the fixed SQL statement."
+        )
         sql_statement = clean_gpt_sql_statement(chat_manager.prompt_ai())
         return verify_and_attempt_fix_sql(sql_statement, chat_manager, remaining_tries=remaining_tries - 1)
 
@@ -156,16 +167,12 @@ def build_ask_manager(table_name: str, user_question: str) -> ChatManager:
 
 def build_chatgpt_system_answer_prompt(sql_result: Cursor) -> str:
     column_names = [d[0] for d in sql_result.description]
-    prompt_builder = PromptBuilder()
-    results = list(sql_result)
+    prompt_builder = PromptBuilder(delimiter="\n")
+    results = sql_result.fetchall()
+    prompt_builder.add_part("header", ",".join(column_names))
     for row_idx, row in enumerate(results):
-        for col_idx, c in enumerate(column_names):
-            prompt_builder.add_part(
-                f"result-table-row-{row_idx}",
-                """Row {row_idx} of {column_name} is {result}. """.format(
-                    row_idx=row_idx + 1, column_name=c, result=results[row_idx][col_idx]
-                ),
-            )
+        prompt_builder.add_part(f"result-table-row-{row_idx}", ",".join([str(col) for col in row]))
+
     app.logger.info("==== SQL Results ====")
     for _, part in prompt_builder._prompt_parts:
         app.logger.info(part)
@@ -188,12 +195,13 @@ def index() -> ResponseReturnValue:
     if request.method == "POST":
         table_name = request.form["table_name"]
         user_question = request.form["user_question"]
-
+        app.logger.info("Request Received")
         ask_manager = build_ask_manager(table_name, user_question)
+        app.logger.info("Built Ask Manager.")
         sql_statement = clean_gpt_sql_statement(ask_manager.prompt_ai())
         try:
             sql_statement, sql_result = verify_and_attempt_fix_sql(sql_statement, ask_manager)
-            app.logger.info(f"Valid SQL: {sql_statement}")
+            app.logger.info(f"Valid SQL Parsed: {sql_statement}")
             answer_manager = build_answer_manager(sql_statement, user_question, sql_result)
             answer = answer_manager.prompt_ai()
             return redirect(url_for("index", answer=answer, selected_table_name=table_name))
