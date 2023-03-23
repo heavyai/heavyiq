@@ -3,6 +3,7 @@ flake8==6.0.0
 flake8-annotations==3.0.0
 flake8-pep585==0.1.7
 Flask==2.2.3
+heavyai==1.1.0
 mypy==1.1.1
 openai==0.27.2
 python-dotenv==1.0.0

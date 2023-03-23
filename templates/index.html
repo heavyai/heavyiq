@@ -1,21 +1,26 @@
 <!DOCTYPE html>
+
 <head>
-  <title>OpenAI Quickstart</title>
-  <link
-    rel="shortcut icon"
-    href="{{ url_for('static', filename='dog.png') }}"
-  />
+  <title>HeavyNL Quickstart</title>
+  <link rel="shortcut icon" href="{{ url_for('static', filename='h_analyst_logo.png') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='main.css') }}" />
 </head>
 
 <body>
-  <img src="{{ url_for('static', filename='dog.png') }}" class="icon" />
-  <h3>Name my pet</h3>
+  <img src="{{ url_for('static', filename='h_analyst_logo.png') }}" class="icon" />
+  <h3>Ask a Question</h3>
   <form action="/" method="post">
-    <input type="text" name="animal" placeholder="Enter an animal" required />
-    <input type="submit" value="Generate names" />
+    <select name="table_name">
+      {% for table_name in tables %}
+      <option value="{{ table_name }}" {% if selected_table_name==table_name %} selected {% endif %}>{{ table_name }}
+      </option>
+      {% endfor %}
+    </select>
+    <textarea type="text" name="user_question" placeholder="Enter a question about the selected dataset"
+      required></textarea>
+    <input type="submit" value="Ask HeavyNL" />
   </form>
-  {% if result %}
-  <div class="result">{{ result }}</div>
+  {% if answer %}
+  <div class="result">{{ answer }}</div>
   {% endif %}
 </body>
