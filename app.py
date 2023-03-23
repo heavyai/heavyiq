@@ -1,5 +1,6 @@
 from functools import lru_cache
 import os
+import re
 from typing import NamedTuple, Literal
 
 import openai
@@ -125,18 +126,18 @@ def build_chatgpt_system_ask_prompt(table_name: str) -> str:
     system_prompt.add_part(
         "instruction",
         """Translate the following instruction into a SQL query on this table. Strong preference to return a single row with the answer. Exclude null values from the results. Do not use reserved SQL keywords as aliases.
-Only output a SQL query and nothing else. Do not apologize for your mistakes; just try again if presented with an error message.""",
+Only output a SQL query and nothing else.""",
     )
     return system_prompt.build()
 
 
 def clean_gpt_sql_statement(stmt: str) -> str:
-    stmt = stmt.replace("\n", " ").replace("\r", " ").replace("```", "")
-    if not stmt.startswith("SELECT"):
-        # trim apology :roll_eye:
-        parts = stmt.partition("SELECT")
-        stmt = parts[1] + parts[2]
-    return stmt
+    stmt = stmt.replace("\n", " ").replace("\r", " ")
+    pattern = r"(SELECT.+?;)"
+    result = re.search(pattern, stmt, re.IGNORECASE)
+    if result:
+        return result.group(0)
+    raise Exception("No SELECT statement found in provided string")
 
 
 def verify_and_attempt_fix_sql(
@@ -150,9 +151,7 @@ def verify_and_attempt_fix_sql(
         if remaining_tries <= 0:
             raise error
         app.logger.info("Trying again...")
-        chat_manager.add_message(
-            "user", f"{str(error)}\nTry again. Do not apologize for the error. Output only the fixed SQL statement."
-        )
+        chat_manager.add_message("user", str(error))
         sql_statement = clean_gpt_sql_statement(chat_manager.prompt_ai())
         return verify_and_attempt_fix_sql(sql_statement, chat_manager, remaining_tries=remaining_tries - 1)
 
@@ -197,7 +196,7 @@ def index() -> ResponseReturnValue:
         user_question = request.form["user_question"]
         app.logger.info("Request Received")
         ask_manager = build_ask_manager(table_name, user_question)
-        app.logger.info("Built Ask Manager.")
+        app.logger.info("Built Ask Manager")
         sql_statement = clean_gpt_sql_statement(ask_manager.prompt_ai())
         try:
             sql_statement, sql_result = verify_and_attempt_fix_sql(sql_statement, ask_manager)
