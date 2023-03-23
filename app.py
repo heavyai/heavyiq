@@ -76,6 +76,11 @@ class ChatManager:
 
 
 @lru_cache
+def get_tables() -> list[str]:
+    return conn.get_tables()
+
+
+@lru_cache
 def get_table_details(table_name: str) -> list[ColumnDetails]:
     return conn.get_table_details(table_name)
 
@@ -114,7 +119,7 @@ def build_chatgpt_system_ask_prompt(table_name: str) -> str:
     system_prompt.add_part("schema", get_table_schema(table_name))
     system_prompt.add_part(
         "instruction",
-        """Translate the following instruction into a SQL query on this table. Exclude null values from the results.
+        """Translate the following instruction into a SQL query on this table. Strong preference to return a single row with the answer. Exclude null values from the results.
 Only output a SQL query and nothing else.""",
     )
     return system_prompt.build()
@@ -131,11 +136,13 @@ def verify_and_attempt_fix_sql(
     try:
         return sql_statement, conn.execute(sql_statement)
     except Exception as error:
+        app.logger.info(f"Invalid SQL: {sql_statement}")
+        app.logger.debug(str(error))
         if remaining_tries <= 0:
             raise error
+        app.logger.info("Trying again...")
         chat_manager.add_message("user", str(error))
         sql_statement = clean_gpt_sql_statement(chat_manager.prompt_ai())
-        chat_manager.add_message("assistant", sql_statement)
         return verify_and_attempt_fix_sql(sql_statement, chat_manager, remaining_tries=remaining_tries - 1)
 
 
@@ -159,6 +166,9 @@ def build_chatgpt_system_answer_prompt(sql_result: Cursor) -> str:
                     row_idx=row_idx + 1, column_name=c, result=results[row_idx][col_idx]
                 ),
             )
+    app.logger.info("==== SQL Results ====")
+    for _, part in prompt_builder._prompt_parts:
+        app.logger.info(part)
     return prompt_builder.build()
 
 
@@ -167,7 +177,7 @@ def build_answer_manager(sql_statement: str, user_question: str, sql_result: Cur
     chat_manager = ChatManager()
     chat_manager.add_message(
         "system",
-        f"From the SQL query {sql_statement} in response to the following question: '{user_question}', we received the following result back from the database. Explain this result in plain English. Give a brief answer to the question without explanation of the SQL.",
+        f"From the SQL query {sql_statement} in response to the following question: '{user_question}', we received the following result back from the database. Explain this result in plain English. Give a brief answer to the question without explanation of the SQL. Do not explain what the SQL means.",
     )
     chat_manager.add_message("user", build_chatgpt_system_answer_prompt(sql_result))
     return chat_manager
@@ -176,20 +186,27 @@ def build_answer_manager(sql_statement: str, user_question: str, sql_result: Cur
 @app.route("/", methods=("GET", "POST"))
 def index() -> ResponseReturnValue:
     if request.method == "POST":
-        # table_name = request.form["table_name"]
-        # user_question = request.form["user_question"]
-        table_name = "flights_small"
-        user_question = "How many flights are there?"
+        table_name = request.form["table_name"]
+        user_question = request.form["user_question"]
 
         ask_manager = build_ask_manager(table_name, user_question)
         sql_statement = clean_gpt_sql_statement(ask_manager.prompt_ai())
         try:
             sql_statement, sql_result = verify_and_attempt_fix_sql(sql_statement, ask_manager)
+            app.logger.info(f"Valid SQL: {sql_statement}")
             answer_manager = build_answer_manager(sql_statement, user_question, sql_result)
             answer = answer_manager.prompt_ai()
-            return redirect(url_for("index", result=answer))
+            return redirect(url_for("index", answer=answer, selected_table_name=table_name))
+        except openai.InvalidRequestError as error:
+            raise error
         except Exception:
             raise Exception("Unable to form valid SQL")
 
-    result = request.args.get("result")
-    return render_template("index.html", result=result)
+    tables = get_tables()
+    tables.sort(key=lambda table: table.lower())
+    return render_template(
+        "index.html",
+        answer=request.args.get("answer"),
+        tables=tables,
+        selected_table_name=request.args.get("selected_table_name"),
+    )
