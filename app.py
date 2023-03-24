@@ -13,11 +13,18 @@ app = Flask(__name__)
 @app.route("/", methods=("GET", "POST"))
 def index() -> ResponseReturnValue:
     if request.method == "POST":
-        table_name = request.form["table_name"]
+        table_name1 = request.form["table_name1"]
+        table_name2 = request.form["table_name2"]
         user_question = request.form["user_question"]
+
+        tables = [table_name1]
+        if table_name2 and table_name2 != "":
+            tables.append(table_name2)
+
         logger.info("Request Received")
+        logger.info(f"Table(s): {', '.join(tables)}")
         # template options: original, summarized_guidelines, given_instruction, with_examples, added_context
-        ask_manager = build_ask_manager([table_name], user_question, include_topN=True, template="original")
+        ask_manager = build_ask_manager(tables, user_question, include_topN=True, template="original")
         logger.info("Built Ask Manager")
         sql_statement = extract_sql_from_response(ask_manager.prompt_ai())
         try:
@@ -25,7 +32,15 @@ def index() -> ResponseReturnValue:
             logger.info(f"Valid SQL Parsed: {sql_statement}")
             answer_manager = build_answer_manager(sql_statement, user_question, sql_result)
             answer = answer_manager.prompt_ai()
-            return redirect(url_for("index", answer=answer, sql=sql_statement, selected_table_name=table_name))
+            return redirect(
+                url_for(
+                    "index",
+                    answer=answer,
+                    sql=sql_statement,
+                    selected_table_name1=table_name1,
+                    selected_table_name2=table_name2,
+                )
+            )
         except openai.InvalidRequestError as error:
             raise error
         except Exception:
@@ -38,5 +53,6 @@ def index() -> ResponseReturnValue:
         answer=request.args.get("answer"),
         sql=request.args.get("sql"),
         tables=tables,
-        selected_table_name=request.args.get("selected_table_name"),
+        selected_table_name1=request.args.get("selected_table_name1"),
+        selected_table_name2=request.args.get("selected_table_name2"),
     )

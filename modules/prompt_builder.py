@@ -118,7 +118,9 @@ def build_chatgpt_system_ask_prompt(
     for table_name in table_names:
         system_prompt.add_part(
             f"{table_name}-schema-intro",
-            SCHEMA_PROMPT_TEMPLATES.get(template, SCHEMA_PROMPT_TEMPLATES.get("original") or ""),
+            SCHEMA_PROMPT_TEMPLATES.get(template, SCHEMA_PROMPT_TEMPLATES.get("original") or "").format(
+                table_name=table_name
+            ),
         )
         system_prompt.add_part(f"{table_name}-schema", db.get_table_schema(table_name))
         if include_topN:

@@ -10,9 +10,16 @@
   <img src="{{ url_for('static', filename='h_analyst_logo.png') }}" class="icon" />
   <h3>Ask a Question</h3>
   <form action="/" method="post">
-    <select name="table_name">
+    <select name="table_name1" required>
       {% for table_name in tables %}
-      <option value="{{ table_name }}" {% if selected_table_name==table_name %} selected {% endif %}>{{ table_name }}
+      <option value="{{ table_name }}" {% if selected_table_name1==table_name %} selected {% endif %}>{{ table_name }}
+      </option>
+      {% endfor %}
+    </select>
+    <select name="table_name2">
+      <option value="">Optionally select a second table</option>
+      {% for table_name in tables %}
+      <option value="{{ table_name }}" {% if selected_table_name2==table_name %} selected {% endif %}>{{ table_name }}
       </option>
       {% endfor %}
     </select>
