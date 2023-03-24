@@ -16,7 +16,8 @@ def index() -> ResponseReturnValue:
         table_name = request.form["table_name"]
         user_question = request.form["user_question"]
         logger.info("Request Received")
-        ask_manager = build_ask_manager([table_name], user_question)
+        # template options: original, summarized_guidelines, given_instruction, with_examples, added_context
+        ask_manager = build_ask_manager([table_name], user_question, include_topN=True, template="original")
         logger.info("Built Ask Manager")
         sql_statement = extract_sql_from_response(ask_manager.prompt_ai())
         try:
@@ -24,7 +25,7 @@ def index() -> ResponseReturnValue:
             logger.info(f"Valid SQL Parsed: {sql_statement}")
             answer_manager = build_answer_manager(sql_statement, user_question, sql_result)
             answer = answer_manager.prompt_ai()
-            return redirect(url_for("index", answer=answer, selected_table_name=table_name))
+            return redirect(url_for("index", answer=answer, sql=sql_statement, selected_table_name=table_name))
         except openai.InvalidRequestError as error:
             raise error
         except Exception:
@@ -35,6 +36,7 @@ def index() -> ResponseReturnValue:
     return render_template(
         "index.html",
         answer=request.args.get("answer"),
+        sql=request.args.get("sql"),
         tables=tables,
         selected_table_name=request.args.get("selected_table_name"),
     )

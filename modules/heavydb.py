@@ -57,3 +57,9 @@ def get_top_k_vals_for_cols(
     table_name: str, columns: list[str], top_k: int = DEFAULT_TOP_K
 ) -> dict[str, list[str | bool | int | float]]:
     return {col: get_top_k_vals(table_name, col, top_k=top_k) for col in columns}
+
+
+def get_top_k_vals_for_str_cols(
+    table_name: str, top_k: int = DEFAULT_TOP_K
+) -> dict[str, list[str | bool | int | float]]:
+    return get_top_k_vals_for_cols(table_name, get_table_string_columns(table_name), top_k=top_k)

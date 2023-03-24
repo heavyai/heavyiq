@@ -98,19 +98,25 @@ class ChatManager:
         return [{"role": m.role, "content": m.content} for m in self._messages]
 
 
-def build_ask_manager(table_names: list[str], user_question: str) -> ChatManager:
+def build_ask_manager(
+    table_names: list[str], user_question: str, include_topN: bool = True, template: str = "original"
+) -> ChatManager:
     """
     Constructs a ChatManager object primed to prompt ChatGPT for an SQL query that can be used to answer the user's question.
 
     Args:
         table_names (list[str]): The names of the tables to include in the prompt.
         user_question (str): The user's question to be answered by the generated SQL query.
+        include_topN (bool, optional): Include the topN for string columns with the table schema. Defaults to True.
+        template (str, optional): The template key for the type of prompt to use. Defaults to "original".
 
     Returns:
         ChatManager: A ChatManager object containing the system and user messages needed to prompt ChatGPT for an SQL query.
     """
     chat_manager = ChatManager()
-    chat_manager.add_message("system", build_chatgpt_system_ask_prompt(table_names))
+    chat_manager.add_message(
+        "system", build_chatgpt_system_ask_prompt(table_names, include_topN=include_topN, template=template)
+    )
     chat_manager.add_message("user", user_question)
     return chat_manager
 

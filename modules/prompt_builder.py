@@ -99,12 +99,15 @@ Only output a SQL query and nothing else.""",
 }
 
 
-def build_chatgpt_system_ask_prompt(table_names: list[str], template: str = "original") -> str:
+def build_chatgpt_system_ask_prompt(
+    table_names: list[str], include_topN: bool = True, template: str = "original"
+) -> str:
     """
     Constructs a system prompt for ChatGPT to generate an SQL query based on the given table names and template.
 
     Args:
         table_names (list[str]): A list of table names to include in the prompt.
+        include_topN (bool, optional): Include the topN for string columns with the table schema. Defaults to True.
         template (str, optional): The template key for the type of prompt to use. Defaults to "original".
 
     Returns:
@@ -118,6 +121,12 @@ def build_chatgpt_system_ask_prompt(table_names: list[str], template: str = "ori
             SCHEMA_PROMPT_TEMPLATES.get(template, SCHEMA_PROMPT_TEMPLATES.get("original") or ""),
         )
         system_prompt.add_part(f"{table_name}-schema", db.get_table_schema(table_name))
+        if include_topN:
+            top_k_dict = db.get_top_k_vals_for_str_cols(table_name)
+            system_prompt.add_part(
+                f"{table_name}-topN",
+                "\n".join([f"Example {col} values: {','.join(vals)}" for col, vals in top_k_dict.items()]),
+            )
     system_prompt.add_part(
         "instruction", INSTRUCTION_PROMPT_TEMPLATES.get(template, INSTRUCTION_PROMPT_TEMPLATES.get("original") or "")
     )
