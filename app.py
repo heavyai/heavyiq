@@ -23,8 +23,51 @@ def build_chatgpt_system_ask_prompt(table_name: str) -> str:
     system_prompt.add_part("schema", db.get_table_schema(table_name))
     system_prompt.add_part(
         "instruction",
-        """Translate the following instruction into a SQL query on this table. Strong preference to return a single row with the answer. Exclude null values from the results. Do not use reserved SQL keywords as aliases.
+        """Translate the following instruction into a SQL query on this table. Moderate preference to return a single row with the answer. Exclude null values from the results. Do not use reserved SQL keywords as aliases.
 Only output a SQL query and nothing else.""",
+    )
+    return system_prompt.build()
+
+
+# alternate prompt suggested by GPT-4
+def build_chatgpt_system_ask_prompt_summarized_guidelines(table_name: str) -> str:
+    system_prompt = PromptBuilder()
+    system_prompt.add_part(
+        "intro", f"A SQL table named {table_name} is stored in the database with the following schema:"
+    )
+    system_prompt.add_part("schema", db.get_table_schema(table_name))
+    system_prompt.add_part(
+        "instruction",
+        """Translate the following instruction into a SQL query on this table. Return a single row with the answer if possible, exclude null values, and avoid reserved SQL keywords as aliases. Only output a SQL query and nothing else.""",
+    )
+    return system_prompt.build()
+
+
+# alternate prompt suggested by GPT-4
+def build_chatgpt_system_ask_prompt_added_context(table_name: str) -> str:
+    system_prompt = PromptBuilder()
+    system_prompt.add_part(
+        "intro",
+        f"As a language model, your task is to translate natural language instructions into SQL queries using the {table_name} table in the database. The table has the following schema:",
+    )
+    system_prompt.add_part("schema", db.get_table_schema(table_name))
+    system_prompt.add_part(
+        "instruction",
+        """Given a specific instruction, create an SQL query on this table, with a moderate preference for a single row answer. Exclude null values from the results and avoid using reserved SQL keywords as aliases. Only output a SQL query and nothing else.""",
+    )
+    return system_prompt.build()
+
+
+# alternate prompt suggested by GPT-4
+def build_chatgpt_system_ask_prompt_with_examples(table_name: str) -> str:
+    system_prompt = PromptBuilder()
+    system_prompt.add_part(
+        "intro", f"A SQL table named {table_name} is stored in the database with the following schema:"
+    )
+    system_prompt.add_part("schema", db.get_table_schema(table_name))
+    system_prompt.add_part(
+        "instruction",
+        """Translate natural language instructions into SQL queries on this table (e.g., "Find the population of a country given its name."). Return a single row with the answer if possible, exclude null values, and avoid reserved SQL keywords as aliases. Only output a SQL query and nothing else.""",
     )
     return system_prompt.build()
 
