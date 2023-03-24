@@ -24,7 +24,7 @@
       {% endfor %}
     </select>
     <textarea type="text" name="user_question" placeholder="Enter a question about the selected dataset"
-      required></textarea>
+      required>{{ user_question }}</textarea>
     <input type="submit" value="Ask HeavyNL" />
   </form>
   {% if answer %}

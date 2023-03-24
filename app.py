@@ -39,6 +39,7 @@ def index() -> ResponseReturnValue:
                     sql=sql_statement,
                     selected_table_name1=table_name1,
                     selected_table_name2=table_name2,
+                    user_question=user_question,
                 )
             )
         except openai.InvalidRequestError as error:
@@ -55,4 +56,5 @@ def index() -> ResponseReturnValue:
         tables=tables,
         selected_table_name1=request.args.get("selected_table_name1"),
         selected_table_name2=request.args.get("selected_table_name2"),
+        user_question=request.args.get("user_question"),
     )
