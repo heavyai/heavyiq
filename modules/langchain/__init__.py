@@ -1,1 +1,1 @@
-from .heavydb import HeavyDB
+from modules.langchain.heavydb import HeavyDB
