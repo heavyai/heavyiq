@@ -110,8 +110,7 @@ class Query(Resource):
         # TODO db_session_id = args["session_id"]
         logger.info("Request Received")
         logger.info(f"Table(s): {', '.join(tables)}")
-        # template options: original, summarized_guidelines, given_instruction, with_examples, added_context
-        ask_manager = build_ask_manager(tables, question, include_topN=True, template="original")
+        ask_manager = build_ask_manager(tables, question, include_topN=True)
         logger.info("Built Ask Manager")
         sql_statement = extract_sql_from_response(ask_manager.prompt_ai())
         try:
@@ -137,7 +136,7 @@ class Question(Resource):
         logger.info("Request Received")
         logger.info(f"Table(s): {', '.join(tables)}")
         # template options: original, summarized_guidelines, given_instruction, with_examples, added_context
-        ask_manager = build_ask_manager(tables, question, include_topN=True, template="original")
+        ask_manager = build_ask_manager(tables, question, include_topN=True)
         logger.info("Built Ask Manager")
         sql_statement = extract_sql_from_response(ask_manager.prompt_ai())
         try:
