@@ -3,17 +3,19 @@ import os
 from typing import Optional, Any, Iterable, TYPE_CHECKING
 
 from heavyai import connect
+from dotenv import load_dotenv
 
 if TYPE_CHECKING:
     from heavyai import Connection
     from heavydb._parsers import ColumnDetails
+
+load_dotenv()
 
 heavydb_host = os.getenv("HEAVYDB_HOST")
 heavydb_port = os.getenv("HEAVYDB_PORT")
 heavydb_dbname = os.getenv("HEAVYDB_DBNAME")
 heavydb_username = os.getenv("HEAVYDB_USERNAME")
 heavydb_password = os.getenv("HEAVYDB_PASSWORD")
-heavydb_protocol = os.getenv("HEAVYDB_PROTOCOL")
 
 
 class HeavyDB:
@@ -75,16 +77,13 @@ class HeavyDB:
             host=heavydb_host,
             port=heavydb_port,
             dbname=heavydb_dbname,
-            protocol=heavydb_protocol,
         )
         return cls(conn, **kwargs)
 
     @classmethod
     def from_session(cls: type[HeavyDB], session_id: str, **kwargs: Any) -> HeavyDB:
         """Create a database connection from a session id."""
-        conn: Connection = connect(
-            sessionid=session_id, host=heavydb_host, port=heavydb_port, dbname=heavydb_dbname, protocol=heavydb_protocol
-        )
+        conn: Connection = connect(sessionid=session_id, host=heavydb_host, port=heavydb_port, dbname=heavydb_dbname)
         return cls(conn, **kwargs)
 
     @classmethod
@@ -96,7 +95,6 @@ class HeavyDB:
             host=heavydb_host,
             port=heavydb_port,
             dbname=heavydb_dbname,
-            protocol=heavydb_protocol,
         )
         return cls(conn, **kwargs)
 

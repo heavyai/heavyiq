@@ -71,9 +71,9 @@ class ListHeavyDBTool(BaseHeavyDBTool, BaseTool):
     Input to this tool is nothing, output is a list of tables in the database.
     """
 
-    def _run(self) -> str:
+    def _run(self, _: str) -> str:
         """Get the list of tables in the database."""
-        return self.db.get_table_info_no_throw()
+        return self.db.get_table_names()
 
     async def _arun(self) -> str:
         raise NotImplementedError("ListSqlDbTool does not support async")
