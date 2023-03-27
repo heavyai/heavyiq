@@ -1,4 +1,4 @@
-"""SQL agent."""
+"""HeavyDB agent."""
 from typing import Any, Optional
 
 from langchain.agents.agent import AgentExecutor
