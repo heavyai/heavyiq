@@ -128,6 +128,10 @@ class HeavyDB:
         res += ");\n"
         return res
 
+    def validate_query(self, query: str) -> list:
+        """Validate a query."""
+        return self._conn._client.sql_validate(self._conn._session, query)
+
     def get_table_info(self, table_names: Optional[list[str]] = None) -> str:
         """Get information about specified tables.
         Follows best practices as specified in: Rajkumar et al, 2022
