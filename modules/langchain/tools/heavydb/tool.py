@@ -34,7 +34,11 @@ class QueryHeavyDBTool(BaseHeavyDBTool, BaseTool):
 
     def _run(self, query: str) -> str:
         """Execute the query, return the results or an error message."""
-        return self.db.run_no_throw(query)
+        try:
+            self.db.validate_query(query)  # validate the query before running it
+            return self.db.run_no_throw(query)
+        except Exception as e:
+            return f"Error: {e}"
 
     async def _arun(self, query: str) -> str:
         raise NotImplementedError("QueryHeavyDBTool does not support async")
