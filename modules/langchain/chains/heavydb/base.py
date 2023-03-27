@@ -1,15 +1,14 @@
 """Chain for interacting with HeavyDB Database."""
 from __future__ import annotations
-
 from typing import Any
-
-from pydantic import BaseModel, Extra, Field
 
 from langchain.chains.base import Chain
 from langchain.chains.llm import LLMChain
 from langchain.chains.sql_database.prompt import DECIDER_PROMPT, PROMPT
 from langchain.prompts.base import BasePromptTemplate
 from langchain.schema import BaseLanguageModel
+from pydantic import BaseModel, Extra, Field
+
 from modules.langchain.heavydb import HeavyDB
 
 
