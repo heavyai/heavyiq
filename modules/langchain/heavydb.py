@@ -16,7 +16,7 @@ heavydb_password = os.getenv("HEAVYDB_PASSWORD")
 heavydb_protocol = os.getenv("HEAVYDB_PROTOCOL")
 
 
-class SQLDatabase:
+class HeavyDB:
     """A heavydb database connection."""
 
     def __init__(
@@ -62,12 +62,12 @@ class SQLDatabase:
             )
 
     @classmethod
-    def from_uri(cls, database_uri: str, **kwargs: Any) -> SQLDatabase:
+    def from_uri(cls: type[HeavyDB], database_uri: str, **kwargs: Any) -> HeavyDB:
         """Create a database connection from a database URI."""
         return cls(connect(database_uri), **kwargs)
 
     @classmethod
-    def from_env(cls, **kwargs: Any) -> SQLDatabase:
+    def from_env(cls: type[HeavyDB], **kwargs: Any) -> HeavyDB:
         """Create a database connection from environment variables."""
         conn: Connection = connect(
             user=heavydb_username,
@@ -80,7 +80,7 @@ class SQLDatabase:
         return cls(conn, **kwargs)
 
     @classmethod
-    def from_session(cls, session_id: str, **kwargs: Any) -> SQLDatabase:
+    def from_session(cls: type[HeavyDB], session_id: str, **kwargs: Any) -> HeavyDB:
         """Create a database connection from a session id."""
         conn: Connection = connect(
             sessionid=session_id, host=heavydb_host, port=heavydb_port, dbname=heavydb_dbname, protocol=heavydb_protocol
@@ -88,7 +88,7 @@ class SQLDatabase:
         return cls(conn, **kwargs)
 
     @classmethod
-    def from_creds(cls, username: str, password: str, **kwargs: Any) -> SQLDatabase:
+    def from_creds(cls: type[HeavyDB], username: str, password: str, **kwargs: Any) -> HeavyDB:
         """Create a database connection from username and password."""
         conn: Connection = connect(
             user=username,
@@ -103,7 +103,7 @@ class SQLDatabase:
     @property
     def dialect(self) -> str:
         """Return string representation of dialect to use."""
-        return "ANSI"
+        return "ANSI SQL"
 
     def get_table_names(self) -> Iterable[str]:
         """Get names of tables available."""
