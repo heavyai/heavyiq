@@ -18,6 +18,6 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           # Optional
           LANGUAGE: English
-          MODEL:
+          MODEL: gpt-3.5-turbo
           top_p: 1
           temperature: 1
