@@ -11,16 +11,8 @@ load_dotenv()
 
 if __name__ == "__main__":
     llm = OpenAI(model_name="text-davinci-003", client=None)
-    db = HeavyDB.from_env(
-        ignore_tables=[
-            "multilinestring_test2",
-            "Multiline_import",
-            "Multiline",
-            "linestrings",
-            "Multiline_7_0_restore",
-            "Multiline_append",
-        ]
-    )
+    db = HeavyDB.from_env(ignore_tables=[], include_tables=None)
+    print("connected to HeavyDB")
     toolkit = HeavyDBToolkit(db=db)
     agent = create_heavydb_agent(llm, toolkit, verbose=True)
 
