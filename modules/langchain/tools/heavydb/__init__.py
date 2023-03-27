@@ -1,1 +1,1 @@
-"""Tools for interacting with a HeavyDB Database"""
+"""Tools for interacting with a HeavyDB Database."""
