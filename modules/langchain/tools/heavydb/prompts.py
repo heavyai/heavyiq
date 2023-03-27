@@ -10,5 +10,6 @@ Double check the {dialect} query above for common mistakes, including:
 - Using the correct number of arguments for functions
 - Casting to the correct data type
 - Using the proper columns for joins
+- Do not change single-quotes to double-quotes
 
 If there are any of the above mistakes, rewrite the query. If there are no mistakes, just reproduce the original query."""

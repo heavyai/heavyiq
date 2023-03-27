@@ -30,6 +30,7 @@ class QueryHeavyDBTool(BaseHeavyDBTool, BaseTool):
     Input to this tool is a detailed and correct SQL query, output is a result from the database.
     If the query is not correct, an error message will be returned.
     If an error is returned, rewrite the query, check the query, and try again.
+    Make sure you know the schema of the tables you are querying by calling schema_sql_db first!
     """
 
     def _run(self, query: str) -> str:
@@ -53,6 +54,7 @@ class InfoHeavyDBTool(BaseHeavyDBTool, BaseTool):
     Be sure that the tables actually exist by calling list_tables_sql_db first!
 
     Example Input: "table1, table2, table3"
+    Do not include single quotes in the table names.
     """
 
     def _run(self, table_names: str) -> str:
