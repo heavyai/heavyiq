@@ -107,7 +107,6 @@ class Query(Resource):
         args = table_question_parser.parse_args()
         tables = args["tables"]
         question = args["question"]
-
         # TODO db_session_id = args["session_id"]
         logger.info("Request Received")
         logger.info(f"Table(s): {', '.join(tables)}")
@@ -133,7 +132,6 @@ class Question(Resource):
         args = table_question_parser.parse_args()
         tables = args["tables"]
         question = args["question"]
-
         # TODO db_session_id = args["session_id"]
         logger.info("Request Received")
         logger.info(f"Table(s): {', '.join(tables)}")
