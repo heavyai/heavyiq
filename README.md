@@ -1,4 +1,4 @@
-# HeavyNL - Natural Language Interface for SQL Databases
+# HeavyNL - Natural Language Interface for HeavyDB
 
 HeavyNL is a python module that serves as a natural language interface to interact with HeavyDB. The application uses [LangChain](https://python.langchain.com/en/latest/index.html) and Large Language Models to process user’s natural language questions and provide corresponding answers based on the data in the database. The module provides a simple REST API for querying the database using natural language questions.
 The application also provides a CLI interface for quick interactions with the HeavyNL agent.
