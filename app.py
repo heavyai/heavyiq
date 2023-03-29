@@ -141,12 +141,12 @@ class Query(Resource):
             args = table_question_parser.parse_args()
             tables = args["tables"]
             question = args["question"]
-            # db_session_id = args["session_id"]
+            db_session_id = args["session_id"]
             logger.info("Request Received")
             logger.info(f"Table(s): {', '.join(tables)}")
             llm = build_llm()
-            # db = HeavyDB.from_session(db_session_id, include_tables=tables)
-            db = HeavyDB.from_env(include_tables=tables)
+            db = HeavyDB.from_session(db_session_id, include_tables=tables)
+            # db = HeavyDB.from_env(include_tables=tables)
             chain = NLtoSQLChain(llm=llm, database=db, verbose=True)
             res = chain(question)
             return {"sql": res[chain.output_key]}, 200
@@ -173,12 +173,12 @@ class Question(Resource):
             args = table_question_parser.parse_args()
             tables = args["tables"]
             question = args["question"]
-            # db_session_id = args["session_id"]
+            db_session_id = args["session_id"]
             logger.info("Request Received")
             logger.info(f"Table(s): {', '.join(tables)}")
             llm = build_llm()
-            # db = HeavyDB.from_session(db_session_id, include_tables=tables)
-            db = HeavyDB.from_env(include_tables=tables)
+            db = HeavyDB.from_session(db_session_id, include_tables=tables)
+            # db = HeavyDB.from_env(include_tables=tables)
             chain = NLtoAnswerChain(llm=llm, database=db, verbose=True)
             res = chain(question)
             return {"answer": res[chain.output_answer_key], "sql": res[chain.output_sql_key]}, 200
