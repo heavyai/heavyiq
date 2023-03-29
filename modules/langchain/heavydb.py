@@ -26,7 +26,7 @@ class HeavyDB:
         conn: Connection,
         ignore_tables: Optional[list[str]] = None,
         include_tables: Optional[list[str]] = None,
-        sample_rows_in_table_info: int = 3,
+        sample_rows_in_table_info: int = 2,
         custom_table_info: Optional[dict[str, str]] = None,
     ):
         if include_tables and ignore_tables:

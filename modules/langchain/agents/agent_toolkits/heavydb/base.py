@@ -7,13 +7,14 @@ from langchain.agents.mrkl.prompt import FORMAT_INSTRUCTIONS
 from langchain.callbacks.base import BaseCallbackManager
 from langchain.chains.llm import LLMChain
 from langchain.llms.base import BaseLLM
+from langchain.chat_models.base import BaseChatModel
 
 from modules.langchain.agents.agent_toolkits.heavydb.toolkit import HeavyDBToolkit
 from modules.langchain.agents.agent_toolkits.heavydb.prompts import SQL_PREFIX, SQL_SUFFIX
 
 
 def create_heavydb_agent(
-    llm: BaseLLM,
+    llm: BaseLLM | BaseChatModel,
     toolkit: HeavyDBToolkit,
     callback_manager: Optional[BaseCallbackManager] = None,
     prefix: str = SQL_PREFIX,

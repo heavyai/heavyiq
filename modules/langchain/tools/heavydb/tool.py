@@ -53,12 +53,14 @@ class InfoHeavyDBTool(BaseHeavyDBTool, BaseTool):
     Input to this tool is a comma-separated list of tables, output is the schema and sample rows for those tables.
     Be sure that the tables actually exist by calling list_tables_sql_db first!
 
-    Example Input: "table1, table2, table3"
+    Example Input: table1, table2, table3
     Do not include single quotes in the table names.
     """
 
     def _run(self, table_names: str) -> str:
         """Get the schema for tables in a comma-separated list."""
+        if "'" in table_names:
+            return "Error: table names cannot contain single quotes"
         return self.db.get_table_info_no_throw(table_names.split(", "))
 
     async def _arun(self, table_name: str) -> str:
