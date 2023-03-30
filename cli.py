@@ -46,7 +46,7 @@ def main(
 ):
     llm: ChatOpenAI | OpenAI
     if model.startswith("gpt-3.5") or model.startswith("gpt-4"):
-        llm = ChatOpenAI(model_name=model, client=None, n=n, max_retries=max_retries)
+        llm = ChatOpenAI(model_name=model, client=None, n=n, max_retries=max_retries, temperature=temperature)
     else:
         llm = OpenAI(
             model_name=model,

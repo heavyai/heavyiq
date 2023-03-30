@@ -27,7 +27,9 @@ class QueryHeavyDBTool(BaseHeavyDBTool, BaseTool):
 
     name = "query_sql_db"
     description = """
-    This tool is designed for querying a HeavyDB database. Ensure that you are familiar with the schema of the tables you intend to query. Use the schema_sql_db tool to obtain table schemas.
+    DO NOT USE THIS TOOL UNLESS YOU KNOW THE SCHEMA OF EACH TABLE YOU ARE QUERYING.
+    Use the schema_sql_db tool to obtain table schemas.
+    This tool is designed for querying a HeavyDB database.
 
     Provide a valid and accurate SQL query as input. The output will be the result from the database. Remember to apply a limit to your query.
     In case the query is incorrect, an error message will be returned. If this occurs, revise the query, verify it, and try again.
@@ -95,7 +97,7 @@ class CanQuestionBeAnsweredHeavyDBTool(BaseHeavyDBTool, BaseTool):
     """
 
     def _run(self, question: str) -> str:
-        query = f"Can information about the following prompt potentially be found in the database? If so which tables should be checked?: {question}"
+        query = f"Can information about the following prompt potentially be found in the database? If so which tables should be checked and or joined?: {question}"
         res = heavydb_index.query(query)
         return res
 
