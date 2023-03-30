@@ -27,13 +27,11 @@ class QueryHeavyDBTool(BaseHeavyDBTool, BaseTool):
 
     name = "query_sql_db"
     description = """
-    You MAY NOT use this tool unless you know the schema of the tables you are querying. Use the schema_sql_db tool to get table schemas.
+    This tool is designed for querying a HeavyDB database. Ensure that you are familiar with the schema of the tables you intend to query. Use the schema_sql_db tool to obtain table schemas.
 
-    Input to this tool is a detailed and correct SQL query, output is a result from the database.
-    Don't forget to apply a limit to your query.
-    If the query is not correct, an error message will be returned.
-    If an error is returned, rewrite the query, check the query, and try again.
-    Do not use this tool unless you know the table schemas.
+    Provide a valid and accurate SQL query as input. The output will be the result from the database. Remember to apply a limit to your query.
+    In case the query is incorrect, an error message will be returned. If this occurs, revise the query, verify it, and try again.
+    Only use this tool if you are knowledgeable about the table schemas.
     """
 
     def _run(self, query: str) -> str:
@@ -53,10 +51,10 @@ class InfoHeavyDBTool(BaseHeavyDBTool, BaseTool):
 
     name = "schema_sql_db"
     description = """
-    Input to this tool is a comma-separated list of tables, output is the schema and sample rows for those tables.
+    Provide a comma-separated list of tables as input, and this tool will output the schema and sample rows for those tables.
 
     Example Input: table1, table2, table3
-    Do not include single quotes in the table names.
+    Refrain from including single quotes in the table names.
     """
 
     def _run(self, table_names: str) -> str:
@@ -90,11 +88,10 @@ class CanQuestionBeAnsweredHeavyDBTool(BaseHeavyDBTool, BaseTool):
 
     name = "can_question_be_answered_sql_db"
     description = """
-    Use this tool first to determine if a question can be answered. If it can, you may continue to list_relevant_tables_sql_db.
+    Use this tool to determine if a question can be answered. If the question can be answered, you may proceed to list_relevant_tables_sql_db.
 
-    Input to this tool is a question.
-    Output is if the question can be answered. If the response contains table names, you can skip list_relevant_tables_sql_db.
-    If the question cannot be answered, do not run list_relevant_tables_sql_db. You can not answer the question. Do not try. Do not continue.
+    Provide a question as input. The output will indicate if the question can be answered. If table names are included in the response, you can skip list_relevant_tables_sql_db.
+    If the question cannot be answered, do not run list_relevant_tables_sql_db. In this case, you cannot answer the question and should not continue.
     """
 
     def _run(self, question: str) -> str:
@@ -111,9 +108,8 @@ class ListRelevantTablesHeavyDBTool(BaseHeavyDBTool, BaseTool):
 
     name = "list_relevant_tables_sql_db"
     description = """
-    Did you run can_question_be_answered_sql_db first? If not, do that first.
-    Input to this tool is a question.
-    Output is if the question can be answered and a list of tables in the database that may contain relevant information.
+    Ensure you have run can_question_be_answered_sql_db before using this tool. If not, do that first.
+    Provide a question as input. The output will indicate if the question can be answered and provide a list of tables in the database that may contain relevant information.
     If the question cannot be answered, do not continue and state that the question cannot be answered.
     """
 
