@@ -127,7 +127,9 @@ class ListRelevantTablesHeavyDBTool(BaseHeavyDBTool, BaseTool):
         # question: what is the population of alabama
         # expected source: usa_states
         # provided source: US Census Bureau
-        res = heavydb_index.query_with_sources(question)
+        res = heavydb_index.query_with_sources(
+            f"Can information about the following prompt potentially be found in the database? If so which tables should be checked?: {question}"
+        )
         table_names = ", ".join(list(set(res["sources"].split(", "))))
         return f"Answer: {res['answer']}\nPotentially Relevant Tables: {table_names}"
 
