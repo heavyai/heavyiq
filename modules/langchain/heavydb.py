@@ -196,7 +196,6 @@ class HeavyDB:
             result = cursor.fetchone()
         else:
             raise ValueError("Fetch parameter must be either 'one' or 'all'")
-        print(str(result))
         return str(result)
 
     def get_table_info_no_throw(self, table_names: Optional[list[str]] = None) -> str:

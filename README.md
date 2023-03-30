@@ -26,6 +26,7 @@ $ . venv/bin/activate
 
 ```bash
 $ pip install -r requirements.txt
+# it may be necessary to `export HNSWLIB_NO_NATIVE=1` to install chromadb on Mac
 ```
 
 6. Make a copy of the example environment variables file:

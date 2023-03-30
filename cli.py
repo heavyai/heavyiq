@@ -12,7 +12,7 @@ load_dotenv()
 
 @click.command()
 @click.option("--model", default="text-davinci-003", help="Specify the model to use for the LLM.")
-@click.option("--temperature", default=0.2, type=float, help="What sampling temperature to use. (Chat: N/A)")
+@click.option("--temperature", default=0.0, type=float, help="What sampling temperature to use. (Chat: N/A)")
 @click.option(
     "--max-tokens",
     default=256,

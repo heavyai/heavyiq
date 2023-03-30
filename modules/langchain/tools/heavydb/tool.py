@@ -4,7 +4,7 @@ from langchain.prompts import PromptTemplate
 from langchain.tools.base import BaseTool
 from pydantic import BaseModel, Extra, Field, validator
 
-from modules.langchain import HeavyDB
+from modules.langchain import HeavyDB, heavydb_index
 from modules.langchain.tools.heavydb.prompts import QUERY_CHECKER
 
 
@@ -27,10 +27,13 @@ class QueryHeavyDBTool(BaseHeavyDBTool, BaseTool):
 
     name = "query_sql_db"
     description = """
+    You MAY NOT use this tool unless you know the schema of the tables you are querying. Use the schema_sql_db tool to get table schemas.
+
     Input to this tool is a detailed and correct SQL query, output is a result from the database.
+    Don't forget to apply a limit to your query.
     If the query is not correct, an error message will be returned.
     If an error is returned, rewrite the query, check the query, and try again.
-    Make sure you know the schema of the tables you are querying by calling schema_sql_db first!
+    Do not use this tool unless you know the table schemas.
     """
 
     def _run(self, query: str) -> str:
@@ -51,7 +54,6 @@ class InfoHeavyDBTool(BaseHeavyDBTool, BaseTool):
     name = "schema_sql_db"
     description = """
     Input to this tool is a comma-separated list of tables, output is the schema and sample rows for those tables.
-    Be sure that the tables actually exist by calling list_tables_sql_db first!
 
     Example Input: table1, table2, table3
     Do not include single quotes in the table names.
@@ -81,6 +83,56 @@ class ListHeavyDBTool(BaseHeavyDBTool, BaseTool):
 
     async def _arun(self) -> str:
         raise NotImplementedError("ListSqlDbTool does not support async")
+
+
+class CanQuestionBeAnsweredHeavyDBTool(BaseHeavyDBTool, BaseTool):
+    """Tool for using an index to check if a question can be answered in a HeavyDB database."""
+
+    name = "can_question_be_answered_sql_db"
+    description = """
+    Use this tool first to determine if a question can be answered. If it can, you may continue to list_relevant_tables_sql_db.
+
+    Input to this tool is a question.
+    Output is if the question can be answered. If the response contains table names, you can skip list_relevant_tables_sql_db.
+    If the question cannot be answered, do not run list_relevant_tables_sql_db. You can not answer the question. Do not try. Do not continue.
+    """
+
+    def _run(self, question: str) -> str:
+        query = f"Can information about the following prompt potentially be found in the database? If so which tables should be checked?: {question}"
+        res = heavydb_index.query(query)
+        return res
+
+    async def _arun(self) -> str:
+        raise NotImplementedError("CanQuestionBeAnsweredHeavyDBTool does not support async")
+
+
+class ListRelevantTablesHeavyDBTool(BaseHeavyDBTool, BaseTool):
+    """Tool for using an index to list relevant tables in a HeavyDB database."""
+
+    name = "list_relevant_tables_sql_db"
+    description = """
+    Did you run can_question_be_answered_sql_db first? If not, do that first.
+    Input to this tool is a question.
+    Output is if the question can be answered and a list of tables in the database that may contain relevant information.
+    If the question cannot be answered, do not continue and state that the question cannot be answered.
+    """
+
+    def _run(self, question: str) -> str:
+        # retriever = heavydb_index.vectorstore.as_retriever()
+        # docs = retriever.get_relevant_documents(question)
+        # table_names = ", ".join(list(set([doc.metadata["source"] for doc in docs])))
+        # return table_names
+
+        # the following tried to answer the question using sources found outside of HeavyDB
+        # question: what is the population of alabama
+        # expected source: usa_states
+        # provided source: US Census Bureau
+        res = heavydb_index.query_with_sources(question)
+        table_names = ", ".join(list(set(res["sources"].split(", "))))
+        return f"Answer: {res['answer']}\nPotentially Relevant Tables: {table_names}"
+
+    async def _arun(self) -> str:
+        raise NotImplementedError("ListRelevantTablesHeavyDBTool does not support async")
 
 
 # This may need to be adapted to check HeavyDB's specific SQL dialect
