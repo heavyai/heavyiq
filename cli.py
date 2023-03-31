@@ -65,7 +65,7 @@ def main(
     agent = create_heavydb_agent(llm, toolkit, verbose=True)
 
     print("asking question: ", question)
-    print(agent(question))
+    agent(question)
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ from modules.langchain.tools.heavydb.tool import (
     QueryHeavyDBTool,
     CanQuestionBeAnsweredHeavyDBTool,
     ListRelevantTablesHeavyDBTool,
+    QueryHeavyDBSchemaTool,
 )
 
 
@@ -30,8 +31,8 @@ class HeavyDBToolkit(BaseToolkit):
     def get_tools(self) -> list[BaseTool]:
         """Get the tools in the toolkit."""
         return [
-            CanQuestionBeAnsweredHeavyDBTool(db=self.db),
             QueryHeavyDBTool(db=self.db),
             InfoHeavyDBTool(db=self.db),
             ListRelevantTablesHeavyDBTool(db=self.db),
+            QueryHeavyDBSchemaTool(db=self.db),
         ]

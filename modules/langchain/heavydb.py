@@ -63,6 +63,9 @@ class HeavyDB:
                 (table, self._custom_table_info[table]) for table in self._custom_table_info if table in intersection
             )
 
+    def __del__(self):
+        self._conn.close()
+
     @classmethod
     def from_uri(cls: type[HeavyDB], database_uri: str, **kwargs: Any) -> HeavyDB:
         """Create a database connection from a database URI."""
@@ -158,7 +161,7 @@ class HeavyDB:
                 command = f"SELECT * FROM {table} LIMIT {self._sample_rows_in_table_info}"
 
                 # save the columns in string format
-                columns_str = "\t".join([col.name for col in self.get_table_details(table)])
+                columns_str = ",".join([col.name for col in self.get_table_details(table)])
 
                 # get the sample rows
                 sample_rows = self._conn.execute(command)
@@ -166,7 +169,7 @@ class HeavyDB:
                 sample_rows = list(map(lambda ls: [str(i)[:100] for i in ls], sample_rows))
 
                 # save the sample rows in string format
-                sample_rows_str = "\n".join(["\t".join(row) for row in sample_rows])
+                sample_rows_str = "\n".join([",".join(row) for row in sample_rows])
 
                 table_info = (
                     f"{table_schema.rstrip()}\n"

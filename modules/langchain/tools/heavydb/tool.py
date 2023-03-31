@@ -22,6 +22,27 @@ class BaseHeavyDBTool(BaseModel):
         extra = Extra.forbid
 
 
+class QueryHeavyDBSchemaTool(BaseHeavyDBTool, BaseTool):
+    """Tool for quering an index for a HeavyDB database."""
+
+    name = "query_sql_db_index"
+    description = """
+    Use this tool to query an index for a HeavyDB database.
+
+    The input is a prompt that will be handled by a LLM with access to a HeavyDB index that contains schemas, sample rows, and summaries of each table in the database.
+    Prepare a prompt that the LLM can use to fetch the information you require to complete your objective.
+    The output will be the result from the LLM responding to the prompt you provide.
+
+    Example prompt: "Which tables contain information about [topic]?"
+    """
+
+    def _run(self, prompt: str) -> str:
+        return heavydb_index.query(prompt)
+
+    async def _arun(self, prompt: str) -> str:
+        raise NotImplementedError("QueryHeavyDBSchemaTool does not support async")
+
+
 class QueryHeavyDBTool(BaseHeavyDBTool, BaseTool):
     """Tool for querying a HeavyDB database."""
 
@@ -63,7 +84,7 @@ class InfoHeavyDBTool(BaseHeavyDBTool, BaseTool):
         """Get the schema for tables in a comma-separated list."""
         if "'" in table_names:
             return "Error: table names cannot contain single quotes"
-        return self.db.get_table_info_no_throw(table_names.split(", "))
+        return self.db.get_table_info_no_throw(table_names.strip().split(", "))
 
     async def _arun(self, table_name: str) -> str:
         raise NotImplementedError("SchemaSqlDbTool does not support async")
@@ -92,7 +113,7 @@ class CanQuestionBeAnsweredHeavyDBTool(BaseHeavyDBTool, BaseTool):
     description = """
     Use this tool to determine if a question can be answered. If the question can be answered, you may proceed to list_relevant_tables_sql_db.
 
-    Provide a question as input. The output will indicate if the question can be answered. If table names are included in the response, you can skip list_relevant_tables_sql_db.
+    Provide a question as input. The output will indicate if the question can be answered. If table names are included in the response, you can skip list_relevant_tables_sql_db and move on to schema_sql_db.
     If the question cannot be answered, do not run list_relevant_tables_sql_db. In this case, you cannot answer the question and should not continue.
     """
 
