@@ -16,9 +16,11 @@ class NLtoSQLChain(Chain, BaseModel):
     """
     Chain for converting a natural language query to a SQL query.
 
-    Note: You can restrict the tables that are used by either:
+    Note: You can and should restrict the tables that are used by either:
         1. Passing in a list of table names to use in the `table_names_to_use` input key.
         2. Setting the `database` attribute to a HeavyDB object with the `include_tables` or `ignore_tables` attribute set.
+
+        If you do not restrict the tables you risk exceeding the token limit of the LLM.
     """
 
     llm: BaseLanguageModel
@@ -106,6 +108,8 @@ class NLtoAnswerChain(Chain, BaseModel):
     Note: You can restrict the tables that are used by either:
         1. Passing in a list of table names to use in the `table_names_to_use` input key.
         2. Setting the `database` attribute to a HeavyDB object with the `include_tables` or `ignore_tables` attribute set.
+
+        If you do not restrict the tables you risk exceeding the token limit of the LLM.
     """
 
     llm: BaseLanguageModel
