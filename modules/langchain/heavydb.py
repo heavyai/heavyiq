@@ -64,7 +64,10 @@ class HeavyDB:
             )
 
     def __del__(self):
-        self._conn.close()
+        try:
+            self._conn.close()
+        except Exception as e:
+            print(f"Error: {e}")
 
     @classmethod
     def from_uri(cls: type[HeavyDB], database_uri: str, **kwargs: Any) -> HeavyDB:
