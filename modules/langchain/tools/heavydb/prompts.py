@@ -3,7 +3,7 @@ QUERY_CHECKER = """
 
 Double check the {dialect} query above for common mistakes, including:
 - Using NOT IN with NULL values
-- Using UNION when UNION ALL should have been used
+- Always use UNION ALL instead of UNION
 - Using BETWEEN for exclusive ranges
 - Data type mismatch in predicates
 - Properly quoting identifiers

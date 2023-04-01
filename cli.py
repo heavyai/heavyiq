@@ -1,7 +1,8 @@
 import click
 from dotenv import load_dotenv
-from langchain.llms import OpenAI
+from langchain.callbacks import get_openai_callback
 from langchain.chat_models import ChatOpenAI
+from langchain.llms import OpenAI
 
 from modules.langchain.heavydb import HeavyDB
 from modules.langchain.agents.agent_toolkits.heavydb.base import create_heavydb_agent
@@ -12,7 +13,7 @@ load_dotenv()
 
 @click.command()
 @click.option("--model", default="text-davinci-003", help="Specify the model to use for the LLM.")
-@click.option("--temperature", default=0.2, type=float, help="What sampling temperature to use. (Chat: N/A)")
+@click.option("--temperature", default=0.0, type=float, help="What sampling temperature to use.")
 @click.option(
     "--max-tokens",
     default=256,
@@ -46,7 +47,7 @@ def main(
 ):
     llm: ChatOpenAI | OpenAI
     if model.startswith("gpt-3.5") or model.startswith("gpt-4"):
-        llm = ChatOpenAI(model_name=model, client=None, n=n, max_retries=max_retries)
+        llm = ChatOpenAI(model_name=model, client=None, n=n, max_retries=max_retries, temperature=temperature)
     else:
         llm = OpenAI(
             model_name=model,
@@ -65,7 +66,13 @@ def main(
     agent = create_heavydb_agent(llm, toolkit, verbose=True)
 
     print("asking question: ", question)
-    print(agent(question))
+    with get_openai_callback() as cb:
+        answer = agent(question)
+        print(f"Question: {question}")
+        print(f"Answer: {answer}")
+        print(f"Prompt Tokens: {cb.prompt_tokens}")
+        print(f"Completion Tokens: {cb.completion_tokens}")
+        print(f"Total Tokens: {cb.total_tokens}")
 
 
 if __name__ == "__main__":
