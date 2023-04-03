@@ -8,8 +8,9 @@ Flask==2.2.3
 Flask-Cors==3.0.10
 flask-restx==1.1.0
 heavyai==1.1.0
-langchain==0.0.128
+langchain==0.0.129
 mypy==1.1.1
 openai==0.27.2
 pydantic==1.10.7
 python-dotenv==1.0.0
+sentence_transformers==2.2.2
