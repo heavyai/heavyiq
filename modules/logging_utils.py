@@ -1,10 +1,6 @@
 from __future__ import annotations
 import logging
-from typing import TYPE_CHECKING
 import sys
-
-if TYPE_CHECKING:
-    from modules.chat_interaction import ChatManager
 
 
 def create_custom_logger(name: str) -> logging.Logger:
@@ -33,17 +29,3 @@ def create_custom_logger(name: str) -> logging.Logger:
 
 
 default_logger = create_custom_logger("heavynl")
-
-
-def log_chat_conversation(chat_manager: ChatManager, logger: logging.Logger = default_logger):
-    """
-    Logs an entire chat conversation.
-
-    Args:
-        chat_manager (ChatManager): The ChatManager instance containing the chat conversation.
-        logger (logging.Logger): The logger to use for logging the conversation.
-    """
-    logger.info("==== Chat Conversation ====")
-    for message in chat_manager._messages:
-        logger.info(f"[{message.role}] {message.content}")
-    logger.info("============================")

@@ -2,6 +2,11 @@ from langchain.tools.base import BaseTool
 from pydantic import BaseModel, Extra, Field
 
 from modules.langchain import HeavyDB, heavydb_index
+from modules.langchain.templates.tools.heavydb import (
+    QueryHeavyDBSchemaToolDescription,
+    QueryHeavyDBToolDescription,
+    InfoHeavyDBToolDescription,
+)
 
 
 class BaseHeavyDBTool(BaseModel):
@@ -22,13 +27,7 @@ class QueryHeavyDBSchemaTool(BaseHeavyDBTool, BaseTool):
     """Tool for quering an index for a HeavyDB database."""
 
     name = "query_sql_db_index"
-    description = """
-    Use this tool to retrieve the schemas for a query.
-
-    The input is a prompt that will be handled by a LLM with access to a HeavyDB index that contains schemas, sample rows, and summaries of each table in the database.
-    Prepare a prompt that the LLM can use to fetch the information you require to complete your objective.
-    The output will be schemas for the tables that the LLM thinks are relevant to the prompt.
-    """
+    description = QueryHeavyDBSchemaToolDescription
 
     def _run(self, prompt: str) -> str:
         resp = heavydb_index.query(
@@ -47,21 +46,7 @@ class QueryHeavyDBTool(BaseHeavyDBTool, BaseTool):
     """Tool for querying a HeavyDB database."""
 
     name = "query_sql_db"
-    description = """
-    ONLY USE WITH KNOWN TABLE SCHEMAS. This tool is for querying HeavyDB databases.
-
-    Input an accurate SQL query for output. Apply query limits. If an error occurs, revise and retry. Be familiar with table schemas and avoid common mistakes, such as:
-
-    - NULL values with NOT IN
-    - Using UNION instead of UNION ALL
-    - BETWEEN for exclusive ranges
-    - Data type mismatch
-    - Incorrectly quoting identifiers
-    - Wrong number of arguments in functions
-    - Incorrect data type casting
-    - Improper join columns
-    - Reserved SQL keywords as aliases
-    """
+    description = QueryHeavyDBToolDescription
 
     def _run(self, query: str) -> str:
         """Execute the query, return the results or an error message."""
@@ -79,12 +64,7 @@ class InfoHeavyDBTool(BaseHeavyDBTool, BaseTool):
     """Tool for getting metadata about a HeavyDB database."""
 
     name = "schema_sql_db"
-    description = """
-    Provide a comma-separated list of tables as input, and this tool will output the schema and sample rows for those tables.
-
-    Example Input: table1, table2, table3
-    Refrain from including single quotes in the table names.
-    """
+    description = InfoHeavyDBToolDescription
 
     def _run(self, table_names: str) -> str:
         """Get the schema for tables in a comma-separated list."""
@@ -94,19 +74,3 @@ class InfoHeavyDBTool(BaseHeavyDBTool, BaseTool):
 
     async def _arun(self, table_name: str) -> str:
         raise NotImplementedError("SchemaSqlDbTool does not support async")
-
-
-class ListHeavyDBTool(BaseHeavyDBTool, BaseTool):
-    """Tool for listing tables in a HeavyDB database."""
-
-    name = "list_tables_sql_db"
-    description = """
-    Input to this tool is nothing, output is a list of tables in the database.
-    """
-
-    def _run(self, _: str) -> str:
-        """Get the list of tables in the database."""
-        return self.db.get_usable_table_names()
-
-    async def _arun(self) -> str:
-        raise NotImplementedError("ListSqlDbTool does not support async")
