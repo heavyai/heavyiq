@@ -31,12 +31,15 @@ class QueryHeavyDBSchemaTool(BaseHeavyDBTool, BaseTool):
 
     def _run(self, prompt: str) -> str:
         resp = heavydb_index.query(
-            f"Please return the relevant table names (comma separated) for the following query: {prompt}"
+            f"Please return the relevant table names (not titles, comma separated) for the following query: {prompt}"
         )
         table_names = resp.strip().split(", ")
-        if table_names == "I don't know.":
+        if table_names[0] == "I don't know.":
             return "No information found. Please revise your prompt if you wish to try again."
-        return self.db.get_table_info(table_names)
+        try:
+            return self.db.get_table_info(table_names)
+        except ValueError:
+            return "No information found. Please revise your prompt if you wish to try again."
 
     async def _arun(self, prompt: str) -> str:
         raise NotImplementedError("QueryHeavyDBSchemaTool does not support async")
