@@ -130,7 +130,8 @@ class HeavyDB:
     def get_table_schema(self, table: str) -> str:
         """Get the schema of a table."""
         create_command = f"SHOW CREATE TABLE {table};"
-        return self.run(create_command, fetch="one")
+        cursor = self._conn.execute(create_command)
+        return cursor.fetchone()[0]
 
     def validate_query(self, query: str) -> list:
         """Validate a query."""

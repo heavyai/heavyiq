@@ -2,6 +2,7 @@ import os
 
 from langchain.chat_models import ChatOpenAI
 from langchain.docstore.document import Document
+from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.indexes import VectorstoreIndexCreator
 from langchain.indexes.vectorstore import VectorStoreIndexWrapper
 from langchain.schema import HumanMessage, SystemMessage
@@ -13,10 +14,14 @@ from modules.langchain.heavydb import HeavyDB
 # Embed and store the texts
 # Supplying a persist_directory will store the embeddings on disk
 persist_directory = "db"
+huggingface_model_name = os.environ.get("HUGGINGFACE_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 
 
 def generate_embeddings(directory: str) -> VectorStore:
-    index_creator = VectorstoreIndexCreator(vectorstore_kwargs={"persist_directory": directory})
+    index_creator = VectorstoreIndexCreator(
+        vectorstore_kwargs={"persist_directory": directory},
+        embedding=HuggingFaceEmbeddings(model_name=huggingface_model_name),
+    )
 
     if os.path.exists(directory):
         print(f"Using persisted embeddings. Delete the '{directory}' folder and rerun to recompute embeddings.")
