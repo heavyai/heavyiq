@@ -9,7 +9,7 @@ from langchain.schema import BaseLanguageModel
 from pydantic import BaseModel, Extra, Field
 
 from modules.langchain.heavydb import HeavyDB
-from modules.langchain.chains.heavydb.prompts import NL_TO_SQL_PROMPT, NL_TO_SQL_ERROR_PROMPT, ANSWER_PROMPT
+from modules.langchain.templates.chains.heavydb import NL_TO_SQL_PROMPT, NL_TO_SQL_ERROR_PROMPT, ANSWER_PROMPT
 
 
 class NLtoSQLChain(Chain, BaseModel):
