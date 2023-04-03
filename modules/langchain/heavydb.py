@@ -1,4 +1,5 @@
 from __future__ import annotations
+from functools import lru_cache
 import os
 from typing import Optional, Any, Iterable, TYPE_CHECKING
 
@@ -109,7 +110,7 @@ class HeavyDB:
         """Return string representation of dialect to use."""
         return "ANSI SQL"
 
-    def get_table_names(self) -> Iterable[str]:
+    def get_usable_table_names(self) -> Iterable[str]:
         """Get names of tables available."""
         if self._include_tables:
             return self._include_tables
@@ -117,20 +118,19 @@ class HeavyDB:
 
     @property
     def table_info(self) -> str:
-        """Information about all tables in the database."""
+        """Information about all usable tables in the database."""
         return self.get_table_info()
 
-    def get_table_details(self, table: str) -> list[ColumnDetails]:
+    @lru_cache
+    def get_table_columns(self, table: str) -> list[ColumnDetails]:
         """Get details about the columns in a table."""
         return self._conn.get_table_details(table)
 
+    @lru_cache
     def get_table_schema(self, table: str) -> str:
         """Get the schema of a table."""
-        table_details: list[ColumnDetails] = self.get_table_details(table)
-        res = f"CREATE TABLE {table} (\n"
-        res += ",\n".join([f"{col.name} {col.type}" for col in table_details]) + "\n"
-        res += ");\n"
-        return res
+        create_command = f"SHOW CREATE TABLE {table};"
+        return self.run(create_command, fetch="one")
 
     def validate_query(self, query: str) -> list:
         """Validate a query."""
@@ -144,7 +144,7 @@ class HeavyDB:
         appended to each table description. This can increase performance as
         demonstrated in the paper.
         """
-        all_table_names = self.get_table_names()
+        all_table_names = self.get_usable_table_names()
         if table_names is not None:
             missing_tables = set(table_names).difference(all_table_names)
             if missing_tables:
@@ -164,7 +164,7 @@ class HeavyDB:
                 command = f"SELECT * FROM {table} LIMIT {self._sample_rows_in_table_info}"
 
                 # save the columns in string format
-                columns_str = ",".join([col.name for col in self.get_table_details(table)])
+                columns_str = ",".join([col.name for col in self.get_table_columns(table)])
 
                 # get the sample rows
                 sample_rows = self._conn.execute(command)
@@ -189,6 +189,10 @@ class HeavyDB:
 
         final_str = "\n\n".join(tables)
         return final_str
+
+    def get_single_table_info(self, table_name: str) -> str:
+        """Get table info for a single table."""
+        return self.get_table_info([table_name])
 
     def run(self, command: str, fetch: str = "all") -> str:
         """Execute a SQL command and return a string representing the results.

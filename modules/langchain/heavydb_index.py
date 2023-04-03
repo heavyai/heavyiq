@@ -27,11 +27,11 @@ def generate_embeddings(directory: str) -> VectorStore:
         llm = ChatOpenAI(model_name="gpt-4", client=None)
         docs = []
 
-        for table in heavydb.get_table_names():
+        for table in heavydb.get_usable_table_names():
             table_info = heavydb.get_table_info([table])
             messages = [
                 SystemMessage(
-                    content="You are a helpful assistant that takes SQL table schemas and sample data and generates a summary of the table contents. This information will be converted into embeddings for easy retrieval from a vectorstore. Do not summarize the sample data or give examples."
+                    content="With respect to the SQL table schema and sample rows provided, please create a comprehensive response encompassing the following aspects: \n\nTitle: Choose a concise and descriptive title reflecting the table's purpose.\nDescription: Write a brief yet informative summary of the table's purpose and primary functionality. Discuss any noteworthy constraints or unique features that set it apart.\nKeywords: Identify a set of essential keywords, including but not limited to column names or relationships that facilitate search, retrieval, and document indexing.\n\nUpon completion, evaluate the coherence, accuracy, and relevance of the generated response to ensure that it adheres to the requirements outlined above, maximizing its value and usefulness for search and retrieval tasks."
                 ),
                 HumanMessage(content=table_info),
             ]

@@ -5,7 +5,6 @@ from pydantic import Field
 
 from modules.langchain.heavydb import HeavyDB
 from modules.langchain.tools.heavydb.tool import (
-    InfoHeavyDBTool,
     QueryHeavyDBTool,
     QueryHeavyDBSchemaTool,
 )
@@ -30,6 +29,5 @@ class HeavyDBToolkit(BaseToolkit):
         """Get the tools in the toolkit."""
         return [
             QueryHeavyDBTool(db=self.db),
-            InfoHeavyDBTool(db=self.db),
             QueryHeavyDBSchemaTool(db=self.db),
         ]
