@@ -47,7 +47,7 @@ def generate_embeddings(directory: str) -> VectorStore:
         print(f"Using persisted embeddings. Delete the '{directory}' folder and rerun to recompute embeddings.")
         vectorstore = Chroma(embedding_function=index_creator.embedding, persist_directory=directory)
     else:
-        heavydb = HeavyDB.from_env(include_tables=["us_pois_safegraph", "usa_states"])
+        heavydb = HeavyDB.from_env()
         print("Computing embeddings. This may take a while...")
         docs = []
 
