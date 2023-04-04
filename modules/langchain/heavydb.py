@@ -1,6 +1,7 @@
 from __future__ import annotations
 from functools import lru_cache
 import os
+from threading import Lock
 from typing import Optional, Any, Iterable, TYPE_CHECKING
 
 from heavyai import connect
@@ -34,6 +35,7 @@ class HeavyDB:
             raise ValueError("Cannot specify both include_tables and ignore_tables")
 
         self._conn = conn
+        self.lock = Lock()
 
         self._all_tables = set(self._conn.get_tables())
         self._include_tables = set(include_tables) if include_tables else set()
