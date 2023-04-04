@@ -57,7 +57,6 @@ def generate_embeddings(directory: str) -> VectorStore:
         with ThreadPoolExecutor() as executor:
             docs = list(executor.map(process_func, table_names))
 
-        print(docs)
         sub_docs = index_creator.text_splitter.split_documents(docs)
         vectorstore = index_creator.vectorstore_cls.from_documents(
             sub_docs, index_creator.embedding, **index_creator.vectorstore_kwargs
