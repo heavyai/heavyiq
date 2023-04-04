@@ -1,9 +1,9 @@
 import click
 from dotenv import load_dotenv
-from langchain.callbacks import get_openai_callback
 from langchain.chat_models import ChatOpenAI
 from langchain.llms import OpenAI
 
+from modules.langchain.logging import log_agent_call
 from modules.langchain.heavydb import HeavyDB
 from modules.langchain.agents.agent_toolkits.heavydb.base import create_heavydb_agent
 from modules.langchain.agents.agent_toolkits.heavydb.toolkit import HeavyDBToolkit
@@ -64,17 +64,8 @@ def main(
     print("connected to HeavyDB")
     toolkit = HeavyDBToolkit(db=db)
     agent = create_heavydb_agent(llm, toolkit, verbose=True)
-
     print("asking question: ", question)
-    with get_openai_callback() as cb:
-        answer = agent(question)
-        print(f"Question: {question}")
-        print(f"Answer: {answer}")
-        print(f"Prompt Tokens: {cb.prompt_tokens}")
-        print(f"Completion Tokens: {cb.completion_tokens}")
-        print(f"Total Tokens: {cb.total_tokens}")
-        print(f"Successful Requests: {cb.successful_requests}")
-        print(f"Total Cost (USD): ${cb.total_cost}")
+    log_agent_call(agent, question, model)
 
 
 if __name__ == "__main__":

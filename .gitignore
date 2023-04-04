@@ -17,3 +17,4 @@ build/
 
 .env
 db/
+langchain_call_log.db
