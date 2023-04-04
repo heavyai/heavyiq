@@ -1,5 +1,4 @@
 from flask_restx import Resource
-from langchain.callbacks import get_openai_callback
 from langchain.chat_models import ChatOpenAI
 from langchain.llms import OpenAI
 
@@ -13,6 +12,7 @@ from modules.api.rest_models import (
 )
 from modules.langchain.heavydb import HeavyDB
 from modules.langchain.chains.heavydb.base import NLtoSQLChain, NLtoAnswerChain
+from modules.langchain.logging import log_chain_call
 from modules.logging_utils import default_logger as logger
 
 MODEL_NAME = "text-davinci-003"
@@ -36,9 +36,9 @@ class Query(Resource):
     @api.response(500, "Error", error_response_model)
     def post(self):
         try:
-            args = table_question_parser.parse_args()
-            tables = args["tables"]
-            question = args["question"]
+            request = table_question_parser.parse_args()
+            tables = request["tables"]
+            question = request["question"]
             # db_session_id = args["session_id"]
             logger.info("Request Received")
             logger.info(f"Table(s): {', '.join(tables)}")
@@ -46,14 +46,10 @@ class Query(Resource):
             # db = HeavyDB.from_session(db_session_id, include_tables=tables)
             db = HeavyDB.from_env(include_tables=tables)
             chain = NLtoSQLChain(llm=llm, database=db, verbose=True)
-            with get_openai_callback() as cb:
-                res = chain(question)
-                print(f"Prompt Tokens: {cb.prompt_tokens}")
-                print(f"Completion Tokens: {cb.completion_tokens}")
-                print(f"Total Tokens: {cb.total_tokens}")
-                print(f"Successful Requests: {cb.successful_requests}")
-                print(f"Total Cost (USD): ${cb.total_cost}")
-            return {"sql": res[chain.output_key]}, 200
+            input = {"query": question, "table_names_to_use": tables}
+            res = log_chain_call(chain, input, MODEL_NAME)
+            response = {"sql": res[chain.output_key]}
+            return response, 200
         except Exception as e:
             return {"error": str(e)}, 500
 
@@ -65,23 +61,18 @@ class Question(Resource):
     @api.response(500, "Error", error_response_model)
     def post(self):
         try:
-            args = table_question_parser.parse_args()
-            tables = args["tables"]
-            question = args["question"]
+            request = table_question_parser.parse_args()
+            tables = request["tables"]
+            question = request["question"]
             # db_session_id = args["session_id"]
             logger.info("Request Received")
             logger.info(f"Table(s): {', '.join(tables)}")
             llm = build_llm()
             # db = HeavyDB.from_session(db_session_id, include_tables=tables)
-            db = HeavyDB.from_env(include_tables=tables)
+            db = HeavyDB.from_env()
             chain = NLtoAnswerChain(llm=llm, database=db, verbose=True)
-            with get_openai_callback() as cb:
-                res = chain(question)
-                print(f"Prompt Tokens: {cb.prompt_tokens}")
-                print(f"Completion Tokens: {cb.completion_tokens}")
-                print(f"Total Tokens: {cb.total_tokens}")
-                print(f"Successful Requests: {cb.successful_requests}")
-                print(f"Total Cost (USD): ${cb.total_cost}")
+            input = {"query": question, "table_names_to_use": tables}
+            res = log_chain_call(chain, input, MODEL_NAME)
             return {"answer": res[chain.output_answer_key], "sql": res[chain.output_sql_key]}, 200
         except Exception as e:
             return {"error": str(e)}, 500
