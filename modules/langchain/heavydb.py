@@ -177,12 +177,24 @@ class HeavyDB:
                 # save the sample rows in string format
                 sample_rows_str = "\n".join([",".join(row) for row in sample_rows])
 
+                text_columns = [
+                    c.name for c in self.get_table_columns(table) if c.type == "STR" and c.encoding == "DICT"
+                ]
+                top_k_strings = "Common values for text columns:\n"
+                for col in text_columns:
+                    top_k_statement = f"SELECT {col}, COUNT(*) as cnt FROM {table} WHERE {col} is not null GROUP BY {col} ORDER BY cnt DESC LIMIT 5;"
+                    cursor = self._conn.execute(top_k_statement)
+                    top_k_res: list[str] = [v[0] for v in cursor.fetchall()]
+                    if not any([v for v in top_k_res if v.startswith("MULTIPOLYGON")]):
+                        top_k_strings += f"{col}: {', '.join(top_k_res)}\n"
+
                 table_info = (
                     f"{table_schema.rstrip()}\n"
                     f"/*\n"
                     f"{self._sample_rows_in_table_info} rows from {table} table:\n"
                     f"{columns_str}\n"
                     f"{sample_rows_str}\n"
+                    f"{top_k_strings}\n"
                     f"*/\n"
                 )
                 # build final info for table
