@@ -139,6 +139,16 @@ class HeavyDB:
         """Validate a query."""
         return self._conn._client.sql_validate(self._conn._session, query)
 
+    @lru_cache
+    def get_column_top_k(self, table: str, column: str, k: int = 5) -> Optional[list[str]]:
+        """Get the top k values for a column."""
+        top_k_statement = f"SELECT {column}, COUNT(*) as cnt FROM {table} WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {k};"
+        cursor = self._conn.execute(top_k_statement)
+        top_k_res: list[str] = [v[0] for v in cursor.fetchall()]
+        if not any([v for v in top_k_res if v.startswith("MULTIPOLYGON")]):
+            return top_k_res
+        return None
+
     def get_table_info(self, table_names: Optional[list[str]] = None) -> str:
         """Get information about specified tables.
         Follows best practices as specified in: Rajkumar et al, 2022
@@ -176,16 +186,15 @@ class HeavyDB:
 
                 # save the sample rows in string format
                 sample_rows_str = "\n".join([",".join(row) for row in sample_rows])
-
                 text_columns = [
-                    c.name for c in self.get_table_columns(table) if c.type == "STR" and c.encoding == "DICT"
+                    c.name
+                    for c in self.get_table_columns(table)
+                    if c.type == "STR" and c.encoding == "DICT" and c.is_array is False
                 ]
-                top_k_strings = "Common values for text columns:\n"
+                top_k_strings = "Sample values for text columns:\n"
                 for col in text_columns:
-                    top_k_statement = f"SELECT {col}, COUNT(*) as cnt FROM {table} WHERE {col} is not null GROUP BY {col} ORDER BY cnt DESC LIMIT 5;"
-                    cursor = self._conn.execute(top_k_statement)
-                    top_k_res: list[str] = [v[0] for v in cursor.fetchall()]
-                    if not any([v for v in top_k_res if v.startswith("MULTIPOLYGON")]):
+                    top_k_res = self.get_column_top_k(table, col)
+                    if top_k_res:
                         top_k_strings += f"{col}: {', '.join(top_k_res)}\n"
 
                 table_info = (

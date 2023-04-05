@@ -1,11 +1,15 @@
+from concurrent.futures import ThreadPoolExecutor
+import csv
+from functools import partial
 import re
 
 from dotenv import load_dotenv
+from langchain.callbacks import get_openai_callback
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage, AIMessage
 
 from modules.langchain.heavydb import HeavyDB
-from modules.langchain.tools.heavydb.tool import QueryHeavyDBSchemaTool
+from modules.langchain.heavydb_index import heavydb_index
 
 load_dotenv()
 
@@ -36,69 +40,99 @@ Keep in mind these examples are generic, and you will need to adapt them to the 
 Only output questions for the agent in an unnumbered list. Do not include any other text or instructions in the output file. Do not include the table name in the question unless necessary. Do not include the column name directly. You may reference column names semantically.
 Emulate questions from users that domain-specific knowledge but have no SQL knowledge."""
 
-table_prompt = """{table_summary}
-{table_info}
-"""
-
-
-def get_table_summary(table_info: str):
-    llm = ChatOpenAI(model_name="gpt-4", temperature=0.2, client=None)
-    messages = [
-        SystemMessage(
-            content="With respect to the SQL table schema and sample rows provided, please create a comprehensive response encompassing the following aspects: \n\nTitle: Choose a concise and descriptive title reflecting the table's purpose.\nDescription: Write a brief yet informative summary of the table's purpose and primary functionality. Discuss any noteworthy constraints or unique features that set it apart.\nKeywords: Identify a set of essential keywords, including but not limited to column names or relationships that facilitate search, retrieval, and document indexing.\n\nUpon completion, evaluate the coherence, accuracy, and relevance of the generated response to ensure that it adheres to the requirements outlined above, maximizing its value and usefulness for search and retrieval tasks."
-        ),
-        HumanMessage(content=table_info),
-    ]
-    resp = llm(messages)
-    return resp.content
-
 
 def extract_list_items(texts: list[str]) -> list[str]:
+    """Extract list items from a list of text strings.
+
+    This function processes each line in the input texts, looking for lines
+    that represent list items. The lines may start with a hyphen, a number followed
+    by a period, or an asterisk, followed by optional whitespace. The function strips
+    any surrounding single or double quotes from each item."""
     items = []
-    pattern = re.compile(r"^\s*-\s*(.+)", re.MULTILINE)
+    pattern = re.compile(r"^\s*(?:-\s*|\*\s*|\d+\.\s*)(.+)", re.MULTILINE)
 
     for text in texts:
         matches = pattern.finditer(text)
         for match in matches:
-            items.append(match.group(1))
+            item = match.group(1)
+            item = item.strip("'\"")  # Strip surrounding quotes
+            items.append(item)
 
     return items
 
 
-def generate_questions_for_joined_tables(
-    llm: ChatOpenAI, table: str, index_tool: QueryHeavyDBSchemaTool, messages: list
-) -> list[str]:
-    res = index_tool.run(
-        f"please return up to two tables that have columns that can be joined on {table} that are not {table}"
+def generate_questions_for_joined_tables(llm: ChatOpenAI, heavydb: HeavyDB, table: str, messages: list) -> list[str]:
+    print(f"Generating questions for joined tables for {table}")
+    index_resp = heavydb_index.query(
+        "what are up to two tables have columns that can be joined on {table} that are not {table}. output comma separated list of table names",
     )
-    if res == "No information found. Please revise your prompt if you wish to try again.":
+    joinable_table_names = [tn.strip() for tn in index_resp.strip().split(",")]
+    if joinable_table_names[0] == "I don't know.":
         return []
-
+    with heavydb.lock:
+        try:
+            tables_summary = heavydb.get_table_info(
+                [joinable_table_names[0]]
+            )  # take first because of token limit errors
+        except Exception as e:
+            print(f"Error getting table info for joinable tables {joinable_table_names} for {table}")
+            print(str(e))
+            return []
     messages.append(
         HumanMessage(
-            content=f"Here are some tables that can be joined on {table}. Please generate another series of questions that would require a join or subquery. Do not make up tables that don't exist. Output the unnumbered list and nothing else. Output nothing if you can't think of any questions. Avoid using table names\n{res}"
+            content=f"Here are some tables that can be joined on {table}. Please generate another series of questions that would require a join or subquery. Do not make up tables that don't exist. Output the unnumbered list and nothing else. Output nothing if you can't think of any questions. Avoid using table names\n{tables_summary}"
         )
     )
-    resp = llm(messages)
+    try:
+        token_count = llm.get_num_tokens_from_messages(messages)
+        if token_count > 8192:
+            print(f"Error generating questions for joined tables for {table} due to token count {token_count}")
+            return []
+        resp = llm(messages)
+    except Exception as e:
+        print(f"Error generating questions for joined tables for {table}")
+        print(str(e))
+        return []
     return extract_list_items([resp.content])
 
 
-def main():
-    db = HeavyDB.from_env()
-    index_tool = QueryHeavyDBSchemaTool(db=db)
-    messages = [SystemMessage(content=prompt)]
-    table_names = list(db.get_usable_table_names())
-    table = table_names[0]
-    table_info = db.get_table_info([table])
-    table_summary = get_table_summary(table_info)
-    llm = ChatOpenAI(model_name="gpt-4", temperature=0.3, client=None)
+def get_questions_for_table(heavydb: HeavyDB, table: str) -> list[tuple[str, bool, str]]:
+    print(f"Processing {table}")
+    messages: list = [SystemMessage(content=prompt)]
+    with heavydb.lock:
+        table_info = heavydb.get_table_info([table])
+    table_summary = heavydb_index.query(f"What is the summary of the {table} table?")
+    llm = ChatOpenAI(model_name="gpt-4", temperature=0.7, client=None)
     messages.append(HumanMessage(content=f"{table_summary}\n\n{table_info}"))
     resp = llm(messages)
+    single_table_questions = extract_list_items([resp.content])
     messages.append(AIMessage(content=resp.content))
-    question_responses = extract_list_items([resp.content])
-    question_responses.extend(generate_questions_for_joined_tables(llm, table, index_tool, messages))
+    multi_table_questions = generate_questions_for_joined_tables(llm, heavydb, table, messages)
+    single_table_questions_formatted = [(table, False, question) for question in single_table_questions]
+    multi_table_questions_formatted = [(table, True, question) for question in multi_table_questions]
+    return single_table_questions_formatted + multi_table_questions_formatted
 
-    print(question_responses)
+
+def main():
+    heavydb = HeavyDB.from_env(
+        include_tables=["usa_states", "us_pois_safegraph", "florida_parcels_2020", "zillow_recent_sales_full_peninsula"]
+    )
+    process_func = partial(get_questions_for_table, heavydb)
+    with get_openai_callback() as cb:
+        with ThreadPoolExecutor() as executor:
+            questions = list(executor.map(process_func, heavydb.get_usable_table_names()))
+
+        print(f"Prompt Tokens: {cb.prompt_tokens}")
+        print(f"Completion Tokens: {cb.completion_tokens}")
+        print(f"Total Tokens: {cb.total_tokens}")
+        print(f"Successful Requests: {cb.successful_requests}")
+        print(f"Total Cost (USD): ${cb.total_cost}")
+
+    with open("output_questions.csv", "w", newline="", encoding="utf-8") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["primary_table", "multi_table", "question"])
+        for question in questions:
+            writer.writerows(question)
 
 
 if __name__ == "__main__":
