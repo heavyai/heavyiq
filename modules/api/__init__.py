@@ -1,14 +1,13 @@
-from flask import Blueprint
-from flask_restx import Api
+import connexion
+from flask import Flask, redirect, Response
+from flask_cors import CORS
 
-api_blueprint = Blueprint("api", __name__, url_prefix="/api/v1")
-api = Api(
-    api_blueprint,
-    version="0.1",
-    title="HeavyAnalyst API",
-    description="A simple REST API for interacting with HeavyNL",
-    doc="/docs/",
-)
 
-from . import routes  # noqa: E402
-from . import rest_models  # noqa: E402
+def get_app() -> Flask:
+    app = connexion.FlaskApp(__name__)
+    CORS(app.app)
+    app.add_api("heavyanalyst.yaml", strict_validation=True)
+
+    app.add_url_rule("/", "redirect_ui", lambda: redirect("/api/v1/ui/", code=302))
+
+    return app.app

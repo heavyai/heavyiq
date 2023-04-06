@@ -11,7 +11,7 @@ paths:
       tags:
         - RequiresTables
       summary: Provided a question and table(s), returns SQL that can be used to answer the question
-      operationId: modules.api2.handlers.query
+      operationId: modules.api.handlers.query
       requestBody:
         required: true
         content:
@@ -36,7 +36,7 @@ paths:
       tags:
         - RequiresTables
       summary: Provided a question and tables(s), returns SQL and a NL Answer to the question
-      operationId: modules.api2.handlers.question
+      operationId: modules.api.handlers.question
       requestBody:
         required: true
         content:
@@ -67,6 +67,9 @@ components:
             type: string
       required:
         - tables
+      example:
+        tables:
+          - usa_states
     Question:
       type: object
       properties:
@@ -74,6 +77,8 @@ components:
           type: string
       required:
         - question
+      example:
+        question: How many states begin with the letter A? What are they?
     QuestionAndTablesRequest:
       allOf:
         - $ref: '#/components/schemas/Tables'

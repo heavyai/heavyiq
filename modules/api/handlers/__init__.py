@@ -1,7 +1,7 @@
 from langchain.chat_models import ChatOpenAI
 from langchain.llms import OpenAI
 
-from modules.api2.utils import handle_errors
+from modules.api.utils import handle_errors
 from modules.logging_utils import default_logger as logger
 from modules.langchain import HeavyDB
 from modules.langchain.chains.heavydb.base import NLtoSQLChain, NLtoAnswerChain
