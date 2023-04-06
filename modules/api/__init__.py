@@ -1,5 +1,5 @@
 import connexion
-from flask import Flask, redirect, Response
+from flask import Flask, redirect
 from flask_cors import CORS
 
 
