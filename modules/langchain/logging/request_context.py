@@ -145,10 +145,10 @@ def agent_log_request_ctx(
     yield ctx
 
 
-def log_chain_call(chain: Chain, input: str | dict, model: str) -> dict:
+def log_chain_call(chain: Chain, input: str | dict, model: str, chain_name: Optional[str]) -> dict:
     if isinstance(input, str):
         input = {chain.input_keys[0]: input}
-    with chain_log_request_ctx(chain._chain_type, model, input) as log_ctx:
+    with chain_log_request_ctx(chain_name or chain._chain_type, model, input) as log_ctx:
         with get_openai_callback() as cb:
             try:
                 output = chain(input)

@@ -1,0 +1,34 @@
+Description: The movie_details table stores information about various movies, such as their budget, genres, IMDb ID, original language, original title, overview, popularity, production companies and countries, release date, revenue, runtime, spoken languages, status, tagline, title, vote average, vote count, number of production companies, production countries, and spoken languages. The primary functionality of this table is to provide a comprehensive overview of different movies and their key attributes, while the secondary functionality is to facilitate data analysis and other queries related to the movies' properties.
+
+Applications: Potential use cases and applications for this table include:
+
+1. Movie recommendations: By analyzing key attributes such as genres, popularity, and vote average, recommendation algorithms can be built to suggest movies tailored to users’ preferences.
+2. Market analysis: The database can be utilized to analyze the success of movies in different markets based on the revenue and production countries. 
+3. Genre trends and insights: By looking into genres, release date, and popularity, trends in the movie industry can be identified, providing insights for filmmakers and investors.
+4. Language preferences: The table can be employed to identify patterns and preferences related to original languages and spoken languages, aiding in the internationalization of projects and decision-making for selecting appropriate subtitles and dubbings.
+
+Keywords: Movie information, box office, genres, language, popularity, production, global market, movie trends, industry insights, revenue analysis.
+
+- id: unique identifier for each movie
+- budget: the amount of money spent on making the movie
+- genres: categories that the movie falls into, separated by "|"
+- imdb_id: unique identifier for each movie on IMDb website
+- original_language: the language in which the movie was originally made
+- original_title: the title of the movie in its original language
+- overview: a brief description of the movie
+- popularity: a metric to represent how popular the movie is among users
+- production_companies: names of production companies involved in making the movie, separated by "|"
+- production_countries: names of countries where the movie was produced, separated by "|"
+- release_date: date on which the movie was released
+- revenue: the amount of money earned by the movie
+- runtime: the duration of the movie in minutes
+- spoken_languages: languages spoken in the movie, separated by "|"
+- status: the current status of the movie, whether it has been released or is still in production, among others
+- tagline: a catchy phrase or line used in promotional material for the movie
+- title: the title of the movie in English
+- vote_average: the average rating given to the movie by users
+- vote_count: the number of users who have rated the movie
+- num_production_companies: total number of production companies involved in making the movie
+- num_production_countries: total number of countries involved in producing the movie
+- num_spoken_languages: total number of languages spoken in the movie
+

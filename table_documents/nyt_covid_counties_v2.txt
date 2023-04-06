@@ -1,0 +1,23 @@
+Description: The nyt_covid_counties_v2 table is designed to provide information on COVID-19 data at the county level in the United States. The primary functionality of the table is to track daily cases, deaths, and associated percentages in each county. The secondary functionality is to offer insights into local trends by providing 1-day and 7-day lagging data on new cases and deaths, as well as daily percentages of the population infected.
+
+Applications: This table can be utilized to identify COVID-19 hotspots, monitor the spread of the virus, and assess the effectiveness of containment measures at a local level. It can also serve as a basis for data visualization, research, and analysis of various factors affecting different counties, such as population density, demographics, healthcare infrastructure, and public-health policies.
+
+Keywords: COVID-19, county data, United States, cases, deaths, new cases, new deaths, percentage of population infected, daily cases, daily deaths, trend analysis, hotspots, pandemic monitoring, containment measures, local insights.
+
+- reporting_date: The date the COVID-19 data was reported and collected for a specific county.
+- county: The county in the United States where the COVID-19 cases and deaths were reported.
+- state: The state in the United States where the county is located.
+- fips: The Federal Information Processing Standard code that uniquely identifies counties and county equivalents in the United States.
+- cases: The total number of confirmed COVID-19 cases in a specific county.
+- deaths: The total number of COVID-19 deaths in a specific county.
+- total_case_pct_per_pop: The percentage of the county's population that has tested positive for COVID-19 since the beginning of the pandemic.
+- total_mortality_pct_per_pop: The percentage of the county's population that has died due to COVID-19 since the beginning of the pandemic.
+- new_cases_1_day_lag: The total number of new COVID-19 cases reported in the county one day before the reporting_date.
+- new_cases_7_day_lag: The total number of new COVID-19 cases reported in the county seven days before the reporting_date.
+- new_deaths_1_day_lag: The total number of new COVID-19 deaths reported in the county one day before the reporting_date.
+- new_deaths_7_day_lag: The total number of new COVID-19 deaths reported in the county seven days before the reporting_date.
+- daily_cases_pct_pop_infected_1_day_avg: The average percentage increase of COVID-19 cases in the county's population over the past day.
+- daily_cases_pct_pop_infected_7_day_avg: The average percentage increase of COVID-19 cases in the county's population over the past seven days.
+- daily_death_pct_pop_infected_1_day_avg: The average percentage increase of COVID-19 deaths in the county's population over the past day.
+- daily_death_pct_pop_infected_7_day_avg: The average percentage increase of COVID-19 deaths in the county's population over the past seven days.
+

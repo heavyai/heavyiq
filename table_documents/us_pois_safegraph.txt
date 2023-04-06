@@ -1,0 +1,37 @@
+Description: The table us_pois_safegraph contains information about points of interest (POIs) in the United States. The primary functionality of this table is to store information about various establishments, such as their geographical location (latitude and longitude), address, opening hours, and related attributes. The secondary functionality includes categorizing POIs based on different fields like brand, top_category, and sub_category.
+
+Applications: This table has various potential applications, such as:
+1. Generating maps and visualizations of different establishments within a specific area, based on their location and address information.
+2. Analyzing the concentration of different categories of establishments in a region and identifying patterns, trends, or gaps in certain markets.
+3. Assisting local businesses and customers in their search for specific types of establishments, such as restaurants or medical facilities, based on location, brands, or opening hours.
+
+Keywords: Points of Interest, POI, Establishments, Geolocation, Categories, Brands, Addresses, Opening Hours, Geographic Information System, GIS, United States Market Analysis
+
+- safegraph_place_id: a unique identifier for each point of interest (POI) defined by Safegraph
+- parent_safegraph_place_id: the safegraph_place_id of the parent POI, if applicable
+- safegraph_brand_ids: a list of unique brand IDs associated with the POI
+- location_name: the name of the location associated with the POI
+- brands: a string containing the brands associated with the POI
+- top_category: the top level category for the POI, i.e. Restaurants and Other Eating Places
+- sub_category: the subcategory for the POI, i.e. Full-Service Restaurants
+- naics_code: the NAICS code for the POI, i.e. 722511 for Full-Service Restaurants
+- latitude: the latitude of the POI's location
+- longitude: the longitude of the POI's location
+- street_address: the street address for the POI
+- primary_number: the primary street number for the POI's address
+- street_predirection: the directional indicator that precedes the street name, i.e. N Main St
+- street_name: the name of the street for the POI's address
+- street_postdirection: the directional indicator that follows the street name, i.e. Main St N
+- street_suffix: the suffix of the street name, i.e. Main St
+- city: the city in which the POI is located
+- region: the state or region abbreviation in which the POI is located
+- postal_code: the postal code in which the POI is located
+- open_hours: the operating hours for the POI, if available
+- category_tags: additional descriptive tags for the POI
+- polygon_wkt: the geometry of the POI represented as a well-known text string
+- polygon_class: a flag used to indicate if the polygon_wkt is owned or shared by multiple POIs
+- phone_number: the phone number for the POI
+- is_synthetic: a flag used to indicate if the POI data is synthetic or real
+- includes_parking_lot: a flag used to indicate if the POI includes a parking lot
+- iso_country_code: the ISO 3166-1 alpha-2 country code for the POI, i.e. US
+

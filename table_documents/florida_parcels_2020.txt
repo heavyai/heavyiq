@@ -1,0 +1,77 @@
+Description: The florida_parcels_2020 table contains data about various parcels of land in Florida. It includes information on parcel use, owner details, location, property values, tax assessment details, sales history, and related geographical information. The primary functionality of this table is to store and manage parcel data, while its secondary functionality is to provide information to support real estate transactions, land use decisions, and tax assessment purposes.
+
+Applications: Potential use cases and applications for this table include, but are not limited to:
+1. Real estate market analysis: Analyzing property values, sales trends, and regional differences to make informed investment decisions.
+2. Urban planning and development: Identifying land use patterns and areas for development or conservation, evaluating environmental impacts and assessing the mix of residential, commercial, and industrial properties.
+3. Tax assessment and administration: Calculating property taxes, assessing exemptions or special property classes, and maintaining tax records for local governments.
+4. GIS applications and spatial analysis: Mapping parcels and analyzing their spatial relationships with other geospatial datasets such as zoning, transportation, or environmental data.
+
+Keywords: Florida, parcels, real estate, land use, property value, tax assessment, sales history, geospatial, owner details, census block, GIS, urban planning, tax administration
+
+- CNTYNAME: Name of the county of the parcel.
+- LINK: Code linking various parcels to their corresponding owner or deed.
+- PARCELID: Unique identifier for a particular parcel.
+- NPARNO: A unique identifier for each parcel within its LINK value.
+- DORUC: Jurisdiction of domicile (tax district).
+- PAUC: The power district (ID) for the parcel.
+- PARUSEDESC: Description of the primary use of the parcel.
+- SPASS_CD: Special assessment code for the parcel.
+- IMPROVVAL: The assigned value of improvements on the parcel.
+- LNDVAL: The assigned value of land on the parcel.
+- JV: The assigned Just Value on the parcel.
+- JV_CHNG: The change in Just Value from the prior year.
+- JV_HMSTD: Homestead value of Just Value.
+- AV_SD: Assessed value by the special district.
+- AV_NSD: Assessed value by the non-special district.
+- AV_HMSTD: Homestead value of Assessed Value.
+- TV_SD: Taxable value by the special district.
+- TV_NSD: Taxable value by the non-special district.
+- JV_CLASS_USE: Just Value of Class Use.
+- ONAME: Owner name.
+- OADDR1: Owner address 1.
+- OADDR2: Owner address 2.
+- OCITY: City related to the owner's address.
+- OSTATE: State related to the owner's address.
+- OZIPCD: Postal code related to the owner's address.
+- PHYADDR1: Address of the physical location of the parcel.
+- PHYCITY: City related to the physical location of the parcel.
+- PHYZIP: Postal code related to the physical location of the parcel.
+- PO_NAME: Post office name of the physical location of the parcel.
+- PO_ZIP: Postal zip code of the physical location of the parcel.
+- SLEGAL: Legal description of the assessed property.
+- ALTKEY: Alternate key value.
+- ACTYRBLT: Year the structure was constructed.
+- EFFYRBLT: Effective year of the structure's condition.
+- TOTLVGAREA: Total living area of the structure in square feet.
+- NOBULDNG: The number of buildings on the parcel.
+- NORESUNTS: The number of residential units on the parcel.
+- PARSPLT: Parcel split number.
+- LNDSQFOOT: Total land area of the parcel.
+- CONSTCLASS: Construction class code in numeric form.
+- DISTR_CD: Distribution Code given by the property appraiser.
+- DISTR_YR: Distribution Year given by the property appraiser.
+- SALEPRC1: Sale price of the parcel.
+- SALEYR1: Year of sale of the parcel.
+- SALEPRC2: Second sale price of the parcel.
+- SALEYR2: Year of second sale of the parcel.
+- NBRHDCD: Neighborhood code given by local municipality.
+- PUBLICLND: Public land designator.
+- TAXAUTHCD: Tax authority code.
+- SEC: Section of land on which the parcel is located.
+- TWN: Township of land on which the parcel is located.
+- RNG: Range of land on which the parcel is located.
+- CENSUSBK: Census tract book where parcel is located.
+- SOURCEAGE: Property appraiser organization for parcel data.
+- SOURCEDATE: Date of Data Source.
+- LAT_DD: Latitude of geographic centroid of the parcel.
+- LONG_DD: Longitude of geographic centroid of the parcel.
+- MGRS: Military Grid Reference System coordinates.
+- GOOGLEMAP: Link to Google Maps URL for the parcel.
+- ACRES: Total acreage of the parcel.
+- EXMPT: Property tax exemption designator.
+- LU_RES: Land use designator for residential land.
+- LUCODE: 3-digit land use code.
+- GCID: Geographic Census Identifier code.
+- DESCRIPT: Description of the primary use of the parcel.
+- FLAG: FEMA Flood Zone.
+

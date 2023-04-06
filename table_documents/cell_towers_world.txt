@@ -1,0 +1,22 @@
+Description: The cell_towers_world table is designed to store information about cell towers from various radio network technologies (GSM, UMTS, LTE, CDMA) around the world. The primary functionality of this table is to provide comprehensive data on cell towers, including location, coverage range, and signal quality. Secondary functionality involves tracking data updates and changes (changeable, created, and updated columns).
+
+Applications: Potential use cases for this table include network performance analysis, location-based services, and network expansion planning, among others. The data may be used by telecom operators to improve network coverage and signal quality, by government agencies for regulatory purposes, and by businesses and developers for creating location-based applications and services.
+
+Keywords: cell tower, radio technology, location, coverage, signal quality, network performance, telecom operator,-location-based services, network expansion, network improvements.
+
+- radio: The type of radio technology used by the cell tower (UMTS, LTE, GSM, CDMA)
+- mcc: The Mobile Country Code identifying the country where the cell tower is located (310, 262, 250, 724, 208)
+- net: The Numeric Identifier for a network within a country (1, 2, 3, 10, 410)
+- area: The area code for the cell tower (1, 65534, 2, 5, 10)
+- cell: The cell identifier or cell ID of the cell tower (0, 4112, 65535, 50594049, 62)
+- unit: The signal measurement unit (0, -1, 1, 9, 8)
+- lon: The longitude of the location of the cell tower (in decimal degrees)
+- lat: The latitude of the location of the cell tower (in decimal degrees)
+- location: The location of the cell tower in WKB format with SRID=4326 and compressed encoding
+- range_: The estimated range from the cell tower to the device (in meters)
+- samples: The number of signal samples taken for the cell tower
+- changeable: A flag specifying if the cell tower details can be changed (1 for yes, 0 for no)
+- created: The timestamp of when the cell tower was added to the database (in UTC)
+- updated: The timestamp of the last update of the cell tower details (in UTC)
+- average_signal: The average signal strength of the cell tower (in dBm)
+
