@@ -5,8 +5,7 @@ from langchain.prompts import PromptTemplate
 from pydantic import BaseModel, Field, validator
 
 from modules.langchain.logging import log_chain_call
-from modules.langchain.heavydb import HeavyDB
-from modules.langchain.heavydb_index import heavydb_index
+from modules.langchain.index import heavydb_index
 
 INDEX_QUERY = """
 Query: {query}

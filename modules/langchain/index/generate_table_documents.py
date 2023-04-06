@@ -78,7 +78,7 @@ def create_and_write_table_document(heavydb: HeavyDB, table: str) -> None:
         heavydb (HeavyDB): An instance of HeavyDB containing the table information.
         table (str): The name of the table for which the document is to be created and written.
     """
-    print(f"Processing {table}...")
+    print(f"Summarizing {table}...")
     docs = [
         get_table_summary_document(heavydb, table),
         get_table_column_description_document(heavydb, table),
@@ -113,18 +113,23 @@ def get_table_names_from_documents(folder_path: str) -> list[str]:
     return table_names
 
 
-def generate_table_documents():
+def generate_table_documents(table_path: str) -> list[str]:
     """
     Generates and writes documents for all usable tables in the HeavyDB instance, containing table summaries and column descriptions.
     Saves them to the table_documents directory.
+    Returns a list of tables that had summaries generated.
     """
-    tables_with_documents_already = get_table_names_from_documents("table_documents")
+    tables_with_documents_already = get_table_names_from_documents(table_path)
+    print("Generating summaries and column descriptions.")
     print(f"Tables with documents already (skipping): {tables_with_documents_already}")
     heavydb = HeavyDB.from_env(ignore_tables=tables_with_documents_already)
     process_func = partial(create_and_write_table_document, heavydb)
+    table_names_to_generate = heavydb.get_usable_table_names()
     with ThreadPoolExecutor() as executor:
-        executor.map(process_func, heavydb.get_usable_table_names())
-    print("Done")
+        executor.map(process_func, table_names_to_generate)
+    print(f"Finished generating summaries and column descriptions for {len(table_names_to_generate)} tables.")
+
+    return list(table_names_to_generate)
 
 
 if __name__ == "__main__":

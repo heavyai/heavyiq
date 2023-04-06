@@ -1,25 +1,25 @@
-Description: The "airports" table is a comprehensive database containing essential details about airports worldwide. Its primary functionality is to store and provide information about individual airports, such as their unique identification codes, types, names, geographical coordinates, and elevation. The table also includes critical operational aspects, such as continent, country and region of location, municipality, scheduled services, GPS codes, IATA codes, local codes, and any relevant website or Wikipedia links. Apart from these, it stores keywords associated with each airport, enabling efficient searching and information retrieval. The secondary functionality of this table is to enable seamless search and organization of airports based on various filters, such as airport type, location, scheduled services, and designated codes.
+Description: The airports table stores information about airports from around the world, including their location, size, and various codes associated with them. The primary functionality of this table is to provide data on airport details, such as their identification, type (small_airport, heliport, closed, medium_airport, seaplane_base), geographical coordinates (latitude and longitude), and region information (continent, iso_country, and iso_region). Secondary functionalities include recording airport-specific information, such as the municipality it serves, whether it has scheduled services, and associated codes (gps_code, iata_code, and local_code). The table also stores links to official websites (home_link) and Wikipedia articles (wikipedia_link) for reference, as well as any associated keywords for indexing and search purposes.
 
-Applications: This airports table can be used in numerous applications, such as airline management systems, flight planning and scheduling software, air traffic control systems, aviation analytics, flight tracking services, and airport information directories. By containing vital information all in one table, it becomes a reliable resource for developers and decision-makers in the aviation industry.
+Applications: This table can be used for a variety of applications, such as mapping and visualizing airport locations, analyzing airport distribution by region, and conducting airport viability studies. It can also serve as a reference for travel-related software or websites to help users find specific airport information, provide data for flight planning and booking systems, and aid aviation authorities and regulatory institutions in managing global aviation activities.
 
-Keywords: Aviation, Airport database, Geographical location, Airport identifier, Airport type, Scheduled services, GPS codes, IATA codes, Air traffic management, Flight planning, Airline management systems, Flight tracking
+Keywords: Airport data, Airport identification, Airport types, Geographical coordinates, Regional information, Airport codes, Scheduled services, Airport websites, Wikipedia articles, Airport mapping, Aviation industry, Travel information, Flight planning.
 
-- id: Unique identifier for each airport record in the table.
-- ident: Shortened identifier code for the airport.
-- type: Type of the airport (e.g. small_airport, heliport, closed).
-- name: Full name of the airport.
-- latitude_deg: Latitude of the airport's geographic location in degrees.
-- longitude_deg: Longitude of the airport's geographic location in degrees.
-- elevation_ft: Elevation of the airport's geographic location in feet.
-- continent: Continent where the airport is located in (e.g. NA, SA, EU).
-- iso_country: ISO 3166-1 alpha-2 code for the country where the airport is located in (e.g. US, BR, JP).
-- iso_region: Code for the country subdivision where the airport is located in (e.g. US-TX, US-CA).
-- municipality: City or municipality where the airport is located in.
-- scheduled_service: Indicates whether the airport has scheduled airline service.
-- gps_code: GPS code for the airport.
-- iata_code: IATA code for the airport.
-- local_code: Local code for the airport.
-- home_link: URL for the airport's homepage (if applicable).
-- wikipedia_link: URL for the airport's wikipedia page (if applicable).
-- keywords: Keywords associated with the airport (e.g. city names, organizations the airport serves).
+- id: unique identifier for each airports row
+- ident: airport identifier code
+- type: type of airport (e.g. small_airport, heliport, closed)
+- name: name of the airport
+- latitude_deg: latitude of the airport location
+- longitude_deg: longitude of the airport location
+- elevation_ft: elevation of the airport above sea level in feet
+- continent: continent where the airport is located
+- iso_country: ISO code for the country where the airport is located
+- iso_region: ISO code for the region where the airport is located
+- municipality: municipality where the airport is located
+- scheduled_service: whether the airport has scheduled commercial flights
+- gps_code: GPS code for the airport
+- iata_code: IATA code for the airport
+- local_code: local code for the airport
+- home_link: link to the airport's official website
+- wikipedia_link: link to the airport's Wikipedia page
+- keywords: keywords associated with the airport (e.g. Cheonmi-ri, Manhattan, Victorian Aerial Fire Bases)
 

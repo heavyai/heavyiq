@@ -1,7 +1,8 @@
 from langchain.tools.base import BaseTool
 from pydantic import BaseModel, Extra, Field
 
-from modules.langchain import HeavyDB, heavydb_index
+from modules.langchain import HeavyDB
+from modules.langchain.index import heavydb_index
 from modules.langchain.templates.tools.heavydb import (
     QueryHeavyDBSchemaToolDescription,
     QueryHeavyDBToolDescription,
