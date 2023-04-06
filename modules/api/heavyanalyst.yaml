@@ -3,8 +3,6 @@ info:
   title: HeavyAnalyst API
   version: "0.1"
   description: A simple REST API for interacting with HeavyNL
-servers:
-  - url: /api/v1
 paths:
   /query:
     post:
@@ -18,6 +16,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/QuestionAndTablesRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/QuestionAndTablesRequest'
       responses:
         200:
           description: Success
@@ -25,10 +26,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SQLStatement'
+            application/x-www-form-urlencoded:
+              schema:
+                $ref: '#/components/schemas/SQLStatement'
         500:
           description: Error
           content:
             application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+            application/x-www-form-urlencoded:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
   /question:
@@ -43,11 +50,17 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/QuestionAndTablesRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/QuestionAndTablesRequest'
       responses:
         200:
           description: Success
           content:
             application/json:
+              schema:
+                $ref: '#/components/schemas/AnswerAndSQLStatement'
+            application/x-www-form-urlencoded:
               schema:
                 $ref: '#/components/schemas/AnswerAndSQLStatement'
         500:
@@ -56,10 +69,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+            application/x-www-form-urlencoded:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
     Tables:
       type: object
+      description: Array of table names to limit the scope of the search/response
       properties:
         tables:
           type: array
@@ -72,6 +89,7 @@ components:
           - usa_states
     Question:
       type: object
+      description: Natural language question (prompts accepted)
       properties:
         question:
           type: string
@@ -85,22 +103,29 @@ components:
         - $ref: '#/components/schemas/Question'
     SQLStatement:
       type: object
+      description: A SQL statement
       properties:
         sql:
           type: string
+      example:
+        sql: SELECT COUNT(*) AS num_states, STATE_NAME FROM usa_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;
     Answer:
       type: object
+      description: Natural language answer
       properties:
         answer:
           type: string
       required:
         - answer
+      example:
+        answer: 4 states start with the letter A; Alaska, Arizona, Arkansas, and Alabama.
     AnswerAndSQLStatement:
       allOf:
         - $ref: '#/components/schemas/SQLStatement'
         - $ref: '#/components/schemas/Answer'
     ErrorResponse:
       type: object
+      description: An error message
       properties:
         error:
           type: string
