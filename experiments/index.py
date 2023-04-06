@@ -44,7 +44,7 @@ EXAMPLE_PROMPT = PromptTemplate(
     input_variables=["page_content", "source"],
 )
 
-combine_prompt_template = """Given the following extracted parts of a long document describing a SQL database and a question that can be solved using data in the SQL database, create a final answer with table_names ("SOURCES").
+combine_prompt_template = """Given the following extracted parts of a long document describing a SQL database and a question that can be solved using data in the SQL database, create a final answer with references ("SOURCES").
 If you don't know the answer, just say that you don't know. Don't try to make up an answer.
 ALWAYS return a "SOURCES" part in your answer.
 
@@ -96,7 +96,7 @@ def main():
 
     output = log_chain_call(
         qa_chain,
-        "What are the top 3 network matches with the highest total data_length in log entries?",
+        "Which tables have information related to Florida county, points of interest, land use descriptions, and acreage",
         model_name,
         "index_test_chain",
     )
