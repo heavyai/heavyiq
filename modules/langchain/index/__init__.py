@@ -1,0 +1,1 @@
+from .create_table_documents import generate_table_documents

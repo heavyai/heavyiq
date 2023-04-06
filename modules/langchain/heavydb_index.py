@@ -16,7 +16,7 @@ from modules.langchain.heavydb import HeavyDB
 # Embed and store the texts
 # Supplying a persist_directory will store the embeddings on disk
 persist_directory = "db"
-huggingface_model_name = os.environ.get("HUGGINGFACE_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+huggingface_model_name = os.environ.get("HUGGINGFACE_EMBED_MODEL", "sentence-transformers/gtr-t5-large")
 
 
 def create_table_info_document(heavydb: HeavyDB, table: str) -> Document:

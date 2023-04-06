@@ -1,0 +1,46 @@
+Description: The "us_upstream_production" table focuses on providing comprehensive data on oil and gas wells across various U.S. states. This table includes key details such as the operator, well name, location (state, county, latitude, and longitude), basin/play name, well type, well status, depth, direction, and essential dates (spud, first completion, first and latest production). Additionally, it contains monthly production data (oil, gas, water, value), GOR (gas-to-oil ratio), water cut, and the producing formation.
+
+Applications: This dataset has several potential use cases, including the following:
+1. Analysis of oil and gas production trends by basin, state, county, and operator.
+2. Market research to identify high-potential regions or operators for investment or collaboration.
+3. Identifying correlations between factors such as depth, horizontal length, hole direction, and formation on production efficiency and profitability.
+4. Tracking the lifespan and status of oil and gas wells (active, abandoned, plugged) to support regulatory compliance and environmental management efforts.
+
+Keywords: Upstream production, oil and gas wells, well location, well status, monthly production data, gas-to-oil ratio (GOR), water cut, producing formation, basin/play name, drilling.
+
+- api_no_10: Unique well identifier provided by the American Petroleum Institute
+- current_operator_name_full: Full name of the current operator of the well
+- well_no: Number assigned to the well within a specific field
+- well_name: Name assigned to the well
+- state_name: State where the well is located
+- county_name: County where the well is located
+- basin_play_name: Name of the basin or play where the well is located
+- field_name: Name of the oil or gas field where the well is located
+- well_type: Classification of the well based on whether it produces oil, gas, or both
+- well_status: Classification of the well based on its current operational status
+- surface_lat: Latitude coordinate of the wellhead
+- surface_lon: Longitude coordinate of the wellhead
+- depth_tvd: Total vertical depth of the well in feet
+- horizontal_length: Length of the horizontal section of the well in feet
+- hole_direction: Orientation of the wellbore with respect to the vertical axis
+- date_spud: Date when drilling operations began for the well
+- date_first_comp: Date when the well was completed for the first time
+- production_first_date: Date of the first production from the well
+- production_latest_date: Date of the most recent production from the well
+- date_prod: Date corresponding to the production_month column
+- production_month: Month and year of the production volume data provided
+- oil_monthly: Monthly volume of oil production in barrels
+- gas_monthly: Monthly volume of natural gas production in cubic feet
+- water_monthly: Monthly volume of water production in barrels
+- oil_price: Price of oil per barrel
+- gas_price: Price of natural gas per thousand cubic feet
+- value_monthly: Total monthly value of oil and gas production
+- gor_monthly: Gas-to-oil ratio, calculated by dividing the volume of gas by the volume of oil produced in a specific time period
+- gor_log_monthly: Natural logarithm of the gor_monthly column
+- gor_monthly_change: Percentage change in the gas-to-oil ratio between the current and previous time periods
+- gor_monthly_change_log: Natural logarithm of the gor_monthly_change column
+- water_cut_monthly: Fraction of the total fluid produced that is water
+- producing_formation: Name of the geological formation from which the hydrocarbons are being produced
+- basin_boundary_geojs: GeoJSON formatted data for the boundary of the basin where the well is located
+- current_operator_name: Abbreviated name of the current operator of the well
+

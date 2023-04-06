@@ -1,0 +1,64 @@
+Description: The table "firewall_in" is designed to store information about network traffic being filtered by a firewall. It contains details regarding connection attempts and traffic, along with geographical information and IP addresses. The primary function of this table is to record and monitor incoming or denied traffic through the firewall. The secondary function is to provide the necessary information for analysis and troubleshooting purposes.
+
+Applications: The data in this table can be used for a variety of purposes. Some potential use cases may include network security and monitoring, intrusion detection systems, understanding the nature of incoming traffic to a network, logging unapproved connections or threats, and providing valuable data for improving firewall rules and configurations. Additionally, the geographic data can be particularly useful in identifying potential threats from specific regions or countries.
+
+Keywords: Firewall, Network security, Traffic filtering, Geolocation, Intrusion detection, IP address, Data analysis, Connection monitoring, Protocol, Timestamp.
+
+- time_stamp: Timestamp of the firewall event
+- fire_wall_host: Hostname of the firewall generating the log
+- log_name: Name of the log where the firewall event is stored
+- rule_number: Number identifying the rule that matched the event
+- sub_rule_number: Number identifying the sub-rule (if any) that matched the event
+- anchor: Name identifying the anchor (if any) where the rule that matched the event is defined
+- tracker_id: ID identifying the firewall policy applying to the event
+- interface_name: Name of the firewall interface where the event was captured
+- log_reason: Reason why the event was logged
+- action: Action taken by the firewall in response to the event
+- msg_direction: Direction of the traffic causing the event
+- ip_protocol_version: IP version of the traffic causing the event
+- TOS: Type of service assigned to the traffic causing the event
+- ECN: Explicit congestion notification marking of the IP header of the traffic causing the event
+- TTL: Time to live assigned to the IP packet of the traffic causing the event
+- ID: ID assigned to the IP packet of the traffic causing the event
+- offset_v4: IPv4 fragmentation offset assigned to the IP packet of the traffic causing the event
+- flags: IPv4 fragmentation flags assigned to the IP packet of the traffic causing the event
+- protocol_id: Protocol number of the transport protocol of the traffic causing the event
+- protocol_text: Textual representation of the transport protocol of the traffic causing the event
+- v6_class: Class of the IPv6 flow label assigned to the traffic causing the event
+- v6_flow_label: Flow label of the IPv6 packet of the traffic causing the event
+- v6_hop_limit: Hop limit assigned to the IPv6 packet of the traffic causing the event
+- hdr_length: Length of the IPv4 or IPv6 header of the traffic causing the event
+- source_ip: IP address of the source host of the traffic causing the event
+- destination_ip: IP address of the destination host of the traffic causing the event
+- source_port_num: TCP/UDP source port number of the traffic causing the event
+- destination_port_num: TCP/UDP destination port number of the traffic causing the event
+- data_length: Length (in bytes) of the payload of the traffic causing the event
+- icmp_type: Type of the ICMP message of the traffic causing the event
+- TCP_FLAGS: TCP flags in the TCP header of the traffic causing the event
+- tcp_sequence_number: TCP sequence number assigned to the TCP packet of the traffic causing the event
+- tcp_ack: TCP acknowledgement number assigned to the TCP packet of the traffic causing the event
+- tcp_window: TCP window size assigned to the TCP packet of the traffic causing the event
+- tcp_urg: Whether the TCP URG flag is set in the TCP header of the traffic causing the event
+- tcp_options: TCP options in the TCP header of the traffic causing the event
+- network_mtch: Matching network for the event
+- gn_id: Globally unique identifier representing the network of the event source
+- acc_rad: Radius of accuracy of location data for the event
+- continent_code: Code identifying the continent of the event source or destination
+- continent_name: Name identifying the continent of the event source or destination
+- country_name: Name identifying the country of the event source or destination
+- city_name: Name identifying the city of the event source or destination
+- reg_country_name: Name of the region of the country of the event source or destination
+- represent_country_name: Name of the country represented by the event source or destination IP
+- reg_cntry_gn_id: Globally unique identifier representing the region of the country of the event source or destination
+- represented_cntry_gn_id: Globally unique identifier representing the country represented by the event source or destination IP
+- is_an_proxy: Whether the event source or destination is an anonymous proxy
+- is_sat_prvder: Whether the event source or destination is a satellite provider
+- pstl_code: Postal code of the event source or destination
+- longitude: Longitude of the geographic location of the event source or destination
+- latitude: Latitude of the geographic location of the event source or destination
+- ip_reference_data_version: Version of the IP geolocation database used to map the event IP to a geographic location
+- address_name: Known name of the entity associated with the IP address of the event source or destination
+- routeable_addr: Whether the event IP is routeable on the public Internet
+- broadcast_addr: Whether the event IP is a broadcast address
+- reserved_addr: Whether the event IP is a reserved address
+

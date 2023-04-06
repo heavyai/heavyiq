@@ -1,0 +1,28 @@
+Description:
+The table ca_crops serves as an extensive repository of agricultural crop data in California, primarily detailing the type of crop, acreage, and location details. It consists of multiple columns, storing crop-related information such as crop type, acres covered, county, and additional comments. The table also records the data source, the person responsible for modifying the data, and other metadata such as timestamps, spatial information, and unique identifiers.
+
+Applications:
+This table has numerous potential use cases and applications, such as:
+
+1. Agricultural planning and analysis: Government agencies, investors, and farmers can utilize this data to plan crop growth, assess agricultural production, and identify suitable regions for specific crops.
+2. Environmental impact assessment: Researchers can analyze this data to study the effects of different crops on ecological balance, water consumption, and other environmental factors.
+3. Economic evaluations: With a comprehensive understanding of the crops being cultivated and their geographical distribution, economists can calculate the direct and indirect effects on regional and nationwide economics. 
+4. Land utilization and zoning: Local authorities can use this data to optimize land usage, designate agricultural areas, and implement zoning regulations.
+5. Food industry stakeholders: Companies involved in the food supply chain or the restaurant industry can leverage this information to optimize their processes, identify potential partnerships, or assess local and regional demand for certain products.
+
+Keywords:
+Agriculture, California, crops, land management, environmental impact, zoning, economic analysis, food industry, spatial data.
+
+- OBJECTID: Unique identifier for each row.
+- Crop2014: Crop type for the given year, represented as text.
+- Acres: Numeric value representing the number of acres for the given crop.
+- County: The county in California where the crop was grown.
+- Comments: Any additional comments related to the crop or the data.
+- Source: The original source of the data.
+- Modified_B: The person who modified the data.
+- Date_Data_: The date when the data was collected.
+- Last_Modif: Timestamp for the last time the row was modified.
+- DWR_Standa: A code representing the crop category based on the Department of Water Resources standard.
+- GlobalID: A unique identifier for the row.
+- omnisci_geo: A multipolygon geometry representing the spatial extent of the crop field.
+

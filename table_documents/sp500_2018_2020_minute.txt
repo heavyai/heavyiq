@@ -1,0 +1,24 @@
+Description: The sp500_2018_2020_minute table is designed to store minute-by-minute stock market data for companies listed in the S&P 500 index from 2018 to 2020. The primary function of this table is to offer a detailed historical record of stock market metrics for every minute, such as open price, high price, low price, close price, trade volume, and other relevant financial figures. Secondary functionality includes facilitating historical data analysis and trend identification for investors, traders, and researchers in the financial field.
+
+Applications: This comprehensive dataset has numerous use cases and applications, such as:
+1. Algorithmic analysis for automating trading strategies or identifying patterns indicative of short-term price movements.
+2. Developing and validating quantitative trading models to detect trends, correlations, or aberrations in the market.
+3. Conducting financial research to compare and contrast market conditions during specific years and times.
+4. Enhancing visualization tools for traders and analysts to study trends, retracements, or other crucial aspects of historical price action.
+5. Educating new investors on market behaviors and attributing share value changes to financial events such as earnings reports and dividend announcements.
+
+Keywords: S&P 500, historical stock data, minute-by-minute, trading analysis, stock market trends, financial research, quantitative models, stock visualization, trading strategy, algorithmic analysis.
+
+- symbol: A text column containing the stock symbol name of S&P 500 index for a particular minute.
+- ts: A timestamp column representing the date and time for a particular minute of trading.
+- ts_int: An integer column representing the date portion of the timestamp in YYYYMMDD format.
+- time_int: A small integer column representing the time portion of the timestamp in HHMM format.
+- price_open: A floating-point column containing the opening price of the stock for a particular minute of trading.
+- price_high: A floating-point column containing the highest price of the stock for a particular minute of trading.
+- price_low: A floating-point column containing the lowest price of the stock for a particular minute of trading.
+- price_close: A floating-point column containing the closing price of the stock for a particular minute of trading.
+- volume: A floating-point column containing the total trading volume of the stock for a particular minute of trading.
+- splits: A floating-point column containing the split factor of the stock for a particular minute of trading.
+- earnings: A floating-point column containing the earnings of the stock for a particular minute of trading.
+- dividends: A floating-point column containing the dividends of the stock for a particular minute of trading.
+

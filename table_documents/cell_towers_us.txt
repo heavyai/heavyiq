@@ -1,0 +1,22 @@
+Description: The cell_towers_us table is designed to store information about various cell towers in the United States. The primary functionality of this table is to manage and retrieve spatial details and operational characteristics for each tower, including radio technology, network operator, location, coverage range, signal strength, and timestamps for creation and modification. The secondary functionality is to enable analysis and visualization of different telecom networks' performances and properties.
+
+Applications: Potential use cases of this table might include querying cell towers' locations and capabilities for specific telecom network operators. Network engineers could perform coverage analysis and optimization, while researchers might analyze signal strengths, coverage area, and potential network bottlenecks to propose possible improvements in the telecom infrastructure. This table may also act as a vital resource for tools that need location-based information about cell towers.
+
+Keywords: cell towers, network operators, spatial details, coverage analysis, signal strength, location, radio technology, telecommunications, infrastructure, United States.
+
+- radio: The type of radio used by the cell tower (e.g., LTE, UMTS, CDMA, GSM).
+- mcc: Mobile country code. Identifies the country in which the cell tower is located.
+- net: The mobile network code. Identifies the network operated by the cell tower.
+- area: The identifier of the geographic area where the cell tower is located.
+- cell: The unique ID of the cell tower.
+- unit: The unit of measurement for measurements taken by the cell tower.
+- lon: The longitude of the cell tower.
+- lat: The latitude of the cell tower.
+- location: The location of the cell tower in WKT format.
+- range_: The range of the cell tower, in meters.
+- samples: The number of signal samples used in calculating average_signal.
+- changeable: A binary value indicating whether this cell tower's attributes can be changed.
+- created: The timestamp when this cell tower was initially created in the database.
+- updated: The timestamp when this cell tower was last updated in the database.
+- average_signal: The average signal strength of the cell tower.
+

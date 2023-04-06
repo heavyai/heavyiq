@@ -1,0 +1,37 @@
+Description: The "craigslist_vehicles" table serves as a comprehensive database for vehicle listings on Craigslist. It primarily functions to store detailed information about each vehicle, including its identification number (VIN), make, model, year, condition, and other specifications. Additionally, this table stores secondary data such as geographical information (region, state, lat, long), pricing, seller contact, posting date, and images, which facilitate gathering insights and analytics on Craigslist vehicle listings.
+
+Applications: Potential use cases and applications of this table include:
+1. Developing vehicle search engines to help users find their desired vehicles easily based on various criteria (e.g., make, model, price range, and location).
+2. Creating dashboards to visualize and analyze regional vehicle market trends, such as the average price, popular models, the most preferred color, and the prevalence of used or new vehicles.
+3. Deriving insights for customers by comparing car models or manufacturers using factors such as price, condition, odometer readings, etc.
+4. Automating the process of monitoring vehicle listings over time to notify users when their target vehicles become available in their chosen location.
+
+Keywords: Craigslist, vehicle listings, car search, used cars, database, market trends, regional insights, automotive analysis, price comparison, VIN, make, model, geographical information, vehicle specifications, analytics.
+
+- id: Unique identifier for each vehicle listing
+- url: URL for the listing on Craigslist's website
+- region: Geographical region where the vehicle is located
+- region_url: URL for the Craigslist page for the region where the vehicle is located
+- price: Price of the vehicle in USD
+- year_: Year the vehicle was manufactured
+- manufacturer: Manufacturer of the vehicle
+- car_model: Model of the vehicle
+- condition_: Condition of the vehicle as described by the seller
+- cylinders: Number of cylinders in the engine of the vehicle
+- fuel: Type of fuel used by the vehicle
+- odometer: Current mileage of the vehicle
+- title_status: Status of the vehicle's title
+- transmission: Type of transmission in the vehicle
+- VIN: Vehicle identification number
+- drive: Type of drive system used by the vehicle
+- size: Size classification of the vehicle
+- type: Type of vehicle (sedan, SUV, truck, etc.)
+- paint_color: Color of the vehicle
+- image_url: URL of the main image for the vehicle listing
+- description: Description of the vehicle as provided by the seller
+- county: County where the vehicle is located
+- state: State where the vehicle is located
+- lat: Latitude of the vehicle's location
+- long: Longitude of the vehicle's location
+- posting_date: Date and time the listing was posted on Craigslist
+

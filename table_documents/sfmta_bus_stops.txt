@@ -1,0 +1,17 @@
+Description: The sfmta_bus_stops table is designed to store information about bus stops for the San Francisco Municipal Transportation Agency (SFMTA). The primary functionality of this table is to maintain details of each bus stop, such as stop ID, stop code, stop name, a brief description, latitude, and longitude. Additionally, the table stores information about the zone ID and stop URL associated with each bus stop.
+
+Applications: As a comprehensive database of bus stops for the SFMTA, this table can be employed in several use cases and applications. It can be utilized to develop public transport applications or websites that provide users with real-time information about bus stop locations, names, and specific details. Furthermore, the table can be integrated into mapping applications to enable accurate route planning, assist with transportation analytics and planning, and facilitate public transit management.
+
+Keywords: San Francisco, Municipal Transportation Agency, bus stops, public transport, geolocation, route planning, transit management, mapping applications, analytics.
+
+The sfmta_bus_stops table has the following columns:
+
+- stop_id: a unique identifier for each bus stop.
+- stop_code: a code for the bus stop that may be used instead of the stop_id.
+- stop_name: the name of the bus stop.
+- stop_desc: a description of the bus stop.
+- stop_lat: the latitude of the bus stop.
+- stop_lon: the longitude of the bus stop.
+- zone_id: the zone ID of the bus stop.
+- stop_url: a URL for the bus stop.
+

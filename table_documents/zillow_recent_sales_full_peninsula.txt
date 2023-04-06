@@ -1,0 +1,58 @@
+Description: The zillow_recent_sales_full_peninsula table stores information about recently sold residential properties in the Peninsula region. The table contains details such as property ID, address, sale price, sale date, property type, and various other attributes related to property's features and location. Primary functionality of the table is to maintain a record of property sales data, while the secondary functionality includes providing details on property attributes and facilitating property search and analysis.
+
+Applications: Potential use cases and applications for the data stored in this table include:
+1. Real estate market analysis to understand recent sales trends, pricing, and property types in the Peninsula region.
+2. Generating statistics and reports to assist potential buyers, sellers, and real estate professionals in making data-driven decisions.
+3. Developing property valuation models and tools, such as Zestimate, to help estimate the market value of a property.
+4. Facilitating search and retrieval of recently sold properties by features, price, location, or other desired criteria.
+
+Keywords: Zillow, recent sales, Peninsula region, real estate, property attributes, property search, market analysis, residential properties, property valuation, Zestimate.
+
+- zpid: Unique identifier for each property
+- id: Unique identifier for each record
+- imgSrc: URL of main image of the property
+- hasImage: Boolean indicating if the property has at least one image
+- detailUrl: URL of the property's detail page on Zillow
+- statusType: Type of status of the property (e.g. 'SOLD', 'FOR_SALE', 'PENDING')
+- statusText: Description of the status of the property (e.g. 'Sold', 'For Sale by Owner', 'Accepting Backup Offers')
+- countryCurrency: Country currency of the property
+- soldPrice: Price at which the property was sold
+- unformattedPrice: Price of the property in unformatted form
+- address: Complete address of the property
+- addressStreet: Street address of the property
+- addressCity: City of the property
+- addressState: State of the property
+- addressZipcode: Zipcode of the property
+- beds: Number of bedrooms in the property
+- baths: Number of bathrooms in the property
+- area: Total area of the property
+- isZillowOwned: Boolean indicating if the property is owned by Zillow
+- commute: Commute data from the property to user's workplace
+- isSaved: Boolean indicating if the property has been saved by user
+- isUserClaimingOwner: Boolean indicating if a user is claiming ownership of the property
+- isUserConfirmedClaim: Boolean indicating if a user has confirmed ownership of the property
+- pgapt: Unknown
+- sgapt: Unknown
+- zestimate: Zestimate (estimated market value) of the property
+- shouldShowZestimateAsPrice: Boolean to show/hide the zestimate price
+- has3DModel: Boolean indicating if the property has a 3D model
+- hasVideo: Boolean indicating if the property has a video
+- list: Unknown
+- relaxed: Unknown
+- street_name: Name of the street of the property
+- geo_lon: Longitude of the geographic location of the property
+- geo_lat: Latitude of the geographic location of the property
+- status: Detailed status of the property
+- date_sold: Date on which the property was sold
+- time_sold: Time of the day on which the property was sold
+- rent_zestimate: Zestimate of the monthly rent
+- is_non_owner_occupied: Boolean indicating if the property is non-owner occupied
+- lot_area_acres: Area of the lot in acres
+- lot_area_sqft: Area of the lot in square feet
+- home_type: Type of the property (e.g. 'SINGLE_FAMILY', 'CONDO', 'TOWNHOUSE')
+- living_area_sqft: Area of the living space in square feet
+- price: Price of the property
+- price_per_sqft: Price of the property per square feet
+- streetViewMetadataURL: URL of metadata for the street view of the property
+- streetViewURL: URL of the street view of the property
+

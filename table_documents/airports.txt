@@ -1,0 +1,25 @@
+Description: The "airports" table is a comprehensive database containing essential details about airports worldwide. Its primary functionality is to store and provide information about individual airports, such as their unique identification codes, types, names, geographical coordinates, and elevation. The table also includes critical operational aspects, such as continent, country and region of location, municipality, scheduled services, GPS codes, IATA codes, local codes, and any relevant website or Wikipedia links. Apart from these, it stores keywords associated with each airport, enabling efficient searching and information retrieval. The secondary functionality of this table is to enable seamless search and organization of airports based on various filters, such as airport type, location, scheduled services, and designated codes.
+
+Applications: This airports table can be used in numerous applications, such as airline management systems, flight planning and scheduling software, air traffic control systems, aviation analytics, flight tracking services, and airport information directories. By containing vital information all in one table, it becomes a reliable resource for developers and decision-makers in the aviation industry.
+
+Keywords: Aviation, Airport database, Geographical location, Airport identifier, Airport type, Scheduled services, GPS codes, IATA codes, Air traffic management, Flight planning, Airline management systems, Flight tracking
+
+- id: Unique identifier for each airport record in the table.
+- ident: Shortened identifier code for the airport.
+- type: Type of the airport (e.g. small_airport, heliport, closed).
+- name: Full name of the airport.
+- latitude_deg: Latitude of the airport's geographic location in degrees.
+- longitude_deg: Longitude of the airport's geographic location in degrees.
+- elevation_ft: Elevation of the airport's geographic location in feet.
+- continent: Continent where the airport is located in (e.g. NA, SA, EU).
+- iso_country: ISO 3166-1 alpha-2 code for the country where the airport is located in (e.g. US, BR, JP).
+- iso_region: Code for the country subdivision where the airport is located in (e.g. US-TX, US-CA).
+- municipality: City or municipality where the airport is located in.
+- scheduled_service: Indicates whether the airport has scheduled airline service.
+- gps_code: GPS code for the airport.
+- iata_code: IATA code for the airport.
+- local_code: Local code for the airport.
+- home_link: URL for the airport's homepage (if applicable).
+- wikipedia_link: URL for the airport's wikipedia page (if applicable).
+- keywords: Keywords associated with the airport (e.g. city names, organizations the airport serves).
+
