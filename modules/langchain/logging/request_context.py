@@ -145,7 +145,7 @@ def agent_log_request_ctx(
     yield ctx
 
 
-def log_chain_call(chain: Chain, input: str | dict, model: str, chain_name: Optional[str]) -> dict:
+def log_chain_call(chain: Chain, input: str | dict, model: str, chain_name: Optional[str] = None) -> dict:
     if isinstance(input, str):
         input = {chain.input_keys[0]: input}
     with chain_log_request_ctx(chain_name or chain._chain_type, model, input) as log_ctx:
