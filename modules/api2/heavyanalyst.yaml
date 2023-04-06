@@ -1,0 +1,101 @@
+openapi: '3.0.0'
+info:
+  title: HeavyAnalyst API
+  version: "0.1"
+  description: A simple REST API for interacting with HeavyNL
+servers:
+  - url: /api/v1
+paths:
+  /query:
+    post:
+      tags:
+        - RequiresTables
+      summary: Provided a question and table(s), returns SQL that can be used to answer the question
+      operationId: modules.api2.handlers.query
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionAndTablesRequest'
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SQLStatement'
+        500:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /question:
+    post:
+      tags:
+        - RequiresTables
+      summary: Provided a question and tables(s), returns SQL and a NL Answer to the question
+      operationId: modules.api2.handlers.question
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionAndTablesRequest'
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnswerAndSQLStatement'
+        500:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    Tables:
+      type: object
+      properties:
+        tables:
+          type: array
+          items:
+            type: string
+      required:
+        - tables
+    Question:
+      type: object
+      properties:
+        question:
+          type: string
+      required:
+        - question
+    QuestionAndTablesRequest:
+      allOf:
+        - $ref: '#/components/schemas/Tables'
+        - $ref: '#/components/schemas/Question'
+    SQLStatement:
+      type: object
+      properties:
+        sql:
+          type: string
+    Answer:
+      type: object
+      properties:
+        answer:
+          type: string
+      required:
+        - answer
+    AnswerAndSQLStatement:
+      allOf:
+        - $ref: '#/components/schemas/SQLStatement'
+        - $ref: '#/components/schemas/Answer'
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
