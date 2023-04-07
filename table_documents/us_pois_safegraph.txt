@@ -1,37 +1,35 @@
-Description: The table us_pois_safegraph contains information about points of interest (POIs) in the United States. The primary functionality of this table is to store information about various establishments, such as their geographical location (latitude and longitude), address, opening hours, and related attributes. The secondary functionality includes categorizing POIs based on different fields like brand, top_category, and sub_category.
+Description: The us_pois_safegraph table contains information about Points of Interest (POIs) in the United States. Each record represents a POI with specific attributes including location_name, street_address, city, region, postal_code, geographic coordinates (latitude and longitude), categories (top_category, sub_category, and category_tags), business contact information (phone_number), and additional information such as operating hours, polygon information, and whether the POI includes a parking lot. The primary functionality of this table is to provide a comprehensive dataset of POIs across the United States for various applications.
 
-Applications: This table has various potential applications, such as:
-1. Generating maps and visualizations of different establishments within a specific area, based on their location and address information.
-2. Analyzing the concentration of different categories of establishments in a region and identifying patterns, trends, or gaps in certain markets.
-3. Assisting local businesses and customers in their search for specific types of establishments, such as restaurants or medical facilities, based on location, brands, or opening hours.
+Applications: Potential use cases and applications for the us_pois_safegraph table include geographic data analysis and visualization, business directory services, mapping applications and navigation systems, location-based recommendations, market research, infrastructure planning, and emergency response planning.
 
-Keywords: Points of Interest, POI, Establishments, Geolocation, Categories, Brands, Addresses, Opening Hours, Geographic Information System, GIS, United States Market Analysis
+Keywords: Points of Interest, POI, United States, locations, geographic data, restaurants, businesses, street addresses, geo-coordinates, mapping, navigation, business directories.
 
-- safegraph_place_id: a unique identifier for each point of interest (POI) defined by Safegraph
-- parent_safegraph_place_id: the safegraph_place_id of the parent POI, if applicable
-- safegraph_brand_ids: a list of unique brand IDs associated with the POI
-- location_name: the name of the location associated with the POI
-- brands: a string containing the brands associated with the POI
-- top_category: the top level category for the POI, i.e. Restaurants and Other Eating Places
-- sub_category: the subcategory for the POI, i.e. Full-Service Restaurants
-- naics_code: the NAICS code for the POI, i.e. 722511 for Full-Service Restaurants
-- latitude: the latitude of the POI's location
-- longitude: the longitude of the POI's location
-- street_address: the street address for the POI
-- primary_number: the primary street number for the POI's address
-- street_predirection: the directional indicator that precedes the street name, i.e. N Main St
-- street_name: the name of the street for the POI's address
-- street_postdirection: the directional indicator that follows the street name, i.e. Main St N
-- street_suffix: the suffix of the street name, i.e. Main St
-- city: the city in which the POI is located
-- region: the state or region abbreviation in which the POI is located
-- postal_code: the postal code in which the POI is located
-- open_hours: the operating hours for the POI, if available
-- category_tags: additional descriptive tags for the POI
-- polygon_wkt: the geometry of the POI represented as a well-known text string
-- polygon_class: a flag used to indicate if the polygon_wkt is owned or shared by multiple POIs
-- phone_number: the phone number for the POI
-- is_synthetic: a flag used to indicate if the POI data is synthetic or real
-- includes_parking_lot: a flag used to indicate if the POI includes a parking lot
-- iso_country_code: the ISO 3166-1 alpha-2 country code for the POI, i.e. US
+Column descriptions for us_pois_safegraph table:
+- us_pois_safegraph.safegraph_place_id: A unique identifier for each point of interest location, assigned by Safegraph.
+- us_pois_safegraph.parent_safegraph_place_id: A unique identifier for the parent location of a point of interest, assigned by Safegraph.
+- us_pois_safegraph.safegraph_brand_ids: The brand identifier(s) associated with a point of interest, assigned by Safegraph.
+- us_pois_safegraph.location_name: The name of the point of interest.
+- us_pois_safegraph.brands: The associated brand name(s).
+- us_pois_safegraph.top_category: A high-level category describing the industry of the point of interest.
+- us_pois_safegraph.sub_category: A more specific category describing the industry of the point of interest.
+- us_pois_safegraph.naics_code: A numerical code assigned to the point of interest based on the North American Industry Classification System (NAICS).
+- us_pois_safegraph.latitude: The latitude coordinate of the point of interest.
+- us_pois_safegraph.longitude: The longitude coordinate of the point of interest.
+- us_pois_safegraph.street_address: The street address of the point of interest.
+- us_pois_safegraph.primary_number: The primary street number associated with the point of interest.
+- us_pois_safegraph.street_predirection: The directional indicator that precedes a street name.
+- us_pois_safegraph.street_name: The name of the street on which the point of interest is located.
+- us_pois_safegraph.street_postdirection: The directional indicator that follows a street name.
+- us_pois_safegraph.street_suffix: The suffix of a street name (e.g. "St", "Rd", "Ave").
+- us_pois_safegraph.city: The city in which the point of interest is located.
+- us_pois_safegraph.region: The state or region in which the point of interest is located.
+- us_pois_safegraph.postal_code: The postal code associated with the point of interest.
+- us_pois_safegraph.open_hours: The hours of operation for the point of interest.
+- us_pois_safegraph.category_tags: Additional descriptive tags for the point of interest.
+- us_pois_safegraph.polygon_wkt: A polygon representation of the shape of the point of interest boundary.
+- us_pois_safegraph.polygon_class: An identifier indicating whether the polygon shape is owned or shared.
+- us_pois_safegraph.phone_number: The phone number associated with the point of interest.
+- us_pois_safegraph.is_synthetic: A flag indicating whether the point of interest is a synthetic location created for privacy or sampling purposes.
+- us_pois_safegraph.includes_parking_lot: A flag indicating whether a parking lot is included in the point of interest boundary.
+- us_pois_safegraph.iso_country_code: The ISO country code for the country in which the point of interest is located.
 

@@ -12,23 +12,24 @@ This table can be used in various applications, including:
 Keywords:
 Vessel, Automatic Identification System (AIS), maritime traffic, navigation information, latitude, longitude, course, speed, heading, ETA (estimated arrival time), position accuracy, destination, call sign, device type, vessel dimensions
 
-- mmsi: Unique identifier for an Automatic Identification System (AIS) device on a vessel
-- utc_timestamp: The UTC timestamp of when the AIS data was received
-- lat: The latitude of the vessel's location
-- lon: The longitude of the vessel's location
-- course_over_ground: The vessel's course over ground in degrees
-- speed_over_ground: The vessel's speed over ground in knots
-- heading: The vessel's heading in degrees
-- position_accuracy: The accuracy of the reported position data
-- imo_id: The International Maritime Organization (IMO) number for the vessel
-- name: The name of the vessel
-- callsign: The callsign of the vessel
-- type: The type of vessel, as defined by AIS
-- device_type: The type of AIS device used by the vessel
-- bow_meters: The length of the bow of the vessel in meters
-- stern_meters: The length of the stern of the vessel in meters
-- port_meters: The length of the port side of the vessel in meters
-- startboard_meters: The length of the starboard side of the vessel in meters
-- destination: The intended destination of the vessel
-- eta: The estimated time of arrival for the vessel at its destination in MM-DD HH:MM format
+Column descriptions for aishub_2021_06_016 table:
+- aishub_2021_06_016.mmsi: Unique identifier for an Automatic Identification System (AIS) device on a vessel
+- aishub_2021_06_016.utc_timestamp: The UTC timestamp of when the AIS data was received
+- aishub_2021_06_016.lat: The latitude of the vessel's location
+- aishub_2021_06_016.lon: The longitude of the vessel's location
+- aishub_2021_06_016.course_over_ground: The vessel's course over ground in degrees
+- aishub_2021_06_016.speed_over_ground: The vessel's speed over ground in knots
+- aishub_2021_06_016.heading: The vessel's heading in degrees
+- aishub_2021_06_016.position_accuracy: The accuracy of the reported position data
+- aishub_2021_06_016.imo_id: The International Maritime Organization (IMO) number for the vessel
+- aishub_2021_06_016.name: The name of the vessel
+- aishub_2021_06_016.callsign: The callsign of the vessel
+- aishub_2021_06_016.type: The type of vessel, as defined by AIS
+- aishub_2021_06_016.device_type: The type of AIS device used by the vessel
+- aishub_2021_06_016.bow_meters: The length of the bow of the vessel in meters
+- aishub_2021_06_016.stern_meters: The length of the stern of the vessel in meters
+- aishub_2021_06_016.port_meters: The length of the port side of the vessel in meters
+- aishub_2021_06_016.startboard_meters: The length of the starboard side of the vessel in meters
+- aishub_2021_06_016.destination: The intended destination of the vessel
+- aishub_2021_06_016.eta: The estimated time of arrival for the vessel at its destination in MM-DD HH:MM format
 

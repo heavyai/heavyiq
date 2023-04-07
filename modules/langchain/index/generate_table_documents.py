@@ -44,7 +44,10 @@ def get_table_summary_document(heavydb: HeavyDB, table: str) -> Document:
 
 
 column_description_prompt = """Provided a table schema, sample rows, and common column values, please return an unnumbered list of each column with comments describing the column's purpose.
-Do not return sample rows or common values. Do not explain any clauses."""
+Do not return sample rows or common values. Do not explain any clauses.
+
+Example:
+- table_name.column_name: Description of the column."""
 
 
 def get_table_column_description_document(heavydb: HeavyDB, table: str) -> Document:
@@ -66,8 +69,8 @@ def get_table_column_description_document(heavydb: HeavyDB, table: str) -> Docum
         HumanMessage(content=table_info),
     ]
     resp = llm(messages)
-    print(resp.content)
-    return Document(page_content=resp.content, metadata={"source": table})
+    page_content = f"Column descriptions for {table} table:\n{resp.content}"
+    return Document(page_content=page_content, metadata={"source": table})
 
 
 def create_and_write_table_document(heavydb: HeavyDB, table: str) -> None:

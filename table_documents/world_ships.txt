@@ -1,24 +1,25 @@
-Description: The "world_ships" table is designed to store detailed information about various types of ships from around the world. The primary functionality of this table is to serve as a comprehensive repository of ship data, including their unique identification information (mmsi, imo, eni), characteristics (name, name_ais, country, callsign), type and classification (vessel_type, vessel_type_specific), specifications (gross_tonnage, deadweight, teu, length_, breadth, home_port), year of build, and current operational status. The secondary functionality is to facilitate search and retrieval of ship data based on any of these attributes.
+Description: The "world_ships" table serves as a comprehensive database of various ships, their identification details, and specifications. The primary functionality of the table is to provide detailed information about each ship, such as maritime identification numbers (MMSI, IMO, and ENI), name, country, callsign, vessel type, vessel type-specific, gross tonnage, deadweight, TEU, dimensions (length and breadth), home port, year built, and current status. This allows for easy organization and retrieval of specific ship data.
 
-Applications: The "world_ships" table can be utilized in various applications, such as maritime domain awareness, shipping industry analytics, vessel tracking systems, and port management. It can also be used by research organizations and government agencies for monitoring and analyzing global shipping trends, enforcing maritime regulations, and ensuring maritime safety and security. Additionally, the table can help businesses in the logistics and cargo transportation sectors to optimize routes, manage fleets, and control costs.
+Applications: Potential use cases for the "world_ships" table include assisting maritime authorities in monitoring and managing vessel traffic, providing data for ship tracking and analysis, and aiding shipping companies in planning and decision-making processes. The table data can also serve as a valuable resource for research and academic purposes, such as studying trends in shipping industries, analyzing the correlation between ship size and fuel efficiency, or investigating the impact of various vessel types on the environment.
 
-Keywords: ship identification, vessel tracking, maritime domain awareness, shipping industry analytics, vessel characteristics, shipping trends, cargo transportation, logistics optimization, maritime security, port management.
+Keywords: Maritime, vessel identification, ship specifications, maritime authorities, vessel traffic management, shipping industry, research, ship tracking, environment, fuel efficiency, vessel management.
 
-- mmsi: The unique identifier for a ship that is assigned by the International Maritime Organization (IMO).
-- imo: The unique identifier for a ship that is assigned by the International Maritime Organization (IMO).
-- eni: The unique identifier for a ship that is assigned by the European Maritime Safety Agency (EMSA).
-- name: The name of the ship.
-- name_ais: The name of the ship as it appears in the Automatic Identification System (AIS) broadcast signal.
-- country: The country of the ship's registry.
-- callsign: The callsign used by the ship for communication purposes.
-- vessel_type: A standard classification of the type of ship, such as cargo, fishing, or pleasure craft.
-- vessel_type_specific: A more specific classification of the type of ship, such as fishing or cargo.
-- gross_tonnage: The measure of the ship's overall size, including the weight of cargo, fuel, water, and crew.
-- deadweight: The measure of the weight of cargo, fuel, water, and crew that a ship can carry.
-- teu: The measure of a ship's cargo-carrying capacity in terms of twenty-foot equivalent units (TEU).
-- length_: The length of the ship.
-- breadth: The width of the ship.
-- home_port: The port where a ship is registered or where it is based.
-- year_build: The year when the ship was built.
-- status: The current status of the ship, such as active, decommissioned or lost, or under repair.
+Column descriptions for world_ships table:
+- world_ships.mmsi: Maritime Mobile Service Identity of the ship.
+- world_ships.imo: International Maritime Organization number of the ship.
+- world_ships.eni: European Vessel Identification Number of the ship.
+- world_ships.name: Name of the ship.
+- world_ships.name_ais: Ship name as received over AIS.
+- world_ships.country: Country of the ship's registration.
+- world_ships.callsign: Radio callsign of the ship.
+- world_ships.vessel_type: General type of vessel.
+- world_ships.vessel_type_specific: Specific type of vessel.
+- world_ships.gross_tonnage: Gross tonnage is a measure of a ship's internal volume.
+- world_ships.deadweight: Maximum weight of cargo that can be carried by the ship in metric tonnes.
+- world_ships.teu: Number of twenty-foot equivalent units that can be carried by the ship.
+- world_ships.length_: Length of the ship in meters.
+- world_ships.breadth: Width of the ship in meters.
+- world_ships.home_port: Port where the ship is registered or normally based.
+- world_ships.year_build: Year the ship was built.
+- world_ships.status: Current status of the ship.
 

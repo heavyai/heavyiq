@@ -1,58 +1,70 @@
-Description: The zillow_recent_sales_full_peninsula table stores information about recently sold residential properties in the Peninsula region. The table contains details such as property ID, address, sale price, sale date, property type, and various other attributes related to property's features and location. Primary functionality of the table is to maintain a record of property sales data, while the secondary functionality includes providing details on property attributes and facilitating property search and analysis.
+Description:
+The "zillow_recent_sales_full_peninsula" table is a comprehensive database containing information about recently sold properties in the Peninsula region. This table stores crucial details such as property address, sale price, date sold, and property type. Primary functionalities of this table include tracking recent property transactions and providing insights into property features such as the number of bedrooms, bathrooms, and living area size. Secondary functionalities comprise analyzing property-related aspects such as image availability, video content, whether the user claims property ownership, or whether the property is non-owner occupied.
 
-Applications: Potential use cases and applications for the data stored in this table include:
-1. Real estate market analysis to understand recent sales trends, pricing, and property types in the Peninsula region.
-2. Generating statistics and reports to assist potential buyers, sellers, and real estate professionals in making data-driven decisions.
-3. Developing property valuation models and tools, such as Zestimate, to help estimate the market value of a property.
-4. Facilitating search and retrieval of recently sold properties by features, price, location, or other desired criteria.
+Applications:
+This table can be used for various applications, such as:
+1. Real estate market analysis: Assessing the property sales trends, average selling prices, most popular property types, and identifying high-demand areas in the Peninsula region.
+2. Property valuation: By analyzing similar properties and their sold prices, property valuation estimates can be derived. 
+3. Investment opportunities: Evaluating potential real estate investment opportunities for profitability, based on property features, location, and historical sale data.
+4. Statistical analysis: Observing patterns and correlations between different property characteristics, such as the relationship between living area size and sale price or address proximity to schools or transport links.
 
-Keywords: Zillow, recent sales, Peninsula region, real estate, property attributes, property search, market analysis, residential properties, property valuation, Zestimate.
+Keywords:
+- Real estate
+- Property sales
+- Peninsula region
+- Property valuation
+- Market analysis
+- Sold prices
+- Investment opportunities
+- Home features
+- Property ownership
 
-- zpid: Unique identifier for each property
-- id: Unique identifier for each record
-- imgSrc: URL of main image of the property
-- hasImage: Boolean indicating if the property has at least one image
-- detailUrl: URL of the property's detail page on Zillow
-- statusType: Type of status of the property (e.g. 'SOLD', 'FOR_SALE', 'PENDING')
-- statusText: Description of the status of the property (e.g. 'Sold', 'For Sale by Owner', 'Accepting Backup Offers')
-- countryCurrency: Country currency of the property
-- soldPrice: Price at which the property was sold
-- unformattedPrice: Price of the property in unformatted form
-- address: Complete address of the property
-- addressStreet: Street address of the property
-- addressCity: City of the property
-- addressState: State of the property
-- addressZipcode: Zipcode of the property
-- beds: Number of bedrooms in the property
-- baths: Number of bathrooms in the property
-- area: Total area of the property
-- isZillowOwned: Boolean indicating if the property is owned by Zillow
-- commute: Commute data from the property to user's workplace
-- isSaved: Boolean indicating if the property has been saved by user
-- isUserClaimingOwner: Boolean indicating if a user is claiming ownership of the property
-- isUserConfirmedClaim: Boolean indicating if a user has confirmed ownership of the property
-- pgapt: Unknown
-- sgapt: Unknown
-- zestimate: Zestimate (estimated market value) of the property
-- shouldShowZestimateAsPrice: Boolean to show/hide the zestimate price
-- has3DModel: Boolean indicating if the property has a 3D model
-- hasVideo: Boolean indicating if the property has a video
-- list: Unknown
-- relaxed: Unknown
-- street_name: Name of the street of the property
-- geo_lon: Longitude of the geographic location of the property
-- geo_lat: Latitude of the geographic location of the property
-- status: Detailed status of the property
-- date_sold: Date on which the property was sold
-- time_sold: Time of the day on which the property was sold
-- rent_zestimate: Zestimate of the monthly rent
-- is_non_owner_occupied: Boolean indicating if the property is non-owner occupied
-- lot_area_acres: Area of the lot in acres
-- lot_area_sqft: Area of the lot in square feet
-- home_type: Type of the property (e.g. 'SINGLE_FAMILY', 'CONDO', 'TOWNHOUSE')
-- living_area_sqft: Area of the living space in square feet
-- price: Price of the property
-- price_per_sqft: Price of the property per square feet
-- streetViewMetadataURL: URL of metadata for the street view of the property
-- streetViewURL: URL of the street view of the property
+Column descriptions for zillow_recent_sales_full_peninsula table:
+- zillow_recent_sales_full_peninsula.zpid: Unique identifier of each property.
+- zillow_recent_sales_full_peninsula.id: Unique identifier of each property assigned by Zillow.
+- zillow_recent_sales_full_peninsula.imgSrc: URL source for image of the property.
+- zillow_recent_sales_full_peninsula.hasImage: Whether the property has an associated image (True or False).
+- zillow_recent_sales_full_peninsula.detailUrl: Link to the property page on Zillow's website.
+- zillow_recent_sales_full_peninsula.statusType: Type of sale status (e.g. SOLD, FOR_SALE).
+- zillow_recent_sales_full_peninsula.statusText: Detailed information on sale status.
+- zillow_recent_sales_full_peninsula.countryCurrency: Currency used to represent the price.
+- zillow_recent_sales_full_peninsula.soldPrice: Price of the property when sold.
+- zillow_recent_sales_full_peninsula.unformattedPrice: Price of the property in unformatted text.
+- zillow_recent_sales_full_peninsula.address: Full address of the property.
+- zillow_recent_sales_full_peninsula.addressStreet: Street address of the property.
+- zillow_recent_sales_full_peninsula.addressCity: City where the property is located.
+- zillow_recent_sales_full_peninsula.addressState: State where the property is located.
+- zillow_recent_sales_full_peninsula.addressZipcode: Zipcode where the property is located.
+- zillow_recent_sales_full_peninsula.beds: Number of bedrooms.
+- zillow_recent_sales_full_peninsula.baths: Number of bathrooms.
+- zillow_recent_sales_full_peninsula.area: Total area of the property.
+- zillow_recent_sales_full_peninsula.isZillowOwned: Whether the property is owned by Zillow (True or False).
+- zillow_recent_sales_full_peninsula.commute: Commute data.
+- zillow_recent_sales_full_peninsula.isSaved: Whether the property is saved by the user (True or False).
+- zillow_recent_sales_full_peninsula.isUserClaimingOwner: Whether the user is claiming ownership of the property (True or False).
+- zillow_recent_sales_full_peninsula.isUserConfirmedClaim: Whether the user's ownership claim is confirmed (True or False).
+- zillow_recent_sales_full_peninsula.pgapt: Unknown.
+- zillow_recent_sales_full_peninsula.sgapt: Unknown.
+- zillow_recent_sales_full_peninsula.zestimate: Estimated value of the property.
+- zillow_recent_sales_full_peninsula.shouldShowZestimateAsPrice: Whether the estimated value of the property should be shown as a price (True or False).
+- zillow_recent_sales_full_peninsula.has3DModel: Whether the property has a 3D model (True or False).
+- zillow_recent_sales_full_peninsula.hasVideo: Whether the property has a video (True or False).
+- zillow_recent_sales_full_peninsula.list: Unknown.
+- zillow_recent_sales_full_peninsula.relaxed: Unknown.
+- zillow_recent_sales_full_peninsula.street_name: Name of the street where the property is located.
+- zillow_recent_sales_full_peninsula.geo_lon: Longitude of the geolocation of the property.
+- zillow_recent_sales_full_peninsula.geo_lat: Latitude of the geolocation of the property.
+- zillow_recent_sales_full_peninsula.status: Sale status of the property.
+- zillow_recent_sales_full_peninsula.date_sold: Date when the property was sold.
+- zillow_recent_sales_full_peninsula.time_sold: Time when the property was sold.
+- zillow_recent_sales_full_peninsula.rent_zestimate: Estimated rental value of the property.
+- zillow_recent_sales_full_peninsula.is_non_owner_occupied: Whether the property is not owner-occupied (True or False).
+- zillow_recent_sales_full_peninsula.lot_area_acres: Total lot area of the property in acres.
+- zillow_recent_sales_full_peninsula.lot_area_sqft: Total lot area of the property in square feet.
+- zillow_recent_sales_full_peninsula.home_type: Type of property.
+- zillow_recent_sales_full_peninsula.living_area_sqft: Total living area of the property in square feet.
+- zillow_recent_sales_full_peninsula.price: Price of the property.
+- zillow_recent_sales_full_peninsula.price_per_sqft: Price per square foot of the property.
+- zillow_recent_sales_full_peninsula.streetViewMetadataURL: Unknown.
+- zillow_recent_sales_full_peninsula.streetViewURL: URL for the Google Street View of the property.
 

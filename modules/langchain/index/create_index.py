@@ -5,10 +5,10 @@ from langchain.vectorstores import Chroma
 from langchain.docstore.document import Document
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.indexes import VectorstoreIndexCreator
-from langchain.indexes.vectorstore import VectorStoreIndexWrapper
 from langchain.vectorstores.base import VectorStore
 
 from modules.langchain.index import generate_table_documents
+from modules.langchain.index.heavydb_metadata_index import HeavyDBMetadataIndex
 
 # huggingface_model_name = os.environ.get("HUGGINGFACE_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 huggingface_model_name = os.environ.get("HUGGINGFACE_EMBED_MODEL", "sentence-transformers/gtr-t5-large")
@@ -32,13 +32,13 @@ def read_table_documents(folder_path: str) -> Iterator[Document]:
 
 def create_index_if_nonexistent(
     folder_path: str = "table_documents", persist_directory: str = "db"
-) -> VectorStoreIndexWrapper:
+) -> HeavyDBMetadataIndex:
     """
     Create a new vector store index if it does not exist, otherwise return the existing index.
 
     :param folder_path: Path to the folder containing table document files.
     :param persist_directory: Path to the directory where the vector store index should be persisted.
-    :return: A VectorStoreIndexWrapper instance containing the vector store index.
+    :return: A HeavyDBMetadataIndex instance containing the vector store index.
     """
     tables_with_new_summaries = generate_table_documents(folder_path)
 
@@ -68,7 +68,7 @@ def create_index_if_nonexistent(
         )
         print("Done")
 
-    return VectorStoreIndexWrapper(vectorstore=vectorstore)
+    return HeavyDBMetadataIndex(vectorstore=vectorstore)
 
 
 heavydb_index = create_index_if_nonexistent()
