@@ -1,7 +1,5 @@
 import re
 from typing import Literal, Optional, Any
-import time
-import functools
 
 from langchain.indexes.vectorstore import VectorStoreIndexWrapper
 from langchain.llms.openai import OpenAI
@@ -9,32 +7,15 @@ from langchain.vectorstores import Chroma
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.prompts import PromptTemplate, FewShotPromptTemplate
 from langchain.prompts.example_selector import MaxMarginalRelevanceExampleSelector
-from langchain.callbacks import get_openai_callback
 from langchain.schema import Document
+from langchain.callbacks import get_openai_callback
 
 from modules.langchain.chains.sql_schema_question import (
     create_sql_schema_question_chain,
     SQLSchemaQuestionChainNoResultsAnswer,
     create_table_docs_map_reduce_chain,
 )
-from modules.langchain.logging import log_chain_call
-
-
-def log_duration(func):
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        start_time = time.time()
-        try:
-            result = func(*args, **kwargs)
-        except Exception as e:
-            raise e
-        finally:
-            duration = time.time() - start_time
-            print(f"{func.__name__} took {duration:.2f} seconds to complete.")
-        return result
-
-    return wrapper
-
+from modules.langchain.logging import log_chain_call, log_request_ctx, LangChainType
 
 search_types = Literal["similarity", "mmr"]
 
@@ -228,7 +209,6 @@ class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
         docs = self.simple_search_for_table_docs(search_string, search_type, k, fetch_k)
         return [doc.metadata["source"] for doc in docs]
 
-    @log_duration
     def ask_about_database(
         self,
         question: str,
@@ -300,28 +280,27 @@ class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
         rephrased_question = self.rephrase_question(question)
         return self.ask_about_database(rephrased_question)
 
-    @log_duration
     def ask_using_simple_search(self, question: str, rephrased_question: Optional[str] = None) -> dict[str, str]:
-        with get_openai_callback() as cb:
-            rephrased_question = rephrased_question or self.rephrase_question(question)
-            table_docs = self.simple_search_for_table_docs(question)
-            chain = create_table_docs_map_reduce_chain()
-            res = chain({chain.input_key: table_docs, "question": rephrased_question})
-            answer = res[chain.output_key]
-            if re.search(r"SOURCES:\s", answer):
-                answer, tables = re.split(r"SOURCES:\s", answer)
-            else:
-                tables = ""
-            result: dict[str, Any] = {
-                "answer": answer.strip(),
-                "tables": [tn.strip() for tn in tables.split(",")],
-            }
-            print(f"Prompt Tokens: {cb.prompt_tokens}")
-            print(f"Completion Tokens: {cb.completion_tokens}")
-            print(f"Total Tokens: {cb.total_tokens}")
-            print(f"Successful Requests: {cb.successful_requests}")
-            print(f"Total Cost (USD): ${cb.total_cost}")
-            if result["answer"] == SQLSchemaQuestionChainNoResultsAnswer:
-                raise Exception("No relevant tables found for query: " + question)
+        with log_request_ctx(LangChainType.Chain, "ask_using_simple_search", "text-davinci-003") as log_ctx:
+            with get_openai_callback() as cb:
+                rephrased_question = rephrased_question or self.rephrase_question(question)
+                table_docs = self.simple_search_for_table_docs(question)
+                chain = create_table_docs_map_reduce_chain()
+                log_ctx.add_input(
+                    {chain.input_key: [doc.page_content for doc in table_docs], "question": rephrased_question}
+                )
+                res = chain({chain.input_key: table_docs, "question": rephrased_question})
+                answer = res[chain.output_key]
+                if re.search(r"SOURCES:\s", answer):
+                    answer, tables = re.split(r"SOURCES:\s", answer)
+                else:
+                    tables = ""
+                result: dict[str, Any] = {
+                    "answer": answer.strip(),
+                    "tables": [tn.strip() for tn in tables.split(",")],
+                }
+                log_ctx.success(result, cb)
+                if result["answer"] == SQLSchemaQuestionChainNoResultsAnswer:
+                    raise Exception("No relevant tables found for query: " + question)
 
-            return result
+                return result

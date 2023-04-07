@@ -2,7 +2,11 @@ from modules.langchain.index import heavydb_index
 
 
 def main():
-    res = heavydb_index.ask_about_database(
+    # heavydb_index.ask
+    # heavydb_index.ask_about_database
+    # heavydb_index.ask_using_rephrased_question
+    # heavydb_index.rephrase_question
+    res = heavydb_index.ask_using_simple_search(
         "I need the schemas for tables containing crop acreage and Mixed Pasture information for the year 2014"
     )
     print(res)
