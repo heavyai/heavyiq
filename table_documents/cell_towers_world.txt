@@ -1,22 +1,28 @@
-Description: The cell_towers_world table is designed to store information about cell towers from various radio network technologies (GSM, UMTS, LTE, CDMA) around the world. The primary functionality of this table is to provide comprehensive data on cell towers, including location, coverage range, and signal quality. Secondary functionality involves tracking data updates and changes (changeable, created, and updated columns).
+Description: The cell_towers_world table stores information about various cell towers across the globe. The data includes radio type (GSM, UMTS, LTE, CDMA), Mobile Country Code (MCC), network code (net), area code, cell identity, unit, geographic coordinates (longitude and latitude), range, number of samples, changeability, creation and update timestamps, and average signal strength.
 
-Applications: Potential use cases for this table include network performance analysis, location-based services, and network expansion planning, among others. The data may be used by telecom operators to improve network coverage and signal quality, by government agencies for regulatory purposes, and by businesses and developers for creating location-based applications and services.
+Applications: This table can be useful for various applications such as:
+1. Telecommunication companies to manage and monitor their network infrastructure.
+2. Mapping and visualizing cell tower locations for analytical purposes.
+3. Analyzing network coverage and signal strength in different regions to improve customer's service quality.
+4. Assisting with efficient network planning and optimization.
+5. Facilitating emergency response teams in locating and identifying cell towers during disaster recovery efforts.
 
-Keywords: cell tower, radio technology, location, coverage, signal quality, network performance, telecom operator,-location-based services, network expansion, network improvements.
+Keywords: cell tower, radio, technology, mobile country code, network, area, cell identity, geographic coordinates, signal strength, timestamp, network infrastructure, coverage, mapping, optimization, emergency response.
 
-- radio: The type of radio technology used by the cell tower (UMTS, LTE, GSM, CDMA)
-- mcc: The Mobile Country Code identifying the country where the cell tower is located (310, 262, 250, 724, 208)
-- net: The Numeric Identifier for a network within a country (1, 2, 3, 10, 410)
-- area: The area code for the cell tower (1, 65534, 2, 5, 10)
-- cell: The cell identifier or cell ID of the cell tower (0, 4112, 65535, 50594049, 62)
-- unit: The signal measurement unit (0, -1, 1, 9, 8)
-- lon: The longitude of the location of the cell tower (in decimal degrees)
-- lat: The latitude of the location of the cell tower (in decimal degrees)
-- location: The location of the cell tower in WKB format with SRID=4326 and compressed encoding
-- range_: The estimated range from the cell tower to the device (in meters)
-- samples: The number of signal samples taken for the cell tower
-- changeable: A flag specifying if the cell tower details can be changed (1 for yes, 0 for no)
-- created: The timestamp of when the cell tower was added to the database (in UTC)
-- updated: The timestamp of the last update of the cell tower details (in UTC)
-- average_signal: The average signal strength of the cell tower (in dBm)
+Column descriptions for cell_towers_world table:
+- cell_towers_world.radio: The radio type used by the cell tower.
+- cell_towers_world.mcc: The Mobile Country Code of the country where the cell tower is located.
+- cell_towers_world.net: The Network Code of the network operator owning the cell tower.
+- cell_towers_world.area: The cell tower location area code.
+- cell_towers_world.cell: The unique identifier number of the cell tower within a location area.
+- cell_towers_world.unit: The unit ID used to identify a group of cells within a base station.
+- cell_towers_world.lon: The longitude of the cell tower location.
+- cell_towers_world.lat: The latitude of the cell tower location.
+- cell_towers_world.location: The geometric coordinates of the cell tower location, encoded as a POINT.
+- cell_towers_world.range_: The estimated coverage range of the cell tower in meters.
+- cell_towers_world.samples: The number of signal samples used to determine the average signal strength.
+- cell_towers_world.changeable: A binary indicator of whether the cell tower location and range can be updated.
+- cell_towers_world.created: The timestamp of when the cell tower record was created.
+- cell_towers_world.updated: The timestamp of when the cell tower record was last updated.
+- cell_towers_world.average_signal: The average signal strength of the cell tower in dBm.
 

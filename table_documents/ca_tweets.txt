@@ -1,41 +1,36 @@
-Description: The "ca_tweets" table stores information about tweets originating from California. It captures various data points such as the tweet content, timestamp, geolocation, sender details, reply information, languages, and social media metrics, amongst others. Primary functionality includes storing and organizing tweets, while secondary functionality supports analysis of user interactions, location context, and tweet sentiments.
+Description: The ca_tweets table is designed for storing and managing tweet information from the California region. It contains details about tweet IDs, timestamps, geographic locations (latitude, longitude, and GeoX/GeoY), sender information (ID, name, and join time), tweet engagement (followers, followees, and tweet count), content (tweet text, language, and tokens), reply-related details (user ID and tweet ID), app source, and various administrative details (country, state, admin levels, and county and abbreviations). Additionally, it holds information about the origin of the tweet, such as whether it came from iOS or Android devices, and associated hashtags.
 
-Applications: Potential use cases and applications for this table include:
-1. Social media analysis: Understand user behavior, trending topics, and engagement levels for tweets originating from California.
-2. Geospatial analysis: Analyze the geographical distribution of tweets and identify localized trends or events.
-3. Sentiment analysis: Investigate and identify attitudes, emotions, and opinions expressed in the tweets.
-4. Influencer identification: Discover and analyze the most influential users based on their metrics, such as followers and tweet counts.
-5. Marketing and advertising: Target campaigns and promotions based on user preferences and location data.
-6. Emergency response and public alerts: Monitor real-time events and relay critical information to the public.
+Applications: The ca_tweets table can be used for a wide range of applications. Some potential use cases include tweet data analysis, sentiment analysis of tweets based in California, trend identification and evaluation of hashtag usage, location-based tweet analysis for marketing and demographic research, tweet responsiveness and user engagement assessments, and data processing for geospatial analysis over social networking content.
 
-Keywords: California, tweets, geolocation, sentiment analysis, social media, user interaction, Twitter, influencers, marketing, emergency response
+Keywords: California tweets, geolocated tweets, social network analysis, tweet data, tweet engagement, sentiment analysis, trend identification, geospatial analysis, demographics, marketing, responsiveness, hashtag usage.
 
-- tweet_id: A unique identifier for each tweet.
-- tweet_time: The timestamp when the tweet was posted.
-- lat: The latitude of the location where the tweet originated.
-- lon: The longitude of the location where the tweet originated.
-- sender_id: A unique identifier for the user who sent the tweet.
-- sender_name: The name of the user who sent the tweet.
-- location: The location listed on the profile of the user who sent the tweet.
-- source: The source application or device used to send the tweet.
-- reply_to_user_id: The unique identifier of the user that this tweet is in reply to, if applicable.
-- reply_to_tweet_id: The unique identifier of the tweet that this tweet is in reply to, if applicable.
-- lang: The language of the tweet.
-- followers: The number of followers the user who sent the tweet has.
-- followees: The number of followees (the users the user who sent the tweet follows) the user who sent the tweet has.
-- tweet_count: The number of tweets the user who sent the tweet has sent in total.
-- join_time: The date and time when the user who sent the tweet joined Twitter.
-- tweet_text: The text content of the tweet.
-- country: The country where the tweet originated.
-- admin1: The first-level administrative division (e.g., state) where the tweet originated.
-- admin2: The second-level administrative division (e.g., city or county) where the tweet originated.
-- place_name: The name of the place where the tweet originated.
-- state_abbr: The two-letter abbreviation of the state where the tweet originated.
-- county_state: The name of the county and state where the tweet originated.
-- origin: The type of device or application used to send the tweet.
-- hashtags: A list of the hashtags included in the tweet.
-- tweet_tokens: A list of the tokens (words) in the tweet after preprocessing.
-- goog_x: The x-coordinate of the location where the tweet originated according to Google Maps.
-- goog_y: The y-coordinate of the location where the tweet originated according to Google Maps.
-- is_exact: A boolean value indicating whether the location where the tweet originated was an exact location or an approximation (e.g., a city center).
+Column descriptions for ca_tweets table:
+- ca_tweets.tweet_id: Unique identifier for the tweet.
+- ca_tweets.tweet_time: Timestamp of when the tweet was posted.
+- ca_tweets.lat: Latitude coordinate of the tweet location.
+- ca_tweets.lon: Longitude coordinate of the tweet location.
+- ca_tweets.sender_id: Unique identifier for the user who posted the tweet.
+- ca_tweets.sender_name: Screen name of the user who posted the tweet.
+- ca_tweets.location: Geographical location associated with the tweet, either provided by the user or determined by Twitter.
+- ca_tweets.source: The application or device used to post the tweet.
+- ca_tweets.reply_to_user_id: The unique identifier of the user to whom the tweet is a reply.
+- ca_tweets.reply_to_tweet_id: The unique identifier of the tweet to which this tweet is a reply.
+- ca_tweets.lang: Language of the tweet.
+- ca_tweets.followers: The number of followers the user who posted the tweet has.
+- ca_tweets.followees: The number of accounts the user who posted the tweet is following.
+- ca_tweets.tweet_count: The number of tweets the user who posted the tweet has sent.
+- ca_tweets.join_time: Timestamp of when the user who posted the tweet joined Twitter.
+- ca_tweets.tweet_text: The text of the tweet.
+- ca_tweets.country: The country where the tweet was posted.
+- ca_tweets.admin1: The first-level administrative division of the country where the tweet was posted (e.g. state or province).
+- ca_tweets.admin2: The second-level administrative division of the country where the tweet was posted (e.g. county or district).
+- ca_tweets.place_name: The name of the place associated with the tweet.
+- ca_tweets.state_abbr: Two-letter abbreviation for the state or province where the tweet was posted.
+- ca_tweets.county_state: The combination of second-level administrative division and first-level administrative division of the country where the tweet was posted.
+- ca_tweets.origin: The device or application used to post the tweet.
+- ca_tweets.hashtags: An array of the hashtags used in the tweet.
+- ca_tweets.tweet_tokens: An array of the words in the tweet text, excluding punctuation and stopwords.
+- ca_tweets.goog_x: The x-coordinate of the tweet location in a global coordinate system (Google).
+- ca_tweets.goog_y: The y-coordinate of the tweet location in a global coordinate system (Google).
+- ca_tweets.is_exact: A boolean value indicating whether the tweet location is exact or approximate.
 

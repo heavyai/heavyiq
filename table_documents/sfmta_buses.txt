@@ -1,16 +1,17 @@
-Description: The sfmta_buses table is designed to store information about the San Francisco Municipal Transportation Agency (SFMTA) buses' live positions and their attributes. The primary functionality of this table is to track the real-time location, speed, and heading of each bus in the city's transit system. Secondary functionality includes storing the train assignment and predictability for each bus.
+Description: The `sfmta_buses` table is designed to store information about buses monitored by the San Francisco Municipal Transportation Agency (SFMTA). The primary functionality of this table is to keep track of real-time data for each bus, including its geographic location, speed, and heading. Secondary features include associating each bus with a specific train assignment and indicating whether the bus's location and speed are predictable based on the current data.
 
-Applications: Potential use cases and applications for the sfmta_buses table include real-time transit tracking applications, allowing commuters to know when to expect specific buses at their stops. Additionally, the data in this table could be used for traffic analysis, performance assessment of the city's transit system, and route optimization to improve the efficiency of the public transportation network.
+Applications: Potential use cases for the `sfmta_buses` table include applications that provide real-time updates on bus locations, offer predictive analysis of bus arrivals, and monitor the overall performance and efficiency of the public transit system. This table can also be used to identify trends and patterns that inform planning and optimization initiatives for the SFMTA public transit network.
 
-Keywords: real-time location, SFMTA, bus tracking, transit system, traffic analysis, route optimization, public transportation, performance assessment, vehicle position, commuter information
+Keywords: SFMTA, buses, real-time tracking, location data, speed, heading, train assignment, predictability, public transit, transportation efficiency, monitoring, trend analysis, geographic information, San Francisco.
 
-- REV: Short for revision, likely denotes version number of data.
-- REPORT_TIME: Timestamp for when the bus report was generated.
-- VEHICLE_TAG: Identifier for a specific bus.
-- LONGITUDE: Bus location's longitude.
-- LATITUDE: Bus location's latitude.
-- SPEED: Bus speed in miles per hour (mph).
-- HEADING: Direction the bus is traveling in degrees clockwise from true north.
-- TRAIN_ASSIGNMENT: Assignment identifier for a specific train.
-- PREDICTABLE: Indicator for whether the bus can be predicted by the system.
+Column descriptions for sfmta_buses table:
+- sfmta_buses.REV: Revision number of the data.
+- sfmta_buses.REPORT_TIME: Timestamp of when the data was reported.
+- sfmta_buses.VEHICLE_TAG: Unique identifier for each vehicle.
+- sfmta_buses.LONGITUDE: The longitude of each vehicle's GPS coordinates.
+- sfmta_buses.LATITUDE: The latitude of each vehicle's GPS coordinates.
+- sfmta_buses.SPEED: The speed of each vehicle in miles per hour.
+- sfmta_buses.HEADING: The direction each vehicle is heading in degrees.
+- sfmta_buses.TRAIN_ASSIGNMENT: Unique identifier for each train assignment.
+- sfmta_buses.PREDICTABLE: Whether or not the vehicle is predictable in its movements.
 

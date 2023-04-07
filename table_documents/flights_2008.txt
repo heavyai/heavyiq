@@ -1,64 +1,65 @@
-Description: The flights_2008 table contains detailed information about domestic flights in the United States during the year 2008. The primary functionality of this table is to store flight data, such as departure and arrival times, carrier details, and delay information. Secondary functionality includes providing information about airports, aircraft details, such as type and manufacturer, and geography (latitude and longitude coordinates).
+Description: The flights_2008 table is designed to store information on flight records for the year 2008, relating to different aspects such as time, location, and aircraft data. The table covers crucial details, including departure/arrival times, delays, origin and destination, distance, aircraft specifics, and airline details. It serves the primary function of serving as a comprehensive repository for flight information, and a secondary function in offering insights into the performance and efficiency of different airlines, location-specific aviation trends, and specific flight dynamics.
 
-Applications: This table can be used for a variety of applications, including but not limited to:
-1. Analyzing travel patterns, airline performance, and identifying potential improvements in operational efficiency.
-2. Performing historical analysis of flight delays, cancellations, and possible factors contributing to these issues.
-3. Investigating relationships between airport locations, carriers, and aircraft types.
-4. Enabling efficient route and connection planning for airlines, passengers, and logistical operations.
-5. Creating insightful visualizations and dashboards for stakeholders in the aviation industry.
+Applications: The flights_2008 table can be utilized in various use cases and applications, including but not limited to:
+1. Performance analysis of different airlines regarding punctuality and efficiency.
+2. Exploration of the correlations between different types of delays or cancellations.
+3. Prediction of potential delays or issues for future flights based on historical data.
+4. Analysis of airport activity trends, such as busiest hours, days, or months.
+5. Comparison of aircraft manufacturers and airplane models in terms of usage and performance.
 
-Keywords: flights, airlines, carriers, airports, aircraft, delay, cancellation, departure, arrival, performance, 2008, United States, domestic, travel patterns, operational efficiency, route planning, visualization.
+Keywords: Flight records, aviation trends, airline performance, airport analytics, aircraft data, delay analysis, cancellation insights, origin and destination analysis, predictive analytics.
 
-- flight_year: year of the flight (e.g. 2008)
-- flight_month: month of the flight (1-12)
-- flight_dayofmonth: day of the month of the flight (1-31)
-- flight_dayofweek: day of the week of the flight (1-7, where 1 is Monday, 7 is Sunday)
-- deptime: scheduled departure time (HHMM format)
-- crsdeptime: expected departure time (HHMM format)
-- arrtime: scheduled arrival time (HHMM format)
-- crsarrtime: expected arrival time (HHMM format)
-- uniquecarrier: unique carrier code
-- flightnum: flight number
-- tailnum: tail number of the aircraft
-- actualelapsedtime: actual elapsed time of the flight (in minutes)
-- crselapsedtime: expected elapsed time of the flight (in minutes)
-- airtime: actual time spent in the air (in minutes)
-- arrdelay: arrival delay (in minutes)
-- depdelay: departure delay (in minutes)
-- origin: three-letter code of the origin airport
-- dest: three-letter code of the destination airport
-- distance: distance between airports (in miles)
-- taxiin: taxi in time (in minutes)
-- taxiout: taxi out time (in minutes)
-- cancelled: whether the flight was cancelled (1) or not (0)
-- cancellationcode: reason for cancellation (A, B, C, D)
-- diverted: whether the flight was diverted (1) or not (0)
-- carrierdelay: delay caused by the carrier (in minutes)
-- weatherdelay: delay caused by weather (in minutes)
-- nasdelay: delay caused by the National Airspace System (in minutes)
-- securitydelay: delay caused by security (in minutes)
-- lateaircraftdelay: delay caused by a previous flight being late (in minutes)
-- dep_timestamp: actual departure timestamp
-- arr_timestamp: actual arrival timestamp
-- carrier_name: name of the carrier
-- plane_type: type of plane (corporation, individual, foreign corporation, co-owner, or partnership)
-- plane_manufacturer: manufacturer of the plane (Boeing, Bombardier Inc, Embraer, Airbus Industrie, McDonnell Douglas)
-- plane_issue_date: date when the plane was issued
-- plane_model: model of the plane (CL-600-2B19, 737-7H4, EMB-145LR, 737-3H4, A320-232)
-- plane_status: current status of the plane (Valid or Registered to Mfr)
-- plane_aircraft_type: type of aircraft (fixed wing multi-engine, fixed wing single-engine, balloon or rotorcraft)
-- plane_engine_type: type of engine (turbo-fan, turbo-jet, turbo-prop, reciprocating or none)
-- plane_year: year when the plane was manufactured
-- origin_name: name of the origin airport
-- origin_city: city of the origin airport
-- origin_state: state of the origin airport
-- origin_country: country of the origin airport
-- origin_lat: latitude of the origin airport
-- origin_lon: longitude of the origin airport
-- dest_name: name of the destination airport
-- dest_city: city of the destination airport
-- dest_state: state of the destination airport
-- dest_country: country of the destination airport
-- dest_lat: latitude of the destination airport
-- dest_lon: longitude of the destination airport
+Column descriptions for flights_2008 table:
+- flights_2008.flight_year: The year of the flight.
+- flights_2008.flight_month: The month of the flight.
+- flights_2008.flight_dayofmonth: The day of the month of the flight.
+- flights_2008.flight_dayofweek: The day of the week of the flight.
+- flights_2008.deptime: The actual departure time of the flight (local time).
+- flights_2008.crsdeptime: The scheduled departure time of the flight (local time).
+- flights_2008.arrtime: The actual arrival time of the flight (local time).
+- flights_2008.crsarrtime: The scheduled arrival time of the flight (local time).
+- flights_2008.uniquecarrier: The unique carrier code for the airline operating the flight.
+- flights_2008.flightnum: The flight number.
+- flights_2008.tailnum: The tail number of the aircraft.
+- flights_2008.actualelapsedtime: The actual elapsed time of the flight in minutes.
+- flights_2008.crselapsedtime: The scheduled elapsed time of the flight in minutes.
+- flights_2008.airtime: The amount of time in minutes between wheels-off and wheels-on.
+- flights_2008.arrdelay: The arrival delay in minutes. Negative numbers represent early arrivals.
+- flights_2008.depdelay: The departure delay in minutes. Negative numbers represent early departures.
+- flights_2008.origin: The origin airport code.
+- flights_2008.dest: The destination airport code.
+- flights_2008.distance: The distance of the flight in miles.
+- flights_2008.taxiin: The time in minutes between wheels-on and gate arrival.
+- flights_2008.taxiout: The time in minutes between push-back from the gate and wheels-off.
+- flights_2008.cancelled: Indicates whether the flight was cancelled or not. 1 = cancelled, 0 = not cancelled.
+- flights_2008.cancellationcode: Specifies a code for the reason of cancellation.
+- flights_2008.diverted: Indicates whether the flight was diverted or not. 1 = diverted, 0 = not diverted.
+- flights_2008.carrierdelay: The delay time in minutes attributed to the airline.
+- flights_2008.weatherdelay: The delay time in minutes attributed to weather conditions.
+- flights_2008.nasdelay: The delay time in minutes attributed to the National Aviation System.
+- flights_2008.securitydelay: The delay time in minutes attributed to security issues.
+- flights_2008.lateaircraftdelay: The delay time in minutes attributed to a previous flight being late.
+- flights_2008.dep_timestamp: The actual departure timestamp of the flight.
+- flights_2008.arr_timestamp: The actual arrival timestamp of the flight.
+- flights_2008.carrier_name: The name of the airline operating the flight.
+- flights_2008.plane_type: The ownership type of the aircraft.
+- flights_2008.plane_manufacturer: The manufacturer of the aircraft.
+- flights_2008.plane_issue_date: The date the aircraft was issued its certificate of airworthiness.
+- flights_2008.plane_model: The specific model of the aircraft.
+- flights_2008.plane_status: The registration status of the aircraft.
+- flights_2008.plane_aircraft_type: The aircraft type (fixed wing, rotorcraft, etc.)
+- flights_2008.plane_engine_type: The type of engine powering the aircraft.
+- flights_2008.plane_year: The year the aircraft was manufactured.
+- flights_2008.origin_name: The name of the origin airport.
+- flights_2008.origin_city: The city of the origin airport.
+- flights_2008.origin_state: The state of the origin airport.
+- flights_2008.origin_country: The country of the origin airport.
+- flights_2008.origin_lat: The latitude of the origin airport.
+- flights_2008.origin_lon: The longitude of the origin airport.
+- flights_2008.dest_name: The name of the destination airport.
+- flights_2008.dest_city: The city of the destination airport.
+- flights_2008.dest_state: The state of the destination airport.
+- flights_2008.dest_country: The country of the destination airport.
+- flights_2008.dest_lat: The latitude of the destination airport.
+- flights_2008.dest_lon: The longitude of the destination airport.
 
