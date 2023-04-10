@@ -22,11 +22,11 @@ EXAMPLE_PROMPT = PromptTemplate(
     input_variables=["page_content", "source"],
 )
 
-combine_prompt_template = """Given the following extracted parts of a long document describing a SQL database and a question about the SQL database, create a final answer with table names ("SOURCES").
+combine_prompt_template = """Given the following extracted parts of a long document describing a SQL database and a question that can be solved using data in the database, create a final answer with table names ("SOURCES").
 If you don't know the answer, just say that you don't know. Don't try to make up an answer. If none of the tables are relevant, just say "{no_results_answer}".
 ALWAYS return a "TABLES" part in your answer.
 
-QUESTION: Which column of the us_pois_safegraph table contains the category?
+QUESTION: What are the categories of the point of interest?
 =========
 Content: The movie_actors table primarily serves to store and organize data related to actors who have participated in various movies. It contains critical information such as movie_id (referring to the specific movie), actor_name, actor_gender, actor_order_num (the ordinal ranking of the actor's prominence in the film), num_total_actors (total number of actors involved in the movie), and movie_title. The table uses TEXT ENCODING DICT(32) for textual columns and DAYS(32) encoding for date columns to optimize data storage. The schema of the movie_actors table is:
 Table: movie_actors
@@ -38,7 +38,7 @@ Table: us_pois_safegraph
 FINAL ANSWER: The us_pois_safegraph table contains two category columns: top_category and sub_category.
 SOURCES: us_pois_safegraph
 
-QUESTION: Which tables are about signal strength?
+QUESTION: Which country has cell towers with the highest signal strength?
 =========
 Content: Description: The cell_towers_us table is designed to store information about various cell towers in the United States. The primary functionality of this table is to manage and retrieve spatial details and operational characteristics for each tower, including radio technology, network operator, location, coverage range, signal strength, and timestamps for creation and modification. The secondary functionality is to enable analysis and visualization of different telecom networks' performances and properties.\nApplications: Potential use cases of this table might include querying cell towers' locations and capabilities for specific telecom network operators. Network engineers could perform coverage analysis and optimization, while researchers might analyze signal strengths, coverage area, and potential network bottlenecks to propose possible improvements in the telecom infrastructure. This table may also act as a vital resource for tools that need location-based information about cell towers.\nKeywords: cell towers, network operators, spatial details, coverage analysis, signal strength, location, radio technology, telecommunications, infrastructure, United States.
 Table: cell_towers_us
@@ -49,7 +49,7 @@ Table: firewall_in
 Content: - cell_towers_world.radio: The type of radio technology used by the cell tower (UMTS, LTE, GSM, CDMA)\n- cell_towers_world.mcc: The Mobile Country Code identifying the country where the cell tower is located (310, 262, 250, 724, 208)\n- cell_towers_world.net: The Numeric Identifier for a network within a country (1, 2, 3, 10, 410)\n- cell_towers_world.area: The area code for the cell tower (1, 65534, 2, 5, 10)\n- cell_towers_world.cell: The cell identifier or cell ID of the cell tower (0, 4112, 65535, 50594049, 62)\n- cell_towers_world.unit: The signal measurement unit (0, -1, 1, 9, 8)\n- cell_towers_world.lon: The longitude of the location of the cell tower (in decimal degrees)\n- cell_towers_world.lat: The latitude of the location of the cell tower (in decimal degrees)\n- cell_towers_world.changeable: A flag specifying if the cell tower details can be changed (1 for yes, 0 for no)\n- cell_towers_world.created: The timestamp of when the cell tower was added to the database (in UTC)\n- cell_towers_world.updated: The timestamp of the last update of the cell tower details (in UTC)\n- cell_towers_world.average_signal: The average signal strength of the cell tower (in dBm)
 Table: cell_towers_world
 =========
-FINAL ANSWER: Both the cell_towers_us and cell_towers_world tables contain information about signal strength as it relates to cell towers.
+FINAL ANSWER: Both the cell_towers_us and cell_towers_world tables contain information about signal strength.
 SOURCES: cell_towers_us, cell_towers_world
 
 QUESTION: {question}

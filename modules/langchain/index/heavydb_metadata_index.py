@@ -1,5 +1,5 @@
 import re
-from typing import Literal, Optional, Any
+from typing import Literal, Any
 
 from langchain.indexes.vectorstore import VectorStoreIndexWrapper
 from langchain.llms.openai import OpenAI
@@ -159,9 +159,9 @@ class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
     _example_selector = None
 
     @classmethod
-    def get_example_selector(cls):
-        print("Initting rephrase example selector. This will only happen once.")
+    def get_example_selector(cls: "HeavyDBMetadataIndex") -> MaxMarginalRelevanceExampleSelector:
         if cls._example_selector is None:
+            print("Initting rephrase example selector. This will only happen once.")
             cls._example_selector = MaxMarginalRelevanceExampleSelector.from_examples(
                 rephrase_question_examples,
                 HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2"),
@@ -170,7 +170,7 @@ class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
         return cls._example_selector
 
     def simple_search_for_table_docs(
-        self, search_string: str, search_type: search_types = "similarity", k: int = 4, fetch_k: int = 20
+        self, search_string: str, search_type: search_types = "similarity", k: int = 5, fetch_k: int = 20
     ) -> list[Document]:
         """Does a simple search for documents that contain text similar to the search string.
 
@@ -179,7 +179,7 @@ class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
             search_type: Type of search to perform. Defaults to "similarity".
                 - similarity: Return docs most similar to query.
                 - mmr: Return docs selected using the maximal marginal relevance.
-            k: Number of Documents to return. Defaults to 4.
+            k: Number of Documents to return. Defaults to 5.
             fetch_k: Number of Documents to fetch to pass to MMR algorithm.
 
         Returns:
@@ -189,7 +189,7 @@ class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
         return retriever.get_relevant_documents(search_string)
 
     def simple_search_for_table_names(
-        self, search_string: str, search_type: search_types = "similarity", k: int = 4, fetch_k: int = 20
+        self, search_string: str, search_type: search_types = "similarity", k: int = 5, fetch_k: int = 20
     ) -> list[str]:
         """Does a simple search for documents that contain text similar to the search string. Returns the table names.
         NOTE: This does not use an LLM to determine relevancy, but it is quick.
@@ -200,14 +200,14 @@ class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
             search_type: Type of search to perform. Defaults to "similarity".
                 - similarity: Return docs most similar to query.
                 - mmr: Return docs selected using the maximal marginal relevance.
-            k: Number of Documents to return. Defaults to 4.
+            k: Number of Documents to return. You want to return at least as many as you expect tables to be returned
             fetch_k: Number of Documents to fetch to pass to MMR algorithm.
 
         Returns:
             List of table names that MAY be relevant to the search string.
         """
         docs = self.simple_search_for_table_docs(search_string, search_type, k, fetch_k)
-        return [doc.metadata["source"] for doc in docs]
+        return list(set([doc.metadata["source"] for doc in docs]))
 
     def ask_about_database(
         self,
@@ -223,7 +223,7 @@ class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
             search_type: Type of search to perform. Defaults to "similarity".
                 - similarity: Return docs most similar to query.
                 - mmr: Return docs selected using the maximal marginal relevance.
-            k: Number of Documents to return. Defaults to 4.
+            k: Number of Documents to return. Defaults to 6.
             fetch_k: Number of Documents to fetch to pass to MMR algorithm.
 
         Returns:
@@ -266,30 +266,40 @@ class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
         new_question = llm(rephrase_question_prompt.format(question=question))
         return new_question
 
-    def ask(self, question: str) -> dict[str, str]:
-        rephrased_question = self.rephrase_question(question)
-        try:
-            return self.ask_about_database(rephrased_question)
-        except Exception:
-            print(
-                f"Failed to ask about database with rephrased question: {rephrased_question}. Falling back to simple search on original question."
-            )
-            return self.ask_using_simple_search(question, rephrased_question=rephrased_question)
-
     def ask_using_rephrased_question(self, question: str) -> dict[str, str]:
+        """Ask a question by first rephrasing the input question and then using the rephrased question to query the database.
+
+        Args:
+            question: Original question to ask the database.
+
+        Returns:
+            Dictionary containing:
+            - answer: A natural language answer to the question.
+            - tables: A list of table names relevant to the answer.
+        """
         rephrased_question = self.rephrase_question(question)
         return self.ask_about_database(rephrased_question)
 
-    def ask_using_simple_search(self, question: str, rephrased_question: Optional[str] = None) -> dict[str, str]:
+    def ask_using_simple_search(self, question: str, fallback_scheme: str = "simple") -> dict[str, str]:
+        """Ask a question using a simple search method and a specified fallback scheme if no relevant tables are found.
+
+        Args:
+            question: The question to ask the database.
+            fallback_scheme: The method to use when the initial search returns no relevant tables. Defaults to "simple".
+                - simple: Returns a list of table names from the documents.
+                - rephrase: Tries to find relevant tables by rephrasing the question.
+
+        Returns:
+            Dictionary containing:
+            - answer: A natural language answer to the question.
+            - tables: A list of table names relevant to the answer.
+        """
         with log_request_ctx(LangChainType.Chain, "ask_using_simple_search", "text-davinci-003") as log_ctx:
             with get_openai_callback() as cb:
-                rephrased_question = rephrased_question or self.rephrase_question(question)
                 table_docs = self.simple_search_for_table_docs(question)
                 chain = create_table_docs_map_reduce_chain()
-                log_ctx.add_input(
-                    {chain.input_key: [doc.page_content for doc in table_docs], "question": rephrased_question}
-                )
-                res = chain({chain.input_key: table_docs, "question": rephrased_question})
+                log_ctx.add_input({chain.input_key: [doc.page_content for doc in table_docs], "question": question})
+                res = chain({chain.input_key: table_docs, "question": question})
                 answer = res[chain.output_key]
                 if re.search(r"SOURCES:\s", answer):
                     answer, tables = re.split(r"SOURCES:\s", answer)
@@ -299,8 +309,25 @@ class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
                     "answer": answer.strip(),
                     "tables": [tn.strip() for tn in tables.split(",")],
                 }
-                log_ctx.success(result, cb)
-                if result["answer"] == SQLSchemaQuestionChainNoResultsAnswer:
-                    raise Exception("No relevant tables found for query: " + question)
 
+                if result["answer"] == SQLSchemaQuestionChainNoResultsAnswer:
+                    if fallback_scheme == "simple":
+                        table_names_from_docs = list(set([doc.metadata["source"] for doc in table_docs]))
+                        if len(table_names_from_docs) == 0:
+                            log_ctx.error("No relevant tables found for query: " + question, cb)
+                            raise Exception("No relevant tables found for query: " + question)
+                        result = {
+                            "answer": f"These tables may be relevant: {', '.join(table_names_from_docs)}",
+                            "tables": table_names_from_docs,
+                        }
+                    elif fallback_scheme == "rephrase":
+                        result = self.ask_using_rephrased_question(question)
+                        if result["answer"] == SQLSchemaQuestionChainNoResultsAnswer:
+                            log_ctx.error("No relevant tables found for query: " + question, cb)
+                            raise Exception("No relevant tables found for query: " + question)
+                    else:
+                        log_ctx.error("No relevant tables found for query: " + question, cb)
+                        raise Exception("No relevant tables found for query: " + question)
+
+                log_ctx.success(result, cb)
                 return result

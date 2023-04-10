@@ -10,8 +10,8 @@ from langchain.vectorstores.base import VectorStore
 from modules.langchain.index import generate_table_documents
 from modules.langchain.index.heavydb_metadata_index import HeavyDBMetadataIndex
 
-# huggingface_model_name = os.environ.get("HUGGINGFACE_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-huggingface_model_name = os.environ.get("HUGGINGFACE_EMBED_MODEL", "sentence-transformers/gtr-t5-large")
+huggingface_model_name = os.environ.get("HUGGINGFACE_EMBED_MODEL", "sentence-transformers/all-mpnet-base-v2")
+# huggingface_model_name = os.environ.get("HUGGINGFACE_EMBED_MODEL", "sentence-transformers/gtr-t5-large")
 
 
 def read_table_documents(folder_path: str) -> Iterator[Document]:

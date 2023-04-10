@@ -1,7 +1,9 @@
 from concurrent.futures import ThreadPoolExecutor
 import csv
 from functools import partial
+import os
 import re
+from typing import Optional
 
 from dotenv import load_dotenv
 from langchain.callbacks import get_openai_callback
@@ -61,26 +63,16 @@ def extract_list_items(texts: list[str]) -> list[str]:
     return items
 
 
-def generate_questions_for_joined_tables(llm: ChatOpenAI, heavydb: HeavyDB, table: str, messages: list) -> list[str]:
+def generate_questions_for_joined_tables(
+    llm: ChatOpenAI, heavydb: HeavyDB, tables: tuple[str, str], messages: list
+) -> list[str]:
+    table, join_table = tables
     print(f"Generating questions for joined tables for {table}")
-    index_resp = heavydb_index.query(
-        "what are up to two tables have columns that can be joined on {table} that are not {table}. output comma separated list of table names",
-    )
-    joinable_table_names = [tn.strip() for tn in index_resp.strip().split(",")]
-    if joinable_table_names[0] == "I don't know.":
-        return []
     with heavydb.lock:
-        try:
-            tables_summary = heavydb.get_table_info(
-                [joinable_table_names[0]]
-            )  # take first because of token limit errors
-        except Exception as e:
-            print(f"Error getting table info for joinable tables {joinable_table_names} for {table}")
-            print(str(e))
-            return []
+        tables_summary = heavydb.get_table_info([join_table])
     messages.append(
         HumanMessage(
-            content=f"Here are some tables that can be joined on {table}. Please generate another series of questions that would require a join or subquery. Do not make up tables that don't exist. Output the unnumbered list and nothing else. Output nothing if you can't think of any questions. Avoid using table names\n{tables_summary}"
+            content=f"Here is a table that can be joined on {table}. Please generate another series of questions that would require a join or subquery. Do not make up tables that don't exist. Output the unnumbered list and nothing else. Output nothing if you can't think of any questions. Avoid using table names\n{tables_summary}"
         )
     )
     try:
@@ -96,7 +88,8 @@ def generate_questions_for_joined_tables(llm: ChatOpenAI, heavydb: HeavyDB, tabl
     return extract_list_items([resp.content])
 
 
-def get_questions_for_table(heavydb: HeavyDB, table: str) -> list[tuple[str, bool, str]]:
+def get_questions_for_table(heavydb: HeavyDB, tables: tuple[str, Optional[str]]) -> list[tuple[str, bool, str, str]]:
+    table, join_table = tables
     print(f"Processing {table}")
     messages: list = [SystemMessage(content=prompt)]
     with heavydb.lock:
@@ -106,21 +99,44 @@ def get_questions_for_table(heavydb: HeavyDB, table: str) -> list[tuple[str, boo
     messages.append(HumanMessage(content=f"{table_summary}\n\n{table_info}"))
     resp = llm(messages)
     single_table_questions = extract_list_items([resp.content])
+    single_table_questions_formatted: list[tuple[str, bool, str, str]] = [
+        (table, False, "", question) for question in single_table_questions
+    ]
     messages.append(AIMessage(content=resp.content))
-    multi_table_questions = generate_questions_for_joined_tables(llm, heavydb, table, messages)
-    single_table_questions_formatted = [(table, False, question) for question in single_table_questions]
-    multi_table_questions_formatted = [(table, True, question) for question in multi_table_questions]
+    if join_table is not None and join_table != "":
+        multi_table_questions = generate_questions_for_joined_tables(llm, heavydb, (table, join_table), messages)
+        multi_table_questions_formatted = [(table, True, join_table, question) for question in multi_table_questions]
+    else:
+        multi_table_questions_formatted = []
+
     return single_table_questions_formatted + multi_table_questions_formatted
 
 
 def main():
-    heavydb = HeavyDB.from_env(
-        include_tables=["usa_states", "us_pois_safegraph", "florida_parcels_2020", "zillow_recent_sales_full_peninsula"]
-    )
+    """Creates a CSV of questions that should be able to be answered by querying the SQL Database"""
+    heavydb = HeavyDB.from_env()
     process_func = partial(get_questions_for_table, heavydb)
     with get_openai_callback() as cb:
         with ThreadPoolExecutor() as executor:
-            questions = list(executor.map(process_func, heavydb.get_usable_table_names()))
+            questions = list(
+                executor.map(
+                    process_func,
+                    [
+                        ("sp500_companies", "sp500_2018_2020_minute"),
+                        ("airports", "flights_2008"),
+                        ("cell_towers_us", "cell_towers_world"),
+                        ("movie_actors", "movie_details"),
+                        ("sfmta_bus_stops", "sfmta_buses"),
+                        ("us_pois_safegraph", "usa_states"),
+                        ("zillow_recent_sales_full_peninsula", "florida_parcels_2020"),
+                        ("nyt_covid_counties_v2", "usa_states"),
+                        ("world_ships", "aishub_2021_06_16"),
+                        ("us_upstream_production", "usa_states"),
+                        ("craigslist_vehicles", "usa_states"),
+                        ("usa_states", "cell_towers_us"),
+                    ],
+                )
+            )
 
         print(f"Prompt Tokens: {cb.prompt_tokens}")
         print(f"Completion Tokens: {cb.completion_tokens}")
@@ -128,9 +144,12 @@ def main():
         print(f"Successful Requests: {cb.successful_requests}")
         print(f"Total Cost (USD): ${cb.total_cost}")
 
-    with open("output_questions.csv", "w", newline="", encoding="utf-8") as csvfile:
+    file_name = "output_questions.csv"
+    write_headers = not os.path.exists(file_name)
+    with open("output_questions.csv", "a", newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(["primary_table", "multi_table", "question"])
+        if write_headers:
+            writer.writerow(["primary_table", "is_multi_table", "secondary_table", "question"])
         for question in questions:
             writer.writerows(question)
 
