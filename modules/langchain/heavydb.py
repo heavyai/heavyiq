@@ -137,6 +137,9 @@ class HeavyDB:
 
     def validate_query(self, query: str) -> list:
         """Validate a query."""
+        if "*/" in query:
+            # remove block comment from begining of query
+            query = query.split("*/", 1)[1]
         return self._conn._client.sql_validate(self._conn._session, query)
 
     @lru_cache
@@ -149,7 +152,60 @@ class HeavyDB:
             return top_k_res
         return None
 
-    def get_table_info(self, table_names: Optional[list[str]] = None) -> str:
+    @lru_cache
+    def get_sample_rows(self, table_name: str) -> str:
+        # build the select command
+        command = f"SELECT * FROM {table_name} LIMIT {self._sample_rows_in_table_info}"
+
+        # save the columns in string format
+        columns_str = ",".join([col.name for col in self.get_table_columns(table_name)])
+
+        # get the sample rows
+        sample_rows = self._conn.execute(command)
+        # shorten values in the sample rows
+        sample_rows = list(map(lambda ls: [str(i)[:100] for i in ls], sample_rows))
+
+        # save the sample rows in string format
+        sample_rows_str = "\n".join([",".join(row) for row in sample_rows])
+
+        return f"{self._sample_rows_in_table_info} rows from {table_name} table:\n{columns_str}\n{sample_rows_str}"
+
+    @lru_cache
+    def get_top_k(self, table_name: str) -> str:
+        text_columns = [
+            c.name
+            for c in self.get_table_columns(table_name)
+            if c.type == "STR" and c.encoding == "DICT" and c.is_array is False
+        ]
+        top_k_strings = "Sample values for text columns:\n"
+        for col in text_columns:
+            top_k_res = self.get_column_top_k(table_name, col)
+            if top_k_res:
+                top_k_strings += f"{col}: {', '.join(top_k_res)}\n"
+        return top_k_strings
+
+    def get_single_table_info(self, table_name: str, include_samples: bool = True, include_top_k: bool = True) -> str:
+        """Get information about a single table."""
+        all_table_names = self.get_usable_table_names()
+        if table_name not in all_table_names:
+            raise ValueError(f"table_name {table_name} not found in database")
+
+        if self._custom_table_info and table_name in self._custom_table_info:
+            return self._custom_table_info[table_name]
+
+        parts = []
+
+        parts.append(self.get_table_schema(table_name))
+
+        if include_samples and self._sample_rows_in_table_info:
+            parts.append(self.get_sample_rows(table_name))
+
+        if include_top_k:
+            parts.append(self.get_top_k(table_name))
+
+        return "\n".join(parts)
+
+    def get_table_info(self, table_names: Optional[list[str]] = None, **kwargs) -> str:
         """Get information about specified tables.
         Follows best practices as specified in: Rajkumar et al, 2022
         (https://arxiv.org/abs/2204.00498)
@@ -166,63 +222,19 @@ class HeavyDB:
 
         tables = []
         for table in all_table_names:
-            if self._custom_table_info and table in self._custom_table_info:
-                tables.append(self._custom_table_info[table])
-                continue
-
-            table_schema = self.get_table_schema(table)
-
-            if self._sample_rows_in_table_info:
-                # build the select command
-                command = f"SELECT * FROM {table} LIMIT {self._sample_rows_in_table_info}"
-
-                # save the columns in string format
-                columns_str = ",".join([col.name for col in self.get_table_columns(table)])
-
-                # get the sample rows
-                sample_rows = self._conn.execute(command)
-                # shorten values in the sample rows
-                sample_rows = list(map(lambda ls: [str(i)[:100] for i in ls], sample_rows))
-
-                # save the sample rows in string format
-                sample_rows_str = "\n".join([",".join(row) for row in sample_rows])
-                text_columns = [
-                    c.name
-                    for c in self.get_table_columns(table)
-                    if c.type == "STR" and c.encoding == "DICT" and c.is_array is False
-                ]
-                top_k_strings = "Sample values for text columns:\n"
-                for col in text_columns:
-                    top_k_res = self.get_column_top_k(table, col)
-                    if top_k_res:
-                        top_k_strings += f"{col}: {', '.join(top_k_res)}\n"
-
-                table_info = (
-                    f"{table_schema.rstrip()}\n"
-                    f"/*\n"
-                    f"{self._sample_rows_in_table_info} rows from {table} table:\n"
-                    f"{columns_str}\n"
-                    f"{sample_rows_str}\n"
-                    f"{top_k_strings}\n"
-                    f"*/\n"
-                )
-                # build final info for table
-                tables.append(table_info)
-            else:
-                tables.append(table_schema)
+            tables.append(self.get_single_table_info(table, **kwargs))
 
         final_str = "\n\n".join(tables)
         return final_str
-
-    def get_single_table_info(self, table_name: str) -> str:
-        """Get table info for a single table."""
-        return self.get_table_info([table_name])
 
     def run(self, command: str, fetch: str = "all") -> str:
         """Execute a SQL command and return a string representing the results.
         If the statement returns rows, a string of the results is returned.
         If the statement returns no rows, an empty string is returned.
         """
+        if "*/" in command:
+            # remove block comment at begining of command
+            command = command.split("*/", 1)[1]
         cursor = self._conn.execute(command)
         if fetch == "all":
             result = cursor.fetchall()

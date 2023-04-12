@@ -4,7 +4,7 @@ from langchain.llms import OpenAI
 from modules.api.utils import handle_errors
 from modules.logging_utils import default_logger as logger
 from modules.langchain import HeavyDB
-from modules.langchain.chains.heavydb.base import NLtoSQLChain, NLtoAnswerChain
+from modules.langchain.chains.heavydb import NLtoSQLChain, NLtoAnswerChain
 from modules.langchain.logging import log_chain_call
 
 
@@ -50,6 +50,6 @@ def question(body: dict) -> dict:
     # db = HeavyDB.from_session(db_session_id, include_tables=tables)
     db = HeavyDB.from_env()
     chain = NLtoAnswerChain(llm=llm, database=db, verbose=True)
-    input = {"query": question, "table_names_to_use": tables}
+    input = {"query": question, "tables": tables}
     res = log_chain_call(chain, input, MODEL_NAME)
     return {"answer": res[chain.output_answer_key], "sql": res[chain.output_sql_key]}

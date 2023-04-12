@@ -1,0 +1,318 @@
+primary_table,is_multi_table,secondary_table,question
+usa_states,False,,What is the total population in the USA according to the data in the usa_states table?
+usa_states,False,,Which state has the highest population density?
+usa_states,False,,What are the top 5 states with the highest percentage of Hispanic population?
+usa_states,False,,What is the average household size in states belonging to the New England sub-region?
+usa_states,False,,Which state has the highest number of vacant housing units?
+usa_states,False,,In which state is the median age for males the lowest?
+usa_states,False,,What is the total number of farms in the Pacific sub-region states?
+usa_states,False,,How many states have a population greater than 10 million?
+usa_states,False,,Which state has the largest land area in square miles?
+usa_states,False,,What are the top 3 states with the highest percentage of the population under the age of 5?
+us_pois_safegraph,False,,How many Points of Interest are there in the dataset?
+us_pois_safegraph,False,,What is the most common city for Points of Interest?
+us_pois_safegraph,False,,What is the average latitude and longitude of Points of Interest in Texas?
+us_pois_safegraph,False,,Which top category of Points of Interest has the highest number of locations?
+us_pois_safegraph,False,,"What are the top 5 cities with the highest number of Points of Interest, and how many Points of Interest are there in each city?"
+us_pois_safegraph,False,,"In California, what is the proportion of Points of Interest that include a parking lot?"
+us_pois_safegraph,False,,What are the top 3 most common street names for Points of Interest locations?
+us_pois_safegraph,False,,Which brand has the highest number of Points of Interest in the United States?
+us_pois_safegraph,False,,What are the operating hours of the Points of Interest with the longest opening hours in New York City?
+us_pois_safegraph,False,,"For Points of Interest in the ""Restaurants and Other Eating Places"" category, which sub_category has the highest occurrence, and what is the associated average latitude and longitude?"
+airports,False,,How many airports are there in the database?
+airports,False,,What is the most common type of airport?
+airports,False,,What is the average elevation of airports across all continents?
+airports,False,,Which continent has the highest number of airports?
+airports,False,,How many airports provide scheduled services?
+airports,False,,What are the top 5 countries with the most airports?
+airports,False,,Which municipality has the highest number of airports within its jurisdiction?
+airports,False,,What is the average latitude and longitude of airports within Europe?
+airports,False,,What are the top 3 most common airport types in North America?
+airports,False,,How many airports have a Wikipedia link provided?
+aishub_2021_06_16,False,,How many vessels are recorded in this dataset?
+aishub_2021_06_16,False,,What is the most common vessel type in the dataset?
+aishub_2021_06_16,False,,What is the average speed of all vessels in the dataset?
+aishub_2021_06_16,False,,"What are the top 5 most frequent destinations for the vessels, and how many times do they appear in the dataset?"
+aishub_2021_06_16,False,,"What is the maximum vessel length (bow to stern) found in the dataset, and which vessel has that length?"
+aishub_2021_06_16,False,,"Which vessel had the highest speed on June 16, 2021, and what was its speed?"
+aishub_2021_06_16,False,,"How many vessels were within a 10-kilometer radius of the coordinates (40.7128, -74.0060) on June 16, 2021?"
+aishub_2021_06_16,False,,What proportion of vessels have an IMO ID in the dataset?
+aishub_2021_06_16,False,,"For vessels with a device type of 10, what is the most common destination and the average speed?"
+aishub_2021_06_16,False,,"Which type of vessel has the highest average speed, and what is the average speed for that type?"
+ca_crops,False,,How many crops are there in the dataset?
+ca_crops,False,,Which crop has the largest acreage?
+ca_crops,False,,What is the most common crop type grown in California in 2014?
+ca_crops,False,,What is the total acreage of grapes in Sonoma County?
+ca_crops,False,,Which county has the highest acreage of almond crops?
+ca_crops,False,,What is the average acreage of citrus crops in Tulare County?
+ca_crops,False,,List the top 5 crops with the largest acreage in Fresno County.
+ca_crops,False,,In which county are mixed pasture crops most commonly grown?
+ca_crops,False,,What proportion of total acreage is dedicated to deciduous fruits and nuts in Stanislaus County?
+ca_crops,False,,How many acres of truck nursery and berry crops are there in San Joaquin County?
+ca_tweets,False,,How many tweets are in the ca_tweets table?
+ca_tweets,False,,What is the most common language used in the tweets?
+ca_tweets,False,,What is the average number of followers for users in the ca_tweets table?
+ca_tweets,False,,Which top 5 locations have the most tweets originating from them?
+ca_tweets,False,,"On average, how many people do users from California follow?"
+ca_tweets,False,,What are the top 3 most common sources for the tweets in the ca_tweets table?
+ca_tweets,False,,What proportion of tweets are sent from iOS devices compared to Android devices?
+ca_tweets,False,,Which county in California has the highest number of tweets?
+ca_tweets,False,,What are the top 5 most frequently used hashtags in the ca_tweets table?
+ca_tweets,False,,"For users with more than 1000 followers, what is the average number of tweets they have posted?"
+cell_towers_us,False,,How many cell towers are there in the United States?
+cell_towers_us,False,,What is the most common radio technology used by cell towers?
+cell_towers_us,False,,What is the average range of cell towers in the country?
+cell_towers_us,False,,Which mobile country code (MCC) has the highest number of cell towers?
+cell_towers_us,False,,What are the top 5 most frequently occurring network codes (net) and how many cell towers are associated with each?
+cell_towers_us,False,,In which area code do cell towers have the highest average signal strength?
+cell_towers_us,False,,"How many cell towers were created before a specific date, such as January 1, 2016?"
+cell_towers_us,False,,What is the average number of samples taken from cell towers for each radio technology type?
+cell_towers_us,False,,Which geographical location (latitude and longitude) has the highest density of cell towers within a specified radius?
+cell_towers_us,False,,"For cell towers with changeable status, which area code has the highest number of cell towers and what is the associated average signal strength?"
+cell_towers_world,False,,How many cell towers use the GSM radio type?
+cell_towers_world,False,,What is the most common Mobile Country Code in the dataset?
+cell_towers_world,False,,Can you provide the average range of cell towers for each radio type?
+cell_towers_world,False,,Which radio type has the highest average signal strength?
+cell_towers_world,False,,What is the total number of cell towers for each network code?
+cell_towers_world,False,,Can you give me the top 5 area codes with the highest number of cell towers?
+cell_towers_world,False,,What is the average number of samples per cell tower for each Mobile Country Code?
+cell_towers_world,False,,"How many cell towers have a range greater than 50,000 meters?"
+cell_towers_world,False,,"Can you find the percentage of cell towers that were created before a specific date, such as January 1, 2015?"
+cell_towers_world,False,,In which Mobile Country Code do cell towers have the highest average latitude?
+cell_towers_world,False,,What are the top 3 countries with the highest number of cell towers using LTE radio type?
+cell_towers_world,False,,What is the proportion of changeable cell towers among all cell towers in the dataset?
+cell_towers_world,False,,Which network code has the highest average range in cell towers using UMTS radio type?
+craigslist_vehicles,False,,What is the total number of vehicles listed in the table?
+craigslist_vehicles,False,,Which region has the most vehicle listings?
+craigslist_vehicles,False,,What is the most common manufacturer for vehicles listed?
+craigslist_vehicles,False,,"What is the average price for vehicles listed as ""good"" condition?"
+craigslist_vehicles,False,,What are the top 5 most frequent car models in the table and how many times do they occur?
+craigslist_vehicles,False,,What percentage of vehicles listed use diesel as fuel?
+craigslist_vehicles,False,,Which year has the highest number of vehicles listed?
+craigslist_vehicles,False,,What is the average price for Toyota vehicles in California?
+craigslist_vehicles,False,,"How many vehicles have an odometer reading between 50,000 and 100,000 miles?"
+craigslist_vehicles,False,,"In which states are electric vehicles most popular, based on the number of listings?"
+firewall_in,False,,How many unique firewall hosts are in the log data?
+firewall_in,False,,What are the most common source IP addresses?
+firewall_in,False,,What is the average number of packets blocked per day?
+firewall_in,False,,Which city has the highest number of blocked packets?
+firewall_in,False,,What are the top 5 countries with the most incoming traffic?
+firewall_in,False,,What percentage of traffic comes from anonymous proxies?
+firewall_in,False,,"Which protocol (TCP, UDP, ICMPv6) has the highest occurrence in the log data?"
+firewall_in,False,,What are the top 3 reasons for blocking traffic according to the log data?
+firewall_in,False,,What is the average data length of blocked packets coming from Europe?
+firewall_in,False,,"For blocked traffic, which continent has the highest average data length?"
+flights_2008,False,,How many unique carriers are present in the flight records?
+flights_2008,False,,What is the most common aircraft manufacturer in the flight records?
+flights_2008,False,,What were the total number of flights that were cancelled in 2008?
+flights_2008,False,,What is the average departure delay across all flights in the dataset?
+flights_2008,False,,Which origin airport had the highest number of flights in 2008?
+flights_2008,False,,What is the longest flight distance recorded in the dataset?
+flights_2008,False,,What is the most common reason for flight cancellations?
+flights_2008,False,,Which day of the week had the highest average arrival delay?
+flights_2008,False,,What is the average airtime for flights operated by Southwest Airlines?
+flights_2008,False,,Which aircraft model had the most occurrences of weather-related delays?
+florida_parcels_2020,False,,How many counties are represented in the Florida parcels data?
+florida_parcels_2020,False,,What is the most common land use description in the dataset?
+florida_parcels_2020,False,,What is the average land value for single-family properties?
+florida_parcels_2020,False,,"What are the top 5 most expensive properties by land value, and what are their land-use descriptions?"
+florida_parcels_2020,False,,In which county can we find the highest number of vacant residential properties?
+florida_parcels_2020,False,,What is the total land value and improvement value for properties in Miami-Dade county?
+florida_parcels_2020,False,,Which land use category has the highest average total living area (TOTLVGAREA)?
+florida_parcels_2020,False,,What percentage of properties have an exemption code related to homestead properties (HOM)?
+florida_parcels_2020,False,,What are the top 3 most common land-use codes for properties in Palm Beach county?
+florida_parcels_2020,False,,"For properties with a sale price in the year 2020, what is the average sale price and the total number of properties sold?"
+movie_actors,False,,"How many actors are there in the movie ""The Normal Heart""?"
+movie_actors,False,,What is the most common gender among actors in the movie_actors table?
+movie_actors,False,,"Which actor has the highest appearance order number in the movie ""Embers""?"
+movie_actors,False,,What is the average number of total actors per movie in the movie_actors table?
+movie_actors,False,,"What are the top 5 most frequent movie titles in the movie_actors table, and how many actors are associated with each title?"
+movie_actors,False,,"In movies with more than 10 actors, which actor has the highest appearance order number and what is the title of the movie they appeared in?"
+movie_actors,False,,What proportion of actors have an unspecified gender in movies with more than 20 actors?
+movie_details,False,,How many movies are stored in the database?
+movie_details,False,,What is the most common genre among the movies?
+movie_details,False,,What is the average budget of movies in the database?
+movie_details,False,,Which movie has the highest revenue?
+movie_details,False,,How many movies have been produced by Universal Pictures?
+movie_details,False,,What is the average runtime for movies in the Drama genre?
+movie_details,False,,Which movies are in the Post Production status?
+movie_details,False,,"What are the top 5 most frequent original languages in the database, and how many movies are in each language?"
+movie_details,False,,How many movies have more than 3 production countries?
+movie_details,False,,What proportion of movies have a vote average greater than 7.5?
+nyt_covid_counties_v2,False,,How many total cases were reported in the dataset?
+nyt_covid_counties_v2,False,,What is the highest number of deaths recorded in a single day for any county?
+nyt_covid_counties_v2,False,,On which date did the highest number of new cases occur within a single day?
+nyt_covid_counties_v2,False,,What is the average daily_cases_pct_pop_infected_7_day_avg across all counties and dates?
+nyt_covid_counties_v2,False,,Which county in Texas had the highest total_case_pct_per_pop on any given day?
+nyt_covid_counties_v2,False,,What are the top 5 states with the highest average total_mortality_pct_per_pop across all their counties?
+nyt_covid_counties_v2,False,,In which state and county did the largest single-day increase in new cases occur within a 7-day lag period?
+nyt_covid_counties_v2,False,,"Which 3 counties had the highest daily_death_pct_pop_infected_1_day_avg, and what were the corresponding dates and states?"
+nyt_covid_counties_v2,False,,How did the daily_cases_pct_pop_infected_7_day_avg change over time for the county with the highest total_case_pct_per_pop?
+nyt_covid_counties_v2,False,,"For counties with a daily_cases_pct_pop_infected_7_day_avg above a certain threshold, which states had the highest average daily_death_pct_pop_infected_7_day_avg?"
+sfmta_bus_stops,False,,How many bus stops are there in the SFMTA network?
+sfmta_bus_stops,False,,Which bus stop has the highest latitude value?
+sfmta_bus_stops,False,,What is the most common zone_id for bus stops in the dataset?
+sfmta_bus_stops,False,,What is the average latitude and longitude of bus stops in the dataset?
+sfmta_bus_stops,False,,Can you provide a list of the top 10 bus stops with the most occurrences in the stop_name column?
+sfmta_bus_stops,False,,Are there any bus stops with missing stop_url information? How many?
+sfmta_bus_stops,False,,What are the five northernmost bus stops and their corresponding stop_names?
+sfmta_bus_stops,False,,Which bus stops have a zone_id that starts with the letter 'A' and what are their stop_names?
+sfmta_bus_stops,False,,How many bus stops are there in each unique zone_id?
+sfmta_bus_stops,False,,"For each zone_id, which bus stop has the easternmost location (highest longitude value)?"
+sfmta_buses,False,,How many buses are currently being monitored by the SFMTA?
+sfmta_buses,False,,What is the most recent report time for bus location data?
+sfmta_buses,False,,What is the highest speed recorded by a bus in the dataset?
+sfmta_buses,False,,What is the average speed of all buses in the dataset?
+sfmta_buses,False,,Which bus has the highest speed at the most recent report time?
+sfmta_buses,False,,How many buses have a predictable location and speed based on the current data?
+sfmta_buses,False,,What is the most common train assignment for buses in the dataset?
+sfmta_buses,False,,Which train assignment has the highest average speed across all associated buses?
+sfmta_buses,False,,What percentage of buses have a predictable location and speed at the most recent report time?
+sfmta_buses,False,,Are there any buses with latitude and longitude values outside the expected range for San Francisco city limits?
+sp500_2018_2020_minute,False,,How many unique stock symbols are there in the dataset?
+sp500_2018_2020_minute,False,,What is the highest recorded opening price for AAPL?
+sp500_2018_2020_minute,False,,On which date and time did AMZN have the lowest closing price?
+sp500_2018_2020_minute,False,,What is the average volume of trades for TMUS?
+sp500_2018_2020_minute,False,,Which stock symbol had the highest earnings in a single minute?
+sp500_2018_2020_minute,False,,What are the top 5 stock symbols with the highest average dividends?
+sp500_2018_2020_minute,False,,"What is the total volume of trades for MXIM on February 13, 2019?"
+sp500_2018_2020_minute,False,,In which month and year did LDOS experience the highest stock split?
+sp500_2018_2020_minute,False,,What are the top 3 dates with the highest overall trading volume?
+sp500_2018_2020_minute,False,,Which stock symbol had the highest percentage increase in price within a single minute?
+sp500_companies,False,,How many companies are listed in the S&P 500 index?
+sp500_companies,False,,What is the most common sector for companies in the S&P 500 index?
+sp500_companies,False,,What are the top 5 sectors with the most companies in the S&P 500 index?
+sp500_companies,False,,What is the average number of companies per sector in the S&P 500 index?
+sp500_companies,False,,Can you list all companies in the Information Technology sector of the S&P 500 index?
+sp500_companies,False,,Which sector has the least number of companies in the S&P 500 index?
+sp500_companies,False,,How many companies in the S&P 500 index have a name starting with the letter 'A'?
+sp500_companies,False,,Are there any companies in the S&P 500 index that belong to both the Health Care and Consumer Discretionary sectors?
+us_upstream_production,False,,How many different operators are in the database?
+us_upstream_production,False,,What is the most common well type?
+us_upstream_production,False,,What is the average depth of the wells in Texas?
+us_upstream_production,False,,Which state has the highest number of active wells?
+us_upstream_production,False,,What are the top 5 producing formations in terms of oil production?
+us_upstream_production,False,,In which county is the well with the longest horizontal length located?
+us_upstream_production,False,,What is the average monthly oil production for wells in the Appalachian Basin?
+us_upstream_production,False,,Which operator has the highest number of wells in the Central Basin Platform Play?
+us_upstream_production,False,,What percentage of wells are horizontal in the Eagle Ford basin play?
+us_upstream_production,False,,"For wells with a depth greater than 10,000 feet, which producing formation is most common?"
+zillow_recent_sales_full_peninsula,False,,How many properties were recently sold in the Peninsula region?
+zillow_recent_sales_full_peninsula,False,,What is the most common home type for recently sold properties?
+zillow_recent_sales_full_peninsula,False,,What is the average sold price for properties with a video available?
+zillow_recent_sales_full_peninsula,False,,Which city in the Peninsula region has the highest average sold price for properties?
+zillow_recent_sales_full_peninsula,False,,How many properties were sold in the last 6 months that have more than 3 bedrooms and at least 2 bathrooms?
+zillow_recent_sales_full_peninsula,False,,What is the average price per square foot for single-family homes in the Peninsula region?
+zillow_recent_sales_full_peninsula,False,,What percentage of recently sold properties in the Peninsula region are non-owner occupied?
+zillow_recent_sales_full_peninsula,False,,Which street had the highest number of recently sold properties in the Peninsula region?
+zillow_recent_sales_full_peninsula,False,,What is the median sold price for properties with a 3D model available?
+zillow_recent_sales_full_peninsula,False,,In which month of the year were the most properties sold in the Peninsula region?
+sp500_companies,True,sp500_2018_2020_minute,Which Information Technology company had the highest price_open during the specified time period?
+sp500_companies,True,sp500_2018_2020_minute,What was the average price_close for Health Care companies during the specified time period?
+sp500_companies,True,sp500_2018_2020_minute,How many Industrials companies experienced a stock split between 2018 and 2020?
+sp500_companies,True,sp500_2018_2020_minute,Which Financials company had the largest trading volume on a single day during the specified time period?
+sp500_companies,True,sp500_2018_2020_minute,Which company in the Consumer Discretionary sector had the highest cumulative dividends between 2018 and 2020?
+sp500_companies,True,sp500_2018_2020_minute,What was the highest price_high achieved by a Materials company during the specified time period?
+sp500_companies,True,sp500_2018_2020_minute,"Which company had the highest earnings in the specified time period, and in which sector does it belong?"
+sp500_companies,True,sp500_2018_2020_minute,How many companies in the S&P 500 index experienced a stock split and an increase in price_close on the same day during the specified time period?
+sp500_companies,True,sp500_2018_2020_minute,What was the average trading volume for companies in the Information Technology sector in the specified time period?
+sp500_companies,True,sp500_2018_2020_minute,"Which company had the lowest price_low in the Health Care sector, and on which date did it occur during the specified time period?"
+airports,True,flights_2008,What is the average distance of flights operated by each carrier?
+airports,True,flights_2008,Which aircraft manufacturer has the highest average flight distance?
+airports,True,flights_2008,How many flights have a departure delay greater than 30 minutes from airports in California?
+airports,True,flights_2008,What are the top 5 busiest airports in terms of the number of flights?
+airports,True,flights_2008,What is the most common destination for flights departing from Chicago O'Hare International Airport?
+airports,True,flights_2008,Which airport has the highest number of diverted flights?
+airports,True,flights_2008,Which carrier has the highest percentage of cancelled flights?
+airports,True,flights_2008,What is the most common reason for flight cancellations?
+airports,True,flights_2008,What are the top 3 plane models with the most flights in the database?
+airports,True,flights_2008,Which airport has the highest average arrival delay?
+cell_towers_us,True,cell_towers_world,What is the total number of cell towers in both the United States and the world dataset?
+cell_towers_us,True,cell_towers_world,How many cell towers in the United States use the same radio technology as the most common radio technology in the world dataset?
+cell_towers_us,True,cell_towers_world,What is the average range of cell towers in the world dataset for networks that also exist in the United States dataset?
+cell_towers_us,True,cell_towers_world,Which network has the highest number of cell towers when considering both datasets?
+cell_towers_us,True,cell_towers_world,What percentage of cell towers in the United States dataset have a higher average signal strength than the global average signal strength in the world dataset?
+cell_towers_us,True,cell_towers_world,Which radio technology has the highest average number of samples in the world dataset compared to the United States dataset?
+cell_towers_us,True,cell_towers_world,"For cell towers with a changeable value of 1 in both datasets, which radio technology has the highest average signal strength?"
+cell_towers_us,True,cell_towers_world,What is the average range of cell towers using LTE technology in the United States compared to the rest of the world dataset?
+cell_towers_us,True,cell_towers_world,How many cell towers were created before the year 2010 in both datasets combined?
+movie_actors,True,movie_details,What is the average budget for movies with a female lead actor?
+movie_actors,True,movie_details,Which genre has the highest average movie revenue?
+movie_actors,True,movie_details,What is the most popular original language for movies with more than 20 actors in the cast?
+movie_actors,True,movie_details,In which production country do male lead actors appear the most frequently?
+movie_actors,True,movie_details,Which actor has starred in the most movies with a runtime greater than 120 minutes?
+movie_actors,True,movie_details,What is the average vote count for movies where the first appearance order actor has the same name as the movie title?
+movie_actors,True,movie_details,Which production company has the highest average revenue for movies starring a specific actor?
+movie_actors,True,movie_details,What is the average number of spoken languages in movies with a male lead actor compared to those with a female lead actor?
+movie_actors,True,movie_details,"What is the total revenue generated by movies starring a certain actor, sorted by genre?"
+movie_actors,True,movie_details,Which movie in the database has the highest number of total actors and the highest revenue?
+sfmta_bus_stops,True,sfmta_buses,Which bus stops are closest to the current location of each bus?
+sfmta_bus_stops,True,sfmta_buses,How many buses are currently within a certain distance of their next bus stop?
+sfmta_bus_stops,True,sfmta_buses,What is the average speed of buses near each bus stop?
+sfmta_bus_stops,True,sfmta_buses,How many buses are currently heading towards a specific bus stop?
+sfmta_bus_stops,True,sfmta_buses,What is the total number of buses assigned to each train assignment?
+sfmta_bus_stops,True,sfmta_buses,What is the average speed and heading of buses in each zone?
+sfmta_bus_stops,True,sfmta_buses,Which bus stop has the highest number of buses in its vicinity within a certain time range?
+sfmta_bus_stops,True,sfmta_buses,"For each bus stop, which bus had the highest speed when approaching it during a specific time period?"
+sfmta_bus_stops,True,sfmta_buses,"Are there any buses currently not following their predictable routes? If so, which bus stops are they closest to?"
+sfmta_bus_stops,True,sfmta_buses,How many buses are currently within a certain radius of a given bus stop and moving towards it?
+us_pois_safegraph,True,usa_states,Which state has the highest number of Points of Interest (POIs)?
+us_pois_safegraph,True,usa_states,In which sub-region are there the most Points of Interest (POIs)?
+us_pois_safegraph,True,usa_states,"What is the total population of states with more than 10,000 Points of Interest (POIs)?"
+us_pois_safegraph,True,usa_states,What are the top 3 most common top categories for Points of Interest (POIs) in the Pacific sub-region?
+us_pois_safegraph,True,usa_states,Which state has the highest density of Points of Interest (POIs) per square mile?
+us_pois_safegraph,True,usa_states,"What is the average population for states with more than 5,000 Starbucks locations?"
+us_pois_safegraph,True,usa_states,"In states with a population of over 10 million, which state has the highest number of Points of Interest (POIs) per capita?"
+us_pois_safegraph,True,usa_states,What are the top 5 most common brands in the Mountain sub-region states?
+us_pois_safegraph,True,usa_states,"How many Points of Interest (POIs) are in the New England sub-region, and what are the top 3 most common top categories?"
+us_pois_safegraph,True,usa_states,"For states with more than 1,000 ""Automotive Repair and Maintenance"" Points of Interest (POIs), what is the average number of households per state?"
+zillow_recent_sales_full_peninsula,True,florida_parcels_2020,"What is the average sale price of properties in Florida that have a living area greater than 2,000 square feet?"
+zillow_recent_sales_full_peninsula,True,florida_parcels_2020,"What are the top 5 most common property uses in Alachua County, and how many properties are there for each use?"
+zillow_recent_sales_full_peninsula,True,florida_parcels_2020,What is the average land value and improvement value for single-family homes in Palm Beach County?
+zillow_recent_sales_full_peninsula,True,florida_parcels_2020,Which county has the highest average sale price for condominiums sold in 2020?
+zillow_recent_sales_full_peninsula,True,florida_parcels_2020,"How many properties in Miami-Dade County have a living area greater than 3,000 square feet and were built before 2000?"
+zillow_recent_sales_full_peninsula,True,florida_parcels_2020,What is the total land area (in acres) of vacant residential properties in Lee County?
+zillow_recent_sales_full_peninsula,True,florida_parcels_2020,Which city in Broward County has the highest average sale price for single-family homes?
+zillow_recent_sales_full_peninsula,True,florida_parcels_2020,"In which county and city is the property with the highest living area, and what is its living area in square feet?"
+zillow_recent_sales_full_peninsula,True,florida_parcels_2020,"For properties with an exemption status of 'HOM', what is the average sale price and average living area in Hillsborough County?"
+zillow_recent_sales_full_peninsula,True,florida_parcels_2020,What is the average number of buildings and residential units for multi-family properties with fewer than 10 units in Florida?
+nyt_covid_counties_v2,True,usa_states,Which state has the highest total population?
+nyt_covid_counties_v2,True,usa_states,What is the average population density (POP_SQMI) across all states?
+nyt_covid_counties_v2,True,usa_states,In which sub-region are the most COVID-19 cases reported?
+nyt_covid_counties_v2,True,usa_states,Which state has the highest percentage of Hispanic population?
+nyt_covid_counties_v2,True,usa_states,What are the top 5 states with the highest median age?
+nyt_covid_counties_v2,True,usa_states,Which states have a higher female population than male population?
+nyt_covid_counties_v2,True,usa_states,In which state and sub-region is the highest average daily_cases_pct_pop_infected_7_day_avg observed?
+nyt_covid_counties_v2,True,usa_states,What is the correlation between a state's population density and its average total_case_pct_per_pop?
+nyt_covid_counties_v2,True,usa_states,Which state has the largest difference between its total population and total cases reported?
+nyt_covid_counties_v2,True,usa_states,What is the average total_case_pct_per_pop for states with a median age below a certain threshold?
+world_ships,True,aishub_2021_06_16,"What is the average speed_over_ground for ships with a vessel_type of ""Cargo""?"
+world_ships,True,aishub_2021_06_16,"How many ships with a vessel_type of ""Fishing"" have a destination of ""ROTTERDAM""?"
+world_ships,True,aishub_2021_06_16,"What is the most common destination for ships with a gross_tonnage greater than 20,000?"
+world_ships,True,aishub_2021_06_16,"Which ship with a vessel_type of ""Pleasure Craft"" has traveled the farthest distance in the last 24 hours?"
+world_ships,True,aishub_2021_06_16,"What is the average course_over_ground for ships with a vessel_type_specific of ""Oil Products Tanker""?"
+world_ships,True,aishub_2021_06_16,"How many ships with a status of ""Active"" have a destination of ""HAMBURG""?"
+world_ships,True,aishub_2021_06_16,"What is the most common device_type for ships with a vessel_type of ""Tug""?"
+world_ships,True,aishub_2021_06_16,"What proportion of ships with a vessel_type of ""Sailing Vessel"" have a position_accuracy of 1?"
+world_ships,True,aishub_2021_06_16,"Which country has the highest number of ships with a type of 30 and a destination of ""AMSTERDAM""?"
+world_ships,True,aishub_2021_06_16,"For ships with a vessel_type_specific of ""Bulk Carrier,"" what is the average bow_meters value?"
+us_upstream_production,True,usa_states,Which state has the highest number of active oil wells per square mile?
+us_upstream_production,True,usa_states,What is the total oil production for each sub-region in the last year?
+us_upstream_production,True,usa_states,Which state has the largest number of active wells operated by the top 3 operators?
+us_upstream_production,True,usa_states,What is the average gas-to-oil ratio for each state in the Pacific sub-region?
+us_upstream_production,True,usa_states,In which sub-region are the majority of abandoned wells located?
+us_upstream_production,True,usa_states,What is the correlation between a state's population and the number of active wells?
+us_upstream_production,True,usa_states,How many active wells are in states with a population density greater than 100 people per square mile?
+us_upstream_production,True,usa_states,What percentage of a state's total wells are located within 50 miles of its largest city?
+us_upstream_production,True,usa_states,Which state has the highest proportion of horizontal wells compared to the total number of wells?
+us_upstream_production,True,usa_states,What is the total monthly value of oil and gas production for each state in the Mountain sub-region?
+usa_states,True,cell_towers_us,In which state is the cell tower with the largest coverage range located?
+usa_states,True,cell_towers_us,What is the average coverage range of cell towers in each state?
+usa_states,True,cell_towers_us,How many cell towers are located in states with a population greater than 10 million?
+usa_states,True,cell_towers_us,Which state has the highest number of cell towers per square mile?
+usa_states,True,cell_towers_us,What is the total number of LTE cell towers in each sub-region?
+usa_states,True,cell_towers_us,"In states with a population density greater than 100 people per square mile, what is the average number of cell towers?"
+usa_states,True,cell_towers_us,What is the average number of samples for cell towers in each state?
+usa_states,True,cell_towers_us,Which state has the highest percentage of GSM cell towers compared to the total number of cell towers in the state?
+usa_states,True,cell_towers_us,What is the average coverage range of UMTS cell towers in states with a median age greater than 35 years?
+usa_states,True,cell_towers_us,"In states with a Hispanic population greater than 1 million, what is the total number of cell towers?"

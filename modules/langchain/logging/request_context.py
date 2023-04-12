@@ -123,7 +123,7 @@ def log_request(
 
 @contextmanager
 def log_request_ctx(
-    langchain_type: LangChainType, langchain_name: str, model: str, input: Optional[dict] = None
+    langchain_type: LangChainType, langchain_name: str, model: str = "", input: Optional[dict] = None
 ) -> Generator[RequestContext, None, None]:
     ctx = RequestContext(langchain_type, langchain_name, model, input)
     yield ctx
@@ -131,7 +131,7 @@ def log_request_ctx(
 
 @contextmanager
 def chain_log_request_ctx(
-    langchain_name: str, model: str, input: Optional[dict] = None
+    langchain_name: str, model: str = "", input: Optional[dict] = None
 ) -> Generator[RequestContext, None, None]:
     ctx = RequestContext(LangChainType.Chain, langchain_name, model, input)
     yield ctx
@@ -139,13 +139,13 @@ def chain_log_request_ctx(
 
 @contextmanager
 def agent_log_request_ctx(
-    langchain_name: str, model: str, input: Optional[dict] = None
+    langchain_name: str, model: str = "", input: Optional[dict] = None
 ) -> Generator[RequestContext, None, None]:
     ctx = RequestContext(LangChainType.Agent, langchain_name, model, input)
     yield ctx
 
 
-def log_chain_call(chain: Chain, input: str | dict, model: str, chain_name: Optional[str] = None) -> dict:
+def log_chain_call(chain: Chain, input: str | dict, model: str = "", chain_name: Optional[str] = None) -> dict:
     if isinstance(input, str):
         input = {chain.input_keys[0]: input}
     with chain_log_request_ctx(chain_name or chain._chain_type, model, input) as log_ctx:
@@ -159,7 +159,7 @@ def log_chain_call(chain: Chain, input: str | dict, model: str, chain_name: Opti
                 raise e
 
 
-def log_agent_call(agent: AgentExecutor, input: str, model: str) -> dict:
+def log_agent_call(agent: AgentExecutor, input: str, model: str = "") -> dict:
     with agent_log_request_ctx("agent", model, {"input": input}) as log_ctx:
         with get_openai_callback() as cb:
             try:
