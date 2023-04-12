@@ -13,6 +13,7 @@ from modules.langchain.heavydb import HeavyDB
 NL_TO_SQL_TEMPLATE = """Create a syntactically correct {dialect} query to answer the input question.
 Only query relevant columns, avoiding SELECT * for any table.
 Use only existing column names from the schema description, ensuring they are from the correct table.
+Do not use STRING_AGG function.
 Use GROUP BY if the question can be answered by aggregating over a column.
 Exclude null values from the results. Do not use reserved SQL keywords as aliases.
 Explain your thinking step-by-step in a block comment before the query. Provide your response using the format below:
@@ -110,10 +111,11 @@ class NLtoSQLChain(Chain, BaseModel):
         retries = 0
         while not verified and retries < self.max_retries:
             try:
+                self.callback_manager.on_text(f"Verifying SQL Query: {sql_cmd}", color="blue", verbose=self.verbose)
                 self.database.validate_query(sql_cmd)
                 verified = True
             except Exception as e:
-                self.callback_manager.on_text(f"Invalid SQL Query: {e}. Retrying...", color="red", verbose=self.verbose)
+                self.callback_manager.on_text(f"Invalid SQL Query: {e}.", color="red", verbose=self.verbose)
                 retry_llm_inputs = {
                     "input": input_text,
                     "sql_cmd": sql_cmd,
@@ -125,6 +127,9 @@ class NLtoSQLChain(Chain, BaseModel):
                 sql_cmd = error_recovery_chain.predict(**retry_llm_inputs)
                 retries += 1
         if not verified:
+            self.callback_manager.on_text(
+                f"Failed to verify SQL query after {self.max_retries} retries.", color="red", verbose=self.verbose
+            )
             raise Exception(f"Failed to verify SQL query after {self.max_retries} retries.")
         self.callback_manager.on_text(sql_cmd, color="green", verbose=self.verbose)
 

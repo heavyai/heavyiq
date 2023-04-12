@@ -1,2 +1,2 @@
 from .generate_table_documents import generate_table_documents
-from .create_index import create_index_if_nonexistent, heavydb_index
+from .create_index import heavydb_index

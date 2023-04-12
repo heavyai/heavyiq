@@ -137,6 +137,9 @@ class HeavyDB:
 
     def validate_query(self, query: str) -> list:
         """Validate a query."""
+        if "*/" in query:
+            # remove block comment from begining of query
+            query = query.split("*/", 1)[1]
         return self._conn._client.sql_validate(self._conn._session, query)
 
     @lru_cache
@@ -229,6 +232,9 @@ class HeavyDB:
         If the statement returns rows, a string of the results is returned.
         If the statement returns no rows, an empty string is returned.
         """
+        if "*/" in command:
+            # remove block comment at begining of command
+            command = command.split("*/", 1)[1]
         cursor = self._conn.execute(command)
         if fetch == "all":
             result = cursor.fetchall()

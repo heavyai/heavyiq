@@ -4,21 +4,37 @@ from typing import Any
 from langchain.chains.base import Chain
 from langchain.chains.llm import LLMChain
 from langchain.prompts.base import BasePromptTemplate
+from langchain.prompts import PromptTemplate
 from langchain.schema import BaseLanguageModel
 from pydantic import BaseModel, Extra, Field
 
 from modules.langchain.heavydb import HeavyDB
-from modules.langchain.templates.chains.heavydb import ANSWER_PROMPT
 
 from .nl_to_sql import NLtoSQLChain
+
+ANSWER_TEMPLATE = """Given an input question, first create a syntactically correct {dialect} query to run, then look at the results of the query and return the answer.
+Use the following format:
+Question: "Question here"
+SQLQuery: "/* step-by-step thought process */ SQL Query to run"
+SQLResult: "Result of the SQLQuery"
+Answer: "Final answer here"
+Only use the tables listed below.
+{table_info}
+Question: {input}
+SQLQuery: {sql_cmd}
+SQLResult: {sql_result}"""
+ANSWER_PROMPT = PromptTemplate(
+    input_variables=["input", "table_info", "dialect", "sql_cmd", "sql_result"],
+    template=ANSWER_TEMPLATE,
+)
 
 
 class NLtoAnswerChain(Chain, BaseModel):
     """
     Chain for translating natural language to an answer.
 
-    Note: You can restrict the tables that are used by either:
-        1. Passing in a list of table names to use in the `table_names_to_use` input key.
+    Note: You MUST restrict the tables that are used by either:
+        1. Passing in a list of table names to use in the `tables` input key.
         2. Setting the `database` attribute to a HeavyDB object with the `include_tables` or `ignore_tables` attribute set.
 
         If you do not restrict the tables you risk exceeding the token limit of the LLM.
@@ -65,15 +81,15 @@ class NLtoAnswerChain(Chain, BaseModel):
         return "nl_to_answer_chain"
 
     def _call(self, inputs: dict[str, Any]) -> dict[str, Any]:
-        table_names_to_use = inputs.get("table_names_to_use")
+        table_names_to_use = inputs.get("tables")
         nl_sql_chain = NLtoSQLChain(llm=self.llm, database=self.database, verbose=self.verbose)
         nl_sql_inputs = {
             nl_sql_chain.input_key: inputs[self.input_key],
-            "table_names_to_use": table_names_to_use,
+            "tables": table_names_to_use,
         }
         nl_sql_results = nl_sql_chain(nl_sql_inputs)
         sql_cmd = nl_sql_results[nl_sql_chain.output_key]
-        table_info = nl_sql_results[nl_sql_chain.output_table_info_key]
+        table_info = self.database.get_table_info(table_names=table_names_to_use)
         self.callback_manager.on_text(sql_cmd, color="green", verbose=self.verbose)
         result = self.database.run(sql_cmd)
         self.callback_manager.on_text("\nSQLResult: ", verbose=self.verbose)
