@@ -5,7 +5,7 @@ from langchain.llms import OpenAI
 
 from modules.langchain.logging import log_agent_call, log_chain_call
 from modules.langchain.heavydb import HeavyDB
-from modules.langchain.chains.heavydb import NLtoSQLChain
+from modules.langchain.chains.heavydb import NLtoSQLChain, NLtoAnswerChain
 from modules.langchain.chains.heavydb_index import SQLMetadataQuestionTransformerChain, AskHeavyDBMetadataIndexChain
 from modules.langchain.agents.agent_toolkits.heavydb.base import create_heavydb_agent
 from modules.langchain.agents.agent_toolkits.heavydb.toolkit import HeavyDBToolkit
@@ -90,6 +90,19 @@ def nl_to_sql_chain(ctx: click.Context, question: str, tables: str, verbose: boo
     heavydb = HeavyDB.from_env(include_tables=[t.strip() for t in tables.split(",")])
     llm = OpenAI(temperature=0.0, client=None)
     chain = NLtoSQLChain(database=heavydb, llm=llm, verbose=verbose)
+    click.echo(log_chain_call(chain, question, ""))
+
+
+@cli.command()
+@click.option("--tables", default="", help="Tables to use for answer (comma-separated)", type=str)
+@click.option("--verbose", default=False, help="Verbose output", type=bool)
+@click.argument("question", type=str)
+@click.pass_context
+def nl_to_answer_chain(ctx: click.Context, question: str, tables: str, verbose: bool) -> None:
+    """Call the NL to SQL Chain"""
+    heavydb = HeavyDB.from_env(include_tables=[t.strip() for t in tables.split(",")])
+    llm = OpenAI(temperature=0.0, client=None)
+    chain = NLtoAnswerChain(database=heavydb, llm=llm, verbose=verbose)
     click.echo(log_chain_call(chain, question, ""))
 
 

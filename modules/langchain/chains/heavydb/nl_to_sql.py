@@ -13,8 +13,11 @@ from modules.langchain.heavydb import HeavyDB
 NL_TO_SQL_TEMPLATE = """Create a syntactically correct {dialect} query to answer the input question.
 Only query relevant columns, avoiding SELECT * for any table.
 Use only existing column names from the schema description, ensuring they are from the correct table.
-Do not use STRING_AGG function.
-Use GROUP BY if the question can be answered by aggregating over a column.
+Do not use STRING_AGG, GROUP_CONCAT functions.
+Do not use STRING_AGG, GROUP_CONCAT functions.
+Do not use STRING_AGG, GROUP_CONCAT functions.
+Do not use STRING_AGG, GROUP_CONCAT functions.
+Use GROUP BY if the question can be answered by aggregating over a column
 Exclude null values from the results. Do not use reserved SQL keywords as aliases.
 Explain your thinking step-by-step in a block comment before the query. Provide your response using the format below:
 Question: "Question here"
@@ -28,6 +31,10 @@ NL_TO_SQL_PROMPT = PromptTemplate(
 )
 
 NL_TO_SQL_ERROR_TEMPLATE = """Correct the given {dialect} query:
+If a function signature does not exist, do not use it. Reformulate the query to not use that function signature.
+Do not use STRING_AGG, GROUP_CONCAT functions.
+Do not use STRING_AGG, GROUP_CONCAT functions.
+Do not use STRING_AGG, GROUP_CONCAT functions.
 Use the following format:
 Question: "Question here"
 SQLQuery: "/* step-by-step thought process */ SQL Query to run"
@@ -37,7 +44,7 @@ Only use the tables listed below.
 {table_info}
 Question: {input}
 SQLQuery: {sql_cmd}
-Error: {error}
+Errors: {error}
 """
 NL_TO_SQL_ERROR_PROMPT = PromptTemplate(
     input_variables=["input", "table_info", "dialect", "sql_cmd", "error"],
