@@ -66,7 +66,7 @@ class NLtoAnswerChain(Chain, BaseModel):
 
     def _call(self, inputs: dict[str, Any]) -> dict[str, Any]:
         table_names_to_use = inputs.get("table_names_to_use")
-        nl_sql_chain = NLtoSQLChain(llm=self.llm, database=self.database, verbose=self.verbose, output_key="sql")
+        nl_sql_chain = NLtoSQLChain(llm=self.llm, database=self.database, verbose=self.verbose)
         nl_sql_inputs = {
             nl_sql_chain.input_key: inputs[self.input_key],
             "table_names_to_use": table_names_to_use,

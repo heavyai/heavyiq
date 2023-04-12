@@ -1,15 +1,13 @@
-from typing import Literal, Any
+from typing import Literal
 
 from langchain.indexes.vectorstore import VectorStoreIndexWrapper
 from langchain.schema import Document
-from langchain.callbacks import get_openai_callback
 
 from modules.langchain.chains.heavydb_index import (
     SQLMetadataQuestionTransformerChain,
     AskHeavyDBMetadataIndexChain,
-    AskHeavyDBMetadataDocumentsChain,
 )
-from modules.langchain.logging import log_chain_call, log_request_ctx, LangChainType
+from modules.langchain.logging import log_chain_call
 
 search_types = Literal["similarity", "mmr"]
 
@@ -83,12 +81,12 @@ class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
         retriever = self.vectorstore.as_retriever(search_type=search_type, search_kwargs={"k": k, "fetch_k": fetch_k})
         chain = AskHeavyDBMetadataIndexChain.create(retriever=retriever)
         res: dict[str, str] = log_chain_call(chain, question, "", chain_name="ask_heavydb_metadata_index")
-        if res[chain.answer_key].strip() == chain.no_results_answer:
+        if res[chain.answer_key] == chain.no_results_answer:
             # consider a fallback to a simple search
             raise Exception("No relevant tables found for query: " + question)
         return {
-            "answer": res[chain.answer_key].strip(),
-            "tables": [tn.strip() for tn in res[chain.tables_answer_key].split(",")],
+            "answer": res[chain.answer_key],
+            "tables": res[chain.tables_answer_key],
         }
 
     def rephrase_question(self, question: str) -> str:
@@ -116,53 +114,3 @@ class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
         """
         rephrased_question = self.rephrase_question(question)
         return self.ask_about_database(rephrased_question)
-
-    def ask_using_simple_search(self, question: str, fallback_scheme: str = "simple") -> dict[str, str]:
-        """Ask a question using a simple search method and a specified fallback scheme if no relevant tables are found.
-
-        Args:
-            question: The question to ask the database.
-            fallback_scheme: The method to use when the initial search returns no relevant tables. Defaults to "simple".
-                - simple: Returns a list of table names from the documents.
-                - rephrase: Tries to find relevant tables by rephrasing the question.
-
-        Returns:
-            Dictionary containing:
-            - answer: A natural language answer to the question.
-            - tables: A list of table names relevant to the answer.
-        """
-        with log_request_ctx(LangChainType.Chain, "ask_using_simple_search", "text-davinci-003") as log_ctx:
-            with get_openai_callback() as cb:
-                table_docs = self.simple_search_for_table_docs(question)
-                chain = AskHeavyDBMetadataDocumentsChain.create()
-                log_ctx.add_input(
-                    {chain.input_key: [doc.page_content for doc in table_docs], chain.input_question_key: question}
-                )
-                res = chain({chain.input_key: table_docs, chain.input_question_key: question})
-                result: dict[str, Any] = {
-                    "answer": res[chain.answer_key],
-                    "tables": res[chain.tables_answer_key],
-                }
-
-                if result["answer"] == chain.no_results_answer:
-                    if fallback_scheme == "simple":
-                        table_names_from_docs = list(set([doc.metadata["source"] for doc in table_docs]))
-                        if len(table_names_from_docs) == 0:
-                            log_ctx.error("No relevant tables found for query: " + question, cb)
-                            raise Exception("No relevant tables found for query: " + question)
-                        result = {
-                            "answer": f"These tables may be relevant: {', '.join(table_names_from_docs)}",
-                            "tables": table_names_from_docs,
-                        }
-                    elif fallback_scheme == "rephrase":
-                        try:
-                            result = self.ask_using_rephrased_question(question)
-                        except Exception as e:
-                            log_ctx.error("No relevant tables found for query: " + question, cb)
-                            raise e
-                    else:
-                        log_ctx.error("No relevant tables found for query: " + question, cb)
-                        raise Exception("No relevant tables found for query: " + question)
-
-                log_ctx.success(result, cb)
-                return result
