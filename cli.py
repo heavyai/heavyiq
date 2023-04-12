@@ -99,7 +99,7 @@ def nl_to_sql_chain(ctx: click.Context, question: str, tables: str, verbose: boo
 @click.argument("question", type=str)
 @click.pass_context
 def nl_to_answer_chain(ctx: click.Context, question: str, tables: str, verbose: bool) -> None:
-    """Call the NL to SQL Chain"""
+    """Call the NL to Answer Chain"""
     heavydb = HeavyDB.from_env(include_tables=[t.strip() for t in tables.split(",")])
     llm = OpenAI(temperature=0.0, client=None)
     chain = NLtoAnswerChain(database=heavydb, llm=llm, verbose=verbose)
