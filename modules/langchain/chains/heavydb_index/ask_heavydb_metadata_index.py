@@ -1,10 +1,11 @@
-from typing import Optional
+import re
+from typing import Optional, Any
 
 from langchain.chains.qa_with_sources.retrieval import RetrievalQAWithSourcesChain
-from langchain.schema import BaseLanguageModel, BaseRetriever
-from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
 from langchain.llms.openai import OpenAI
-from langchain.chains.llm import LLMChain
+from langchain.prompts import PromptTemplate
+from langchain.schema import BaseLanguageModel, BaseRetriever
 from langchain.chains.combine_documents.map_reduce import MapReduceDocumentsChain
 from langchain.chains.combine_documents.stuff import StuffDocumentsChain
 
@@ -61,7 +62,7 @@ FINAL ANSWER:"""
 SQLSchemaQuestionChainNoResultsAnswer = "None relevant."
 
 
-class SQLSchemaQuestionChain(RetrievalQAWithSourcesChain):
+class AskHeavyDBMetadataIndexChain(RetrievalQAWithSourcesChain):
     """
     Takes a question about the database and returns an answer and list of tables.
     """
@@ -72,43 +73,126 @@ class SQLSchemaQuestionChain(RetrievalQAWithSourcesChain):
     def tables_answer_key(self) -> str:
         return self.sources_answer_key
 
+    @classmethod
+    def create(
+        cls, retriever: BaseRetriever, llm: Optional[BaseLanguageModel] = None, **kwargs
+    ) -> "AskHeavyDBMetadataIndexChain":
+        # ChatOpenAI has a hard time formatting proper response
+        # Unfortunate because this is more expensive ($0.08 vs $0.008)
+        llm = llm or OpenAI(temperature=0)
+        COMBINE_PROMPT = PromptTemplate(
+            template=combine_prompt_template,
+            input_variables=["summaries", "question"],
+            partial_variables={"no_results_answer": SQLSchemaQuestionChainNoResultsAnswer},
+        )
+        return AskHeavyDBMetadataIndexChain.from_llm(
+            llm=llm,
+            retriever=retriever,
+            question_prompt=QUESTION_PROMPT,
+            document_prompt=EXAMPLE_PROMPT,
+            combine_prompt=COMBINE_PROMPT,
+            sources_answer_key="tables",
+            **kwargs,
+        )
 
-def create_sql_schema_question_chain(
-    retriever: BaseRetriever, llm: Optional[BaseLanguageModel] = None, **kwargs
-) -> SQLSchemaQuestionChain:
-    llm = llm or OpenAI(temperature=0)
-    COMBINE_PROMPT = PromptTemplate(
-        template=combine_prompt_template,
-        input_variables=["summaries", "question"],
-        partial_variables={"no_results_answer": SQLSchemaQuestionChainNoResultsAnswer},
-    )
-    return SQLSchemaQuestionChain.from_llm(
-        llm=llm,
-        retriever=retriever,
-        question_prompt=QUESTION_PROMPT,
-        document_prompt=EXAMPLE_PROMPT,
-        combine_prompt=COMBINE_PROMPT,
-        sources_answer_key="tables",
-        **kwargs,
-    )
+    def _call(self, inputs: dict[str, Any]) -> dict[str, Any]:
+        docs = self._get_docs(inputs)
+        answer = self.combine_documents_chain.run(input_documents=docs, **inputs)
+        if re.search(r"SOURCES:\s", answer):
+            answer, tables = re.split(r"SOURCES:\s", answer)
+        else:
+            tables = ""
+        result: dict[str, Any] = {
+            self.answer_key: answer.strip(),
+            self.tables_answer_key: [tn.strip() for tn in tables.split(",")],
+        }
+        if self.return_source_documents:
+            result["source_documents"] = docs
+        return result
+
+    async def _acall(self, inputs: dict[str, Any]) -> dict[str, Any]:
+        docs = await self._aget_docs(inputs)
+        answer = await self.combine_documents_chain.arun(input_documents=docs, **inputs)
+        if re.search(r"SOURCES:\s", answer):
+            answer, tables = re.split(r"SOURCES:\s", answer)
+        else:
+            tables = ""
+        result: dict[str, Any] = {
+            self.answer_key: answer.strip(),
+            self.tables_answer_key: [tn.strip() for tn in tables.split(",")],
+        }
+        if self.return_source_documents:
+            result["source_documents"] = docs
+        return result
 
 
-def create_table_docs_map_reduce_chain(llm: Optional[BaseLanguageModel] = None, **kwargs) -> MapReduceDocumentsChain:
-    llm = llm or OpenAI(temperature=0)
-    COMBINE_PROMPT = PromptTemplate(
-        template=combine_prompt_template,
-        input_variables=["summaries", "question"],
-        partial_variables={"no_results_answer": SQLSchemaQuestionChainNoResultsAnswer},
-    )
-    llm_question_chain = LLMChain(llm=llm, prompt=QUESTION_PROMPT)
-    llm_combine_chain = LLMChain(llm=llm, prompt=COMBINE_PROMPT)
-    combine_results_chain = StuffDocumentsChain(
-        llm_chain=llm_combine_chain,
-        document_prompt=EXAMPLE_PROMPT,
-        document_variable_name="summaries",
-    )
-    return MapReduceDocumentsChain(
-        llm_chain=llm_question_chain,
-        combine_document_chain=combine_results_chain,
-        document_variable_name="context",
-    )
+class AskHeavyDBMetadataDocumentsChain(MapReduceDocumentsChain):
+    """Takes a question about the database and documents about the database and returns an answer and list of tables."""
+
+    no_results_answer = SQLSchemaQuestionChainNoResultsAnswer
+
+    input_key: str = "input_documents"  #: :meta private:
+    input_question_key: str = "question"  #: :meta private:
+    answer_key: str = "answer"  #: :meta private:
+    tables_answer_key: str = "tables"  #: :meta private:
+
+    @property
+    def input_keys(self) -> list[str]:
+        """Return the singular input key.
+        :meta private:
+        """
+        return [self.input_key, self.input_question_key]
+
+    @property
+    def output_keys(self) -> list[str]:
+        """Return the output keys.
+        :meta private:
+        """
+        return [self.answer_key, self.tables_answer_key]
+
+    @classmethod
+    def create(cls, llm: Optional[BaseLanguageModel] = None) -> "AskHeavyDBMetadataDocumentsChain":
+        llm = llm or OpenAI(temperature=0)
+        COMBINE_PROMPT = PromptTemplate(
+            template=combine_prompt_template,
+            input_variables=["summaries", "question"],
+            partial_variables={"no_results_answer": SQLSchemaQuestionChainNoResultsAnswer},
+        )
+        llm_question_chain = LLMChain(llm=llm, prompt=QUESTION_PROMPT)
+        llm_combine_chain = LLMChain(llm=llm, prompt=COMBINE_PROMPT)
+        combine_results_chain = StuffDocumentsChain(
+            llm_chain=llm_combine_chain,
+            document_prompt=EXAMPLE_PROMPT,
+            document_variable_name="summaries",
+        )
+        return AskHeavyDBMetadataDocumentsChain(
+            llm_chain=llm_question_chain,
+            combine_document_chain=combine_results_chain,
+            document_variable_name="context",
+        )
+
+    def _call(self, inputs: dict[str, Any]) -> dict[str, str]:
+        docs = inputs[self.input_key]
+        # Other keys are assumed to be needed for LLM prediction
+        other_keys = {k: v for k, v in inputs.items() if k != self.input_key}
+        answer, extra_return_dict = self.combine_docs(docs, **other_keys)
+        if re.search(r"SOURCES:\s", answer):
+            answer, tables = re.split(r"SOURCES:\s", answer)
+        else:
+            tables = ""
+        extra_return_dict[self.answer_key] = answer.strip()
+        extra_return_dict[self.tables_answer_key] = [tn.strip() for tn in tables.split(",")]
+        return extra_return_dict
+
+    async def _acall(self, inputs: dict[str, Any]) -> dict[str, str]:
+        docs = inputs[self.input_key]
+        # Other keys are assumed to be needed for LLM prediction
+        other_keys = {k: v for k, v in inputs.items() if k != self.input_key}
+        answer, extra_return_dict = await self.acombine_docs(docs, **other_keys)
+        if re.search(r"SOURCES:\s", answer):
+            answer, tables = re.split(r"SOURCES:\s", answer)
+        else:
+            tables = ""
+        extra_return_dict[self.answer_key] = answer.strip()
+        extra_return_dict[self.tables_answer_key] = [tn.strip() for tn in tables.split(",")]
+        return extra_return_dict

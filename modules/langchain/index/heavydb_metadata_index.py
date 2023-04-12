@@ -1,173 +1,21 @@
-import re
 from typing import Literal, Any
 
 from langchain.indexes.vectorstore import VectorStoreIndexWrapper
-from langchain.llms.openai import OpenAI
-from langchain.vectorstores import Chroma
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.prompts import PromptTemplate, FewShotPromptTemplate
-from langchain.prompts.example_selector import MaxMarginalRelevanceExampleSelector
 from langchain.schema import Document
 from langchain.callbacks import get_openai_callback
 
-from modules.langchain.chains.sql_schema_question import (
-    create_sql_schema_question_chain,
-    SQLSchemaQuestionChainNoResultsAnswer,
-    create_table_docs_map_reduce_chain,
+from modules.langchain.chains.heavydb_index import (
+    SQLMetadataQuestionTransformerChain,
+    AskHeavyDBMetadataIndexChain,
+    AskHeavyDBMetadataDocumentsChain,
 )
 from modules.langchain.logging import log_chain_call, log_request_ctx, LangChainType
 
 search_types = Literal["similarity", "mmr"]
 
-rephrase_question_examples = [
-    {
-        "input": "What is the elevation of the highest airport in Europe?",
-        "output": "Which table contains information on airports? What are the relevant columns for elevation and continent?",
-    },
-    {
-        "input": "Which firewall rule has the highest number of blocked traffic events?",
-        "output": "Which table contains information on firewall events? What are the relevant columns for rule number and action?",
-    },
-    {
-        "input": "How many heliports are located in the United States?",
-        "output": "Which table contains information on airports? What are the relevant columns for airport type and country?",
-    },
-    {
-        "input": "What was the average Time To Live (TTL) value for traffic blocked by firewall rule number 5?",
-        "output": "Which table contains information on firewall events? What are the relevant columns for TTL, rule number, and action?",
-    },
-    {
-        "input": "What are the names of the bus stops located at the highest latitudes?",
-        "output": "Which table contains information on bus stops? What are the relevant columns for stop name and latitude?",
-    },
-    {
-        "input": "Which airport has the longest scheduled flights in Asia?",
-        "output": "Which table contains information on airports? What are the relevant columns for airport name, scheduled flights, and continent?",
-    },
-    {
-        "input": "What are the top 5 most common protocols used in incoming traffic according to firewall logs?",
-        "output": "Which table contains information on firewall events? What are the relevant columns for protocol text and direction?",
-    },
-    {
-        "input": "Which bus stop has the highest number of routes passing through it?",
-        "output": "Which table contains information on bus stops? What are the relevant columns for stop name and number of routes?",
-    },
-    {
-        "input": "What was the highest trading volume for a single minute for the stock symbol 'AAPL'?",
-        "output": "Which table contains information on stock data? What are the relevant columns for stock symbol, trading volume, and minute timestamp?",
-    },
-    {
-        "input": "What was the average closing price for the stock symbol 'GOOGL' in October 2019?",
-        "output": "Which table contains information on stock data? What are the relevant columns for stock symbol, closing price, and timestamp?",
-    },
-    {
-        "input": "How many companies in the S&P 500 belong to the Technology sector?",
-        "output": "Which table contains information on S&P 500 companies? What are the relevant columns for sector and company name or symbol?",
-    },
-    {
-        "input": "Which company in the S&P 500 had the highest average closing price in 2020?",
-        "output": "Which table contains information on stock data and S&P 500 companies? What are the relevant columns for company name or symbol, closing price, and timestamp?",
-    },
-    {
-        "input": "What was the total trading volume for the S&P 500 index on December 15, 2020?",
-        "output": "Which table contains information on stock data? What are the relevant columns for trading volume and timestamp?",
-    },
-    {
-        "input": "Which vessel had the highest speed recorded in the aishub_2021_06_16 table?",
-        "output": "In the aishub_2021_06_16 table what are the relevant columns for vessel name or identifier and speed over ground?",
-    },
-    {
-        "input": "What was the destination of the vessel with MMSI 123456789 on June 10, 2021?",
-        "output": "Which table contains information on vessel movements? What are the relevant columns for vessel MMSI, destination, and timestamp?",
-    },
-    {
-        "input": "How many vessels with a position accuracy of 1 were in the area defined by latitudes 40-45 and longitudes -10 to -5 on June 12, 2021?",
-        "output": "Which table contains information on vessel movements? What are the relevant columns for latitude, longitude, position accuracy, and timestamp?",
-    },
-    {
-        "input": "What is the average speed of cargo ships in the aishub_2021_06_16 table?",
-        "output": "In the aishub_2021_06_16 table what are the relevant columns for vessel type and speed over ground?",
-    },
-    {
-        "input": "Which ships in the world_ships table have a deadweight of more than 200,000 metric tonnes?",
-        "output": "In the world_ships table what are the relevant columns for ship name or identifier and deadweight?",
-    },
-    {
-        "input": "What is the average signal strength for LTE cell towers in the United States?",
-        "output": "Which table contains information on cell towers in the United States? What are the relevant columns for radio access technology and average signal strength?",
-    },
-    {
-        "input": "How many GSM cell towers are there in a specific area code?",
-        "output": "Which table contains information on cell towers? What are the relevant columns for radio access technology and area code?",
-    },
-    {
-        "input": "What is the distribution of cell towers across different network operators in the United States?",
-        "output": "Which table contains information on cell towers in the United States? What are the relevant columns for network code and cell tower count?",
-    },
-    {
-        "input": "Which cell towers have a range of over 1000 meters?",
-        "output": "Which table contains information on cell towers? What are the relevant columns for cell tower identifier and range?",
-    },
-    {
-        "input": "What is the total number of cell towers using UMTS technology in a specific country?",
-        "output": "Which table contains information on cell towers across the globe? What are the relevant columns for radio access technology and mobile country code?",
-    },
-    {
-        "input": "What are the most popular hashtags in the California region according to the ca_tweets table?",
-        "output": "In the ca_tweets table, what is the relevant column for hashtags? How can we rank the popularity of hashtags?",
-    },
-    {
-        "input": "What is the average number of followers for users who tweeted about the hashtag #Earthquake?",
-        "output": "Which table contains information on tweets? What are the relevant columns for hashtags and number of followers?",
-    },
-    {
-        "input": "How many tweets were in English and originated from iOS devices in the last month?",
-        "output": "Which table contains information on tweets? What are the relevant columns for language, device, and timestamp?",
-    },
-    {
-        "input": "What is the daily average of new COVID-19 cases in Los Angeles County during the last month using nyt_covid_counties_v2 table?",
-        "output": "In the nyt_covid_counties_v2 table, what are the relevant columns for county, new cases, and reporting date?",
-    },
-    {
-        "input": "Who are the top 3 actors in the movie 'The Matrix'?",
-        "output": "Which table contains information on movie actors? What are the relevant columns for movie title, actor name, and appearance order?",
-    },
-    {
-        "input": "How many female actors are in the movie 'Wonder Woman'?",
-        "output": "Which table contains information on movie actors? What are the relevant columns for movie title, actor gender, and actor name?",
-    },
-    {
-        "input": "Which movie has the largest cast?",
-        "output": "Which table contains information on movie actors? What are the relevant columns for movie title and total number of actors?",
-    },
-    {
-        "input": "List all the movies starring Scarlett Johansson.",
-        "output": "Which table contains information on movie actors? What is the relevant column for actor name and movie title?",
-    },
-    {
-        "input": "What is the gender distribution among actors in the movie 'Inception'?",
-        "output": "Which table contains information on movie actors? What are the relevant columns for movie title, actor gender, and actor name?",
-    },
-]
-example_prompt = PromptTemplate(
-    input_variables=["input", "output"],
-    template="Input: {input}\nOutput: {output}",
-)
-
 
 class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
     _example_selector = None
-
-    @classmethod
-    def get_example_selector(cls: "HeavyDBMetadataIndex") -> MaxMarginalRelevanceExampleSelector:
-        if cls._example_selector is None:
-            print("Initting rephrase example selector. This will only happen once.")
-            cls._example_selector = MaxMarginalRelevanceExampleSelector.from_examples(
-                rephrase_question_examples,
-                HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2"),
-                Chroma,
-            )
-        return cls._example_selector
 
     def simple_search_for_table_docs(
         self, search_string: str, search_type: search_types = "similarity", k: int = 5, fetch_k: int = 20
@@ -231,13 +79,11 @@ class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
               - answer: natural language answer
               - tables: list[str]
         """
-        # ChatOpenAI has a hard time formatting proper response
-        # Unfortunate because this is more expensive ($0.08 vs $0.008)
-        llm = OpenAI(temperature=0)
+
         retriever = self.vectorstore.as_retriever(search_type=search_type, search_kwargs={"k": k, "fetch_k": fetch_k})
-        chain = create_sql_schema_question_chain(retriever, llm=llm)
-        res: dict[str, str] = log_chain_call(chain, question, llm.model_name, chain_name="sql_schema_question_chain")
-        if res[chain.answer_key].strip() == SQLSchemaQuestionChainNoResultsAnswer:
+        chain = AskHeavyDBMetadataIndexChain.create(retriever=retriever)
+        res: dict[str, str] = log_chain_call(chain, question, "", chain_name="ask_heavydb_metadata_index")
+        if res[chain.answer_key].strip() == chain.no_results_answer:
             # consider a fallback to a simple search
             raise Exception("No relevant tables found for query: " + question)
         return {
@@ -254,17 +100,8 @@ class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
         Returns:
             Rephrased question.
         """
-        example_selector = self.get_example_selector()
-        rephrase_question_prompt = FewShotPromptTemplate(
-            example_selector=example_selector,
-            example_prompt=example_prompt,
-            prefix="Rephrase the provided question to ask an index that contains descriptions about the SQL tables and columns required to answer the question",
-            suffix="Input: {question}\nOutput:",
-            input_variables=["question"],
-        )
-        llm = OpenAI(temperature=0)
-        new_question = llm(rephrase_question_prompt.format(question=question))
-        return new_question
+        chain = SQLMetadataQuestionTransformerChain()
+        return log_chain_call(chain, {chain.input_key: question}, "")[chain.output_key]
 
     def ask_using_rephrased_question(self, question: str) -> dict[str, str]:
         """Ask a question by first rephrasing the input question and then using the rephrased question to query the database.
@@ -297,20 +134,17 @@ class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
         with log_request_ctx(LangChainType.Chain, "ask_using_simple_search", "text-davinci-003") as log_ctx:
             with get_openai_callback() as cb:
                 table_docs = self.simple_search_for_table_docs(question)
-                chain = create_table_docs_map_reduce_chain()
-                log_ctx.add_input({chain.input_key: [doc.page_content for doc in table_docs], "question": question})
-                res = chain({chain.input_key: table_docs, "question": question})
-                answer = res[chain.output_key]
-                if re.search(r"SOURCES:\s", answer):
-                    answer, tables = re.split(r"SOURCES:\s", answer)
-                else:
-                    tables = ""
+                chain = AskHeavyDBMetadataDocumentsChain.create()
+                log_ctx.add_input(
+                    {chain.input_key: [doc.page_content for doc in table_docs], chain.input_question_key: question}
+                )
+                res = chain({chain.input_key: table_docs, chain.input_question_key: question})
                 result: dict[str, Any] = {
-                    "answer": answer.strip(),
-                    "tables": [tn.strip() for tn in tables.split(",")],
+                    "answer": res[chain.answer_key],
+                    "tables": res[chain.tables_answer_key],
                 }
 
-                if result["answer"] == SQLSchemaQuestionChainNoResultsAnswer:
+                if result["answer"] == chain.no_results_answer:
                     if fallback_scheme == "simple":
                         table_names_from_docs = list(set([doc.metadata["source"] for doc in table_docs]))
                         if len(table_names_from_docs) == 0:
@@ -321,10 +155,11 @@ class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
                             "tables": table_names_from_docs,
                         }
                     elif fallback_scheme == "rephrase":
-                        result = self.ask_using_rephrased_question(question)
-                        if result["answer"] == SQLSchemaQuestionChainNoResultsAnswer:
+                        try:
+                            result = self.ask_using_rephrased_question(question)
+                        except Exception as e:
                             log_ctx.error("No relevant tables found for query: " + question, cb)
-                            raise Exception("No relevant tables found for query: " + question)
+                            raise e
                     else:
                         log_ctx.error("No relevant tables found for query: " + question, cb)
                         raise Exception("No relevant tables found for query: " + question)
