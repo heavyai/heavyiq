@@ -39,6 +39,37 @@ def agent(
 
 
 @cli.command()
+@click.option(
+    "--model",
+    default="gpt-3.5-turbo",
+    help="Specify the model to use for the LLM. (Defaults to 'gpt-3.5-turbo', use 'gpt-4' for best results)",
+)
+@click.option("--temperature", default=0.5, type=float, help="What sampling temperature to use.")
+@click.option("--verbose", default=False, help="Verbose output", type=bool)
+@click.pass_context
+def conversational_agent(
+    ctx: click.Context,
+    model: str,
+    verbose: bool,
+    temperature: float,
+) -> None:
+    """Begin a conversation with an Agent with access to HeavyDB"""
+    from modules.langchain.agents.convo_agent import create_conversational_agent
+
+    chat_llm = ChatOpenAI(model_name=model, temperature=temperature, client=None)
+    sql_agent = create_conversational_agent(chat_llm=chat_llm, verbose=verbose)
+    # start a loop that asks for input and then calls the agent, break the loop on EXIT
+    while True:
+        question = input("You (type EXIT to break loop): ")
+        if question == "EXIT":
+            break
+        # show "Processing..." until the answer returns and then show the answer in its place
+        print("Processing...", end="\r")
+        answer = sql_agent.run(input=question)
+        print(f"Assistant: {answer}")
+
+
+@cli.command()
 @click.option("--tables", default="", help="Tables to use for answer (comma-separated)", type=str)
 @click.option("--verbose", default=False, help="Verbose output", type=bool)
 @click.argument("question", type=str)
