@@ -24,7 +24,7 @@ class HeavyDBToolkit(BaseToolkit):
     def get_tools(self) -> list[BaseTool]:
         """Get the tools in the toolkit."""
         return [
-            RetrieveRelevantSchemasTool(db=self.db),
             RetrieveTableSchemasTool(db=self.db),
+            RetrieveRelevantSchemasTool(db=self.db),
             QueryHeavyDBTool(db=self.db),
         ]

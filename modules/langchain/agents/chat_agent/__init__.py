@@ -15,6 +15,8 @@ from modules.langchain.agents.toolkit import HeavyDBToolkit
 AGENT_PROMPT_TEMPLATE = """You are an agent designed to interact with a SQL database.
 Before executing any queries, please consider if the question can be answered by the data in the database.
 
+Available tables: {tables}
+
 Given an input question, you may need to create one or more syntactically correct ANSI SQL queries to run.
 You can order the results by a relevant column to return the most interesting examples in the database.
 NEVER query for all the columns from a specific table, ONLY ask for the few relevant columns given the question.
@@ -51,6 +53,8 @@ class ChatAgentPromptTemplate(BaseChatPromptTemplate):
     template: str
     # The list of tools available
     tools: list[BaseTool]
+    # The list of tables available to the bot
+    tables: list[str]
     # The limit as to how many rows the agent should return
     top_k: int = 10
 
@@ -65,6 +69,7 @@ class ChatAgentPromptTemplate(BaseChatPromptTemplate):
         # Set the agent_scratchpad variable to that value
         kwargs["agent_scratchpad"] = thoughts
         # Create a tools variable from the list of tools provided
+        kwargs["tables"] = ", ".join(self.tables)
         kwargs["tools"] = "\n".join([f"{tool.name}: {tool.description}" for tool in self.tools])
         # Create a list of tool names for the tools provided
         kwargs["tool_names"] = ", ".join([tool.name for tool in self.tools])
@@ -76,11 +81,11 @@ class ChatAgentPromptTemplate(BaseChatPromptTemplate):
 class CustomOutputParser(AgentOutputParser):
     def parse(self, llm_output: str) -> AgentAction | AgentFinish:
         # Check if agent should finish
-        if "Final Answer:" in llm_output:
+        if "final answer:" in llm_output.lower():
             return AgentFinish(
                 # Return values is generally always a dictionary with a single `output` key
                 # It is not recommended to try anything else at the moment :)
-                return_values={"output": llm_output.split("Final Answer:")[-1].strip()},
+                return_values={"output": llm_output.lower().split("final answer:")[-1].strip()},
                 log=llm_output,
             )
         # Parse out the action and action input
@@ -106,6 +111,7 @@ def create_sql_agent(
         tools=tools,
         top_k=top_k,  # This omits the `agent_scratchpad`, `tools`, `tool_names`, and `top_k` variables because those are generated dynamically
         # This includes the `intermediate_steps` variable because that is needed
+        tables=list(heavydb.get_usable_table_names()),
         input_variables=["input", "intermediate_steps"],
     )
     output_parser = CustomOutputParser()

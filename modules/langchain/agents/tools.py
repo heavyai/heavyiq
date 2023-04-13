@@ -22,9 +22,9 @@ class BaseHeavyDBTool(BaseModel):
 
 class RetrieveRelevantSchemasTool(BaseHeavyDBTool, BaseTool):
     name = "query_for_relevant_tables"
-    description = """Use this tool to retrieve the schemas of tables relevant to a query.
+    description = """If you can't tell which tables are relevant to the query, use this tool to retrieve the schemas of tables relevant to a query.
 
-The output will be schemas for the tables that the LLM thinks are relevant to the prompt.
+The output will be schemas for the tables that are relevant to the prompt.
 
 Example Input: 'Which table contains information on [topic]? What are the relevant columns for [foo] and [bar]?'"""
 
