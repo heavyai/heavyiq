@@ -62,7 +62,8 @@ Input an accurate SQL query for output. Apply query limits. If an error occurs, 
 - Wrong number of arguments in functions
 - Incorrect data type casting
 - Improper join columns
-- Reserved SQL keywords as aliases"""
+- Reserved SQL keywords as aliases
+- Using an ORDER BY clause without applying a NULLS LAST qualifier"""
 
     def _run(self, query: str) -> str:
         """Execute the query, return the results or an error message."""
