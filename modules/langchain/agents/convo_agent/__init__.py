@@ -67,20 +67,24 @@ class CustomOutputParser(BaseOutputParser):
         return FORMAT_INSTRUCTIONS
 
     def parse(self, text: str) -> Any:
-        cleaned_output = text.strip()
-        if "```json" in cleaned_output:
-            _, cleaned_output = cleaned_output.split("```json")
-        if "```" in cleaned_output:
-            cleaned_output, _ = cleaned_output.split("```")
-        if cleaned_output.startswith("```json"):
-            cleaned_output = cleaned_output[len("```json") :]
-        if cleaned_output.startswith("```"):
-            cleaned_output = cleaned_output[len("```") :]
-        if cleaned_output.endswith("```"):
-            cleaned_output = cleaned_output[: -len("```")]
-        cleaned_output = cleaned_output.strip()
-        response = json.loads(cleaned_output)
-        return {"action": response["action"], "action_input": response["action_input"]}
+        try:
+            cleaned_output = text.strip()
+            if "```json" in cleaned_output:
+                _, cleaned_output = cleaned_output.split("```json")
+            if "```" in cleaned_output:
+                cleaned_output, _ = cleaned_output.split("```")
+            if cleaned_output.startswith("```json"):
+                cleaned_output = cleaned_output[len("```json") :]
+            if cleaned_output.startswith("```"):
+                cleaned_output = cleaned_output[len("```") :]
+            if cleaned_output.endswith("```"):
+                cleaned_output = cleaned_output[: -len("```")]
+            cleaned_output = cleaned_output.strip()
+            response = json.loads(cleaned_output)
+            return {"action": response["action"], "action_input": response["action_input"]}
+        except Exception:
+            # bot forgot to speak json, just output the response as a final answer
+            return {"action": "Final Answer", "action_input": text.strip()}
 
 
 def create_conversational_agent(
