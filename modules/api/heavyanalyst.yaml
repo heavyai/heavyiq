@@ -29,6 +29,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - session_id: []
   /question:
     post:
       tags:
@@ -54,7 +56,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - session_id: []
 components:
+  securitySchemes:
+    session_id:
+      type: apiKey
+      name: X-Auth-Session-ID
+      in: header
+      x-apikeyInfoFunc: modules.api.apikey_auth
   schemas:
     Tables:
       type: object

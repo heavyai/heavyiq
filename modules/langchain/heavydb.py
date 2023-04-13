@@ -92,7 +92,7 @@ class HeavyDB:
     @classmethod
     def from_session(cls: type[HeavyDB], session_id: str, **kwargs: Any) -> HeavyDB:
         """Create a database connection from a session id."""
-        conn: Connection = connect(sessionid=session_id, host=heavydb_host, port=heavydb_port, dbname=heavydb_dbname)
+        conn: Connection = connect(sessionid=session_id, host=heavydb_host, port=heavydb_port)
         return cls(conn, **kwargs)
 
     @classmethod
@@ -141,6 +141,9 @@ class HeavyDB:
             # remove block comment from begining of query
             query = query.split("*/", 1)[1]
         return self._conn._client.sql_validate(self._conn._session, query)
+
+    def validate_session(self, session_id: str) -> bool:
+        return self._conn._client.get_session_info(session_id)
 
     @lru_cache
     def get_column_top_k(self, table: str, column: str, k: int = 5) -> Optional[list[str]]:

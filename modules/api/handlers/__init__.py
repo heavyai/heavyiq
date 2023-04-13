@@ -23,15 +23,15 @@ def build_llm(model: str = MODEL_NAME) -> ChatOpenAI | OpenAI:
 
 
 @handle_errors
-def query(body: dict) -> dict:
+def query(body: dict, user: str) -> dict:  # user == session_id
     tables = body["tables"]
     question = body["question"]
     # db_session_id = args["session_id"]
     logger.info("Request Received")
     logger.info(f"Table(s): {', '.join(tables)}")
     llm = build_llm()
-    # db = HeavyDB.from_session(db_session_id, include_tables=tables)
-    db = HeavyDB.from_env(include_tables=tables)
+    db = HeavyDB.from_session(user, include_tables=tables)
+    # db = HeavyDB.from_env(include_tables=tables)
     chain = NLtoSQLChain(llm=llm, database=db, verbose=True)
     input = {"query": question, "table_names_to_use": tables}
     res = log_chain_call(chain, input, MODEL_NAME)
@@ -40,15 +40,15 @@ def query(body: dict) -> dict:
 
 
 @handle_errors
-def question(body: dict) -> dict:
+def question(body: dict, user: str) -> dict:
     tables = body["tables"]
     question = body["question"]
     # db_session_id = args["session_id"]
     logger.info("Request Received")
     logger.info(f"Table(s): {', '.join(tables)}")
     llm = build_llm()
-    # db = HeavyDB.from_session(db_session_id, include_tables=tables)
-    db = HeavyDB.from_env()
+    db = HeavyDB.from_session(user, include_tables=tables)
+    # db = HeavyDB.from_env()
     chain = NLtoAnswerChain(llm=llm, database=db, verbose=True)
     input = {"query": question, "tables": tables}
     res = log_chain_call(chain, input, MODEL_NAME)
