@@ -177,7 +177,7 @@ class HeavyDB:
             for c in self.get_table_columns(table_name)
             if c.type == "STR" and c.encoding == "DICT" and c.is_array is False
         ]
-        top_k_strings = "Sample values for text columns:\n"
+        top_k_strings = "Sample values for text columns (comma-separated):\n"
         for col in text_columns:
             top_k_res = self.get_column_top_k(table_name, col)
             if top_k_res:

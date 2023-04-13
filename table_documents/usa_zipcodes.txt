@@ -1,0 +1,19 @@
+Description: The usa_zipcodes table is designed to store information about zip codes in the United States, including their geographical boundaries, land and water area, and population. The primary functionality of this table is to provide a comprehensive dataset of zip code areas, while the secondary functionality is to enable spatial analysis and querying based on the provided geometries and population data.
+
+Applications: Potential use cases for the usa_zipcodes table include mapping and visualization of zip code areas, demographic analysis, location-based services, and regional planning. Additionally, the table can be used for market research, real estate analysis, and public policy development.
+
+Keywords: United States, zip codes, geographical boundaries, land area, water area, population, spatial analysis, mapping, visualization, demographics, location-based services, regional planning, market research, real estate, public policy.
+
+Column descriptions for usa_zipcodes table:
+- usa_zipcodes.ZCTA5CE10: The 5-digit ZIP Code Tabulation Area code.
+- usa_zipcodes.GEOID10: The 10-digit Census block code.
+- usa_zipcodes.CLASSFP10: The FIPS class code.
+- usa_zipcodes.MTFCC10: The MAF/TIGER feature class code.
+- usa_zipcodes.FUNCSTAT10: The functional status of the ZIP code.
+- usa_zipcodes.ALAND10: The land area of the ZIP code in square meters.
+- usa_zipcodes.AWATER10: The water area of the ZIP code in square meters.
+- usa_zipcodes.INTPTLAT10: The latitude of the internal point of the ZIP code.
+- usa_zipcodes.INTPTLON10: The longitude of the internal point of the ZIP code.
+- usa_zipcodes.omnisci_geo: The geometry of the ZIP code in a compressed format.
+- usa_zipcodes.pop: The population of the ZIP code.
+

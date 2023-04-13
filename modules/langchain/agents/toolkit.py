@@ -1,13 +1,9 @@
-"""Toolkit for interacting with a HeavyDB database."""
 from langchain.agents.agent_toolkits.base import BaseToolkit
 from langchain.tools import BaseTool
 from pydantic import Field
 
 from modules.langchain.heavydb import HeavyDB
-from modules.langchain.tools.heavydb.tool import (
-    QueryHeavyDBTool,
-    QueryHeavyDBSchemaTool,
-)
+from modules.langchain.agents.tools import QueryHeavyDBTool, RetrieveRelevantSchemasTool, RetrieveTableSchemasTool
 
 
 class HeavyDBToolkit(BaseToolkit):
@@ -15,19 +11,20 @@ class HeavyDBToolkit(BaseToolkit):
 
     db: HeavyDB = Field(exclude=True)
 
-    @property
-    def dialect(self) -> str:
-        """Return string representation of dialect to use."""
-        return self.db.dialect
-
     class Config:
         """Configuration for this pydantic object."""
 
         arbitrary_types_allowed = True
 
+    @property
+    def dialect(self) -> str:
+        """Return string representation of dialect to use."""
+        return self.db.dialect
+
     def get_tools(self) -> list[BaseTool]:
         """Get the tools in the toolkit."""
         return [
+            RetrieveRelevantSchemasTool(db=self.db),
+            RetrieveTableSchemasTool(db=self.db),
             QueryHeavyDBTool(db=self.db),
-            QueryHeavyDBSchemaTool(db=self.db),
         ]

@@ -1,0 +1,74 @@
+Description: The usa_counties table is designed to store demographic, geographic, and socioeconomic data for counties across the United States. The primary functionality of this table is to provide a comprehensive dataset for analyzing various aspects of the population, such as age distribution, race, and household composition. Additionally, the table includes information on housing units, agricultural data, and geographic attributes, such as area and shape, which serve as secondary functionalities.
+
+Applications: Potential use cases and applications for the usa_counties table include:
+1. Analyzing population trends and demographic shifts across different regions of the United States.
+2. Identifying areas with specific demographic characteristics for targeted marketing or policy implementation.
+3. Examining the relationship between population density, housing, and agricultural land use.
+4. Conducting geographic analysis and visualization of county-level data for research or decision-making purposes.
+
+Keywords: demographics, population, age distribution, race, households, housing units, agriculture, geographic analysis, United States, counties, socioeconomic data, land use, geographic attributes
+
+Column descriptions for usa_counties table:
+- usa_counties.FID: Unique identifier for each county.
+- usa_counties.NAME: Name of the county.
+- usa_counties.STATE_NAME: Name of the state where the county is located.
+- usa_counties.STATE_FIPS: FIPS code for the state where the county is located.
+- usa_counties.CNTY_FIPS: FIPS code for the county.
+- usa_counties.FIPS: Concatenation of STATE_FIPS and CNTY_FIPS.
+- usa_counties.POPULATION: Total population of the county.
+- usa_counties.POP_SQMI: Population per square mile.
+- usa_counties.POP2010: Population count in 2010.
+- usa_counties.POP10_SQMI: Population per square mile in 2010.
+- usa_counties.WHITE: White population count.
+- usa_counties.BLACK: Black population count.
+- usa_counties.AMERI_ES: American Indian and Alaska Native population count.
+- usa_counties.ASIAN: Asian population count.
+- usa_counties.HAWN_PI: Native Hawaiian and Other Pacific Islander population count.
+- usa_counties.HISPANIC: Hispanic or Latino population count.
+- usa_counties.OTHER: Population count of other races.
+- usa_counties.MULT_RACE: Population count of multiple races.
+- usa_counties.MALES: Male population count.
+- usa_counties.FEMALES: Female population count.
+- usa_counties.AGE_UNDER5: Population count under 5 years old.
+- usa_counties.AGE_5_9: Population count between 5 and 9 years old.
+- usa_counties.AGE_10_14: Population count between 10 and 14 years old.
+- usa_counties.AGE_15_19: Population count between 15 and 19 years old.
+- usa_counties.AGE_20_24: Population count between 20 and 24 years old.
+- usa_counties.AGE_25_34: Population count between 25 and 34 years old.
+- usa_counties.AGE_35_44: Population count between 35 and 44 years old.
+- usa_counties.AGE_45_54: Population count between 45 and 54 years old.
+- usa_counties.AGE_55_64: Population count between 55 and 64 years old.
+- usa_counties.AGE_65_74: Population count between 65 and 74 years old.
+- usa_counties.AGE_75_84: Population count between 75 and 84 years old.
+- usa_counties.AGE_85_UP: Population count 85 years old and over.
+- usa_counties.MED_AGE: Median age of the population.
+- usa_counties.MED_AGE_M: Median age of males.
+- usa_counties.MED_AGE_F: Median age of females.
+- usa_counties.HOUSEHOLDS: Total number of households.
+- usa_counties.AVE_HH_SZ: Average household size.
+- usa_counties.HSEHLD_1_M: Number of male-headed households with one or more children under 18.
+- usa_counties.HSEHLD_1_F: Number of female-headed households with one or more children under 18.
+- usa_counties.MARHH_CHD: Number of married-couple families with own children under 18.
+- usa_counties.MARHH_NO_C: Number of married-couple families without own children under 18.
+- usa_counties.MHH_CHILD: Number of male-headed households with own children under 18.
+- usa_counties.FHH_CHILD: Number of female-headed households with own children under 18.
+- usa_counties.FAMILIES: Total number of families.
+- usa_counties.AVE_FAM_SZ: Average family size.
+- usa_counties.HSE_UNITS: Total number of housing units.
+- usa_counties.VACANT: Number of vacant housing units.
+- usa_counties.OWNER_OCC: Number of owner-occupied housing units.
+- usa_counties.RENTER_OCC: Number of renter-occupied housing units.
+- usa_counties.NO_FARMS12: Number of farms in 2012.
+- usa_counties.AVE_SIZE12: Average farm size in 2012.
+- usa_counties.CROP_ACR12: Total acres of harvested cropland in 2012.
+- usa_counties.AVE_SALE12: Average value of sales per farm in 2012.
+- usa_counties.SQMI: Total area of the county in square miles.
+- usa_counties.NO_FARMS17: Number of farms in 2017.
+- usa_counties.AVE_SIZE17: Average farm size in 2017.
+- usa_counties.CROP_ACR17: Total acres of harvested cropland in 2017.
+- usa_counties.AVE_SALE17: Average value of sales per farm in 2017.
+- usa_counties.Shape_Leng: Length of the county shape.
+- usa_counties.SHAPE_Le_1: Length of the county shape (alternative column).
+- usa_counties.SHAPE_Area: Area of the county shape.
+- usa_counties.geom: Geometry of the county shape.
+

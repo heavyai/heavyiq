@@ -1,0 +1,26 @@
+Description: The usa_shipping_ports table is designed to store information about various shipping ports in the United States. The primary functionality of this table is to provide essential details about each port, such as its name, waterway, state, and geographical coordinates. The secondary functionality includes providing additional information like the state FIPS code, GNIS ID, GNIS name, data source, and any secondary waterways or bodies of water associated with the port.
+
+Applications: This table can be used in various applications, such as:
+1. Mapping and visualization tools for analyzing the distribution of shipping ports across the United States.
+2. Supply chain management systems to optimize shipping routes and transportation logistics.
+3. Environmental impact assessments of shipping activities on waterways and coastal areas.
+4. Economic analysis of trade and commerce activities related to shipping ports.
+5. Emergency management and disaster response planning involving shipping ports and their surrounding areas.
+
+Keywords: Shipping Ports, United States, Waterways, Geographical Coordinates, State FIPS, GNIS ID, Data Source, Secondary Waterways, Mapping, Visualization, Supply Chain Management, Environmental Impact, Economic Analysis, Emergency Management
+
+Column descriptions for usa_shipping_ports table:
+- usa_shipping_ports.NAME: The name of the shipping port.
+- usa_shipping_ports.WATERWAY: The waterway that the shipping port is located on.
+- usa_shipping_ports.STATE: The state that the shipping port is located in.
+- usa_shipping_ports.STATE_FIPS: The FIPS code for the state that the shipping port is located in.
+- usa_shipping_ports.GNIS_ID: The Geographic Names Information System (GNIS) ID for the shipping port.
+- usa_shipping_ports.GNIS_NAME: The name of the shipping port in the GNIS.
+- usa_shipping_ports.SOURCE: The source of the data for the shipping port.
+- usa_shipping_ports.SECONDARY_: Additional information about the shipping port.
+- usa_shipping_ports.SOURCE_LAT: The latitude of the source of the data for the shipping port.
+- usa_shipping_ports.SOURCE_LON: The longitude of the source of the data for the shipping port.
+- usa_shipping_ports.LAT: The latitude of the shipping port.
+- usa_shipping_ports.LONG: The longitude of the shipping port.
+- usa_shipping_ports.geom: The geometry of the shipping port in a point format.
+
