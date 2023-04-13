@@ -1,0 +1,25 @@
+Description: The world_cities table is designed to store information about cities across the globe. Its primary functionality is to provide details such as city name, geographical coordinates (latitude and longitude), country, and administrative region. Additionally, the table includes secondary information such as the city's capital status and population. This data can be used to analyze and compare cities worldwide based on various attributes.
+
+Applications: Potential use cases and applications for the world_cities table include:
+1. Geospatial analysis and mapping: The table can be used to create maps and visualize the distribution of cities across the globe.
+2. Demographic studies: Researchers can analyze population data and trends in different cities and countries.
+3. Location-based services: The table can be utilized to develop applications that provide information or services based on a user's location.
+4. Travel planning: The data can be used to create travel itineraries, calculate distances between cities, and provide recommendations for nearby attractions.
+5. Business analysis: Companies can use the information to identify potential markets, analyze regional trends, and make informed decisions about expansion or investment.
+
+Keywords: world cities, global, geospatial, latitude, longitude, country, administrative region, capital status, population, demographics, location-based services, travel planning, business analysis
+
+Column descriptions for world_cities table:
+- world_cities.city: The name of the city.
+- world_cities.city_ascii: The ASCII name of the city.
+- world_cities.lat: The latitude of the city.
+- world_cities.lng: The longitude of the city.
+- world_cities.country: The name of the country where the city is located.
+- world_cities.iso2: The ISO 3166-1 alpha-2 code of the country where the city is located.
+- world_cities.iso3: The ISO 3166-1 alpha-3 code of the country where the city is located.
+- world_cities.admin_name: The name of the highest level administration region of the city (e.g. state, province).
+- world_cities.capital: Indicates whether the city is a capital and the level of the capital (e.g. primary, admin, minor).
+- world_cities.population: The population of the city.
+- world_cities.id: The unique identifier of the city.
+- world_cities.location: The location of the city represented as a point in the WGS 84 coordinate reference system.
+

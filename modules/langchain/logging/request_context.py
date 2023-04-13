@@ -163,8 +163,11 @@ def log_agent_call(agent: AgentExecutor, input: str, model: str = "") -> dict:
     with agent_log_request_ctx("agent", model, {"input": input}) as log_ctx:
         with get_openai_callback() as cb:
             try:
-                output = agent(input)
-                log_ctx.success(output, cb)
+                agent.return_intermediate_steps = True
+                res = agent({"input": input})
+                output = res["output"]
+                intermediate_steps = res["intermediate_steps"]
+                log_ctx.success(output, cb, "\n".join([str(step) for step in intermediate_steps]))
                 return output
             except Exception as e:
                 log_ctx.error(str(e), cb)

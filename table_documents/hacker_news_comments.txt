@@ -1,0 +1,22 @@
+Description: The hacker_news_comments table is designed to store information about comments on the Hacker News platform. The primary functionality of this table is to store comment-related data such as the content, author, score, and timestamp. Secondary functionality includes tracking the comment's status (dead or deleted) and its relationship to other comments or posts (parent and descendants).
+
+Applications: This table can be used to analyze and understand user engagement on the Hacker News platform. Potential use cases include sentiment analysis of comments, identifying popular topics or authors, tracking comment activity over time, and monitoring the quality of discussions. Additionally, the table can be used to develop recommendation systems for users based on their comment history and preferences.
+
+Keywords: Hacker News, comments, user engagement, sentiment analysis, discussion quality, recommendation systems, comment activity, popular topics, content analysis, data storage.
+
+Column descriptions for hacker_news_comments table:
+- hacker_news_comments.title: The title of the post or comment.
+- hacker_news_comments.url: The URL associated with the post or comment.
+- hacker_news_comments.content_text: The text content of the post or comment.
+- hacker_news_comments.dead: A flag indicating whether the post or comment has been marked as dead.
+- hacker_news_comments.author: The username of the author of the post or comment.
+- hacker_news_comments.score: The score of the post or comment.
+- hacker_news_comments.time_epoch: The time the post or comment was created, in epoch format.
+- hacker_news_comments.timestamp_: The timestamp of the post or comment.
+- hacker_news_comments.type: The type of the post or comment.
+- hacker_news_comments.id: The unique identifier of the post or comment.
+- hacker_news_comments.parent: The unique identifier of the parent post or comment.
+- hacker_news_comments.descendants: The number of descendants of the post or comment.
+- hacker_news_comments.ranking: The ranking of the post or comment.
+- hacker_news_comments.deleted: A flag indicating whether the post or comment has been marked as deleted.
+
