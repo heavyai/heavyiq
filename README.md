@@ -29,13 +29,13 @@ $ pip install -r requirements.txt
 # it may be necessary to `export HNSWLIB_NO_NATIVE=1` to install chromadb on Mac
 ```
 
-6. Make a copy of the example environment variables file:
+6. Make a copy of the example config file:
 
 ```bash
-$ cp .env.example .env
+$ cp config.example.toml config.toml
 ```
 
-7. Add your [API key](https://beta.openai.com/account/api-keys) and HeavyDB Credentials to the newly created `.env` file.
+7. Add your [API key](https://beta.openai.com/account/api-keys) and HeavyDB Credentials to the newly created `config.toml` file.
 
 8. Run the app:
 
@@ -43,12 +43,9 @@ $ cp .env.example .env
 $ flask run
 ```
 
-You should now be able to access the app at [http://localhost:5000](http://localhost:5000)!
-API Documents (Swagger) can be found at [http://localhost:5000/api/v1/docs/](http://localhost:5000/api/v1/docs/)
+You should now be able to access the API Documentation at [http://localhost:5000](http://localhost:5000)!
 
 ## Using the CLI
 ```bash
-$ python cli.py "Your question here"
 $ python cli.py --help
 ```
-
