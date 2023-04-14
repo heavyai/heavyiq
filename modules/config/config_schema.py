@@ -1,7 +1,7 @@
 from confz import ConfZ, ConfZFileSource
 
 
-class HeavyNL(ConfZ):  # type: ignore
+class HeavyNLConfig(ConfZ):  # type: ignore
     heavydb_host: str
     heavydb_port: int
     heavydb_dbname: str
@@ -12,6 +12,6 @@ class HeavyNL(ConfZ):  # type: ignore
 
 
 class AppConfig(ConfZ):  # type: ignore
-    heavynl: HeavyNL
+    nl: HeavyNLConfig
 
     CONFIG_SOURCES = [ConfZFileSource(file="./config.toml")]

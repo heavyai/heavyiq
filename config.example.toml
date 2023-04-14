@@ -1,4 +1,4 @@
-[heavynl]
+[nl]
 heavydb_host = "localhost"
 heavydb_port = 6274
 heavydb_dbname = "heavyai"
