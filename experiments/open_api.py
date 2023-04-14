@@ -1,11 +1,13 @@
-from dotenv import load_dotenv
+import os
 
 from langchain.tools import OpenAPISpec, APIOperation
 from langchain.chains import OpenAPIEndpointChain
 from langchain.requests import Requests
 from langchain.llms import OpenAI
 
-load_dotenv()
+from modules.config import config
+
+os.environ["OPENAI_API_KEY"] = config.openai_api_key
 
 
 def main():

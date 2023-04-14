@@ -1,23 +1,14 @@
 from __future__ import annotations
 from functools import lru_cache
-import os
 from threading import Lock
 from typing import Optional, Any, Iterable, TYPE_CHECKING
 
 from heavyai import connect
-from dotenv import load_dotenv
+from modules.config import config
 
 if TYPE_CHECKING:
     from heavyai import Connection
     from heavydb._parsers import ColumnDetails
-
-load_dotenv()
-
-heavydb_host = os.getenv("HEAVYDB_HOST")
-heavydb_port = os.getenv("HEAVYDB_PORT")
-heavydb_dbname = os.getenv("HEAVYDB_DBNAME")
-heavydb_username = os.getenv("HEAVYDB_USERNAME")
-heavydb_password = os.getenv("HEAVYDB_PASSWORD")
 
 
 class HeavyDB:
@@ -81,18 +72,20 @@ class HeavyDB:
     def from_env(cls: type[HeavyDB], **kwargs: Any) -> HeavyDB:
         """Create a database connection from environment variables."""
         conn: Connection = connect(
-            user=heavydb_username,
-            password=heavydb_password,
-            host=heavydb_host,
-            port=heavydb_port,
-            dbname=heavydb_dbname,
+            user=config.heavydb_username,
+            password=config.heavydb_password,
+            host=config.heavydb_host,
+            port=config.heavydb_port,
+            dbname=config.heavydb_dbname,
         )
         return cls(conn, **kwargs)
 
     @classmethod
     def from_session(cls: type[HeavyDB], session_id: str, **kwargs: Any) -> HeavyDB:
         """Create a database connection from a session id."""
-        conn: Connection = connect(sessionid=session_id, host=heavydb_host, port=heavydb_port, dbname=heavydb_dbname)
+        conn: Connection = connect(
+            sessionid=session_id, host=config.heavydb_host, port=config.heavydb_port, dbname=config.heavydb_dbname
+        )
         return cls(conn, **kwargs)
 
     @classmethod
@@ -101,9 +94,9 @@ class HeavyDB:
         conn: Connection = connect(
             user=username,
             password=password,
-            host=heavydb_host,
-            port=heavydb_port,
-            dbname=heavydb_dbname,
+            host=config.heavydb_host,
+            port=config.heavydb_port,
+            dbname=config.heavydb_dbname,
         )
         return cls(conn, **kwargs)
 

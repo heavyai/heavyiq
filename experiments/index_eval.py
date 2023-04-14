@@ -78,7 +78,7 @@ def test_stuff(question_dicts: list[dict[str, Any]]) -> tuple[str, dict]:
         question = question_dict["question"]
         try:
             simple_start = datetime.now()
-            simple_res = heavydb_index.ask_using_simple_search(question)
+            simple_res = heavydb_index.ask_about_database(question)
             simple_end = datetime.now()
             simple["time_spent"] += (simple_end - simple_start).total_seconds()
             simple_guessed_tables = set(simple_res["tables"])

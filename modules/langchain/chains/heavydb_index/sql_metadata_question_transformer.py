@@ -10,6 +10,8 @@ from langchain.vectorstores import Chroma
 from langchain.schema import BaseLanguageModel
 from pydantic import BaseModel, Extra
 
+from modules.config import config
+
 rephrase_question_examples = [
     {
         "input": "What is the elevation of the highest airport in Europe?",
@@ -154,7 +156,7 @@ def get_example_selector() -> MaxMarginalRelevanceExampleSelector:
         print("Initting rephrase example selector. This will only happen once.")
         _example_selector = MaxMarginalRelevanceExampleSelector.from_examples(
             rephrase_question_examples,
-            HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2"),
+            HuggingFaceEmbeddings(model_name=config.huggingface_embed_model),
             Chroma,
         )
     return _example_selector

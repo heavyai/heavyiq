@@ -5,15 +5,16 @@ import os
 import re
 from typing import Optional
 
-from dotenv import load_dotenv
 from langchain.callbacks import get_openai_callback
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage, AIMessage
 
+from modules.config import config
 from modules.langchain import HeavyDB
 from modules.langchain.index import heavydb_index
 
-load_dotenv()
+os.environ["OPENAI_API_KEY"] = config.openai_api_key
+
 
 prompt = """Create questions that require querying and analyzing a SQL database, provided information about a table within the SQL Database
 

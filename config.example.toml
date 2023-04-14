@@ -1,0 +1,8 @@
+[nl]
+heavydb_host = "localhost"
+heavydb_port = 6274
+heavydb_dbname = "heavyai"
+heavydb_username = "admin"
+heavydb_password = "HyperInteractive"
+openai_api_key = "sk-xxxxxxxxetc"
+huggingface_embed_model = "sentence-transformers/all-mpnet-base-v2"

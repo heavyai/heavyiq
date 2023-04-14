@@ -6,8 +6,10 @@ from langchain.docstore.document import Document
 from langchain.schema import HumanMessage, SystemMessage
 from langchain.chat_models import ChatOpenAI
 
+from modules.config import config
 from modules.langchain.heavydb import HeavyDB
 
+os.environ["OPENAI_API_KEY"] = config.openai_api_key
 
 table_summary_prompt = """With respect to the SQL table schema and sample data provided,
 please create a comprehensive response encompassing the following aspects:
