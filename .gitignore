@@ -15,6 +15,7 @@ build/
 
 .DS_STORE
 
-.env
 db/
 langchain_call_log.db
+
+config.toml

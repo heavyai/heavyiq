@@ -1,6 +1,12 @@
+import os
+
 import connexion
 from flask import Flask, redirect
 from flask_cors import CORS
+
+from modules.config import config
+
+os.environ["OPENAI_API_KEY"] = config.openai_api_key
 
 
 def get_app() -> Flask:

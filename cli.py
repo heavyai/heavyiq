@@ -1,12 +1,13 @@
+import os
+
 import click
-from dotenv import load_dotenv
 from langchain.chat_models import ChatOpenAI
 from langchain.llms import OpenAI
 
+from modules.config import config
 from modules.langchain.logging import log_agent_call, log_chain_call
 
-
-load_dotenv()
+os.environ["OPENAI_API_KEY"] = config.openai_api_key
 
 
 @click.group()
