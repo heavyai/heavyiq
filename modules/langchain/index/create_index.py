@@ -15,6 +15,12 @@ huggingface_model_name = config.huggingface_embed_model
 
 
 def read_table_documents(folder_path: str, include: Optional[list[str]] = None) -> Iterator[Document]:
+    """
+    Iterate over a folder containing table documents and yield Document instances.
+    :param folder_path: Path to the folder containing table document files.
+    :param include: Optional list of table names to include. If None, all tables will be included.
+    :return: An iterator yielding Document instances for each table document.
+    """
     folder = Path(folder_path)
     for file_name in folder.iterdir():
         if file_name.suffix == ".txt":
