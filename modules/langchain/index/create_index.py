@@ -1,11 +1,11 @@
 from collections.abc import Iterator
-import os
+from pathlib import Path
+from typing import Optional
 
 from langchain.vectorstores import Chroma
 from langchain.docstore.document import Document
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.indexes import VectorstoreIndexCreator
-from langchain.vectorstores.base import VectorStore
 
 from modules.config import config
 from modules.langchain.index import generate_table_documents
@@ -14,20 +14,33 @@ from modules.langchain.index.heavydb_metadata_index import HeavyDBMetadataIndex
 huggingface_model_name = config.huggingface_embed_model
 
 
-def read_table_documents(folder_path: str) -> Iterator[Document]:
-    """
-    Iterate over a folder containing table documents and yield Document instances.
-
-    :param folder_path: Path to the folder containing table document files.
-    :return: An iterator yielding Document instances for each table document.
-    """
-    for file_name in os.listdir(folder_path):
-        if file_name.endswith(".txt"):
-            table_name = os.path.splitext(file_name)[0]
-            file_path = os.path.join(folder_path, file_name)
-            with open(file_path, "r") as f:
+def read_table_documents(folder_path: str, include: Optional[list[str]] = None) -> Iterator[Document]:
+    folder = Path(folder_path)
+    for file_name in folder.iterdir():
+        if file_name.suffix == ".txt":
+            table_name = file_name.stem
+            if include is not None and table_name not in include:
+                continue
+            with open(file_name, "r") as f:
                 file_contents = f.read()
             yield Document(page_content=file_contents, metadata={"source": table_name})
+
+
+def update_existing_index(
+    index_creator: VectorstoreIndexCreator, vectorstore: Chroma, folder_path: str, tables_to_update: list[str]
+):
+    print("New table summaries will replace existing summaries in the index.")
+    if len(tables_to_update) == 1:
+        vectorstore._collection.delete(where={"source": tables_to_update[0]})
+    else:
+        vectorstore._collection.delete(where={"$or": [{"source": table_name} for table_name in tables_to_update]})
+    print("Reading new table documents...")
+    docs = list(read_table_documents(folder_path, include=tables_to_update))
+    print("Splitting documents...")
+    sub_docs = index_creator.text_splitter.split_documents(docs)
+    print(f"Indexing documents with {huggingface_model_name}...")
+    vectorstore.add_documents(sub_docs)
+    print("Done")
 
 
 def create_index_if_nonexistent(
@@ -42,19 +55,17 @@ def create_index_if_nonexistent(
     """
     tables_with_new_summaries = generate_table_documents(folder_path)
 
-    if len(tables_with_new_summaries) > 0 and os.path.exists(persist_directory):
-        print(f"New table summaries created. Delete {persist_directory} to regenerate index.")
-
     index_creator = VectorstoreIndexCreator(
         vectorstore_kwargs={"persist_directory": persist_directory},
         embedding=HuggingFaceEmbeddings(model_name=huggingface_model_name),
     )
 
-    if os.path.exists(persist_directory):
-        print("No new table summaries created. Index already exists. Returning existing index.")
-        vectorstore: VectorStore = Chroma(
-            embedding_function=index_creator.embedding, persist_directory=persist_directory
-        )
+    persist_path = Path(persist_directory)
+    if persist_path.exists():
+        print("Index already exists. Returning existing index.")
+        vectorstore: Chroma = Chroma(embedding_function=index_creator.embedding, persist_directory=persist_directory)
+        if len(tables_with_new_summaries) > 0:
+            update_existing_index(index_creator, vectorstore, folder_path, tables_with_new_summaries)
     else:
         print("Index does not exist. Creating new index.")
         print("Reading table documents...")
