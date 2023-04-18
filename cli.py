@@ -1,13 +1,19 @@
 import os
 
 import click
-from langchain.chat_models import ChatOpenAI
-from langchain.llms import OpenAI
+from langchain.chat_models import PromptLayerChatOpenAI
+import promptlayer
 
 from modules.config import config
 from modules.langchain.logging import log_agent_call, log_chain_call
 
 os.environ["OPENAI_API_KEY"] = config.openai_api_key
+os.environ["PROMPTLAYER_API_KEY"] = config.promptlayer_api_key
+
+promptlayer.api_key = os.environ["PROMPTLAYER_API_KEY"]
+
+OpenAI = promptlayer.openai
+OpenAI.api_key = os.environ["OPENAI_API_KEY"]
 
 
 @click.group()
@@ -34,7 +40,9 @@ def agent(
     """Call SQL Agent with a question"""
     from modules.langchain.agents.chat_agent import create_sql_agent
 
-    chat_llm = ChatOpenAI(model_name=model, temperature=temperature, client=None)
+    chat_llm = PromptLayerChatOpenAI(
+        model_name=model, temperature=temperature, client=None, pl_tags=["cli", "sql_agent"]
+    )
     sql_agent = create_sql_agent(chat_llm=chat_llm)
     log_agent_call(sql_agent, question, model)
 
@@ -57,7 +65,9 @@ def conversational_agent(
     """Begin a conversation with an Agent with access to HeavyDB"""
     from modules.langchain.agents.convo_agent import create_conversational_agent
 
-    chat_llm = ChatOpenAI(model_name=model, temperature=temperature, client=None)
+    chat_llm = PromptLayerChatOpenAI(
+        model_name=model, temperature=temperature, client=None, pl_tags=["cli", "heavydb_agent"]
+    )
     sql_agent = create_conversational_agent(chat_llm=chat_llm, verbose=verbose)
     # start a loop that asks for input and then calls the agent, break the loop on EXIT
     while True:

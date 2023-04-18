@@ -8,6 +8,7 @@ class HeavyNLConfig(ConfZ):  # type: ignore
     heavydb_username: str
     heavydb_password: str
     openai_api_key: str
+    promptlayer_api_key: str
     huggingface_embed_model: str
 
 
