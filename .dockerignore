@@ -1,8 +1,0 @@
-venv/
-
-*.pyc
-__pycache__/
-.chroma/
-.mypy_cache/
-db/
-experiments/
