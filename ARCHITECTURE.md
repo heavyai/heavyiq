@@ -16,7 +16,7 @@ A large language model (or LLM) is an artificial intelligence system that is tra
 
 LLMs, such as GPT-4, lack knowledge beyond the data they were trained on, hence they do not possess any inherent knowledge of the contents of the HeavyDB instance that HeavyNL is intended to communicate with. As HeavyDB is used in many industries for a wide variety of purposes, it is prohibitively expensive to train a LLM for each instance; instead, the information a LLM needs to effectively communicate with HeavyDB must be provided in the prompt itself.
 
-Unfortunately, a current limitation of LLMs is a limit to the prompt size that can be parsed and kept “in context” by the LLM as it formulates its response (this is known as a “token limit”). As there is no limit to the quantity or complexity of data stored within HeavyDB, it is not possible to provide a full description of each table schema in every prompt. This one of the main obstacles HeavyNL is designed to overcome—providing the LLM with the proper context required to respond.
+Unfortunately, a current limitation of LLMs is a limit to the prompt size that can be parsed and kept “in context” by the LLM as it formulates its response (this is known as a “token limit”). As there is no limit to the quantity or complexity of data stored within HeavyDB, it is not possible to provide a full description of each table schema in every prompt. This is one of the main obstacles HeavyNL is designed to overcome—providing the LLM with the proper context required to respond.
 
 
 
