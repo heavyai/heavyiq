@@ -22,6 +22,8 @@ Unfortunately, a current limitation of LLMs is a limit to the prompt size that c
 
 ## System Overview
 
+![Quick Architecture Diagram](../media/architecture.png?raw=true)
+
 A HeavyDB Metadata Index (`HeavyDBMetadataIndex`) is generated and updated to hold the details and overviews of the tables present in the HeavyDB instance. This index aids in obtaining and delivering the required context for LLM prompts. The HeavyDB Metadata Index is searched to identify relevant tables, allowing the table structure to be supplied to the LLM to produce valid SQL.
 
 HeavyNL utilizes [LangChain](https://python.langchain.com/en/latest/index.html), a framework for developing applications powered by LLMs, for [prompt templating](https://python.langchain.com/en/latest/modules/prompts.html), [LLM output parsing](https://python.langchain.com/en/latest/modules/prompts/output_parsers.html), [performing operations on documents](https://python.langchain.com/en/latest/modules/chains/index_examples/qa_with_sources.html) , and more. LangChain provides useful building blocks that allow developers to establish boundaries for LLMs such that they can be integrated more deterministically alongside more traditional classes and functions. LangChain also rests on the cutting edge of LLM integration, granting LLMs the ability to  [act as an agent](https://python.langchain.com/en/latest/modules/agents.html) capable of ‘Reasoning & Acting’ ([ReAct](https://arxiv.org/pdf/2210.03629.pdf)). If one were to create a clone of ChatGPT w/ Plugins, it could be [accomplished almost entirely with LangChain alone](https://python.langchain.com/en/latest/modules/agents/agents/custom_llm_chat_agent.html).
@@ -50,4 +52,23 @@ This class is a wrapper for interacting with the HeavyDB Metadata Index. Under t
 
 ### Chains
 
+Using an LLM in isolation is fine for some simple applications, but many more complex ones require chaining LLMs together and using the response of one LLM in the prompt of another. [LangChain Documentation](https://python.langchain.com/en/latest/modules/chains.html)
+
 ### Agents
+
+Some applications will require not just a predetermined chain of calls to LLMs, but potentially an unknown chain that depends on the user’s input. In these situations, there is a “agent” which has access to a suite of tools and the ability to Reason & Act. Depending on the user input, the agent can then decide which, if any, of these tools to utilize to accomplish the user input. [LangChain Documentation](https://python.langchain.com/en/latest/modules/agents.html)
+
+## Logging
+
+Calls to Chains and Agents are stored in a SQLite database found in the root of the application. This database captures:
+* the type of call that was made (agent or chain)
+* the name of the agent/chain called
+* timestamps at the start and completion of the call
+* the input arguments and resulting output
+* any errors that resulted from the call
+* token data (tokens used, cost of the call, etc)
+
+
+## Conclusion
+
+In summary, HeavyNL is a powerful and versatile Python module that leverages large language models to provide a natural language interface for interacting with HeavyDB. By utilizing the HeavyDB Metadata Index and LangChain framework, HeavyNL overcomes the limitations of LLMs and enables users to seamlessly communicate with their HeavyDB instances. With support for REST API and Command-Line Interface, HeavyNL offers a flexible and user-friendly solution for a wide range of applications. As the field of natural language processing continues to advance, HeavyNL is poised to further enhance the user experience and streamline the process of gaining insights from data stored in HeavyDB.
