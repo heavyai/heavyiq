@@ -2,6 +2,7 @@ import os
 
 import click
 from langchain.chat_models import PromptLayerChatOpenAI
+from langchain.llms import PromptLayerOpenAI
 import promptlayer
 
 from modules.config import config
@@ -11,9 +12,6 @@ os.environ["OPENAI_API_KEY"] = config.openai_api_key
 os.environ["PROMPTLAYER_API_KEY"] = config.promptlayer_api_key
 
 promptlayer.api_key = os.environ["PROMPTLAYER_API_KEY"]
-
-OpenAI = promptlayer.openai
-OpenAI.api_key = os.environ["OPENAI_API_KEY"]
 
 
 @click.group()
@@ -91,7 +89,7 @@ def nl_to_sql_chain(ctx: click.Context, question: str, tables: str, verbose: boo
     from modules.langchain.chains.heavydb import NLtoSQLChain
 
     heavydb = HeavyDB.from_env(include_tables=[t.strip() for t in tables.split(",")])
-    llm = OpenAI(temperature=0.0, client=None)
+    llm = PromptLayerOpenAI(temperature=0.0, client=None, pl_tags=["cli", "chain" "heavydb_sql_chain"])
     chain = NLtoSQLChain(database=heavydb, llm=llm, verbose=verbose)
     click.echo(log_chain_call(chain, question, ""))
 
@@ -107,7 +105,7 @@ def nl_to_answer_chain(ctx: click.Context, question: str, tables: str, verbose: 
     from modules.langchain.chains.heavydb import NLtoAnswerChain
 
     heavydb = HeavyDB.from_env(include_tables=[t.strip() for t in tables.split(",")])
-    llm = OpenAI(temperature=0.0, client=None)
+    llm = PromptLayerOpenAI(temperature=0.0, client=None, pl_tags=["cli", "chain" "heavydb_question_chain"])
     chain = NLtoAnswerChain(database=heavydb, llm=llm, verbose=verbose)
     click.echo(log_chain_call(chain, question, llm.model_name))
 
