@@ -1,14 +1,13 @@
 import json
 from typing import Optional, Any
 
-from langchain.agents import Tool
 from langchain.memory import ConversationBufferMemory
 from langchain.chat_models import ChatOpenAI
 from langchain.chat_models.base import BaseChatModel
 from langchain.agents import AgentExecutor
-from langchain.agents import initialize_agent
+from langchain.schema import AgentAction, AgentFinish
 from langchain.agents.conversational_chat.base import ConversationalChatAgent
-from langchain.schema import BaseOutputParser
+from langchain.agents import AgentOutputParser
 
 from modules.langchain import HeavyDB
 from modules.langchain.agents import HeavyDBToolkit
@@ -62,11 +61,11 @@ Use this if you want to respond directly to the human. Markdown code snippet for
 ```"""
 
 
-class CustomOutputParser(BaseOutputParser):
+class CustomOutputParser(AgentOutputParser):
     def get_format_instructions(self) -> str:
         return FORMAT_INSTRUCTIONS
 
-    def parse(self, text: str) -> Any:
+    def parse(self, text: str) -> AgentAction | AgentFinish:
         try:
             cleaned_output = text.strip()
             if "```json" in cleaned_output:
@@ -81,10 +80,14 @@ class CustomOutputParser(BaseOutputParser):
                 cleaned_output = cleaned_output[: -len("```")]
             cleaned_output = cleaned_output.strip()
             response = json.loads(cleaned_output)
-            return {"action": response["action"], "action_input": response["action_input"]}
+            action, action_input = response["action"], response["action_input"]
+            if action == "Final Answer":
+                return AgentFinish({"output": action_input}, text)
+            else:
+                return AgentAction(action, action_input, text)
         except Exception:
             # bot forgot to speak json, just output the response as a final answer
-            return {"action": "Final Answer", "action_input": text.strip()}
+            return AgentFinish({"output": text.strip()}, text)
 
 
 def create_conversational_agent(
