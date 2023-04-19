@@ -7,7 +7,15 @@ from modules.langchain.agents.tools import QueryHeavyDBTool, RetrieveRelevantSch
 
 
 class HeavyDBToolkit(BaseToolkit):
-    """Toolkit for interacting with HeavyDB databases."""
+    """This toolkit provides a set of tools for querying and retrieving information from a HeavyDB instance.
+    It includes tools for retrieving table schemas, finding relevant tables for a query, and executing SQL queries.
+
+    Attributes:
+    - db (HeavyDB): A HeavyDB instance to interact with.
+
+    Methods:
+    - dialect() -> str: Returns the dialect used by the HeavyDB instance.
+    - get_tools() -> list[BaseTool]: Returns a list of tools available in the toolkit."""
 
     db: HeavyDB = Field(exclude=True)
 
@@ -18,11 +26,21 @@ class HeavyDBToolkit(BaseToolkit):
 
     @property
     def dialect(self) -> str:
-        """Return string representation of dialect to use."""
+        """
+        Return the dialect used by the HeavyDB instance.
+
+        Returns:
+        - str: The dialect used by the HeavyDB instance.
+        """
         return self.db.dialect
 
     def get_tools(self) -> list[BaseTool]:
-        """Get the tools in the toolkit."""
+        """
+        Get the tools available in the toolkit.
+
+        Returns:
+        - list[BaseTool]: A list of tools for interacting with the HeavyDB instance.
+        """
         return [
             RetrieveTableSchemasTool(db=self.db),
             RetrieveRelevantSchemasTool(db=self.db),

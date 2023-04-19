@@ -102,6 +102,22 @@ class CustomOutputParser(AgentOutputParser):
 def create_sql_agent(
     heavydb: Optional[HeavyDB] = None, top_k: int = 10, chat_llm: Optional[BaseChatModel] = None
 ) -> AgentExecutor:
+    """This function creates an AgentExecutor instance that uses a language model to generate SQL queries
+    based on input questions. The agent is designed to interact with a HeavyDB instance and has access
+    to a set of tools for querying the database. The agent follows a specific prompt template and
+    returns the final answer after executing the necessary SQL queries.
+
+    Parameters:
+    - heavydb (Optional[HeavyDB]): A HeavyDB instance to interact with. If not provided, a default
+    HeavyDB instance will be created using environment variables.
+    - top_k (int, optional): The maximum number of rows the agent should return in its queries.
+    Defaults to 10.
+    - chat_llm (Optional[BaseChatModel], optional): A language model instance to use for generating
+    SQL queries. If not provided, a default ChatOpenAI instance with GPT-4 will be used.
+
+    Returns:
+    - AgentExecutor: An AgentExecutor instance configured with the SQL agent and the set of tools
+    for interacting with the database."""
     chat_llm = chat_llm or ChatOpenAI(temperature=0, model_name="gpt-4")
     heavydb = heavydb or HeavyDB.from_env()
     toolkit = HeavyDBToolkit(db=heavydb)
