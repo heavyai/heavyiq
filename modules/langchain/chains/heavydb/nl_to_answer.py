@@ -8,7 +8,7 @@ from langchain.prompts import PromptTemplate
 from langchain.schema import BaseLanguageModel
 from pydantic import BaseModel, Extra, Field
 
-from modules.langchain.heavydb import HeavyDB
+from modules.langchain import HeavyDB
 
 from .nl_to_sql import NLtoSQLChain
 

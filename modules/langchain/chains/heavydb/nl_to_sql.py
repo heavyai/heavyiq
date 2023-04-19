@@ -8,7 +8,7 @@ from langchain.schema import BaseLanguageModel
 from pydantic import BaseModel, Extra, Field
 from langchain.prompts.prompt import PromptTemplate
 
-from modules.langchain.heavydb import HeavyDB
+from modules.langchain import HeavyDB
 
 NL_TO_SQL_TEMPLATE = """Create a syntactically correct {dialect} query to answer the input question.
 Only query relevant columns, avoiding SELECT * for any table.
