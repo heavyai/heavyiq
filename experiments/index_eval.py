@@ -2,8 +2,8 @@ import csv
 from datetime import datetime
 from typing import Any, Callable
 
+from modules.config import config
 from modules.langchain.index import heavydb_index
-from modules.langchain.index.create_index import huggingface_model_name
 
 
 def read_csv_file(file_name: str) -> list[dict[str, Any]]:
@@ -103,7 +103,7 @@ def main():
 
     list_of_table_retrievers = [
         (
-            f"Simple search using {huggingface_model_name}",
+            f"Simple search using {config.huggingface_embed_model}",
             heavydb_index.simple_search_for_table_names,
             lambda x: set(x),
         )

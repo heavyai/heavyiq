@@ -77,8 +77,8 @@ def conversational_agent(
 @click.pass_context
 def nl_to_sql_chain(ctx: click.Context, question: str, tables: str, verbose: bool) -> None:
     """Call the NL to SQL Chain"""
-    from modules.langchain.heavydb import HeavyDB
-    from modules.langchain.chains.heavydb import NLtoSQLChain
+    from modules.langchain import HeavyDB
+    from modules.langchain.chains import NLtoSQLChain
 
     heavydb = HeavyDB.from_env(include_tables=[t.strip() for t in tables.split(",")])
     llm = OpenAI(temperature=0.0, client=None)
@@ -93,8 +93,8 @@ def nl_to_sql_chain(ctx: click.Context, question: str, tables: str, verbose: boo
 @click.pass_context
 def nl_to_answer_chain(ctx: click.Context, question: str, tables: str, verbose: bool) -> None:
     """Call the NL to Answer Chain"""
-    from modules.langchain.heavydb import HeavyDB
-    from modules.langchain.chains.heavydb import NLtoAnswerChain
+    from modules.langchain import HeavyDB
+    from modules.langchain.chains import NLtoAnswerChain
 
     heavydb = HeavyDB.from_env(include_tables=[t.strip() for t in tables.split(",")])
     llm = OpenAI(temperature=0.0, client=None)
@@ -107,7 +107,7 @@ def nl_to_answer_chain(ctx: click.Context, question: str, tables: str, verbose: 
 @click.pass_context
 def question_rephraser_chain(ctx: click.Context, question: str) -> None:
     """Rephrase a question to be about SQL metadata"""
-    from modules.langchain.chains.heavydb_index import SQLMetadataQuestionTransformerChain
+    from modules.langchain.chains import SQLMetadataQuestionTransformerChain
 
     chain = SQLMetadataQuestionTransformerChain()
     click.echo(log_chain_call(chain, question, ""))
@@ -122,7 +122,7 @@ def question_rephraser_chain(ctx: click.Context, question: str) -> None:
 def ask_heavydb_index_chain(ctx: click.Context, question: str, search_type: str, k: int, fetch_k: int) -> None:
     """Ask the HeavyDB Metadata Index"""
     from modules.langchain.index import heavydb_index
-    from modules.langchain.chains.heavydb_index import AskHeavyDBMetadataIndexChain
+    from modules.langchain.chains import AskHeavyDBMetadataIndexChain
 
     retriever = heavydb_index.vectorstore.as_retriever(
         search_type=search_type, search_kwargs={"k": k, "fetch_k": fetch_k}

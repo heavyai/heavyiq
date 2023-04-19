@@ -4,7 +4,7 @@ from langchain.llms import OpenAI
 from modules.api.utils import handle_errors
 from modules.logging_utils import default_logger as logger
 from modules.langchain import HeavyDB
-from modules.langchain.chains.heavydb import NLtoSQLChain, NLtoAnswerChain
+from modules.langchain.chains import NLtoSQLChain, NLtoAnswerChain
 from modules.langchain.logging import log_chain_call
 
 

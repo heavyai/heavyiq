@@ -3,7 +3,7 @@ from pydantic import BaseModel, Extra, Field
 
 from modules.langchain.index import heavydb_index
 from modules.langchain import HeavyDB
-from modules.langchain.chains.heavydb_index import AskHeavyDBMetadataIndexChain
+from modules.langchain.chains import AskHeavyDBMetadataIndexChain
 
 
 class BaseHeavyDBTool(BaseModel):

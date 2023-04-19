@@ -2,7 +2,7 @@ from langchain.agents.agent_toolkits.base import BaseToolkit
 from langchain.tools import BaseTool
 from pydantic import Field
 
-from modules.langchain.heavydb import HeavyDB
+from modules.langchain import HeavyDB
 from modules.langchain.agents.tools import QueryHeavyDBTool, RetrieveRelevantSchemasTool, RetrieveTableSchemasTool
 
 

@@ -1,2 +1,3 @@
 from .generate_table_documents import generate_table_documents
 from .create_index import heavydb_index
+from .heavydb_metadata_index import HeavyDBMetadataIndex

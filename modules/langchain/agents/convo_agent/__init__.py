@@ -11,7 +11,7 @@ from langchain.agents.conversational_chat.base import ConversationalChatAgent
 from langchain.schema import BaseOutputParser
 
 from modules.langchain import HeavyDB
-from modules.langchain.agents.toolkit import HeavyDBToolkit
+from modules.langchain.agents import HeavyDBToolkit
 
 SYSTEM_MESSAGE = """Assistant is a large language model trained by OpenAI.
 

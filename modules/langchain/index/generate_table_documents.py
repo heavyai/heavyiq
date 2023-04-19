@@ -7,7 +7,7 @@ from langchain.schema import HumanMessage, SystemMessage
 from langchain.chat_models import ChatOpenAI
 
 from modules.config import config
-from modules.langchain.heavydb import HeavyDB
+from modules.langchain import HeavyDB
 
 os.environ["OPENAI_API_KEY"] = config.openai_api_key
 

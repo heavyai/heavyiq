@@ -3,7 +3,7 @@ from typing import Literal
 from langchain.indexes.vectorstore import VectorStoreIndexWrapper
 from langchain.schema import Document
 
-from modules.langchain.chains.heavydb_index import (
+from modules.langchain.chains import (
     SQLMetadataQuestionTransformerChain,
     AskHeavyDBMetadataIndexChain,
 )

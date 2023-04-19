@@ -10,7 +10,7 @@ from langchain.prompts import BaseChatPromptTemplate
 from langchain.schema import AgentAction, AgentFinish, HumanMessage
 
 from modules.langchain import HeavyDB
-from modules.langchain.agents.toolkit import HeavyDBToolkit
+from modules.langchain.agents import HeavyDBToolkit
 
 AGENT_PROMPT_TEMPLATE = """You are an agent designed to interact with a SQL database.
 Before executing any queries, please consider if the question can be answered by the data in the database.
