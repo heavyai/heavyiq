@@ -8,7 +8,8 @@ from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.indexes import VectorstoreIndexCreator
 
 from modules.config import config
-from modules.langchain.index import generate_table_documents, HeavyDBMetadataIndex
+from modules.langchain.index import generate_table_documents
+from .heavydb_metadata_index import HeavyDBMetadataIndex
 
 huggingface_model_name = config.huggingface_embed_model
 
