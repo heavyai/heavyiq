@@ -1,7 +1,7 @@
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Extra, Field
 
-from modules.langchain.index import heavydb_index
+from modules.langchain.index import get_heavydb_index
 from modules.langchain import HeavyDB
 from modules.langchain.chains import AskHeavyDBMetadataIndexChain
 
@@ -41,7 +41,7 @@ Example Input: 'Which table contains information on [topic]? What are the releva
 
     def _run(self, query: str) -> str:
         try:
-            retriever = heavydb_index.vectorstore.as_retriever(search_kwargs={"k": 5})
+            retriever = get_heavydb_index().vectorstore.as_retriever(search_kwargs={"k": 5})
             chain = AskHeavyDBMetadataIndexChain.create(retriever=retriever)
             res: dict[str, str] = chain(query)
             if res["answer"] == chain.no_results_answer:

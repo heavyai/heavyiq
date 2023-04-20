@@ -11,7 +11,7 @@ from langchain.schema import HumanMessage, SystemMessage, AIMessage
 
 from modules.config import config
 from modules.langchain import HeavyDB
-from modules.langchain.index import heavydb_index
+from modules.langchain.index import get_heavydb_index
 
 os.environ["OPENAI_API_KEY"] = config.openai_api_key
 
@@ -95,7 +95,7 @@ def get_questions_for_table(heavydb: HeavyDB, tables: tuple[str, Optional[str]])
     messages: list = [SystemMessage(content=prompt)]
     with heavydb.lock:
         table_info = heavydb.get_table_info([table])
-    table_summary = heavydb_index.query(f"What is the summary of the {table} table?")
+    table_summary = get_heavydb_index().query(f"What is the summary of the {table} table?")
     llm = ChatOpenAI(model_name="gpt-4", temperature=0.7, client=None)
     messages.append(HumanMessage(content=f"{table_summary}\n\n{table_info}"))
     resp = llm(messages)
