@@ -9,6 +9,7 @@ class HeavyNLConfig(ConfZ):  # type: ignore
     heavydb_password: str
     openai_api_key: str
     huggingface_embed_model: str
+    metadata_index_dir: str
 
 
 class AppConfig(ConfZ):  # type: ignore
