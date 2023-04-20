@@ -2,6 +2,7 @@ from typing import Literal
 
 from langchain.indexes.vectorstore import VectorStoreIndexWrapper
 from langchain.schema import Document
+from langchain.text_splitter import TextSplitter
 
 from modules.langchain.chains import (
     SQLMetadataQuestionTransformerChain,
@@ -13,7 +14,7 @@ search_types = Literal["similarity", "mmr"]
 
 
 class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
-    _example_selector = None
+    text_splitter: TextSplitter
 
     def simple_search_for_table_docs(
         self, search_string: str, search_type: search_types = "similarity", k: int = 5, fetch_k: int = 20

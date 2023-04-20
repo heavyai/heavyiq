@@ -12,6 +12,7 @@ from modules.langchain.index import generate_table_documents
 from .heavydb_metadata_index import HeavyDBMetadataIndex
 
 huggingface_model_name = config.huggingface_embed_model
+metadata_index_dir = config.metadata_index_dir
 
 
 def read_table_documents(folder_path: str, include: Optional[list[str]] = None) -> Iterator[Document]:
@@ -35,7 +36,7 @@ def read_table_documents(folder_path: str, include: Optional[list[str]] = None) 
 def update_tables_in_index(
     index_creator: VectorstoreIndexCreator, vectorstore: Chroma, folder_path: str, tables_to_update: list[str]
 ):
-    print("New table summaries will replace existing summaries in the index.")
+    print("New table summaries will replace existing summaries in the index (if any).")
     if len(tables_to_update) == 1:
         vectorstore._collection.delete(where={"source": tables_to_update[0]})
     else:
@@ -49,9 +50,19 @@ def update_tables_in_index(
     print("Done")
 
 
-def create_index_if_nonexistent(
-    folder_path: str = "table_documents", persist_directory: str = "db"
-) -> HeavyDBMetadataIndex:
+def get_vectorstore_index_creator(persist_directory: str) -> VectorstoreIndexCreator:
+    """
+    Get a VectorstoreIndexCreator instance.
+    :param persist_directory: Path to the directory where the vector store index should be persisted.
+    :return: A VectorstoreIndexCreator instance.
+    """
+    return VectorstoreIndexCreator(
+        vectorstore_kwargs={"persist_directory": persist_directory},
+        embedding=HuggingFaceEmbeddings(model_name=huggingface_model_name),
+    )
+
+
+def create_index_if_nonexistent(folder_path: str = "table_documents") -> HeavyDBMetadataIndex:
     """
     Create a new vector store index if it does not exist, otherwise return the existing index.
 
@@ -61,15 +72,12 @@ def create_index_if_nonexistent(
     """
     tables_with_new_summaries = generate_table_documents(folder_path)
 
-    index_creator = VectorstoreIndexCreator(
-        vectorstore_kwargs={"persist_directory": persist_directory},
-        embedding=HuggingFaceEmbeddings(model_name=huggingface_model_name),
-    )
+    index_creator = get_vectorstore_index_creator(metadata_index_dir)
 
-    persist_path = Path(persist_directory)
+    persist_path = Path(metadata_index_dir)
     if persist_path.exists():
         print("Index already exists. Returning existing index.")
-        vectorstore: Chroma = Chroma(embedding_function=index_creator.embedding, persist_directory=persist_directory)
+        vectorstore: Chroma = Chroma(embedding_function=index_creator.embedding, persist_directory=metadata_index_dir)
         if len(tables_with_new_summaries) > 0:
             update_tables_in_index(index_creator, vectorstore, folder_path, tables_with_new_summaries)
     else:
@@ -85,4 +93,4 @@ def create_index_if_nonexistent(
         )
         print("Done")
 
-    return HeavyDBMetadataIndex(vectorstore=vectorstore)
+    return HeavyDBMetadataIndex(vectorstore=vectorstore, text_splitter=index_creator.text_splitter)
