@@ -32,7 +32,7 @@ def read_table_documents(folder_path: str, include: Optional[list[str]] = None) 
             yield Document(page_content=file_contents, metadata={"source": table_name})
 
 
-def update_existing_index(
+def update_tables_in_index(
     index_creator: VectorstoreIndexCreator, vectorstore: Chroma, folder_path: str, tables_to_update: list[str]
 ):
     print("New table summaries will replace existing summaries in the index.")
@@ -71,7 +71,7 @@ def create_index_if_nonexistent(
         print("Index already exists. Returning existing index.")
         vectorstore: Chroma = Chroma(embedding_function=index_creator.embedding, persist_directory=persist_directory)
         if len(tables_with_new_summaries) > 0:
-            update_existing_index(index_creator, vectorstore, folder_path, tables_with_new_summaries)
+            update_tables_in_index(index_creator, vectorstore, folder_path, tables_with_new_summaries)
     else:
         print("Index does not exist. Creating new index.")
         print("Reading table documents...")
@@ -86,6 +86,3 @@ def create_index_if_nonexistent(
         print("Done")
 
     return HeavyDBMetadataIndex(vectorstore=vectorstore)
-
-
-heavydb_index = create_index_if_nonexistent()

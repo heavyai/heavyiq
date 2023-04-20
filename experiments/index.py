@@ -1,7 +1,8 @@
-from modules.langchain.index import heavydb_index
+from modules.langchain.index import get_heavydb_index
 
 
 def main():
+    heavydb_index = get_heavydb_index()
     # heavydb_index.ask
     # heavydb_index.ask_about_database
     # heavydb_index.ask_using_rephrased_question

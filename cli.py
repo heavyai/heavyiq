@@ -121,10 +121,10 @@ def question_rephraser_chain(ctx: click.Context, question: str) -> None:
 @click.pass_context
 def ask_heavydb_index_chain(ctx: click.Context, question: str, search_type: str, k: int, fetch_k: int) -> None:
     """Ask the HeavyDB Metadata Index"""
-    from modules.langchain.index import heavydb_index
+    from modules.langchain.index import get_heavydb_index
     from modules.langchain.chains import AskHeavyDBMetadataIndexChain
 
-    retriever = heavydb_index.vectorstore.as_retriever(
+    retriever = get_heavydb_index().vectorstore.as_retriever(
         search_type=search_type, search_kwargs={"k": k, "fetch_k": fetch_k}
     )
     chain = AskHeavyDBMetadataIndexChain.create(retriever=retriever)

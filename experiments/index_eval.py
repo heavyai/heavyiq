@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any, Callable
 
 from modules.config import config
-from modules.langchain.index import heavydb_index
+from modules.langchain.index import get_heavydb_index
 
 
 def read_csv_file(file_name: str) -> list[dict[str, Any]]:
@@ -78,7 +78,7 @@ def test_stuff(question_dicts: list[dict[str, Any]]) -> tuple[str, dict]:
         question = question_dict["question"]
         try:
             simple_start = datetime.now()
-            simple_res = heavydb_index.ask_about_database(question)
+            simple_res = get_heavydb_index().ask_about_database(question)
             simple_end = datetime.now()
             simple["time_spent"] += (simple_end - simple_start).total_seconds()
             simple_guessed_tables = set(simple_res["tables"])
@@ -104,7 +104,7 @@ def main():
     list_of_table_retrievers = [
         (
             f"Simple search using {config.huggingface_embed_model}",
-            heavydb_index.simple_search_for_table_names,
+            get_heavydb_index().simple_search_for_table_names,
             lambda x: set(x),
         )
     ]
