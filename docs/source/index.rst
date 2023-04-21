@@ -11,6 +11,7 @@ Welcome to HeavyNL's documentation!
    :caption: Contents:
 
    langchain
+   cli
 
 Indices and tables
 ==================
