@@ -7,8 +7,8 @@ paths:
   /query:
     post:
       tags:
-        - RequiresTables
-      summary: Provided a question and table(s), returns SQL that can be used to answer the question
+        - OptionalTables
+      summary: Provided a question and (optionally) table(s), returns SQL that can be used to answer the question
       operationId: modules.api.handlers.query
       requestBody:
         required: true
@@ -32,8 +32,8 @@ paths:
   /question:
     post:
       tags:
-        - RequiresTables
-      summary: Provided a question and tables(s), returns SQL and a NL Answer to the question
+        - OptionalTables
+      summary: Provided a question and (optionally) tables(s), returns SQL and a NL Answer to the question
       operationId: modules.api.handlers.question
       requestBody:
         required: true
@@ -93,8 +93,6 @@ components:
           type: array
           items:
             type: string
-      required:
-        - tables
       example:
         tables:
           - usa_states
