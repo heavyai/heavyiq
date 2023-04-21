@@ -5,6 +5,7 @@ from typing import Optional, Any, Iterable, TYPE_CHECKING
 
 from heavyai import connect
 from modules.config import config
+from modules.utils import strip_sql_comments
 
 if TYPE_CHECKING:
     from heavyai import Connection
@@ -130,9 +131,8 @@ class HeavyDB:
 
     def validate_query(self, query: str) -> list:
         """Validate a query."""
-        if "*/" in query:
-            # remove block comment from begining of query
-            query = query.split("*/", 1)[1]
+        # Remove block comments
+        query = strip_sql_comments(query)
         return self._conn._client.sql_validate(self._conn._session, query)
 
     @lru_cache
@@ -225,9 +225,7 @@ class HeavyDB:
         If the statement returns rows, a string of the results is returned.
         If the statement returns no rows, an empty string is returned.
         """
-        if "*/" in command:
-            # remove block comment at begining of command
-            command = command.split("*/", 1)[1]
+        command = strip_sql_comments(command)
         cursor = self._conn.execute(command)
         if fetch == "all":
             result = cursor.fetchall()

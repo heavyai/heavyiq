@@ -19,3 +19,4 @@ db/
 langchain_call_log.db
 
 config.toml
+.chroma/
