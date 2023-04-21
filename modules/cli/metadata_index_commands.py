@@ -32,7 +32,7 @@ def generate_table_document(ctx: click.Context, table_name: str) -> None:
 @metadata_index.command()
 @click.argument("table_name", type=str)
 @click.pass_context
-def reload_table_document(ctx: click.Context, table_name: str) -> None:
+def reindex_table_document(ctx: click.Context, table_name: str) -> None:
     """Reload the table document in index."""
     # Add the implementation for reloading table document here
     persist_path = Path(config.metadata_index_dir)
@@ -41,5 +41,5 @@ def reload_table_document(ctx: click.Context, table_name: str) -> None:
     click.echo(f"Reloading table document for table: {table_name}")
     index_creator = get_vectorstore_index_creator(config.metadata_index_dir)
     vectorstore = Chroma(embedding_function=index_creator.embedding, persist_directory=config.metadata_index_dir)
-    update_tables_in_index(index_creator, vectorstore, config.table_documents_dir, [table_name])
+    update_tables_in_index(index_creator, vectorstore, [table_name])
     vectorstore.persist()

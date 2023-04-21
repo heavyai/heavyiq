@@ -1,5 +1,6 @@
 from typing import Literal
 
+from langchain.vectorstores import Chroma
 from langchain.indexes.vectorstore import VectorStoreIndexWrapper
 from langchain.schema import Document
 from langchain.text_splitter import TextSplitter
@@ -9,6 +10,7 @@ from modules.langchain.chains import (
     AskHeavyDBMetadataIndexChain,
 )
 from modules.langchain.logging import log_chain_call
+from .utils import read_table_documents
 
 
 search_types = Literal["similarity", "mmr"]
@@ -16,6 +18,7 @@ search_types = Literal["similarity", "mmr"]
 
 class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
     text_splitter: TextSplitter
+    vectorstore: Chroma
 
     def simple_search_for_table_docs(
         self, search_string: str, search_type: search_types = "similarity", k: int = 5, fetch_k: int = 20
@@ -116,3 +119,11 @@ class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
         """
         rephrased_question = self.rephrase_question(question)
         return self.ask_about_database(rephrased_question)
+
+    def reindex_table_document(self, table_name: str) -> None:
+        docs = list(read_table_documents(include=[table_name]))
+        if len(docs) == 0:
+            raise Exception(f"No document found for table {table_name}")
+        self.vectorstore._collection.delete(where={"source": table_name})
+        sub_docs = self.text_splitter.split_documents(docs)
+        self.vectorstore.add_documents(sub_docs)

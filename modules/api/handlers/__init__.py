@@ -1,3 +1,6 @@
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
+
 from langchain.chat_models import ChatOpenAI
 from langchain.llms import OpenAI
 
@@ -6,6 +9,7 @@ from modules.logging_utils import default_logger as logger
 from modules.langchain import HeavyDB
 from modules.langchain.chains import NLtoSQLChain, NLtoAnswerChain
 from modules.langchain.logging import log_chain_call
+from modules.langchain.index import create_and_write_table_document, get_heavydb_index
 
 
 MODEL_NAME = "text-davinci-003"
@@ -53,3 +57,20 @@ def question(body: dict) -> dict:
     input = {"query": question, "tables": tables}
     res = log_chain_call(chain, input, MODEL_NAME)
     return {"answer": res[chain.output_answer_key], "sql": res[chain.output_sql_key]}
+
+
+@handle_errors
+def add_tables(body: dict) -> dict:
+    tables = body["tables"]
+    logger.info("Request Received")
+    logger.info(f"Table(s): {', '.join(tables)}")
+    # db = HeavyDB.from_session(db_session_id, include_tables=tables)
+    db = HeavyDB.from_env(include_tables=tables)
+    process_func = partial(create_and_write_table_document, db)
+    with ThreadPoolExecutor() as executor:
+        executor.map(process_func, tables)
+    logger.info("Finished generating summaries")
+    heavydb_index = get_heavydb_index()
+    for table in tables:
+        heavydb_index.reindex_table_document(table)
+    return {"status": "Tables successfully added to Metadata Index"}
