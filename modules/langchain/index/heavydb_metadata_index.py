@@ -10,6 +10,7 @@ from modules.langchain.chains import (
 )
 from modules.langchain.logging import log_chain_call
 
+
 search_types = Literal["similarity", "mmr"]
 
 
