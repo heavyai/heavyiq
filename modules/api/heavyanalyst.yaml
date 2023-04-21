@@ -54,6 +54,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /metadata-index/add-tables:
+    post:
+      tags:
+        - Metadata
+      summary: Generate summary docs and add them to metadata index. Overwrites existing docs if present.
+      operationId: modules.api.handlers.add_tables
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Tables'
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: Tables successfully added to Metadata Index
+        500:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
     Tables:
