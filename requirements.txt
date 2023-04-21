@@ -9,6 +9,7 @@ flake8-pep585==0.1.7
 Flask==2.2.3
 Flask-Cors==3.0.10
 furo==2023.3.27
+liccheck==0.8.3
 heavyai==1.1.0
 langchain==0.0.144
 mypy==1.2.0
