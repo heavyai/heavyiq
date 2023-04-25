@@ -43,7 +43,7 @@ def query(body: dict) -> dict:
     # db_session_id = args["session_id"]
     logger.info("Request Received")
     logger.info(f"Table(s): {', '.join(tables)}")
-    llm = build_llm(MODEL_NAME, ["nl_to_sql_chain", "rest_api", "query"])
+    llm = build_llm(MODEL_NAME, ["rest_api", "query", "chain", "nl_to_sql_chain"])
     # db = HeavyDB.from_session(db_session_id, include_tables=tables)
     db = HeavyDB.from_env(include_tables=tables)
     chain = NLtoSQLChain(llm=llm, database=db, verbose=True)
@@ -60,7 +60,7 @@ def question(body: dict) -> dict:
     # db_session_id = args["session_id"]
     logger.info("Request Received")
     logger.info(f"Table(s): {', '.join(tables)}")
-    llm = build_llm(MODEL_NAME, ["nl_to_answer_chain", "rest_api", "question"])
+    llm = build_llm(MODEL_NAME, ["rest_api", "question", "chain", "nl_to_answer_chain"])
     # db = HeavyDB.from_session(db_session_id, include_tables=tables)
     db = HeavyDB.from_env()
     chain = NLtoAnswerChain(llm=llm, database=db, verbose=True)
