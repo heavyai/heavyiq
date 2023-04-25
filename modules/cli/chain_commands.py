@@ -1,7 +1,5 @@
 import click
 
-from langchain.llms import OpenAI
-
 from modules.langchain import HeavyDB
 from modules.langchain.logging import log_chain_call
 from modules.langchain.index import get_heavydb_index
@@ -11,6 +9,7 @@ from modules.langchain.chains import (
     SQLMetadataQuestionTransformerChain,
     AskHeavyDBMetadataIndexChain,
 )
+from modules.langchain.llms import get_llm
 
 
 @click.group()
@@ -28,7 +27,7 @@ def nl_to_sql(ctx: click.Context, question: str, tables: str, verbose: bool) -> 
     """Call the NL to SQL Chain"""
 
     heavydb = HeavyDB.from_env(include_tables=[t.strip() for t in tables.split(",")])
-    llm = OpenAI(temperature=0.0, client=None)
+    llm = get_llm(["cli", "chain", "nl_to_sql_chain"], temperature=0.0, client=None)
     chain = NLtoSQLChain(database=heavydb, llm=llm, verbose=verbose)
     click.echo(log_chain_call(chain, question, ""))
 
@@ -41,7 +40,7 @@ def nl_to_sql(ctx: click.Context, question: str, tables: str, verbose: bool) -> 
 def nl_to_answer(ctx: click.Context, question: str, tables: str, verbose: bool) -> None:
     """Call the NL to Answer Chain"""
     heavydb = HeavyDB.from_env(include_tables=[t.strip() for t in tables.split(",")])
-    llm = OpenAI(temperature=0.0, client=None)
+    llm = get_llm(["cli", "chain", "nl_to_answer_chain"], temperature=0.0, client=None)
     chain = NLtoAnswerChain(database=heavydb, llm=llm, verbose=verbose)
     click.echo(log_chain_call(chain, question, llm.model_name))
 

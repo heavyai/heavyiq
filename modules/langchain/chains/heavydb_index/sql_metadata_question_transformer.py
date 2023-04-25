@@ -2,7 +2,6 @@ from typing import Any
 
 from langchain.chains import LLMChain
 from langchain.chains.base import Chain
-from langchain.llms.openai import OpenAI
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.prompts import PromptTemplate, FewShotPromptTemplate
 from langchain.prompts.example_selector import MaxMarginalRelevanceExampleSelector
@@ -11,6 +10,7 @@ from langchain.schema import BaseLanguageModel
 from pydantic import BaseModel, Extra
 
 from modules.config import config
+from modules.langchain.llms import get_llm
 
 rephrase_question_examples = [
     {
@@ -177,7 +177,7 @@ class SQLMetadataQuestionTransformerChain(Chain, BaseModel):
         extra = Extra.forbid
         arbitrary_types_allowed = True
 
-    llm: BaseLanguageModel = OpenAI(temperature=0)
+    llm: BaseLanguageModel = get_llm(["chain", "sql_metadata_question_transformer_chain"], temperature=0)
     """LLM wrapper to use."""
     input_key: str = "input"  #: :meta private:
     output_key: str = "sql_metadata_question"  #: :meta private:

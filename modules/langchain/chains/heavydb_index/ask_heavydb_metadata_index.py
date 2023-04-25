@@ -2,9 +2,10 @@ import re
 from typing import Optional, Any
 
 from langchain.chains.qa_with_sources.retrieval import RetrievalQAWithSourcesChain
-from langchain.llms.openai import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.schema import BaseLanguageModel, BaseRetriever
+
+from modules.langchain.llms import get_llm
 
 question_prompt_template = """Use the following description of a SQL table.
 If relevant to the question, return the text verbatim.
@@ -85,7 +86,7 @@ class AskHeavyDBMetadataIndexChain(RetrievalQAWithSourcesChain):
     ) -> "AskHeavyDBMetadataIndexChain":
         # ChatOpenAI has a hard time formatting proper response
         # Unfortunate because this is more expensive ($0.08 vs $0.008)
-        llm = llm or OpenAI(temperature=0)
+        llm = llm or get_llm(["chain", "ask_metadata_index_chain"], temperature=0)
         COMBINE_PROMPT = PromptTemplate(
             template=combine_prompt_template,
             input_variables=["summaries", "question"],

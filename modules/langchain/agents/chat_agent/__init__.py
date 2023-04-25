@@ -4,13 +4,13 @@ from typing import Optional
 from langchain.agents import AgentExecutor, LLMSingleActionAgent, AgentOutputParser
 from langchain.tools import BaseTool
 from langchain.chat_models.base import BaseChatModel
-from langchain.chat_models import ChatOpenAI
 from langchain import LLMChain
 from langchain.prompts import BaseChatPromptTemplate
 from langchain.schema import AgentAction, AgentFinish, HumanMessage
 
 from modules.langchain import HeavyDB
 from modules.langchain.agents import HeavyDBToolkit
+from modules.langchain.llms import get_chat_llm
 
 AGENT_PROMPT_TEMPLATE = """You are an agent designed to interact with a SQL database.
 Before executing any queries, please consider if the question can be answered by the data in the database.
@@ -118,7 +118,7 @@ def create_sql_agent(
     Returns:
     - AgentExecutor: An AgentExecutor instance configured with the SQL agent and the set of tools
     for interacting with the database."""
-    chat_llm = chat_llm or ChatOpenAI(temperature=0, model_name="gpt-4")
+    chat_llm = chat_llm or get_chat_llm(["agent", "one_time_sql_agent"], temperature=0, model_name="gpt-4")
     heavydb = heavydb or HeavyDB.from_env()
     toolkit = HeavyDBToolkit(db=heavydb)
     tools = toolkit.get_tools()

@@ -2,7 +2,6 @@ import json
 from typing import Optional, Any
 
 from langchain.memory import ConversationBufferMemory
-from langchain.chat_models import ChatOpenAI
 from langchain.chat_models.base import BaseChatModel
 from langchain.agents import AgentExecutor
 from langchain.schema import AgentAction, AgentFinish
@@ -11,6 +10,7 @@ from langchain.agents import AgentOutputParser
 
 from modules.langchain import HeavyDB
 from modules.langchain.agents import HeavyDBToolkit
+from modules.langchain.llms import get_chat_llm
 
 SYSTEM_MESSAGE = """Assistant is a large language model trained by OpenAI.
 
@@ -110,7 +110,7 @@ def create_conversational_agent(
     Returns:
     - AgentExecutor: An AgentExecutor instance configured with the conversational agent and the set
     of tools for interacting with the database."""
-    chat_llm = chat_llm or ChatOpenAI(temperature=0, model_name="gpt-4")
+    chat_llm = chat_llm or get_chat_llm(["agent", "conversational_sql_agent"], temperature=0, model_name="gpt-4")
     heavydb = heavydb or HeavyDB.from_env()
     toolkit = HeavyDBToolkit(db=heavydb)
     tools = toolkit.get_tools()

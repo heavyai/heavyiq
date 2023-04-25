@@ -8,3 +8,6 @@ openai_api_key = "sk-xxxxxxxxetc"
 huggingface_embed_model = "sentence-transformers/all-mpnet-base-v2"
 metadata_index_dir = "db"
 table_documents_dir = "table_documents"
+
+# optional
+promptlayer_api_key = ""
