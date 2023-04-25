@@ -7,7 +7,7 @@ from langchain.schema import HumanMessage, SystemMessage
 from langchain.chat_models import ChatOpenAI
 
 from modules.config import config
-from modules.langchain.heavydb import HeavyDB
+from modules.langchain import HeavyDB
 
 os.environ["OPENAI_API_KEY"] = config.openai_api_key
 
@@ -118,13 +118,13 @@ def get_table_names_from_documents(folder_path: str) -> list[str]:
     return table_names
 
 
-def generate_table_documents(table_path: str) -> list[str]:
+def generate_table_documents() -> list[str]:
     """
     Generates and writes documents for all usable tables in the HeavyDB instance, containing table summaries and column descriptions.
     Saves them to the table_documents directory.
     Returns a list of tables that had summaries generated.
     """
-    tables_with_documents_already = get_table_names_from_documents(table_path)
+    tables_with_documents_already = get_table_names_from_documents(config.table_documents_dir)
     print("Generating summaries and column descriptions.")
     print(f"Tables with documents already (skipping): {tables_with_documents_already}")
     heavydb = HeavyDB.from_env(ignore_tables=tables_with_documents_already)

@@ -2,13 +2,14 @@ from __future__ import annotations
 from typing import Any
 
 from langchain.chains.base import Chain
+from langchain.chat_models import ChatOpenAI
 from langchain.chains.llm import LLMChain
 from langchain.prompts.base import BasePromptTemplate
 from langchain.schema import BaseLanguageModel
 from pydantic import BaseModel, Extra, Field
 from langchain.prompts.prompt import PromptTemplate
 
-from modules.langchain.heavydb import HeavyDB
+from modules.langchain import HeavyDB
 
 NL_TO_SQL_TEMPLATE = """Create a syntactically correct {dialect} query to answer the input question.
 Only query relevant columns, avoiding SELECT * for any table.
@@ -22,7 +23,7 @@ Exclude null values from the results. Do not use reserved SQL keywords as aliase
 Explain your thinking step-by-step in a block comment before the query. Provide your response using the format below:
 Question: "Question here"
 SQLQuery: "/* step-by-step reasoning */ SQL Query to run"
-Only use the tables listed below.
+Only use the tables listed below. Some of the tables may not be relevant.
 {table_info}
 Question: {input}"""
 NL_TO_SQL_PROMPT = PromptTemplate(
@@ -107,6 +108,34 @@ class NLtoSQLChain(Chain, BaseModel):
         # If not present, then defaults to None which is all tables available to HeavyDB wrapper instance
         table_names_to_use = inputs.get("tables")
         table_info = self.database.get_table_info(table_names=table_names_to_use)
+
+        # we should be smarter about this.
+        token_limit = 3800
+        if isinstance(self.llm, ChatOpenAI) and self.llm.model_name == "gpt-4":
+            token_limit = 7800
+        if (
+            self.llm.get_num_tokens(
+                self.prompt.format(input=input_text, dialect=self.database.dialect, table_info=table_info)
+            )
+            > token_limit
+        ):
+            table_info = self.database.get_table_info(table_names=table_names_to_use, include_top_k=False)
+        if (
+            self.llm.get_num_tokens(
+                self.prompt.format(input=input_text, dialect=self.database.dialect, table_info=table_info)
+            )
+            > token_limit
+        ):
+            table_info = self.database.get_table_info(table_names=table_names_to_use, include_samples=False)
+        if (
+            self.llm.get_num_tokens(
+                self.prompt.format(input=input_text, dialect=self.database.dialect, table_info=table_info)
+            )
+            > token_limit
+        ):
+            table_info = self.database.get_table_info(
+                table_names=table_names_to_use, include_samples=False, include_top_k=False
+            )
         llm_inputs = {
             "input": input_text,
             "dialect": self.database.dialect,
@@ -132,6 +161,8 @@ class NLtoSQLChain(Chain, BaseModel):
                     "stop": ["\nNewSQLQuery:"],
                 }
                 sql_cmd = error_recovery_chain.predict(**retry_llm_inputs)
+                if sql_cmd.startswith("NewSQLQuery:"):
+                    sql_cmd = sql_cmd.replace("NewSQLQuery:", "").strip()
                 retries += 1
         if not verified:
             self.callback_manager.on_text(

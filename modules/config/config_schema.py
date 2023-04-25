@@ -10,6 +10,8 @@ class HeavyNLConfig(ConfZ):  # type: ignore
     openai_api_key: str
     promptlayer_api_key: str
     huggingface_embed_model: str
+    metadata_index_dir: str
+    table_documents_dir: str
 
 
 class AppConfig(ConfZ):  # type: ignore

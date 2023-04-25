@@ -1,9 +1,9 @@
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Extra, Field
 
-from modules.langchain.index import heavydb_index
+from modules.langchain.index import get_heavydb_index
 from modules.langchain import HeavyDB
-from modules.langchain.chains.heavydb_index import AskHeavyDBMetadataIndexChain
+from modules.langchain.chains import AskHeavyDBMetadataIndexChain
 
 
 class BaseHeavyDBTool(BaseModel):
@@ -21,6 +21,17 @@ class BaseHeavyDBTool(BaseModel):
 
 
 class RetrieveRelevantSchemasTool(BaseHeavyDBTool, BaseTool):
+    """This tool uses a HeavyDB instance and a metadata index to find the relevant tables for a given query.
+    It returns the schemas and sample rows for the relevant tables.
+
+    Attributes:
+    - name (str): The name of the tool, "query_for_relevant_tables".
+    - description (str): A description of the tool and its usage.
+
+    Methods:
+    - _run(query: str) -> str: Executes the tool with the given query and returns the relevant table schemas.
+    - _arun(query: str) -> str: Not implemented for this tool."""
+
     name = "query_for_relevant_tables"
     description = """If you can't tell which tables are relevant to the query, use this tool to retrieve the schemas of tables relevant to a query.
 
@@ -30,7 +41,7 @@ Example Input: 'Which table contains information on [topic]? What are the releva
 
     def _run(self, query: str) -> str:
         try:
-            retriever = heavydb_index.vectorstore.as_retriever(search_kwargs={"k": 5})
+            retriever = get_heavydb_index().vectorstore.as_retriever(search_kwargs={"k": 5})
             chain = AskHeavyDBMetadataIndexChain.create(retriever=retriever)
             res: dict[str, str] = chain(query)
             if res["answer"] == chain.no_results_answer:
@@ -49,6 +60,16 @@ Example Input: 'Which table contains information on [topic]? What are the releva
 
 
 class QueryHeavyDBTool(BaseHeavyDBTool, BaseTool):
+    """This tool uses a HeavyDB instance to execute SQL queries and return the results or an error message.
+
+    Attributes:
+    - name (str): The name of the tool, "run_sql_query".
+    - description (str): A description of the tool and its usage.
+
+    Methods:
+    - _run(query: str) -> str: Executes the SQL query with the given HeavyDB instance and returns the results or an error message.
+    - _arun(query: str) -> str: Not implemented for this tool."""
+
     name = "run_sql_query"
     description = """ONLY USE WITH KNOWN TABLE SCHEMAS. This tool is for querying HeavyDB databases.
 
@@ -79,7 +100,15 @@ Input an accurate SQL query for output. Apply query limits. If an error occurs, 
 
 
 class RetrieveTableSchemasTool(BaseHeavyDBTool, BaseTool):
-    """Tool for getting table schemas for provided table names."""
+    """This tool uses a HeavyDB instance to get the schema and sample rows for the provided table names.
+
+    Attributes:
+    - name (str): The name of the tool, "retrieve_table_schemas".
+    - description (str): A description of the tool and its usage.
+
+    Methods:
+    - _run(table_names: str) -> str: Retrieves the schema for tables in a comma-separated list of table names.
+    - _arun(table_names: str) -> str: Not implemented for this tool."""
 
     name = "retrieve_table_schemas"
     description = """

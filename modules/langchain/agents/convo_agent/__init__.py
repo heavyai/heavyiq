@@ -1,17 +1,16 @@
 import json
 from typing import Optional, Any
 
-from langchain.agents import Tool
 from langchain.memory import ConversationBufferMemory
 from langchain.chat_models import ChatOpenAI
 from langchain.chat_models.base import BaseChatModel
 from langchain.agents import AgentExecutor
-from langchain.agents import initialize_agent
+from langchain.schema import AgentAction, AgentFinish
 from langchain.agents.conversational_chat.base import ConversationalChatAgent
-from langchain.schema import BaseOutputParser
+from langchain.agents import AgentOutputParser
 
 from modules.langchain import HeavyDB
-from modules.langchain.agents.toolkit import HeavyDBToolkit
+from modules.langchain.agents import HeavyDBToolkit
 
 SYSTEM_MESSAGE = """Assistant is a large language model trained by OpenAI.
 
@@ -62,11 +61,11 @@ Use this if you want to respond directly to the human. Markdown code snippet for
 ```"""
 
 
-class CustomOutputParser(BaseOutputParser):
+class CustomOutputParser(AgentOutputParser):
     def get_format_instructions(self) -> str:
         return FORMAT_INSTRUCTIONS
 
-    def parse(self, text: str) -> Any:
+    def parse(self, text: str) -> AgentAction | AgentFinish:
         try:
             cleaned_output = text.strip()
             if "```json" in cleaned_output:
@@ -81,16 +80,36 @@ class CustomOutputParser(BaseOutputParser):
                 cleaned_output = cleaned_output[: -len("```")]
             cleaned_output = cleaned_output.strip()
             response = json.loads(cleaned_output)
-            return {"action": response["action"], "action_input": response["action_input"]}
+            action, action_input = response["action"], response["action_input"]
+            if action == "Final Answer":
+                return AgentFinish({"output": action_input}, text)
+            else:
+                return AgentAction(action, action_input, text)
         except Exception:
             # bot forgot to speak json, just output the response as a final answer
-            return {"action": "Final Answer", "action_input": text.strip()}
+            return AgentFinish({"output": text.strip()}, text)
 
 
 def create_conversational_agent(
     heavydb: Optional[HeavyDB] = None, chat_llm: Optional[BaseChatModel] = None, verbose: bool = False
 ) -> AgentExecutor:
-    """Returned AgentExecutor has a memory of each input and output."""
+    """This function creates an AgentExecutor instance that uses a language model to generate responses
+    based on user inputs. The agent is designed to interact with a HeavyDB instance and has access
+    to a set of tools for querying the database. The agent follows a specific prompt template and
+    returns the final answer after executing the necessary SQL queries or directly responds to the
+    user if no tool is required. The language model has a memory of the conversation.
+
+    Parameters:
+    - heavydb (Optional[HeavyDB]): A HeavyDB instance to interact with. If not provided, a default
+    HeavyDB instance will be created using environment variables.
+    - chat_llm (Optional[BaseChatModel], optional): A language model instance to use for generating
+    responses. If not provided, a default ChatOpenAI instance with GPT-4 will be used.
+    - verbose (bool, optional): If True, the AgentExecutor will print additional information during
+    execution. Defaults to False.
+
+    Returns:
+    - AgentExecutor: An AgentExecutor instance configured with the conversational agent and the set
+    of tools for interacting with the database."""
     chat_llm = chat_llm or ChatOpenAI(temperature=0, model_name="gpt-4")
     heavydb = heavydb or HeavyDB.from_env()
     toolkit = HeavyDBToolkit(db=heavydb)

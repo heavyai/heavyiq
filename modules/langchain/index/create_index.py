@@ -1,47 +1,30 @@
-from collections.abc import Iterator
 from pathlib import Path
-from typing import Optional
 
 from langchain.vectorstores import Chroma
-from langchain.docstore.document import Document
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.indexes import VectorstoreIndexCreator
 
 from modules.config import config
-from modules.langchain.index import generate_table_documents
-from modules.langchain.index.heavydb_metadata_index import HeavyDBMetadataIndex
+from .generate_table_documents import generate_table_documents
+from .heavydb_metadata_index import HeavyDBMetadataIndex
+from .utils import read_table_documents
 
 huggingface_model_name = config.huggingface_embed_model
+metadata_index_dir = config.metadata_index_dir
+table_documents_dir = config.table_documents_dir
 
 
-def read_table_documents(folder_path: str, include: Optional[list[str]] = None) -> Iterator[Document]:
-    """
-    Iterate over a folder containing table documents and yield Document instances.
-    :param folder_path: Path to the folder containing table document files.
-    :param include: Optional list of table names to include. If None, all tables will be included.
-    :return: An iterator yielding Document instances for each table document.
-    """
-    folder = Path(folder_path)
-    for file_name in folder.iterdir():
-        if file_name.suffix == ".txt":
-            table_name = file_name.stem
-            if include is not None and table_name not in include:
-                continue
-            with open(file_name, "r") as f:
-                file_contents = f.read()
-            yield Document(page_content=file_contents, metadata={"source": table_name})
-
-
-def update_existing_index(
-    index_creator: VectorstoreIndexCreator, vectorstore: Chroma, folder_path: str, tables_to_update: list[str]
-):
-    print("New table summaries will replace existing summaries in the index.")
+def update_tables_in_index(index_creator: VectorstoreIndexCreator, vectorstore: Chroma, tables_to_update: list[str]):
+    print("New table summaries will replace existing summaries in the index (if any).")
+    print("Reading new table documents...")
+    docs = list(read_table_documents(include=tables_to_update))
+    if len(docs) != len(tables_to_update):
+        raise ValueError("Not all provided tables have documents. Aborting.")
+    print("Deleting existing table documents from index...")
     if len(tables_to_update) == 1:
         vectorstore._collection.delete(where={"source": tables_to_update[0]})
     else:
         vectorstore._collection.delete(where={"$or": [{"source": table_name} for table_name in tables_to_update]})
-    print("Reading new table documents...")
-    docs = list(read_table_documents(folder_path, include=tables_to_update))
     print("Splitting documents...")
     sub_docs = index_creator.text_splitter.split_documents(docs)
     print(f"Indexing documents with {huggingface_model_name}...")
@@ -49,33 +32,39 @@ def update_existing_index(
     print("Done")
 
 
-def create_index_if_nonexistent(
-    folder_path: str = "table_documents", persist_directory: str = "db"
-) -> HeavyDBMetadataIndex:
+def get_vectorstore_index_creator(persist_directory: str) -> VectorstoreIndexCreator:
     """
-    Create a new vector store index if it does not exist, otherwise return the existing index.
-
-    :param folder_path: Path to the folder containing table document files.
+    Get a VectorstoreIndexCreator instance.
     :param persist_directory: Path to the directory where the vector store index should be persisted.
-    :return: A HeavyDBMetadataIndex instance containing the vector store index.
+    :return: A VectorstoreIndexCreator instance.
     """
-    tables_with_new_summaries = generate_table_documents(folder_path)
-
-    index_creator = VectorstoreIndexCreator(
+    return VectorstoreIndexCreator(
         vectorstore_kwargs={"persist_directory": persist_directory},
         embedding=HuggingFaceEmbeddings(model_name=huggingface_model_name),
     )
 
-    persist_path = Path(persist_directory)
+
+def create_index_if_nonexistent() -> HeavyDBMetadataIndex:
+    """
+    Create a new vector store index if it does not exist, otherwise return the existing index.
+
+    :param persist_directory: Path to the directory where the vector store index should be persisted.
+    :return: A HeavyDBMetadataIndex instance containing the vector store index.
+    """
+    tables_with_new_summaries = generate_table_documents()
+
+    index_creator = get_vectorstore_index_creator(metadata_index_dir)
+
+    persist_path = Path(metadata_index_dir)
     if persist_path.exists():
         print("Index already exists. Returning existing index.")
-        vectorstore: Chroma = Chroma(embedding_function=index_creator.embedding, persist_directory=persist_directory)
+        vectorstore: Chroma = Chroma(embedding_function=index_creator.embedding, persist_directory=metadata_index_dir)
         if len(tables_with_new_summaries) > 0:
-            update_existing_index(index_creator, vectorstore, folder_path, tables_with_new_summaries)
+            update_tables_in_index(index_creator, vectorstore, tables_with_new_summaries)
     else:
         print("Index does not exist. Creating new index.")
         print("Reading table documents...")
-        docs = read_table_documents(folder_path)
+        docs = read_table_documents()
 
         print("Splitting documents...")
         sub_docs = index_creator.text_splitter.split_documents(list(docs))
@@ -85,7 +74,4 @@ def create_index_if_nonexistent(
         )
         print("Done")
 
-    return HeavyDBMetadataIndex(vectorstore=vectorstore)
-
-
-heavydb_index = create_index_if_nonexistent()
+    return HeavyDBMetadataIndex(vectorstore=vectorstore, text_splitter=index_creator.text_splitter)

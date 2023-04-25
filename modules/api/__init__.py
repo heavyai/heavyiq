@@ -5,11 +5,15 @@ from flask import Flask, redirect
 from flask_cors import CORS
 
 from modules.config import config
+from modules.langchain.index import get_heavydb_index
 
 os.environ["OPENAI_API_KEY"] = config.openai_api_key
 
 
 def get_app() -> Flask:
+    # eagerly load the index
+    get_heavydb_index()
+
     app = connexion.FlaskApp(__name__)
     CORS(app.app)
 
