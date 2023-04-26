@@ -66,7 +66,7 @@ def question(body: dict) -> dict:
     chain = NLtoAnswerChain(llm=llm, database=db, verbose=True)
     input = {"query": question, "tables": tables}
     res = log_chain_call(chain, input, MODEL_NAME)
-    return {"answer": res[chain.output_answer_key], "sql": strip_sql_comments(res[chain.output_key])}
+    return {"answer": res[chain.output_answer_key], "sql": strip_sql_comments(res[chain.output_sql_key])}
 
 
 @handle_errors
