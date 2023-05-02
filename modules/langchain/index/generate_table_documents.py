@@ -4,12 +4,11 @@ import os
 
 from langchain.docstore.document import Document
 from langchain.schema import HumanMessage, SystemMessage
-from langchain.chat_models import ChatOpenAI
 
 from modules.config import config
 from modules.langchain import HeavyDB
+from modules.langchain.llms import get_chat_llm
 
-os.environ["OPENAI_API_KEY"] = config.openai_api_key
 
 table_summary_prompt = """With respect to the SQL table schema and sample data provided,
 please create a comprehensive response encompassing the following aspects:
@@ -35,7 +34,7 @@ def get_table_summary_document(heavydb: HeavyDB, table: str) -> Document:
     """
     with heavydb.lock:
         table_info = heavydb.get_table_info([table])
-    llm = ChatOpenAI(model_name="gpt-4", temperature=0.2, client=None)
+    llm = get_chat_llm(["metadata_index", "table_summary"], model_name="gpt-4", temperature=0.2)
     messages = [
         SystemMessage(content=table_summary_prompt),
         HumanMessage(content=table_info),
@@ -65,7 +64,7 @@ def get_table_column_description_document(heavydb: HeavyDB, table: str) -> Docum
     """
     with heavydb.lock:
         table_info = heavydb.get_table_info([table])
-    llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0.2, client=None)
+    llm = get_chat_llm(["metadata_index", "table_columns_description"], model_name="gpt-3.5-turbo", temperature=0.2)
     messages = [
         SystemMessage(content=column_description_prompt),
         HumanMessage(content=table_info),

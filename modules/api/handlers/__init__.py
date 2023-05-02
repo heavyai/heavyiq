@@ -9,6 +9,7 @@ from modules.api.utils import handle_errors
 from modules.logging_utils import default_logger as logger
 from modules.langchain import HeavyDB
 from modules.langchain.chains import NLtoSQLChain, NLtoAnswerChain
+from modules.langchain.llms import get_chat_llm, get_llm
 from modules.langchain.logging import log_chain_call
 from modules.langchain.index import create_and_write_table_document, get_heavydb_index
 from modules.utils import strip_sql_comments
@@ -17,15 +18,11 @@ from modules.utils import strip_sql_comments
 MODEL_NAME = "gpt-4"
 
 
-def build_llm(model: str = MODEL_NAME) -> ChatOpenAI | OpenAI:
+def build_llm(model: str, tags: list[str] = []) -> ChatOpenAI | OpenAI:
     if model.startswith("gpt-3.5") or model.startswith("gpt-4"):
-        return ChatOpenAI(model_name=model, client=None)
+        return get_chat_llm(tags, model_name=model)
     else:
-        return OpenAI(
-            model_name=model,
-            client=None,
-            temperature=0.2,
-        )
+        return get_llm(tags, temperature=0.2, model_name=model)
 
 
 def parse_tables_from_body(body: dict) -> list[str]:
@@ -46,7 +43,7 @@ def query(body: dict) -> dict:
     # db_session_id = args["session_id"]
     logger.info("Request Received")
     logger.info(f"Table(s): {', '.join(tables)}")
-    llm = build_llm()
+    llm = build_llm(MODEL_NAME, ["rest_api", "query", "chain", "nl_to_sql_chain"])
     # db = HeavyDB.from_session(db_session_id, include_tables=tables)
     db = HeavyDB.from_env(include_tables=tables)
     chain = NLtoSQLChain(llm=llm, database=db, verbose=True)
@@ -63,13 +60,13 @@ def question(body: dict) -> dict:
     # db_session_id = args["session_id"]
     logger.info("Request Received")
     logger.info(f"Table(s): {', '.join(tables)}")
-    llm = build_llm()
+    llm = build_llm(MODEL_NAME, ["rest_api", "question", "chain", "nl_to_answer_chain"])
     # db = HeavyDB.from_session(db_session_id, include_tables=tables)
     db = HeavyDB.from_env()
     chain = NLtoAnswerChain(llm=llm, database=db, verbose=True)
     input = {"query": question, "tables": tables}
     res = log_chain_call(chain, input, MODEL_NAME)
-    return {"answer": res[chain.output_answer_key], "sql": strip_sql_comments(res[chain.output_key])}
+    return {"answer": res[chain.output_answer_key], "sql": strip_sql_comments(res[chain.output_sql_key])}
 
 
 @handle_errors

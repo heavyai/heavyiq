@@ -2,30 +2,32 @@ from __future__ import annotations
 from typing import Any
 
 from langchain.chains.base import Chain
-from langchain.chains.llm import LLMChain
-from langchain.prompts.base import BasePromptTemplate
-from langchain.prompts import PromptTemplate
 from langchain.schema import BaseLanguageModel
 from pydantic import BaseModel, Extra, Field
 
 from modules.langchain import HeavyDB
+from modules.langchain.prompts import LoggedPromptTemplate
+from ..logged_llm import LoggedLLMChain
 
 from .nl_to_sql import NLtoSQLChain
 
 ANSWER_TEMPLATE = """Given an input question, first create a syntactically correct {dialect} query to run, then look at the results of the query and return the answer.
 Use the following format:
-Question: "Question here"
-SQLQuery: "/* step-by-step thought process */ SQL Query to run"
-SQLResult: "Result of the SQLQuery"
-Answer: "Final answer here"
+Question: Question here
+SQLQuery: /* step-by-step thought process */ SQL Query to run
+SQLResult: Result of the SQLQuery
+Answer: Final answer here
 Only use the tables listed below.
 {table_info}
 Question: {input}
 SQLQuery: {sql_cmd}
 SQLResult: {sql_result}"""
-ANSWER_PROMPT = PromptTemplate(
+ANSWER_PROMPT = LoggedPromptTemplate(
+    name="nl_to_answer_chain",
+    tags=["chain", "nl_to_answer_chain"],
     input_variables=["input", "table_info", "dialect", "sql_cmd", "sql_result"],
     template=ANSWER_TEMPLATE,
+    version=1,
 )
 
 
@@ -44,7 +46,7 @@ class NLtoAnswerChain(Chain, BaseModel):
     """LLM wrapper to use."""
     database: HeavyDB = Field(exclude=True)
     """HeavyDB Database to connect to."""
-    prompt: BasePromptTemplate = ANSWER_PROMPT
+    prompt: LoggedPromptTemplate = ANSWER_PROMPT
     """Prompt to use to translate natural language to SQL."""
     input_key: str = "query"  #: :meta private:
     output_answer_key: str = "answer"  #: :meta private:
@@ -102,7 +104,7 @@ class NLtoAnswerChain(Chain, BaseModel):
             }
         else:
             self.callback_manager.on_text("\nAnswer:", verbose=self.verbose)
-            llm_chain = LLMChain(llm=self.llm, prompt=self.prompt, verbose=self.verbose, output_key="answer")
+            llm_chain = LoggedLLMChain(llm=self.llm, prompt=self.prompt, verbose=self.verbose, output_key="answer")
             llm_inputs = {
                 "input": inputs[self.input_key],
                 "dialect": self.database.dialect,

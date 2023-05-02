@@ -3,53 +3,52 @@ from typing import Any
 
 from langchain.chains.base import Chain
 from langchain.chat_models import ChatOpenAI
-from langchain.chains.llm import LLMChain
-from langchain.prompts.base import BasePromptTemplate
 from langchain.schema import BaseLanguageModel
 from pydantic import BaseModel, Extra, Field
-from langchain.prompts.prompt import PromptTemplate
 
 from modules.langchain import HeavyDB
+from modules.langchain.prompts import LoggedPromptTemplate
+from ..logged_llm import LoggedLLMChain
 
 NL_TO_SQL_TEMPLATE = """Create a syntactically correct {dialect} query to answer the input question.
 Only query relevant columns, avoiding SELECT * for any table.
+These functions do not exist: STRING_AGG, GROUP_CONCAT
 Use only existing column names from the schema description, ensuring they are from the correct table.
-Do not use STRING_AGG, GROUP_CONCAT functions.
-Do not use STRING_AGG, GROUP_CONCAT functions.
-Do not use STRING_AGG, GROUP_CONCAT functions.
-Do not use STRING_AGG, GROUP_CONCAT functions.
-Use GROUP BY if the question can be answered by aggregating over a column
 Exclude null values from the results. Do not use reserved SQL keywords as aliases.
 Explain your thinking step-by-step in a block comment before the query. Provide your response using the format below:
-Question: "Question here"
-SQLQuery: "/* step-by-step reasoning */ SQL Query to run"
+Question: [QUESTION]
+SQLQuery: /* step-by-step reasoning */ [SINGLE SQL QUERY]
 Only use the tables listed below. Some of the tables may not be relevant.
 {table_info}
 Question: {input}"""
-NL_TO_SQL_PROMPT = PromptTemplate(
+NL_TO_SQL_PROMPT = LoggedPromptTemplate(
+    name="nl_to_sql_chain",
+    tags=["chain", "nl_to_sql_chain"],
     input_variables=["input", "table_info", "dialect"],
     template=NL_TO_SQL_TEMPLATE,
+    version=1,
 )
 
 NL_TO_SQL_ERROR_TEMPLATE = """Correct the given {dialect} query:
 If a function signature does not exist, do not use it. Reformulate the query to not use that function signature.
 Do not use STRING_AGG, GROUP_CONCAT functions.
-Do not use STRING_AGG, GROUP_CONCAT functions.
-Do not use STRING_AGG, GROUP_CONCAT functions.
 Use the following format:
-Question: "Question here"
-SQLQuery: "/* step-by-step thought process */ SQL Query to run"
-Error: "Error message"
-NewSQLQuery: "/* new step-by-step thought process */ Fixed SQL Query"
+Question: [QUESTION]
+SQLQuery: /* step-by-step thought process */ [SQL QUERY]
+Error: [ERROR MESSAGE]
+NewSQLQuery: /* new step-by-step thought process */ [FIXED SQL QUERY]
 Only use the tables listed below.
 {table_info}
 Question: {input}
 SQLQuery: {sql_cmd}
 Errors: {error}
 """
-NL_TO_SQL_ERROR_PROMPT = PromptTemplate(
+NL_TO_SQL_ERROR_PROMPT = LoggedPromptTemplate(
+    name="nl_to_sql_chain_error",
+    tags=["chain", "nl_to_sql_chain", "nl_to_sql_chain_error"],
     input_variables=["input", "table_info", "dialect", "sql_cmd", "error"],
     template=NL_TO_SQL_ERROR_TEMPLATE,
+    version=1,
 )
 
 
@@ -74,9 +73,9 @@ class NLtoSQLChain(Chain, BaseModel):
     """LLM wrapper to use."""
     database: HeavyDB = Field(exclude=True)
     """HeavyDB Database to connect to."""
-    prompt: BasePromptTemplate = NL_TO_SQL_PROMPT
+    prompt: LoggedPromptTemplate = NL_TO_SQL_PROMPT
     """Prompt to use to translate natural language to SQL."""
-    error_prompt: BasePromptTemplate = NL_TO_SQL_ERROR_PROMPT
+    error_prompt: LoggedPromptTemplate = NL_TO_SQL_ERROR_PROMPT
     """Prompt to use to fix SQL errors."""
     input_key: str = "query"  #: :meta private:
     output_key: str = "sql"  #: :meta private:
@@ -101,8 +100,8 @@ class NLtoSQLChain(Chain, BaseModel):
         return [self.output_key]
 
     def _call(self, inputs: dict[str, Any]) -> dict[str, Any]:
-        llm_chain = LLMChain(llm=self.llm, prompt=self.prompt)
-        error_recovery_chain = LLMChain(llm=self.llm, prompt=self.error_prompt)
+        llm_chain = LoggedLLMChain(llm=self.llm, prompt=self.prompt)
+        error_recovery_chain = LoggedLLMChain(llm=self.llm, prompt=self.error_prompt)
         input_text = f"{inputs[self.input_key]} \nSQLQuery:"
         self.callback_manager.on_text(input_text, verbose=self.verbose)
         # If not present, then defaults to None which is all tables available to HeavyDB wrapper instance

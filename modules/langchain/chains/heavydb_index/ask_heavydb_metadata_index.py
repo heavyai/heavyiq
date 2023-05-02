@@ -1,10 +1,14 @@
 import re
-from typing import Optional, Any
+from typing import Any
 
 from langchain.chains.qa_with_sources.retrieval import RetrievalQAWithSourcesChain
-from langchain.llms.openai import OpenAI
-from langchain.prompts import PromptTemplate
-from langchain.schema import BaseLanguageModel, BaseRetriever
+from langchain.chains.combine_documents.map_reduce import MapReduceDocumentsChain
+from langchain.chains.combine_documents.stuff import StuffDocumentsChain
+from langchain.schema import BaseRetriever
+
+from modules.langchain.llms import get_llm
+from modules.langchain.prompts import LoggedPromptTemplate
+from ..logged_llm import LoggedLLMChain
 
 question_prompt_template = """Use the following description of a SQL table.
 If relevant to the question, return the text verbatim.
@@ -13,13 +17,23 @@ If relevant to the question, return the text verbatim.
 
 Question: {question}
 Relevant text, if any:"""
-QUESTION_PROMPT = PromptTemplate(template=question_prompt_template, input_variables=["context", "question"])
-
-EXAMPLE_PROMPT = PromptTemplate(
-    template="Content: {page_content}\nTable: {source}",
-    input_variables=["page_content", "source"],
+QUESTION_PROMPT = LoggedPromptTemplate(
+    name="ask_heavydb_metadata_index_chain_question",
+    tags=["chain", "ask_heavydb_metadata_index_chain", "ask_heavydb_metadata_index_chain_question"],
+    template=question_prompt_template,
+    input_variables=["context", "question"],
+    version=1,
 )
 
+EXAMPLE_PROMPT = LoggedPromptTemplate(
+    name="ask_heavydb_metadata_index_chain_example",
+    tags=["chain", "ask_heavydb_metadata_index_chain", "ask_heavydb_metadata_index_chain_example"],
+    template="Content: {page_content}\nTable: {source}",
+    input_variables=["page_content", "source"],
+    version=1,
+)
+
+SQLSchemaQuestionChainNoResultsAnswer = "None relevant."
 combine_prompt_template = """Given the following extracted parts of a long document describing a SQL database and a question that can be solved using data in the database, create a final answer with table names ("SOURCES").
 If you don't know the answer, just say that you don't know. Don't try to make up an answer. If none of the tables are relevant, just say "{no_results_answer}".
 ALWAYS return a "SOURCES" part in your answer.
@@ -55,8 +69,13 @@ QUESTION: {question}
 {summaries}
 =========
 FINAL ANSWER:"""
-
-SQLSchemaQuestionChainNoResultsAnswer = "None relevant."
+COMBINE_PROMPT = LoggedPromptTemplate(
+    name="ask_heavydb_metadata_index_chain_combine",
+    tags=["chain", "ask_heavydb_metadata_index_chain", "ask_heavydb_metadata_index_chain_combine"],
+    template=combine_prompt_template,
+    input_variables=["summaries", "question"],
+    partial_variables={"no_results_answer": SQLSchemaQuestionChainNoResultsAnswer},
+)
 
 
 class AskHeavyDBMetadataIndexChain(RetrievalQAWithSourcesChain):
@@ -80,24 +99,26 @@ class AskHeavyDBMetadataIndexChain(RetrievalQAWithSourcesChain):
         return self.sources_answer_key
 
     @classmethod
-    def create(
-        cls, retriever: BaseRetriever, llm: Optional[BaseLanguageModel] = None, **kwargs
-    ) -> "AskHeavyDBMetadataIndexChain":
+    def create(cls, retriever: BaseRetriever, **kwargs) -> "AskHeavyDBMetadataIndexChain":
         # ChatOpenAI has a hard time formatting proper response
         # Unfortunate because this is more expensive ($0.08 vs $0.008)
-        llm = llm or OpenAI(temperature=0)
-        COMBINE_PROMPT = PromptTemplate(
-            template=combine_prompt_template,
-            input_variables=["summaries", "question"],
-            partial_variables={"no_results_answer": SQLSchemaQuestionChainNoResultsAnswer},
-        )
-        return AskHeavyDBMetadataIndexChain.from_llm(
-            llm=llm,
-            retriever=retriever,
-            question_prompt=QUESTION_PROMPT,
+        llm = get_llm(["chain", "ask_metadata_index_chain"], temperature=0)
+        llm_question_chain = LoggedLLMChain(llm=llm, prompt=QUESTION_PROMPT)
+        llm_combine_chain = LoggedLLMChain(llm=llm, prompt=COMBINE_PROMPT)
+        combine_results_chain = StuffDocumentsChain(
+            llm_chain=llm_combine_chain,
             document_prompt=EXAMPLE_PROMPT,
-            combine_prompt=COMBINE_PROMPT,
+            document_variable_name="summaries",
+        )
+        combine_document_chain = MapReduceDocumentsChain(
+            llm_chain=llm_question_chain,
+            combine_document_chain=combine_results_chain,
+            document_variable_name="context",
+        )
+        return cls(
+            combine_documents_chain=combine_document_chain,
             sources_answer_key="tables",
+            retriever=retriever,
             **kwargs,
         )
 

@@ -1,3 +1,5 @@
+from typing import Optional
+
 from confz import ConfZ, ConfZFileSource
 
 
@@ -11,6 +13,7 @@ class HeavyNLConfig(ConfZ):  # type: ignore
     huggingface_embed_model: str
     metadata_index_dir: str
     table_documents_dir: str
+    promptlayer_api_key: Optional[str] = None
 
 
 class AppConfig(ConfZ):  # type: ignore
