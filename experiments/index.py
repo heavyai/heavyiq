@@ -1,4 +1,4 @@
-from modules.langchain.index import get_heavydb_index
+from heavynl.langchain.index import get_heavydb_index
 
 
 def main():
