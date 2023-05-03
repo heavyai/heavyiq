@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Any
 
 from langchain.chains.base import Chain
-from langchain.schema import BaseLanguageModel
+from langchain.base_language import BaseLanguageModel
 from pydantic import BaseModel, Extra, Field
 
 from modules.langchain import HeavyDB

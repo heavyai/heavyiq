@@ -6,8 +6,8 @@ from langchain.chains.llm import LLMChain
 from langchain.chains.summarize import map_reduce_prompt
 from langchain.prompts.base import BasePromptTemplate
 from langchain.output_parsers import PydanticOutputParser
-from langchain.schema import BaseLanguageModel
-from pydantic import BaseModel, Field, validator
+from langchain.base_language import BaseLanguageModel
+from pydantic import BaseModel, Field
 
 from langchain.chat_models import ChatOpenAI
 from langchain.docstore.document import Document
