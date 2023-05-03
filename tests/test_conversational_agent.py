@@ -2,7 +2,7 @@ import unittest
 
 from langchain.agents import AgentExecutor
 
-from modules.langchain.agents.convo_agent import create_conversational_agent
+from heavynl.langchain.agents.convo_agent import create_conversational_agent
 
 
 class TestConversationalAgent(unittest.TestCase):

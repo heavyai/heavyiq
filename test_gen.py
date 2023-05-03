@@ -9,9 +9,9 @@ from langchain.callbacks import get_openai_callback
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage, AIMessage
 
-from modules.config import config
-from modules.langchain import HeavyDB
-from modules.langchain.index import get_heavydb_index
+from heavynl.config import config
+from heavynl.langchain import HeavyDB
+from heavynl.langchain.index import get_heavydb_index
 
 os.environ["OPENAI_API_KEY"] = config.openai_api_key
 

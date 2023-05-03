@@ -58,6 +58,16 @@ Using an LLM in isolation is fine for some simple applications, but many more co
 
 Some applications will require not just a predetermined chain of calls to LLMs, but potentially an unknown chain that depends on the user’s input. In these situations, there is a “agent” which has access to a suite of tools and the ability to Reason & Act. Depending on the user input, the agent can then decide which, if any, of these tools to utilize to accomplish the user input. [LangChain Documentation](https://python.langchain.com/en/latest/modules/agents.html)
 
+## Security
+
+### Table-Level Access Permissions
+
+HeavyNL ensures the security and privacy of data stored in HeavyDB by implementing table-level access permissions in two ways:
+
+1. **Session Authentication Level with HeavyDB**: When a user interacts with HeavyDB through HeavyNL, their access permissions are checked at the session authentication level. This prevents users from seeing or querying tables they do not have the necessary permissions to access. HeavyDB handles this by ensuring that users can only interact with tables they are authorized to see via the typical roles/permissions.
+
+2. **Prefiltering Metadata Index Queries**: To further secure the data and prevent unauthorized access, HeavyNL pre-filters all user queries on the metadata index. This is done by only including documents for tables the user has permission to access. By prefiltering queries, HeavyNL ensures that users cannot query the metadata index for tables they are not authorized to see, and therefore LLMs will not attempt to create SQL statements that can not be executed by the user.
+
 ## Logging
 
 Calls to Chains and Agents are stored in a SQLite database found in the root of the application. This database captures:

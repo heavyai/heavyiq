@@ -2,8 +2,8 @@ import csv
 from datetime import datetime
 from typing import Any, Callable
 
-from modules.config import config
-from modules.langchain.index import get_heavydb_index
+from heavynl.config import config
+from heavynl.langchain.index import get_heavydb_index
 
 
 def read_csv_file(file_name: str) -> list[dict[str, Any]]:

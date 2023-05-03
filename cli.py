@@ -1,4 +1,4 @@
-from modules.cli import cli
+from heavynl.cli import cli
 
 if __name__ == "__main__":
     cli(obj={})
