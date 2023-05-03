@@ -6,7 +6,7 @@ from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.prompts import PromptTemplate, FewShotPromptTemplate
 from langchain.prompts.example_selector import MaxMarginalRelevanceExampleSelector
 from langchain.vectorstores import Chroma
-from langchain.schema import BaseLanguageModel
+from langchain.base_language import BaseLanguageModel
 from pydantic import BaseModel, Extra
 
 from modules.config import config
