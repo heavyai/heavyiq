@@ -5,7 +5,7 @@ from typing import Optional, Any, Iterable, TYPE_CHECKING
 
 from heavyai import connect
 from heavynl.config import config
-from heavynl.utils import strip_sql_comments
+from heavynl.utils import strip_sql_comments, is_destructive_sql
 
 if TYPE_CHECKING:
     from heavyai import Connection
@@ -133,6 +133,8 @@ class HeavyDB:
         """Validate a query."""
         # Remove block comments
         query = strip_sql_comments(query)
+        if is_destructive_sql(query):
+            raise ValueError("Destructive SQL is not allowed")
         return self._conn._client.sql_validate(self._conn._session, query)
 
     @lru_cache
@@ -226,6 +228,8 @@ class HeavyDB:
         If the statement returns no rows, an empty string is returned.
         """
         command = strip_sql_comments(command)
+        if is_destructive_sql(command):
+            raise ValueError("Destructive SQL is not allowed")
         cursor = self._conn.execute(command)
         if fetch == "all":
             result = cursor.fetchall()
