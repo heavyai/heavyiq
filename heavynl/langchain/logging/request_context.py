@@ -7,7 +7,7 @@ from langchain.agents.agent import AgentExecutor
 from langchain.callbacks import OpenAICallbackHandler, get_openai_callback
 from langchain.chains.base import Chain
 
-from .database import request_log_table, engine
+from .database import Session, RequestLog
 from .enums import LangChainType
 
 
@@ -101,24 +101,26 @@ def log_request(
     successful_requests: Optional[int] = None,
     total_cost: Optional[float] = None,
 ) -> None:
-    with engine.begin() as connection:
-        row = request_log_table.insert().values(
-            langchain_type=langchain_type,
-            langchain_name=langchain_name,
-            start_time=start_time,
-            end_time=end_time,
-            input=input,
-            output=output,
-            model=model,
-            error=error,
-            agent_log=agent_log,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            total_tokens=total_tokens,
-            successful_requests=successful_requests,
-            total_cost=total_cost,
-        )
-        connection.execute(row)
+    new_request = RequestLog(
+        langchain_type=langchain_type,
+        langchain_name=langchain_name,
+        start_time=start_time,
+        end_time=end_time,
+        input=input,
+        output=output,
+        model=model,
+        error=error,
+        agent_log=agent_log,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        total_tokens=total_tokens,
+        successful_requests=successful_requests,
+        total_cost=total_cost,
+    )
+
+    with Session() as session:
+        session.add(new_request)
+        session.commit()
 
 
 @contextmanager
