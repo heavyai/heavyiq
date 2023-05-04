@@ -25,12 +25,13 @@ def build_llm(model: str, tags: list[str] = []) -> ChatOpenAI | OpenAI:
         return get_llm(tags, temperature=0.2, model_name=model)
 
 
-def parse_tables_from_body(body: dict) -> list[str]:
+def parse_tables_from_body(body: dict, heavydb: HeavyDB) -> list[str]:
     if "tables" not in body or len(body["tables"]) == 0:
+        allowable_tables = list(heavydb.get_usable_table_names())
         # there are options here
-        # tables = get_heavydb_index().ask_using_rephrased_question(body["question"])["tables"]
-        # tables = get_heavydb_index().ask_about_database(body["question"])["tables"]
-        tables = get_heavydb_index().simple_search_for_table_names(body["question"])
+        # tables = get_heavydb_index().ask_using_rephrased_question(body["question"], allowable_tables=allowable_tables)["tables"]
+        # tables = get_heavydb_index().ask_about_database(body["question"], allowable_tables=allowable_tables)["tables"]
+        tables = get_heavydb_index().simple_search_for_table_names(body["question"], allowable_tables=allowable_tables)
     else:
         tables = body["tables"]
     return tables
@@ -38,16 +39,16 @@ def parse_tables_from_body(body: dict) -> list[str]:
 
 @handle_errors
 def query(body: dict) -> dict:
-    tables = parse_tables_from_body(body)
-    question = body["question"]
     # db_session_id = args["session_id"]
+    # db = HeavyDB.from_session(db_session_id, include_tables=tables)
+    db = HeavyDB.from_env()
+    tables = parse_tables_from_body(body, db)
+    question = body["question"]
     logger.info("Request Received")
     logger.info(f"Table(s): {', '.join(tables)}")
     llm = build_llm(MODEL_NAME, ["rest_api", "query", "chain", "nl_to_sql_chain"])
-    # db = HeavyDB.from_session(db_session_id, include_tables=tables)
-    db = HeavyDB.from_env(include_tables=tables)
     chain = NLtoSQLChain(llm=llm, database=db, verbose=True)
-    input = {"query": question, "table_names_to_use": tables}
+    input = {chain.input_key: question, "tables": tables}
     res = log_chain_call(chain, input, MODEL_NAME)
     response = {"sql": strip_sql_comments(res[chain.output_key])}
     return response
@@ -55,16 +56,16 @@ def query(body: dict) -> dict:
 
 @handle_errors
 def question(body: dict) -> dict:
-    tables = parse_tables_from_body(body)
-    question = body["question"]
     # db_session_id = args["session_id"]
+    # db = HeavyDB.from_session(db_session_id)
+    db = HeavyDB.from_env()
+    tables = parse_tables_from_body(body, db)
+    question = body["question"]
     logger.info("Request Received")
     logger.info(f"Table(s): {', '.join(tables)}")
     llm = build_llm(MODEL_NAME, ["rest_api", "question", "chain", "nl_to_answer_chain"])
-    # db = HeavyDB.from_session(db_session_id, include_tables=tables)
-    db = HeavyDB.from_env()
     chain = NLtoAnswerChain(llm=llm, database=db, verbose=True)
-    input = {"query": question, "tables": tables}
+    input = {chain.input_key: question, "tables": tables}
     res = log_chain_call(chain, input, MODEL_NAME)
     return {"answer": res[chain.output_answer_key], "sql": strip_sql_comments(res[chain.output_sql_key])}
 
