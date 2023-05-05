@@ -11,7 +11,7 @@ Flask-Cors==3.0.10
 furo==2023.3.27
 liccheck==0.9.0
 heavyai==1.1.0
-langchain==0.0.158
+langchain==0.0.159
 mypy==1.2.0
 openai==0.27.4
 promptlayer==0.1.80
