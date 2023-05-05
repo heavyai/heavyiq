@@ -9,7 +9,7 @@ paths:
       tags:
         - OptionalTables
       summary: Provided a question and (optionally) table(s), returns SQL that can be used to answer the question
-      operationId: modules.api.handlers.query
+      operationId: heavynl.api.handlers.query
       requestBody:
         required: true
         content:
@@ -34,7 +34,7 @@ paths:
       tags:
         - OptionalTables
       summary: Provided a question and (optionally) tables(s), returns SQL and a NL Answer to the question
-      operationId: modules.api.handlers.question
+      operationId: heavynl.api.handlers.question
       requestBody:
         required: true
         content:
@@ -59,7 +59,7 @@ paths:
       tags:
         - Metadata
       summary: Generate summary docs and add them to metadata index. Overwrites existing docs if present.
-      operationId: modules.api.handlers.add_tables
+      operationId: heavynl.api.handlers.add_tables
       requestBody:
         required: true
         content:
