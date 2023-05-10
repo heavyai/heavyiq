@@ -44,6 +44,7 @@ def query(body: dict) -> dict:
     db = HeavyDB.from_env()
     tables = parse_tables_from_body(body, db)
     question = body["question"]
+    # dbname = body["databaseName"]
     logger.info("Request Received")
     logger.info(f"Table(s): {', '.join(tables)}")
     llm = build_llm(MODEL_NAME, ["rest_api", "query", "chain", "nl_to_sql_chain"])
@@ -61,6 +62,7 @@ def question(body: dict) -> dict:
     db = HeavyDB.from_env()
     tables = parse_tables_from_body(body, db)
     question = body["question"]
+    # dbname = body["databaseName"]
     logger.info("Request Received")
     logger.info(f"Table(s): {', '.join(tables)}")
     llm = build_llm(MODEL_NAME, ["rest_api", "question", "chain", "nl_to_answer_chain"])
@@ -73,6 +75,7 @@ def question(body: dict) -> dict:
 @handle_errors
 def add_tables(body: dict) -> dict:
     tables = body["tables"]
+    # dbname = body["databaseName"]
     logger.info("Request Received")
     logger.info(f"Table(s): {', '.join(tables)}")
     # db = HeavyDB.from_session(db_session_id, include_tables=tables)

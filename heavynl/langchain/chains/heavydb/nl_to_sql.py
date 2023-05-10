@@ -1,7 +1,8 @@
 from __future__ import annotations
-from typing import Any
+from typing import Any, Optional
 
 from langchain.chains.base import Chain
+from langchain.callbacks.manager import CallbackManagerForChainRun
 from langchain.chat_models import ChatOpenAI
 from langchain.base_language import BaseLanguageModel
 from pydantic import BaseModel, Extra, Field
@@ -12,6 +13,7 @@ from ..logged_llm import LoggedLLMChain
 
 NL_TO_SQL_TEMPLATE = """Create a syntactically correct {dialect} query to answer the input question.
 Only query relevant columns, avoiding SELECT * for any table.
+Only create one query.
 These functions do not exist: STRING_AGG, GROUP_CONCAT
 Use only existing column names from the schema description, ensuring they are from the correct table.
 Exclude null values from the results. Do not use reserved SQL keywords as aliases.
@@ -99,11 +101,12 @@ class NLtoSQLChain(Chain, BaseModel):
         """
         return [self.output_key]
 
-    def _call(self, inputs: dict[str, Any]) -> dict[str, Any]:
+    def _call(self, inputs: dict[str, Any], run_manager: Optional[CallbackManagerForChainRun] = None) -> dict[str, Any]:
         llm_chain = LoggedLLMChain(llm=self.llm, prompt=self.prompt)
         error_recovery_chain = LoggedLLMChain(llm=self.llm, prompt=self.error_prompt)
         input_text = f"{inputs[self.input_key]} \nSQLQuery:"
-        self.callback_manager.on_text(input_text, verbose=self.verbose)
+        if run_manager:
+            run_manager.on_text(input_text, verbose=self.verbose)
         # If not present, then defaults to None which is all tables available to HeavyDB wrapper instance
         table_names_to_use = inputs.get("tables")
         table_info = self.database.get_table_info(table_names=table_names_to_use)
@@ -146,11 +149,13 @@ class NLtoSQLChain(Chain, BaseModel):
         retries = 0
         while not verified and retries < self.max_retries:
             try:
-                self.callback_manager.on_text(f"Verifying SQL Query: {sql_cmd}", color="blue", verbose=self.verbose)
+                if run_manager:
+                    run_manager.on_text(f"Verifying SQL Query: {sql_cmd}", color="blue", verbose=self.verbose)
                 self.database.validate_query(sql_cmd)
                 verified = True
             except Exception as e:
-                self.callback_manager.on_text(f"Invalid SQL Query: {e}.", color="red", verbose=self.verbose)
+                if run_manager:
+                    run_manager.on_text(f"Invalid SQL Query: {e}.", color="red", verbose=self.verbose)
                 retry_llm_inputs = {
                     "input": input_text,
                     "sql_cmd": sql_cmd,
@@ -164,11 +169,13 @@ class NLtoSQLChain(Chain, BaseModel):
                     sql_cmd = sql_cmd.replace("NewSQLQuery:", "").strip()
                 retries += 1
         if not verified:
-            self.callback_manager.on_text(
-                f"Failed to verify SQL query after {self.max_retries} retries.", color="red", verbose=self.verbose
-            )
+            if run_manager:
+                run_manager.on_text(
+                    f"Failed to verify SQL query after {self.max_retries} retries.", color="red", verbose=self.verbose
+                )
             raise Exception(f"Failed to verify SQL query after {self.max_retries} retries.")
-        self.callback_manager.on_text(sql_cmd, color="green", verbose=self.verbose)
+        if run_manager:
+            run_manager.on_text(sql_cmd, color="green", verbose=self.verbose)
 
         chain_result: dict[str, Any] = {self.output_key: sql_cmd.strip()}
         return chain_result
