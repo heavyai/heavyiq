@@ -82,22 +82,27 @@ class HeavyDB:
         return cls(conn, **kwargs)
 
     @classmethod
-    def from_session(cls: type[HeavyDB], session_id: str, **kwargs: Any) -> HeavyDB:
+    def from_session(cls: type[HeavyDB], session_id: str, dbname: Optional[str] = None, **kwargs: Any) -> HeavyDB:
         """Create a database connection from a session id."""
         conn: Connection = connect(
-            sessionid=session_id, host=config.heavydb_host, port=config.heavydb_port, dbname=config.heavydb_dbname
+            sessionid=session_id,
+            host=config.heavydb_host,
+            port=config.heavydb_port,
+            dbname=dbname or config.heavydb_dbname,
         )
         return cls(conn, **kwargs)
 
     @classmethod
-    def from_creds(cls: type[HeavyDB], username: str, password: str, **kwargs: Any) -> HeavyDB:
+    def from_creds(
+        cls: type[HeavyDB], username: str, password: str, dbname: Optional[str] = None, **kwargs: Any
+    ) -> HeavyDB:
         """Create a database connection from username and password."""
         conn: Connection = connect(
             user=username,
             password=password,
             host=config.heavydb_host,
             port=config.heavydb_port,
-            dbname=config.heavydb_dbname,
+            dbname=dbname or config.heavydb_dbname,
         )
         return cls(conn, **kwargs)
 

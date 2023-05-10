@@ -1,8 +1,9 @@
 from __future__ import annotations
-from typing import Any
+from typing import Any, Optional
 
 from langchain.chains.base import Chain
 from langchain.base_language import BaseLanguageModel
+from langchain.callbacks.manager import CallbackManagerForChainRun
 from pydantic import BaseModel, Extra, Field
 
 from heavynl.langchain import HeavyDB
@@ -82,7 +83,7 @@ class NLtoAnswerChain(Chain, BaseModel):
     def _chain_type(self) -> str:
         return "nl_to_answer_chain"
 
-    def _call(self, inputs: dict[str, Any]) -> dict[str, Any]:
+    def _call(self, inputs: dict[str, Any], run_manager: Optional[CallbackManagerForChainRun] = None) -> dict[str, Any]:
         table_names_to_use = inputs.get("tables")
         nl_sql_chain = NLtoSQLChain(llm=self.llm, database=self.database, verbose=self.verbose)
         nl_sql_inputs = {
@@ -92,10 +93,12 @@ class NLtoAnswerChain(Chain, BaseModel):
         nl_sql_results = nl_sql_chain(nl_sql_inputs)
         sql_cmd = nl_sql_results[nl_sql_chain.output_key]
         table_info = self.database.get_table_info(table_names=table_names_to_use)
-        self.callback_manager.on_text(sql_cmd, color="green", verbose=self.verbose)
+        if run_manager:
+            run_manager.on_text(sql_cmd, color="green", verbose=self.verbose)
         result = self.database.run(sql_cmd)
-        self.callback_manager.on_text("\nSQLResult: ", verbose=self.verbose)
-        self.callback_manager.on_text(result, color="yellow", verbose=self.verbose)
+        if run_manager:
+            run_manager.on_text("\nSQLResult: ", verbose=self.verbose)
+            run_manager.on_text(result, color="yellow", verbose=self.verbose)
 
         if self.return_direct:
             return {
@@ -103,7 +106,8 @@ class NLtoAnswerChain(Chain, BaseModel):
                 self.output_results_key: result,
             }
         else:
-            self.callback_manager.on_text("\nAnswer:", verbose=self.verbose)
+            if run_manager:
+                run_manager.on_text("\nAnswer:", verbose=self.verbose)
             llm_chain = LoggedLLMChain(llm=self.llm, prompt=self.prompt, verbose=self.verbose, output_key="answer")
             llm_inputs = {
                 "input": inputs[self.input_key],
@@ -114,7 +118,8 @@ class NLtoAnswerChain(Chain, BaseModel):
                 "stop": ["\nAnswer:"],
             }
             final_result = llm_chain.predict(**llm_inputs)
-            self.callback_manager.on_text(final_result, color="green", verbose=self.verbose)
+            if run_manager:
+                run_manager.on_text(final_result, color="green", verbose=self.verbose)
             return {
                 self.output_sql_key: sql_cmd,
                 self.output_results_key: result,

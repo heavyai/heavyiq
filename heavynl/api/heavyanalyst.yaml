@@ -15,7 +15,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/QuestionAndTablesRequest'
+              $ref: '#/components/schemas/DatabaseQuestionAndTablesRequest'
       responses:
         200:
           description: Success
@@ -40,7 +40,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/QuestionAndTablesRequest'
+              $ref: '#/components/schemas/DatabaseQuestionAndTablesRequest'
       responses:
         200:
           description: Success
@@ -65,7 +65,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Tables'
+              $ref: '#/components/schemas/DatabaseTables'
       responses:
         200:
           description: Success
@@ -85,17 +85,27 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
-    Tables:
+    DatabaseTables:
       type: object
-      description: Array of table names to limit the scope of the search/response
+      description: Array of table names to limit the scope of the search/response and database name
       properties:
         tables:
           type: array
           items:
             type: string
+        databaseName:
+          type: string
+          description: Name of the database
+      required:
+        - databaseName
       example:
         tables:
           - usa_states
+        databaseName: heavynl
+    DatabaseQuestionAndTablesRequest:
+      allOf:
+        - $ref: '#/components/schemas/DatabaseTables'
+        - $ref: '#/components/schemas/Question'
     Question:
       type: object
       description: Natural language question (prompts accepted)
@@ -106,10 +116,6 @@ components:
         - question
       example:
         question: How many states begin with the letter A? What are they?
-    QuestionAndTablesRequest:
-      allOf:
-        - $ref: '#/components/schemas/Tables'
-        - $ref: '#/components/schemas/Question'
     SQLStatement:
       type: object
       description: A SQL statement
