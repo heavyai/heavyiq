@@ -16,7 +16,7 @@ Submodules
 langchain.agents.toolkit module
 -------------------------------
 
-.. automodule:: modules.langchain.agents.toolkit
+.. automodule:: heavynl.langchain.agents.toolkit
    :members:
    :undoc-members:
    :show-inheritance:
@@ -24,7 +24,7 @@ langchain.agents.toolkit module
 langchain.agents.tools module
 -----------------------------
 
-.. automodule:: modules.langchain.agents.tools
+.. automodule:: heavynl.langchain.agents.tools
    :members:
    :undoc-members:
    :show-inheritance:
@@ -32,7 +32,7 @@ langchain.agents.tools module
 Module contents
 ---------------
 
-.. automodule:: modules.langchain.agents
+.. automodule:: heavynl.langchain.agents
    :members:
    :undoc-members:
    :show-inheritance:

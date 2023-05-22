@@ -11,6 +11,7 @@ Subpackages
    langchain.chains
    langchain.index
    langchain.logging
+   langchain.prompts
 
 Submodules
 ----------
@@ -18,7 +19,23 @@ Submodules
 langchain.heavydb module
 ------------------------
 
-.. automodule:: modules.langchain.heavydb
+.. automodule:: heavynl.langchain.heavydb
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+langchain.llms module
+---------------------
+
+.. automodule:: heavynl.langchain.llms
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+langchain.utils module
+----------------------
+
+.. automodule:: heavynl.langchain.utils
    :members:
    :undoc-members:
    :show-inheritance:
@@ -26,7 +43,7 @@ langchain.heavydb module
 Module contents
 ---------------
 
-.. automodule:: modules.langchain
+.. automodule:: heavynl.langchain
    :members:
    :undoc-members:
    :show-inheritance:

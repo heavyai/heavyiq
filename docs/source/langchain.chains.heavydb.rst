@@ -7,7 +7,7 @@ Submodules
 langchain.chains.heavydb.nl\_to\_answer module
 ----------------------------------------------
 
-.. automodule:: modules.langchain.chains.heavydb.nl_to_answer
+.. automodule:: heavynl.langchain.chains.heavydb.nl_to_answer
    :members:
    :undoc-members:
    :show-inheritance:
@@ -15,7 +15,7 @@ langchain.chains.heavydb.nl\_to\_answer module
 langchain.chains.heavydb.nl\_to\_sql module
 -------------------------------------------
 
-.. automodule:: modules.langchain.chains.heavydb.nl_to_sql
+.. automodule:: heavynl.langchain.chains.heavydb.nl_to_sql
    :members:
    :undoc-members:
    :show-inheritance:
@@ -23,7 +23,7 @@ langchain.chains.heavydb.nl\_to\_sql module
 Module contents
 ---------------
 
-.. automodule:: modules.langchain.chains.heavydb
+.. automodule:: heavynl.langchain.chains.heavydb
    :members:
    :undoc-members:
    :show-inheritance:
