@@ -11,6 +11,6 @@ Command Groups
    cli.chain
    cli.metadata_index
 
-.. click:: modules.cli:cli
+.. click:: heavynl.cli:cli
    :prog: python cli.py
    :nested: full

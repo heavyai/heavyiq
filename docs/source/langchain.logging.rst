@@ -7,7 +7,7 @@ Submodules
 langchain.logging.database module
 ---------------------------------
 
-.. automodule:: modules.langchain.logging.database
+.. automodule:: heavynl.langchain.logging.database
    :members:
    :undoc-members:
    :show-inheritance:
@@ -15,7 +15,7 @@ langchain.logging.database module
 langchain.logging.enums module
 ------------------------------
 
-.. automodule:: modules.langchain.logging.enums
+.. automodule:: heavynl.langchain.logging.enums
    :members:
    :undoc-members:
    :show-inheritance:
@@ -23,7 +23,7 @@ langchain.logging.enums module
 langchain.logging.request\_context module
 -----------------------------------------
 
-.. automodule:: modules.langchain.logging.request_context
+.. automodule:: heavynl.langchain.logging.request_context
    :members:
    :undoc-members:
    :show-inheritance:
@@ -31,7 +31,7 @@ langchain.logging.request\_context module
 Module contents
 ---------------
 
-.. automodule:: modules.langchain.logging
+.. automodule:: heavynl.langchain.logging
    :members:
    :undoc-members:
    :show-inheritance:
