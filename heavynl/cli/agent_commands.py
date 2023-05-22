@@ -42,7 +42,7 @@ def one_time(
     default="gpt-3.5-turbo",
     help="Specify the model to use for the LLM. (Defaults to 'gpt-3.5-turbo', use 'gpt-4' for best results)",
 )
-@click.option("--temperature", default=0.5, type=float, help="What sampling temperature to use.")
+@click.option("--temperature", default=0.0, type=float, help="What sampling temperature to use.")
 @click.option("--verbose", default=False, help="Verbose output", type=bool)
 @click.pass_context
 def conversational(
