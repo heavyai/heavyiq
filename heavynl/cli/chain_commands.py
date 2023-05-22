@@ -9,7 +9,7 @@ from heavynl.langchain.chains import (
     SQLMetadataQuestionTransformerChain,
     AskHeavyDBMetadataIndexChain,
 )
-from heavynl.langchain.llms import get_llm
+from heavynl.langchain.llms import get_llm_by_model_name
 
 
 @click.group()
@@ -19,38 +19,59 @@ def chain():
 
 
 @chain.command()
+@click.option(
+    "--model",
+    default="text-davinci-003",
+    help="Specify the model to use for the LLM. (Defaults to 'text-davinci-003')",
+)
+@click.option("--temperature", default=0.0, help="Temperature for LLM (Defaults to 0.0)", type=float)
 @click.option("--tables", default="", help="Tables to use for answer (comma-separated)", type=str)
 @click.option("--verbose", default=False, help="Verbose output", type=bool)
 @click.argument("question", type=str)
 @click.pass_context
-def nl_to_sql(ctx: click.Context, question: str, tables: str, verbose: bool) -> None:
+def nl_to_sql(ctx: click.Context, question: str, model: str, tables: str, verbose: bool, temperature: float) -> None:
     """Call the NL to SQL Chain"""
 
     heavydb = HeavyDB.from_env(include_tables=[t.strip() for t in tables.split(",")])
-    llm = get_llm(["cli", "chain", "nl_to_sql_chain"], temperature=0.0, client=None)
+    llm = get_llm_by_model_name(model, ["cli", "chain", "nl_to_sql_chain"], temperature=temperature, client=None)
     chain = NLtoSQLChain(database=heavydb, llm=llm, verbose=verbose)
     click.echo(log_chain_call(chain, question, ""))
 
 
 @chain.command()
+@click.option(
+    "--model",
+    default="text-davinci-003",
+    help="Specify the model to use for the LLM. (Defaults to 'text-davinci-003')",
+)
+@click.option("--temperature", default=0.0, help="Temperature for LLM (Defaults to 0.0)", type=float)
 @click.option("--tables", default="", help="Tables to use for answer (comma-separated)", type=str)
 @click.option("--verbose", default=False, help="Verbose output", type=bool)
 @click.argument("question", type=str)
 @click.pass_context
-def nl_to_answer(ctx: click.Context, question: str, tables: str, verbose: bool) -> None:
+def nl_to_answer(ctx: click.Context, question: str, model: str, tables: str, verbose: bool, temperature: float) -> None:
     """Call the NL to Answer Chain"""
     heavydb = HeavyDB.from_env(include_tables=[t.strip() for t in tables.split(",")])
-    llm = get_llm(["cli", "chain", "nl_to_answer_chain"], temperature=0.0, client=None)
+    llm = get_llm_by_model_name(model, ["cli", "chain", "nl_to_answer_chain"], temperature=temperature, client=None)
     chain = NLtoAnswerChain(database=heavydb, llm=llm, verbose=verbose)
     click.echo(log_chain_call(chain, question, llm.model_name))
 
 
 @chain.command()
+@click.option(
+    "--model",
+    default="text-davinci-003",
+    help="Specify the model to use for the LLM. (Defaults to 'text-davinci-003')",
+)
+@click.option("--temperature", default=0.0, help="Temperature for LLM (Defaults to 0.0)", type=float)
 @click.argument("question", type=str)
 @click.pass_context
-def question_rephraser(ctx: click.Context, question: str) -> None:
+def question_rephraser(ctx: click.Context, question: str, model: str, temperature: float) -> None:
     """Rephrase a question to be about SQL metadata"""
-    chain = SQLMetadataQuestionTransformerChain()
+    llm = get_llm_by_model_name(
+        model, ["cli", "chain", "sql_metadata_question_transformer_chain"], temperature=temperature, client=None
+    )
+    chain = SQLMetadataQuestionTransformerChain(llm=llm)
     click.echo(log_chain_call(chain, question, ""))
 
 

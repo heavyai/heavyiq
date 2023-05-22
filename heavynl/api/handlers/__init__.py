@@ -9,20 +9,13 @@ from heavynl.api.utils import handle_errors
 from heavynl.logging_utils import default_logger as logger
 from heavynl.langchain import HeavyDB
 from heavynl.langchain.chains import NLtoSQLChain, NLtoAnswerChain
-from heavynl.langchain.llms import get_chat_llm, get_llm
+from heavynl.langchain.llms import get_llm_by_model_name
 from heavynl.langchain.logging import log_chain_call
 from heavynl.langchain.index import create_and_write_table_document, get_heavydb_index
 from heavynl.utils import strip_sql_comments
 
 
 MODEL_NAME = "gpt-4"
-
-
-def build_llm(model: str, tags: list[str] = []) -> ChatOpenAI | OpenAI:
-    if model.startswith("gpt-3.5") or model.startswith("gpt-4"):
-        return get_chat_llm(tags, model_name=model)
-    else:
-        return get_llm(tags, temperature=0.2, model_name=model)
 
 
 def parse_tables_from_body(body: dict, heavydb: HeavyDB) -> list[str]:
@@ -47,7 +40,7 @@ def query(body: dict) -> dict:
     # dbname = body["databaseName"]
     logger.info("Request Received")
     logger.info(f"Table(s): {', '.join(tables)}")
-    llm = build_llm(MODEL_NAME, ["rest_api", "query", "chain", "nl_to_sql_chain"])
+    llm = get_llm_by_model_name(MODEL_NAME, ["rest_api", "query", "chain", "nl_to_sql_chain"])
     chain = NLtoSQLChain(llm=llm, database=db, verbose=True)
     input = {chain.input_key: question, "tables": tables}
     res = log_chain_call(chain, input, MODEL_NAME)
@@ -65,7 +58,7 @@ def question(body: dict) -> dict:
     # dbname = body["databaseName"]
     logger.info("Request Received")
     logger.info(f"Table(s): {', '.join(tables)}")
-    llm = build_llm(MODEL_NAME, ["rest_api", "question", "chain", "nl_to_answer_chain"])
+    llm = get_llm_by_model_name(MODEL_NAME, ["rest_api", "question", "chain", "nl_to_answer_chain"])
     chain = NLtoAnswerChain(llm=llm, database=db, verbose=True)
     input = {chain.input_key: question, "tables": tables}
     res = log_chain_call(chain, input, MODEL_NAME)
