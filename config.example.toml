@@ -9,5 +9,7 @@ huggingface_embed_model = "sentence-transformers/all-mpnet-base-v2"
 metadata_index_dir = "db"
 table_documents_dir = "table_documents"
 
-# optional
+# optional, don't copy to your config if you don't have these
 promptlayer_api_key = ""
+promptwatch_api_key = ""
+promptwatch_tracking_project = "<name>_dev" # i.e. "bfturner_dev"

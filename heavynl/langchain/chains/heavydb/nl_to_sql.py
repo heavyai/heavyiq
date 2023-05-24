@@ -14,7 +14,7 @@ from ..logged_llm import LoggedLLMChain
 NL_TO_SQL_TEMPLATE = """Create a syntactically correct {dialect} query to answer the input question.
 Only query relevant columns, avoiding SELECT * for any table.
 Only create one query.
-These functions do not exist: STRING_AGG, GROUP_CONCAT
+These functions DO NOT EXIST: STRING_AGG, GROUP_CONCAT
 Use only existing column names from the schema description, ensuring they are from the correct table.
 Exclude null values from the results. Do not use reserved SQL keywords as aliases.
 Explain your thinking step-by-step in a block comment before the query. Provide your response using the format below:
@@ -33,7 +33,7 @@ NL_TO_SQL_PROMPT = LoggedPromptTemplate(
 
 NL_TO_SQL_ERROR_TEMPLATE = """Correct the given {dialect} query:
 If a function signature does not exist, do not use it. Reformulate the query to not use that function signature.
-Do not use STRING_AGG, GROUP_CONCAT functions.
+DO NOT USE STRING_AGG, GROUP_CONCAT functions.
 Use the following format:
 Question: [QUESTION]
 SQLQuery: /* step-by-step thought process */ [SQL QUERY]
