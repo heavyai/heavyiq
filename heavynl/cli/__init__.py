@@ -2,13 +2,13 @@ import os
 
 import click
 
-from heavynl.config import config
+from heavynl.config import get_config
 from .agent_commands import agent
 from .chain_commands import chain
 from .metadata_index_commands import metadata_index
 
 
-os.environ["OPENAI_API_KEY"] = config.openai_api_key
+os.environ["OPENAI_API_KEY"] = get_config().openai_api_key
 
 
 @click.group()

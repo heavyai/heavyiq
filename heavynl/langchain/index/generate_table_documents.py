@@ -5,7 +5,7 @@ import os
 from langchain.docstore.document import Document
 from langchain.schema import HumanMessage, SystemMessage
 
-from heavynl.config import config
+from heavynl.config import get_config
 from heavynl.langchain import HeavyDB
 from heavynl.langchain.llms import get_chat_llm
 
@@ -123,7 +123,7 @@ def generate_table_documents() -> list[str]:
     Saves them to the table_documents directory.
     Returns a list of tables that had summaries generated.
     """
-    tables_with_documents_already = get_table_names_from_documents(config.table_documents_dir)
+    tables_with_documents_already = get_table_names_from_documents(get_config().table_documents_dir)
     print("Generating summaries and column descriptions.")
     print(f"Tables with documents already (skipping): {tables_with_documents_already}")
     heavydb = HeavyDB.from_env(ignore_tables=tables_with_documents_already)

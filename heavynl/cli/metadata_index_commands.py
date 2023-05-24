@@ -9,7 +9,7 @@ from heavynl.langchain.index import (
     get_vectorstore_index_creator,
     update_tables_in_index,
 )
-from heavynl.config import config
+from heavynl.config import get_config
 
 
 @click.group()
@@ -35,6 +35,7 @@ def generate_table_document(ctx: click.Context, table_name: str) -> None:
 def reindex_table_document(ctx: click.Context, table_name: str) -> None:
     """Reload the table document in index."""
     # Add the implementation for reloading table document here
+    config = get_config()
     persist_path = Path(config.metadata_index_dir)
     if not persist_path.exists():
         raise click.ClickException(f"Index does not exist at configured path: {persist_path}")

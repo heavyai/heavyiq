@@ -4,10 +4,10 @@ from langchain.llms.openai import OpenAI
 from langchain.llms.promptlayer_openai import PromptLayerOpenAI
 from langchain.chat_models import PromptLayerChatOpenAI, ChatOpenAI
 
-from heavynl.config import config
+from heavynl.config import get_config
 from heavynl.langchain.utils import is_promptlayer_active
 
-os.environ["OPENAI_API_KEY"] = config.openai_api_key
+os.environ["OPENAI_API_KEY"] = get_config().openai_api_key
 
 
 def get_llm_by_model_name(model_name: str, tags: list[str] = [], **kwargs) -> OpenAI | ChatOpenAI:

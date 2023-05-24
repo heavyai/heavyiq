@@ -9,11 +9,11 @@ from langchain.callbacks import get_openai_callback
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage, AIMessage
 
-from heavynl.config import config
+from heavynl.config import get_config
 from heavynl.langchain import HeavyDB
 from heavynl.langchain.index import get_heavydb_index
 
-os.environ["OPENAI_API_KEY"] = config.openai_api_key
+os.environ["OPENAI_API_KEY"] = get_config().openai_api_key
 
 
 prompt = """Create questions that require querying and analyzing a SQL database, provided information about a table within the SQL Database

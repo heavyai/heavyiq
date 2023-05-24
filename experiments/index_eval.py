@@ -2,7 +2,7 @@ import csv
 from datetime import datetime
 from typing import Any, Callable
 
-from heavynl.config import config
+from heavynl.config import get_config
 from heavynl.langchain.index import get_heavydb_index
 
 
@@ -103,7 +103,7 @@ def main():
 
     list_of_table_retrievers = [
         (
-            f"Simple search using {config.huggingface_embed_model}",
+            f"Simple search using {get_config().huggingface_embed_model}",
             get_heavydb_index().simple_search_for_table_names,
             lambda x: set(x),
         )

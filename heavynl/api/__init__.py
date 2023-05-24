@@ -4,15 +4,11 @@ import connexion
 from flask import Flask, redirect
 from flask_cors import CORS
 
-from heavynl.config import config
-from heavynl.langchain.index import get_heavydb_index
-
-os.environ["OPENAI_API_KEY"] = config.openai_api_key
+from heavynl.config import get_config
 
 
-def get_app() -> Flask:
-    # eagerly load the index
-    get_heavydb_index()
+def get_app(config_path: str = "./config.toml") -> Flask:
+    get_config(config_path)  # loads config using specified path
 
     app = connexion.FlaskApp(__name__)
     CORS(app.app)

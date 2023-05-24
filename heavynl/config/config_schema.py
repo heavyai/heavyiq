@@ -1,6 +1,6 @@
 from typing import Optional
 
-from confz import ConfZ, ConfZFileSource
+from confz import ConfZ
 
 
 class HeavyNLConfig(ConfZ):  # type: ignore
@@ -18,5 +18,3 @@ class HeavyNLConfig(ConfZ):  # type: ignore
 
 class AppConfig(ConfZ):  # type: ignore
     nl: HeavyNLConfig
-
-    CONFIG_SOURCES = [ConfZFileSource(file="./config.toml")]

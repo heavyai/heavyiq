@@ -4,9 +4,9 @@ from typing import Optional
 
 from langchain.docstore.document import Document
 
-from heavynl.config import config
+from heavynl.config import get_config
 
-table_documents_dir = config.table_documents_dir
+table_documents_dir = get_config().table_documents_dir
 
 
 def read_table_documents(include: Optional[list[str]] = None) -> Iterator[Document]:
