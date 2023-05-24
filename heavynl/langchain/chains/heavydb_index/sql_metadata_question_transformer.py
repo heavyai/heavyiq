@@ -10,7 +10,7 @@ from langchain.vectorstores import Chroma
 from langchain.base_language import BaseLanguageModel
 from pydantic import BaseModel, Extra
 
-from heavynl.config import config
+from heavynl.config import get_config
 from heavynl.langchain.llms import get_llm
 
 rephrase_question_examples = [
@@ -157,7 +157,7 @@ def get_example_selector() -> MaxMarginalRelevanceExampleSelector:
         print("Initting rephrase example selector. This will only happen once.")
         _example_selector = MaxMarginalRelevanceExampleSelector.from_examples(
             rephrase_question_examples,
-            HuggingFaceEmbeddings(model_name=config.huggingface_embed_model),
+            HuggingFaceEmbeddings(model_name=get_config().huggingface_embed_model),
             Chroma,
         )
     return _example_selector

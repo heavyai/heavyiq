@@ -4,7 +4,7 @@ from threading import Lock
 from typing import Optional, Any, Iterable, TYPE_CHECKING
 
 from heavyai import connect
-from heavynl.config import config
+from heavynl.config import get_config
 from heavynl.utils import strip_sql_comments, is_destructive_sql
 
 if TYPE_CHECKING:
@@ -72,6 +72,7 @@ class HeavyDB:
     @classmethod
     def from_env(cls: type[HeavyDB], **kwargs: Any) -> HeavyDB:
         """Create a database connection from environment variables."""
+        config = get_config()
         conn: Connection = connect(
             user=config.heavydb_username,
             password=config.heavydb_password,
@@ -84,6 +85,7 @@ class HeavyDB:
     @classmethod
     def from_session(cls: type[HeavyDB], session_id: str, dbname: Optional[str] = None, **kwargs: Any) -> HeavyDB:
         """Create a database connection from a session id."""
+        config = get_config()
         conn: Connection = connect(
             sessionid=session_id,
             host=config.heavydb_host,
@@ -97,6 +99,7 @@ class HeavyDB:
         cls: type[HeavyDB], username: str, password: str, dbname: Optional[str] = None, **kwargs: Any
     ) -> HeavyDB:
         """Create a database connection from username and password."""
+        config = get_config()
         conn: Connection = connect(
             user=username,
             password=password,

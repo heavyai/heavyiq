@@ -4,11 +4,12 @@ from langchain.vectorstores import Chroma
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.indexes import VectorstoreIndexCreator
 
-from heavynl.config import config
+from heavynl.config import get_config
 from .generate_table_documents import generate_table_documents
 from .heavydb_metadata_index import HeavyDBMetadataIndex
 from .utils import read_table_documents
 
+config = get_config()
 huggingface_model_name = config.huggingface_embed_model
 metadata_index_dir = config.metadata_index_dir
 table_documents_dir = config.table_documents_dir
