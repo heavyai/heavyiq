@@ -66,7 +66,7 @@ def run_model_on_questions(ctx: click.Context, model: str, temperature: float, v
                     print(f"Question {index+1} of {num_of_questions}...")
                 primary_table, is_multi_table, secondary_table, question, reference_sql = question.split("\t")
                 tables = [primary_table]
-                if is_multi_table == "True":
+                if is_multi_table.upper() == "TRUE":
                     tables.append(secondary_table)
                 heavydb = HeavyDB.from_env(include_tables=tables)
                 chain = NLtoSQLChain(database=heavydb, llm=llm, verbose=verbose)
