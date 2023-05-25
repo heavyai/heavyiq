@@ -28,7 +28,7 @@ def eval():
 @click.option("--n", default=1, help="How many times to run model on each question", type=int)
 @click.pass_context
 def run_model_on_questions(ctx: click.Context, model: str, temperature: float, verbose: bool, n: int) -> None:
-    """Call the NL to SQL Chain on each question in eval_questions.csv. Provides tables to LLM"""
+    """Call the NL to SQL Chain on each question in eval_questions.tsv. Provides tables to LLM"""
     # generate UUID for this run, just need the first few digits
     eval_id = uuid4().hex[:8]
     eval_str = f"eval_{eval_id}"
