@@ -35,6 +35,8 @@ NL_TO_SQL_PROMPT = LoggedPromptTemplate(
 NL_TO_SQL_ERROR_TEMPLATE = """Correct the given {dialect} query:
 If a function signature does not exist, do not use it. Reformulate the query to not use that function signature.
 DO NOT USE STRING_AGG, GROUP_CONCAT functions.
+Exclude null values from the results. Do not use reserved SQL keywords as aliases.
+Do not use double colon cast operators ("::"); instead use the CAST function if needed.
 Use the following format:
 Question: [QUESTION]
 SQLQuery: /* step-by-step thought process */ [SQL QUERY]
