@@ -1,12 +1,15 @@
 from uuid import uuid4
+from contextlib import nullcontext
 
 import click
 from langchain.callbacks import get_openai_callback
+from promptwatch import PromptWatch
 
 from heavynl.langchain import HeavyDB
 from heavynl.langchain.chains import (
     NLtoSQLChain,
 )
+from heavynl.config import get_config
 from heavynl.langchain.llms import get_llm_by_model_name
 from heavynl.utils import strip_sql_comments
 
@@ -15,6 +18,14 @@ from heavynl.utils import strip_sql_comments
 def eval():
     """Evaluate models."""
     pass
+
+
+def promptwatch_context(project: str, tenant: str):
+    config = get_config()
+    if config.promptwatch_api_key and config.promptlayer_api_key != "":
+        return PromptWatch(api_key=config.promptwatch_api_key, tracking_project=project, tracking_tenant=tenant)
+    else:
+        return nullcontext()
 
 
 @eval.command()
@@ -59,7 +70,7 @@ def run_model_on_questions(ctx: click.Context, model: str, temperature: float, v
                     tables.append(secondary_table)
                 heavydb = HeavyDB.from_env(include_tables=tables)
                 chain = NLtoSQLChain(database=heavydb, llm=llm, verbose=verbose)
-                with get_openai_callback() as cb:
+                with promptwatch_context("nl_to_sql_eval", str(eval_id)), get_openai_callback() as cb:
                     try:
                         sql = strip_sql_comments(chain.run(question)).replace("\n", " ")
                         num_of_successes += 1

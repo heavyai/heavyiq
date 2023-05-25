@@ -4,7 +4,7 @@ from langchain.prompts import PromptTemplate
 import promptlayer
 from promptwatch import PromptWatch
 
-from heavynl.config import config
+from heavynl.config import get_config
 from heavynl.langchain.utils import is_promptlayer_active
 
 
@@ -19,6 +19,7 @@ class LoggedPromptTemplate(PromptTemplate):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+        config = get_config()
         if config.promptwatch_api_key is not None and config.promptwatch_api_key != "":
             with PromptWatch(
                 api_key=config.promptwatch_api_key, tracking_project=config.promptwatch_tracking_project
