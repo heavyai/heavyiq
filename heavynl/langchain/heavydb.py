@@ -1,5 +1,6 @@
 from __future__ import annotations
 from functools import lru_cache
+import re
 from threading import Lock
 from typing import Optional, Any, Iterable, TYPE_CHECKING
 
@@ -135,7 +136,11 @@ class HeavyDB:
         """Get the schema of a table."""
         create_command = f"SHOW CREATE TABLE {table};"
         cursor = self._conn.execute(create_command)
-        return cursor.fetchone()[0]
+        table_schema = cursor.fetchone()[0]
+        table_schema = re.sub(r" ENCODING .*\)([,\)])", r"\1", table_schema)
+        table_schema = re.sub(r",\n.*SHARED DICTIONARY.*REFERENCES.*\([A-Za-z0-9_]*\)", "", table_schema)
+        table_schema = re.sub(r"\n", "", table_schema)
+        return table_schema
 
     def validate_query(self, query: str) -> list:
         """Validate a query."""
