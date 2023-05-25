@@ -17,6 +17,7 @@ Only create one query.
 These functions DO NOT EXIST: STRING_AGG, GROUP_CONCAT
 Use only existing column names from the schema description, ensuring they are from the correct table.
 Exclude null values from the results. Do not use reserved SQL keywords as aliases.
+Do not use double colon cast operators ("::"); instead use the CAST function if needed.
 Explain your thinking step-by-step in a block comment before the query. Provide your response using the format below:
 Question: [QUESTION]
 SQLQuery: /* step-by-step reasoning */ [SINGLE SQL QUERY]

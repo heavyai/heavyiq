@@ -1,5 +1,7 @@
 from uuid import uuid4
 from contextlib import nullcontext
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import partial
 
 import click
 from langchain.callbacks import get_openai_callback
@@ -37,10 +39,34 @@ def promptwatch_context(project: str, tenant: str) -> PromptWatch | nullcontext:
 @click.option("--temperature", default=0.0, help="Temperature for LLM (Defaults to 0.0)", type=float)
 @click.option("--verbose", default=False, help="Verbose output", type=bool)
 @click.option("--n", default=1, help="How many times to run model on each question", type=int)
+@click.option("--max_threads", default=8, help="Maximum number of threads. (Defaults to 8)", type=int)
 @click.pass_context
-def run_model_on_questions(ctx: click.Context, model: str, temperature: float, verbose: bool, n: int) -> None:
+def run_model_on_questions(
+    ctx: click.Context, model: str, temperature: float, verbose: bool, n: int, max_threads: int
+) -> None:
     """Call the NL to SQL Chain on each question in eval_questions.tsv. Provides tables to LLM"""
-    # generate UUID for this run, just need the first few digits
+
+    def process_question(heavydb: HeavyDB, index: int, question: str) -> int:
+        primary_table, is_multi_table, secondary_table, question, reference_sql = question.split("\t")
+        tables = [primary_table]
+        if is_multi_table.upper() == "TRUE":
+            tables.append(secondary_table)
+        chain = NLtoSQLChain(database=heavydb, llm=llm, verbose=verbose)
+        with promptwatch_context("nl_to_sql_eval", str(eval_id)), get_openai_callback() as cb:
+            try:
+                res = chain({"query": question, "tables": tables})
+                sql = strip_sql_comments(res["sql"]).replace("\n", " ")
+                num_of_successes = 1
+            except Exception as e:
+                sql = f"ERROR: {e}".replace("\n", " ")
+                num_of_successes = 0
+
+            with open(f"./eval/results/{eval_str}_results.tsv", "a") as f:
+                f.write(
+                    f"{eval_id}\t{model}\t{temperature}\t{primary_table}\t{is_multi_table}\t{secondary_table}\t{question.strip()}\t{sql}\t{cb.total_tokens}\t{cb.prompt_tokens}\t{cb.completion_tokens}\t{cb.successful_requests}\t{round(cb.total_cost, 4)}\t{reference_sql.strip()}\n"
+                )
+        return num_of_successes
+
     eval_id = uuid4().hex[:8]
     eval_str = f"eval_{eval_id}"
     print(f"Eval ID: {eval_id}")
@@ -49,9 +75,11 @@ def run_model_on_questions(ctx: click.Context, model: str, temperature: float, v
             "eval_id\tmodel\ttemperature\tprimary_table\tis_multi_table\tsecondary_table\tquestion\toutput_sql\ttotal_tokens\tprompt_tokens\tcompletion_tokens\tsuccessful_requests\ttotal_cost\treference_sql\n"
         )
 
+    heavydb = HeavyDB.from_env()
     llm = get_llm_by_model_name(
         model, [eval_str, "cli", "chain", "nl_to_sql_chain"], temperature=temperature, client=None
     )
+    process_func = partial(process_question, heavydb)
 
     with open("./eval/questions.tsv") as f:
         f.readline()  # skip the header
@@ -60,28 +88,14 @@ def run_model_on_questions(ctx: click.Context, model: str, temperature: float, v
         for i in range(n):
             print(f"=========== Run {i+1} of {n} ===========")
             num_of_questions = len(questions)
-            num_of_successes = 0
-            for index, question in enumerate(questions):
-                if index % 5 == 0:
-                    print(f"Question {index+1} of {num_of_questions}...")
-                primary_table, is_multi_table, secondary_table, question, reference_sql = question.split("\t")
-                tables = [primary_table]
-                if is_multi_table.upper() == "TRUE":
-                    tables.append(secondary_table)
-                heavydb = HeavyDB.from_env(include_tables=tables)
-                chain = NLtoSQLChain(database=heavydb, llm=llm, verbose=verbose)
-                with promptwatch_context("nl_to_sql_eval", str(eval_id)), get_openai_callback() as cb:
-                    try:
-                        sql = strip_sql_comments(chain.run(question)).replace("\n", " ")
-                        num_of_successes += 1
-                    except Exception as e:
-                        sql = f"ERROR: {e}".replace("\n", " ")
-
-                    with open(f"./eval/results/{eval_str}_results.tsv", "a") as f:
-                        f.write(
-                            f"{eval_id}\t{model}\t{temperature}\t{primary_table}\t{is_multi_table}\t{secondary_table}\t{question.strip()}\t{sql}\t{cb.total_tokens}\t{cb.prompt_tokens}\t{cb.completion_tokens}\t{cb.successful_requests}\t{round(cb.total_cost, 4)}\t{reference_sql.strip()}\n"
-                        )
-
+            total_num_of_successes = 0
+            with ThreadPoolExecutor(max_workers=max_threads) as executor:
+                future_results = {
+                    executor.submit(process_func, index, question): question for index, question in enumerate(questions)
+                }
+                for future in as_completed(future_results):
+                    num_of_successes = future.result()
+                    total_num_of_successes += num_of_successes
             print(
-                f"Generated SQL for {num_of_successes}/{num_of_questions} questions. ({round((num_of_successes/num_of_questions)*100, 2)}%)"
+                f"Generated SQL for {total_num_of_successes}/{num_of_questions} questions. ({round((total_num_of_successes/num_of_questions)*100, 2)}%)"
             )

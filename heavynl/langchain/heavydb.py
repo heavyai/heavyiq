@@ -129,13 +129,15 @@ class HeavyDB:
     @lru_cache
     def get_table_columns(self, table: str) -> list[ColumnDetails]:
         """Get details about the columns in a table."""
-        return self._conn.get_table_details(table)
+        with self.lock:
+            return self._conn.get_table_details(table)
 
     @lru_cache
     def get_table_schema(self, table: str) -> str:
         """Get the schema of a table."""
         create_command = f"SHOW CREATE TABLE {table};"
-        cursor = self._conn.execute(create_command)
+        with self.lock:
+            cursor = self._conn.execute(create_command)
         table_schema = cursor.fetchone()[0]
         table_schema = re.sub(r" ENCODING .*\)([,\)])", r"\1", table_schema)
         table_schema = re.sub(r",\n.*SHARED DICTIONARY.*REFERENCES.*\([A-Za-z0-9_]*\)", "", table_schema)
@@ -148,13 +150,15 @@ class HeavyDB:
         query = strip_sql_comments(query)
         if is_destructive_sql(query):
             raise ValueError("Destructive SQL is not allowed")
-        return self._conn._client.sql_validate(self._conn._session, query)
+        with self.lock:
+            return self._conn._client.sql_validate(self._conn._session, query)
 
     @lru_cache
     def get_column_top_k(self, table: str, column: str, k: int = 5) -> Optional[list[str]]:
         """Get the top k values for a column."""
         top_k_statement = f"SELECT {column}, COUNT(*) as cnt FROM {table} WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {k};"
-        cursor = self._conn.execute(top_k_statement)
+        with self.lock:
+            cursor = self._conn.execute(top_k_statement)
         top_k_res: list[str] = [v[0] for v in cursor.fetchall()]
         if not any([v for v in top_k_res if v.startswith("MULTIPOLYGON")]):
             return top_k_res
@@ -169,7 +173,8 @@ class HeavyDB:
         columns_str = ",".join([col.name for col in self.get_table_columns(table_name)])
 
         # get the sample rows
-        sample_rows = self._conn.execute(command)
+        with self.lock:
+            sample_rows = self._conn.execute(command)
         # shorten values in the sample rows
         sample_rows = list(map(lambda ls: [str(i)[:100] for i in ls], sample_rows))
 
@@ -243,7 +248,8 @@ class HeavyDB:
         command = strip_sql_comments(command)
         if is_destructive_sql(command):
             raise ValueError("Destructive SQL is not allowed")
-        cursor = self._conn.execute(command)
+        with self.lock:
+            cursor = self._conn.execute(command)
         if fetch == "all":
             result = cursor.fetchall()
         elif fetch == "one":
