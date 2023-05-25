@@ -20,7 +20,7 @@ def eval():
     pass
 
 
-def promptwatch_context(project: str, tenant: str):
+def promptwatch_context(project: str, tenant: str) -> PromptWatch | nullcontext:
     config = get_config()
     if config.promptwatch_api_key and config.promptlayer_api_key != "":
         return PromptWatch(api_key=config.promptwatch_api_key, tracking_project=project, tracking_tenant=tenant)
