@@ -8,7 +8,7 @@ from langchain.callbacks import OpenAICallbackHandler, get_openai_callback
 from langchain.chains.base import Chain
 from promptwatch import PromptWatch
 
-from heavynl.config import config
+from heavynl.config import get_config
 from .database import Session, RequestLog
 from .enums import LangChainType
 
@@ -150,6 +150,7 @@ def agent_log_request_ctx(
 
 
 def promptwatch_context():
+    config = get_config()
     if config.promptwatch_api_key and config.promptlayer_api_key != "":
         return PromptWatch(api_key=config.promptwatch_api_key, tracking_project=config.promptwatch_tracking_project)
     else:
