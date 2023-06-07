@@ -40,7 +40,7 @@ class HeavyDB:
         if self._ignore_tables:
             missing_tables = self._ignore_tables - self._all_tables
             if missing_tables:
-                print("WARNING: ignore_tables {missing_tables} not found in database")
+                print(f"WARNING: ignore_tables {missing_tables} not found in database")
 
         if not isinstance(sample_rows_in_table_info, int):
             raise TypeError("sample_rows_in_table_info must be an integer")
