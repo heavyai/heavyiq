@@ -8,6 +8,7 @@ from langchain import LLMChain
 from langchain.prompts import BaseChatPromptTemplate
 from langchain.schema import AgentAction, AgentFinish, HumanMessage
 
+from heavynl.config import get_config
 from heavynl.langchain import HeavyDB
 from heavynl.langchain.agents import HeavyDBToolkit
 from heavynl.langchain.llms import get_chat_llm
@@ -118,7 +119,9 @@ def create_sql_agent(
     Returns:
     - AgentExecutor: An AgentExecutor instance configured with the SQL agent and the set of tools
     for interacting with the database."""
-    chat_llm = chat_llm or get_chat_llm(["agent", "one_time_sql_agent"], temperature=0, model_name="gpt-4")
+    chat_llm = chat_llm or get_chat_llm(
+        ["agent", "one_time_sql_agent"], temperature=0, model_name=get_config().openai_gpt_model
+    )
     heavydb = heavydb or HeavyDB.from_env()
     toolkit = HeavyDBToolkit(db=heavydb)
     tools = toolkit.get_tools()

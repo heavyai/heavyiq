@@ -20,6 +20,8 @@ Keywords: Identify a set of essential keywords and relationships that facilitate
 Upon completion, evaluate the coherence, accuracy, and relevance of the generated response to ensure that it adheres to the requirements outlined above,
 maximizing its value and usefulness for search and retrieval tasks."""
 
+CONFIG = get_config()
+
 
 def get_table_summary_document(heavydb: HeavyDB, table: str) -> Document:
     """
@@ -33,7 +35,7 @@ def get_table_summary_document(heavydb: HeavyDB, table: str) -> Document:
         Document: A Document object containing the table summary and metadata.
     """
     table_info = heavydb.get_table_info([table])
-    llm = get_chat_llm(["metadata_index", "table_summary"], model_name="gpt-3.5-turbo", temperature=0.2)
+    llm = get_chat_llm(["metadata_index", "table_summary"], model_name=CONFIG.openai_gpt_model, temperature=0.2)
     messages = [
         SystemMessage(content=table_summary_prompt),
         HumanMessage(content=table_info),
@@ -62,7 +64,9 @@ def get_table_column_description_document(heavydb: HeavyDB, table: str) -> Docum
         Document: A Document object containing the column descriptions and metadata.
     """
     table_info = heavydb.get_table_info([table])
-    llm = get_chat_llm(["metadata_index", "table_columns_description"], model_name="gpt-3.5-turbo", temperature=0.2)
+    llm = get_chat_llm(
+        ["metadata_index", "table_columns_description"], model_name=CONFIG.openai_gpt_model, temperature=0.2
+    )
     messages = [
         SystemMessage(content=column_description_prompt),
         HumanMessage(content=table_info),
@@ -121,7 +125,7 @@ def generate_table_documents() -> list[str]:
     Saves them to the table_documents directory.
     Returns a list of tables that had summaries generated.
     """
-    tables_with_documents_already = get_table_names_from_documents(get_config().table_documents_dir)
+    tables_with_documents_already = get_table_names_from_documents(CONFIG.table_documents_dir)
     print("Generating summaries and column descriptions.")
     print(f"Tables with documents already (skipping): {tables_with_documents_already}")
     heavydb = HeavyDB.from_env(ignore_tables=tables_with_documents_already)
