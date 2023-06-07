@@ -6,6 +6,7 @@ from langchain.chat_models import ChatOpenAI
 from langchain.llms import OpenAI
 
 from heavynl.api.utils import handle_errors
+from heavynl.config import get_config
 from heavynl.logging_utils import default_logger as logger
 from heavynl.langchain import HeavyDB
 from heavynl.langchain.chains import NLtoSQLChain, NLtoAnswerChain
@@ -15,7 +16,7 @@ from heavynl.langchain.index import create_and_write_table_document, get_heavydb
 from heavynl.utils import strip_sql_comments
 
 
-MODEL_NAME = "gpt-4"
+MODEL_NAME = get_config().openai_gpt_model
 
 
 def parse_tables_from_body(body: dict, heavydb: HeavyDB) -> list[str]:

@@ -13,6 +13,7 @@ class HeavyNLConfig(ConfZ):  # type: ignore
     huggingface_embed_model: str
     metadata_index_dir: str
     table_documents_dir: str
+    openai_gpt_model: str
     promptlayer_api_key: Optional[str] = None
     promptwatch_api_key: Optional[str] = None
     promptwatch_tracking_project: Optional[str] = None
