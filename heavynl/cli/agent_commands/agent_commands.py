@@ -3,7 +3,7 @@ from heavynl.langchain.agents.chat_agent import create_sql_agent
 from heavynl.langchain.agents.convo_agent import create_conversational_agent
 from heavynl.langchain.logging import log_agent_call
 from heavynl.langchain.llms import get_chat_llm
-from heavynl.cli.agent_messages import HumanConvoMessage, AIConvoMessage
+from .agent_messages import HumanConvoMessage, AIConvoMessage
 
 
 @click.group()
@@ -63,7 +63,7 @@ def conversational(
         question = input(HumanConvoMessage(is_first_message=is_first_message).colorize())
         if is_first_message:
             is_first_message = False
-        if question in ["exit", "EXIT"]:
+        if question.upper() == "EXIT":
             break
         # show "Processing..." until the answer returns and then show the answer in its place
         print("Processing...", end="\r")
