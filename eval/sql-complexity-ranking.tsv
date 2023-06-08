@@ -1,0 +1,6 @@
+Ranking	Feature	Description	Example
+1	Simple SELECT statements	These are the most basic SQL queries that retrieve data from a single table without any complex conditions or joins.	SELECT * FROM my_table;
+2	SELECT with basic filtering	These queries include simple filtering criteria like WHERE clauses with one or two conditions.	SELECT * FROM my_table WHERE column1 = 'value' AND column2 > 10;
+3	Aggregation Queries	These queries involve grouping and aggregating data using functions such as COUNT, SUM, AVG, MIN, and MAX.	SELECT column1, COUNT(*) FROM my_table GROUP BY column1;
+4	Subqueries	These queries involve nesting one query inside another. Subqueries can be used in many ways, such as filtering, joining, or performing calculations on the results of the inner query. 	SELECT * FROM my_table WHERE column1 IN (SELECT column1 FROM another_table WHERE column2 = 'value');
+5+	Joins and Complex Queries	These queries involve joining multiple tables together and may include multiple levels of subqueries and complex conditions. These queries require a deeper understanding of SQL syntax and data modeling	SELECT t1.*, t2.* FROM table1 t1 JOIN table2 t2 ON t1.id = t2.table1_id WHERE t1.column1 = 'value' AND t2.column2 > 10 GROUP BY t1.column1, t2.column2 HAVING COUNT(*) > 1 ORDER BY t1.column1 ASC, t2.column2 DESC;
