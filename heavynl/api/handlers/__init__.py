@@ -40,7 +40,7 @@ def query(body: dict) -> dict:
     question = body["question"]
     # dbname = body["databaseName"]
     logger.info("Request Received")
-    logger.info("Table(s): %s", ", ".join(tables))
+    logger.info(f"Table(s): {', '.join(tables)}")
     llm = get_llm_by_model_name(MODEL_NAME, ["rest_api", "query", "chain", "nl_to_sql_chain"])
     chain = NLtoSQLChain(llm=llm, database=db, verbose=True)
     chain_input = {chain.input_key: question, "tables": tables}
@@ -58,7 +58,7 @@ def question(body: dict) -> dict:
     question = body["question"]
     # dbname = body["databaseName"]
     logger.info("Request Received")
-    logger.info("Table(s): %s", ", ".join(tables))
+    logger.info(f"Table(s): {', '.join(tables)}")
     llm = get_llm_by_model_name(MODEL_NAME, ["rest_api", "question", "chain", "nl_to_answer_chain"])
     chain = NLtoAnswerChain(llm=llm, database=db, verbose=True)
     chain_input = {chain.input_key: question, "tables": tables}
@@ -71,7 +71,7 @@ def add_tables(body: dict) -> dict:
     tables = body["tables"]
     # dbname = body["databaseName"]
     logger.info("Request Received")
-    logger.info("Table(s): %s", ", ".join(tables))
+    logger.info(f"Table(s): {', '.join(tables)}")
     # db = HeavyDB.from_session(db_session_id, include_tables=tables)
     db = HeavyDB.from_env(include_tables=tables)
     process_func = partial(create_and_write_table_document, db)
