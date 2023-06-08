@@ -1,10 +1,10 @@
 import click
+
 from heavynl.langchain.agents.chat_agent import create_sql_agent
 from heavynl.langchain.agents.convo_agent import create_conversational_agent
 from heavynl.langchain.logging import log_agent_call
 from heavynl.langchain.llms import get_chat_llm
-from .agent_messages import HumanConvoMessage, AIConvoMessage
-from heavynl.logging_utils import default_logger as logger
+from heavynl.cli.agent_messages import HumanConvoMessage, AIConvoMessage
 
 
 @click.group()
