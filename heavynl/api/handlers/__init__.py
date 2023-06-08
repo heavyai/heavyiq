@@ -40,11 +40,11 @@ def query(body: dict) -> dict:
     question = body["question"]
     # dbname = body["databaseName"]
     logger.info("Request Received")
-    logger.info(f"Table(s): {', '.join(tables)}")
+    logger.info("Table(s): %s", ", ".join(tables))
     llm = get_llm_by_model_name(MODEL_NAME, ["rest_api", "query", "chain", "nl_to_sql_chain"])
     chain = NLtoSQLChain(llm=llm, database=db, verbose=True)
-    input = {chain.input_key: question, "tables": tables}
-    res = log_chain_call(chain, input, MODEL_NAME)
+    chain_input = {chain.input_key: question, "tables": tables}
+    res = log_chain_call(chain, chain_input, MODEL_NAME)
     response = {"sql": strip_sql_comments(res[chain.output_key])}
     return response
 
@@ -58,11 +58,11 @@ def question(body: dict) -> dict:
     question = body["question"]
     # dbname = body["databaseName"]
     logger.info("Request Received")
-    logger.info(f"Table(s): {', '.join(tables)}")
+    logger.info("Table(s): %s", ", ".join(tables))
     llm = get_llm_by_model_name(MODEL_NAME, ["rest_api", "question", "chain", "nl_to_answer_chain"])
     chain = NLtoAnswerChain(llm=llm, database=db, verbose=True)
-    input = {chain.input_key: question, "tables": tables}
-    res = log_chain_call(chain, input, MODEL_NAME)
+    chain_input = {chain.input_key: question, "tables": tables}
+    res = log_chain_call(chain, chain_input, MODEL_NAME)
     return {"answer": res[chain.output_answer_key], "sql": strip_sql_comments(res[chain.output_sql_key])}
 
 
@@ -71,7 +71,7 @@ def add_tables(body: dict) -> dict:
     tables = body["tables"]
     # dbname = body["databaseName"]
     logger.info("Request Received")
-    logger.info(f"Table(s): {', '.join(tables)}")
+    logger.info("Table(s): %s", ", ".join(tables))
     # db = HeavyDB.from_session(db_session_id, include_tables=tables)
     db = HeavyDB.from_env(include_tables=tables)
     process_func = partial(create_and_write_table_document, db)

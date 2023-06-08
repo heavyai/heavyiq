@@ -1,9 +1,9 @@
 import click
-
 from heavynl.langchain.agents.chat_agent import create_sql_agent
 from heavynl.langchain.agents.convo_agent import create_conversational_agent
 from heavynl.langchain.logging import log_agent_call
 from heavynl.langchain.llms import get_chat_llm
+from heavynl.cli.agent_messages import HumanConvoMessage, AIConvoMessage
 
 
 @click.group()
@@ -58,11 +58,14 @@ def conversational(
     )
     sql_agent = create_conversational_agent(chat_llm=chat_llm, verbose=verbose)
     # start a loop that asks for input and then calls the agent, break the loop on EXIT
+    is_first_message = True
     while True:
-        question = input("You (type EXIT to break loop): ")
-        if question == "EXIT":
+        question = input(HumanConvoMessage(is_first_message=is_first_message).colorize())
+        if is_first_message:
+            is_first_message = False
+        if question in ["exit", "EXIT"]:
             break
         # show "Processing..." until the answer returns and then show the answer in its place
         print("Processing...", end="\r")
         answer = sql_agent.run(input=question)
-        print(f"Assistant: {answer}")
+        print(AIConvoMessage(message=answer).colorize())
