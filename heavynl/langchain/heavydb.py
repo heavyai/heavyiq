@@ -74,6 +74,8 @@ class HeavyDB:
     def from_env(cls: type[HeavyDB], **kwargs: Any) -> HeavyDB:
         """Create a database connection from environment variables."""
         config = get_config()
+        if not config.heavydb_username or not config.heavydb_password or not config.heavydb_dbname:
+            raise ValueError("Please set the config variables heavydb_username, heavydb_password and heavydb_dbname")
         conn: Connection = connect(
             user=config.heavydb_username,
             password=config.heavydb_password,
@@ -87,6 +89,12 @@ class HeavyDB:
     def from_session(cls: type[HeavyDB], session_id: str, dbname: Optional[str] = None, **kwargs: Any) -> HeavyDB:
         """Create a database connection from a session id."""
         config = get_config()
+        if not config.heavydb_username or not config.heavydb_password:
+            raise ValueError("Please set the config variables heavydb_username, heavydb_password")
+        if not config.heavydb_dbname and not dbname:
+            raise ValueError(
+                "Please set the config variable heavydb_dbname or provide a dbname as an argument to HeavyDB.from_session"
+            )
         conn: Connection = connect(
             sessionid=session_id,
             host=config.heavydb_host,
@@ -101,6 +109,10 @@ class HeavyDB:
     ) -> HeavyDB:
         """Create a database connection from username and password."""
         config = get_config()
+        if not config.heavydb_dbname and not dbname:
+            raise ValueError(
+                "Please set the config variable heavydb_dbname or provide a dbname as an argument to HeavyDB.from_creds"
+            )
         conn: Connection = connect(
             user=username,
             password=password,
