@@ -72,7 +72,7 @@ def add_tables(body: dict) -> dict:
     # dbname = body["databaseName"]
     logger.info("Request Received")
     logger.info(f"Table(s): {', '.join(tables)}")
-    # db = HeavyDB.from_session(db_session_id, include_tables=tables)
+    # db = HeavyDB.from_session(db_session_id, dbname=dbname, include_tables=tables)
     db = HeavyDB.from_env(include_tables=tables)
     process_func = partial(create_and_write_table_document, db)
     with ThreadPoolExecutor() as executor:
