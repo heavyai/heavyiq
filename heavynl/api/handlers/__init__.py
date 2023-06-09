@@ -2,8 +2,8 @@ from heavynl.api.utils import handle_errors
 from heavynl.config import get_config
 from heavynl.logging_utils import heavynl_logger as logger
 from heavynl.langchain import HeavyDB
-from heavynl.langchain.chains import NLtoSQLChain, NLtoAnswerChain
-from heavynl.langchain.llms import get_llm_by_model_name
+from heavynl.langchain.chains import NLtoSQLChain, NLtoAnswerChain, NLtoSQLChatChain
+from heavynl.langchain.llms import get_llm_by_model_name, get_chat_llm
 from heavynl.langchain.logging import log_chain_call
 from heavynl.utils import strip_sql_comments
 

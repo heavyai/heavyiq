@@ -27,6 +27,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /auto_retry_query:
+    post:
+      tags:
+        - OptionalTables
+      summary: Provided a question and (optionally) table(s), returns SQL that can be used to answer the question. 
+               It has the ability to re-generate new sql in case if the generated sql query found invalid.
+      operationId: heavynl.api.handlers.retry_query
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatabaseQuestionAndTablesRequest'
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SQLStatement'
+        500:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /question:
     post:
       summary: Provided a question and (optionally) tables(s), returns SQL and a NL Answer to the question
