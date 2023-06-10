@@ -1,1 +1,1 @@
-from .prompt import LoggedPromptTemplate
+from .prompt import LoggedPromptTemplate, LoggedChatPromptTemplate
