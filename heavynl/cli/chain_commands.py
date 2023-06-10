@@ -4,10 +4,10 @@ from heavynl.langchain import HeavyDB
 from heavynl.langchain.logging import log_chain_call
 from heavynl.langchain.index import get_heavydb_index, SearchType
 from heavynl.langchain.chains import (
-    NLtoSQLChain,
     NLtoAnswerChain,
     SQLMetadataQuestionTransformerChain,
     AskHeavyDBMetadataIndexChain,
+    get_nl_to_sql_chain_by_llm,
 )
 from heavynl.langchain.llms import get_llm_by_model_name
 
@@ -34,7 +34,7 @@ def nl_to_sql(ctx: click.Context, question: str, model: str, tables: str, verbos
 
     heavydb = HeavyDB.from_env(include_tables=[t.strip() for t in tables.split(",")])
     llm = get_llm_by_model_name(model, ["cli", "chain", "nl_to_sql_chain"], temperature=temperature, client=None)
-    chain = NLtoSQLChain(database=heavydb, llm=llm, verbose=verbose)
+    chain = get_nl_to_sql_chain_by_llm(llm)(database=heavydb, llm=llm, verbose=verbose)
     click.echo(log_chain_call(chain, question, ""))
 
 

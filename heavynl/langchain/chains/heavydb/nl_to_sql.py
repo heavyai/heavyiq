@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Optional, Type
 
 from langchain.base_language import BaseLanguageModel
 from langchain.callbacks.manager import CallbackManagerForChainRun
+from langchain.llms.openai import OpenAI
 from langchain.chat_models import ChatOpenAI
 from langchain.chat_models.base import BaseChatModel
 from langchain.prompts import HumanMessagePromptTemplate, SystemMessagePromptTemplate
@@ -364,3 +365,10 @@ class NLtoSQLChatChain(BaseChain):
 
         chain_result: dict[str, Any] = {self.output_key: sql_query}
         return chain_result
+
+
+def get_nl_to_sql_chain_by_llm(llm: OpenAI | ChatOpenAI) -> Type[NLtoSQLChain] | Type[NLtoSQLChatChain]:
+    """
+    Gets the appropriate nt_to_sql chain class based upon the llm passed.
+    """
+    return NLtoSQLChatChain if isinstance(llm, ChatOpenAI) else NLtoSQLChain
