@@ -1,8 +1,9 @@
+from langchain.chat_models import ChatOpenAI
 from heavynl.api.utils import handle_errors
 from heavynl.config import get_config
 from heavynl.logging_utils import heavynl_logger as logger
 from heavynl.langchain import HeavyDB
-from heavynl.langchain.chains import NLtoSQLChain, NLtoAnswerChain
+from heavynl.langchain.chains import NLtoSQLChain, NLtoAnswerChain, NLtoSQLChatChain
 from heavynl.langchain.llms import get_llm_by_model_name
 from heavynl.langchain.logging import log_chain_call
 from heavynl.utils import strip_sql_comments
@@ -20,7 +21,8 @@ def query(body: dict) -> dict:
     logger.info("Request Received")
     logger.info("Table(s): %s", ", ".join(tables))
     llm = get_llm_by_model_name(MODEL_NAME, ["rest_api", "query", "chain", "nl_to_sql_chain"])
-    chain = NLtoSQLChain(llm=llm, database=db, verbose=True)
+    chain_cls = NLtoSQLChatChain if isinstance(llm, ChatOpenAI) else NLtoSQLChain
+    chain = chain_cls(llm=llm, database=db, verbose=True)
     chain_input = {chain.input_key: question, "tables": tables}
     res = log_chain_call(chain, chain_input, MODEL_NAME)
     response = {"sql": strip_sql_comments(res[chain.output_key])}
