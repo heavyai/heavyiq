@@ -35,7 +35,7 @@ def get_table_summary_document(heavydb: HeavyDB, table: str) -> Document:
         Document: A Document object containing the table summary and metadata.
     """
     table_info = heavydb.get_table_info([table])
-    llm = get_chat_llm(["metadata_index", "table_summary"], model_name=CONFIG.openai_gpt_model, temperature=0.2)
+    llm = get_chat_llm(["metadata_index", "table_summary"], model=CONFIG.openai_gpt_model, temperature=0.2)
     messages = [
         SystemMessage(content=table_summary_prompt),
         HumanMessage(content=table_info),
@@ -64,9 +64,7 @@ def get_table_column_description_document(heavydb: HeavyDB, table: str) -> Docum
         Document: A Document object containing the column descriptions and metadata.
     """
     table_info = heavydb.get_table_info([table])
-    llm = get_chat_llm(
-        ["metadata_index", "table_columns_description"], model_name=CONFIG.openai_gpt_model, temperature=0.2
-    )
+    llm = get_chat_llm(["metadata_index", "table_columns_description"], model=CONFIG.openai_gpt_model, temperature=0.2)
     messages = [
         SystemMessage(content=column_description_prompt),
         HumanMessage(content=table_info),
