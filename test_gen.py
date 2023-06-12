@@ -96,7 +96,7 @@ def get_questions_for_table(heavydb: HeavyDB, tables: tuple[str, Optional[str]])
     with heavydb.lock:
         table_info = heavydb.get_table_info([table])
     table_summary = get_heavydb_index().query(f"What is the summary of the {table} table?")
-    llm = ChatOpenAI(model_name=get_config().openai_gpt_model, temperature=0.7, client=None)
+    llm = ChatOpenAI(model=get_config().openai_gpt_model, temperature=0.7, client=None)
     messages.append(HumanMessage(content=f"{table_summary}\n\n{table_info}"))
     resp = llm(messages)
     single_table_questions = extract_list_items([resp.content])

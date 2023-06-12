@@ -109,7 +109,7 @@ RELEVANT TABLE NAME AND COLUMNS:"""
 
 def main() -> None:
     db = HeavyDB.from_env()
-    llm = ChatOpenAI(temperature=0.0, client=None, model_name="gpt-3.5-turbo")
+    llm = ChatOpenAI(temperature=0.0, client=None, model="gpt-3.5-turbo")
     query = "What actor appeared in the most action movies in the 1990s?"
     as_relates_to_query_map = PromptTemplate(
         template=MAP_QUERY,
