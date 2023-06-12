@@ -30,6 +30,8 @@ def get_config(file: str = "./config.toml") -> HeavyNLConfig:
     if _config:
         return _config
     app_config = AppConfig(config_sources=ConfZFileSource(file=file))
+    if len(app_config.nl.openai_api_key.strip()) == 0:
+        raise ValueError("OpenAI API key must be set in config")
     if app_config.web and app_config.web.backend_url:
         hostname, port = split_url_port(app_config.web.backend_url)
         app_config.nl.heavydb_host = hostname

@@ -5,6 +5,7 @@ from pydantic import Field
 
 
 class HeavyNLConfig(ConfZ):  # type: ignore
+    port: int = 6275
     openai_api_key: str
     openai_gpt_model: str = "gpt-3.5-turbo"
     heavydb_dbname: Optional[str] = None
