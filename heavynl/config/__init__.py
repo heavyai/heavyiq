@@ -1,6 +1,7 @@
 from urllib.parse import urlparse
 
 from confz import ConfZFileSource
+import openai
 
 from .config_schema import AppConfig, HeavyNLConfig
 
@@ -30,8 +31,11 @@ def get_config(file: str = "./config.toml") -> HeavyNLConfig:
     if _config:
         return _config
     app_config = AppConfig(config_sources=ConfZFileSource(file=file))
-    if len(app_config.nl.openai_api_key.strip()) == 0:
-        raise ValueError("OpenAI API key must be set in config")
+    openai.api_key = app_config.nl.openai_api_key
+    try:
+        openai.Model.list()
+    except Exception as e:
+        raise ValueError(f"Unable to communicate with OpenAI: {e}")
     if app_config.web and app_config.web.backend_url:
         hostname, port = split_url_port(app_config.web.backend_url)
         app_config.nl.heavydb_host = hostname
