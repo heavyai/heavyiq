@@ -1,7 +1,8 @@
 import json
 from typing import Optional, Any
 
-from langchain.memory import ConversationBufferMemory
+from langchain.prompts.chat import ChatPromptTemplate, MessagesPlaceholder
+from langchain.memory import ConversationBufferMemory, CombinedMemory
 from langchain.chat_models.base import BaseChatModel
 from langchain.agents import AgentExecutor
 from langchain.schema import AgentAction, AgentFinish
@@ -11,6 +12,8 @@ from langchain.agents import AgentOutputParser
 from heavynl.config import get_config
 from heavynl.langchain import HeavyDB
 from heavynl.langchain.agents import HeavyDBToolkit
+from heavynl.langchain.memory import HeavyNLQueryBufferWindowMemory
+from heavynl.langchain.callbacks import ConvoAgentCallbackHandler
 from heavynl.langchain.llms import get_chat_llm
 
 SYSTEM_MESSAGE = """Assistant is a large language model trained by OpenAI.
@@ -91,6 +94,20 @@ class CustomOutputParser(AgentOutputParser):
             return AgentFinish({"output": text.strip()}, text)
 
 
+class CustomConversationalChatAgent(ConversationalChatAgent):
+    """
+    Subclass of ConversationalChatAgent to include last_run_sql message inside ChatPromptTemplate messages which
+    again passed as input to llm.
+    """
+
+    @classmethod
+    def create_prompt(cls, *args, **kwargs) -> ChatPromptTemplate:
+        chat_prompt = super().create_prompt(*args, **kwargs)
+        messages: list = chat_prompt.messages
+        messages.insert(2, MessagesPlaceholder(variable_name="last_run_sql"))
+        return ChatPromptTemplate(input_variables=chat_prompt.input_variables, messages=chat_prompt.messages)
+
+
 def create_conversational_agent(
     heavydb: Optional[HeavyDB] = None, chat_llm: Optional[BaseChatModel] = None, verbose: bool = False
 ) -> AgentExecutor:
@@ -117,12 +134,43 @@ def create_conversational_agent(
     heavydb = heavydb or HeavyDB.from_env()
     toolkit = HeavyDBToolkit(db=heavydb)
     tools = toolkit.get_tools()
-    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True, ai_prefix="Assistant")
-    agent = ConversationalChatAgent.from_llm_and_tools(
+    memory = ConversationBufferMemory(
+        memory_key="chat_history", return_messages=True, ai_prefix="Assistant", input_key="input", output_key="output"
+    )
+    latest_run_sql_memeory = HeavyNLQueryBufferWindowMemory(
+        memory_key="last_run_sql", k=1, input_key="input", return_messages=True, output_key="output"
+    )
+    memory = CombinedMemory(memories=[memory, latest_run_sql_memeory])
+
+    agent = CustomConversationalChatAgent.from_llm_and_tools(
         llm=chat_llm,
         tools=tools,
         system_message=SYSTEM_MESSAGE,
         human_message=HUMAN_MESSAGE,
+        input_variables=["input", "chat_history", "last_run_sql", "agent_scratchpad"],
         output_parser=CustomOutputParser(),
     )
-    return AgentExecutor.from_agent_and_tools(agent=agent, tools=tools, memory=memory, verbose=verbose)
+    return AgentExecutor.from_agent_and_tools(
+        agent=agent,
+        tools=tools,
+        memory=memory,
+        verbose=verbose,
+        return_intermediate_steps=True,
+        callbacks=[ConvoAgentCallbackHandler()],
+    )
+
+
+def run_conversational_agent(sql_agent: AgentExecutor, question: str) -> str:
+    """
+    Function responsible for running the conversational agent.
+    """
+    heavynl_buffer_memory = next(i for i in sql_agent.memory.memories if isinstance(i, HeavyNLQueryBufferWindowMemory))
+    response = sql_agent({"input": question})
+    # save the intermediate success query on HeavyNLQueryBufferWindowMemory memory
+    for agent_action, output in response["intermediate_steps"][::-1]:
+        if agent_action.tool == "run_sql_query" and not output.startswith("Error:"):
+            inputs = {heavynl_buffer_memory.input_key: response["input"]}
+            outputs = {heavynl_buffer_memory.output_key: agent_action.tool_input}
+            heavynl_buffer_memory.save_context(inputs, outputs, manual_save=True)
+            break
+    return response["output"]

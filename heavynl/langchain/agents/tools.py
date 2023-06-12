@@ -71,9 +71,16 @@ class QueryHeavyDBTool(BaseHeavyDBTool, BaseTool):
     - _arun(query: str) -> str: Not implemented for this tool."""
 
     name = "run_sql_query"
-    description = """ONLY USE WITH KNOWN TABLE SCHEMAS. This tool is for querying HeavyDB databases.
+    description = """ONLY USE WITH KNOWN TABLE SCHEMAS.
+    DONT RUN THE QUERY IF YOU'RE NOT SURE ABOUT THE TABLE SCHEMA.
+    This tool is for querying HeavyDB databases.
 
-Input an accurate SQL query for output. Apply query limits. If an error occurs, revise and retry. Be familiar with table schemas and avoid common mistakes, such as:
+Input an accurate SQL query having semicolon at the end for output. Apply query limits. Following are the sample action input queries:
+
+SELECT COUNT(*) FROM usa_counties WHERE name LIKE 'A%';
+SELECT name FROM usa_counties WHERE name LIKE 'A%';
+
+If an error occurs, revise and retry. Be familiar with table schemas and avoid common mistakes, such as:
 
 - NULL values with NOT IN
 - Using UNION instead of UNION ALL
