@@ -1,9 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-import re
-
-from langchain.chat_models import ChatOpenAI
-from langchain.llms import OpenAI
 
 from heavynl.api.utils import handle_errors
 from heavynl.config import get_config

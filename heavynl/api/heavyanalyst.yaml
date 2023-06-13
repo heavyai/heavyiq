@@ -98,6 +98,7 @@ components:
           description: Name of the database
       required:
         - databaseName
+        - tables
       example:
         tables:
           - usa_states
