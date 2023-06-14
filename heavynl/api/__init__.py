@@ -41,4 +41,4 @@ def get_app(config_path: str = "./config.toml") -> Flask:
         """
         heavynl_logger.debug("Request Body: %s", request.get_data(as_text=True))
 
-    return flask_app
+    return flask_app  # type: ignore

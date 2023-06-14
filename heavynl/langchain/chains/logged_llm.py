@@ -24,8 +24,10 @@ class LoggedLLMChain(LLMChain):
         res = self.llm.generate_prompt(prompts, stop, callbacks=run_manager.get_child() if run_manager else None)
         if is_promptlayer_active:
             for index, inputs in enumerate(input_list):
-                request_id = res.generations[index][0].generation_info["pl_request_id"]
-                self.prompt.track_request(request_id, inputs)
+                generation_info = res.generations[index][0].generation_info
+                if generation_info is not None:
+                    request_id = generation_info["pl_request_id"]
+                    self.prompt.track_request(request_id, inputs)
         return res
 
     async def agenerate(
@@ -38,6 +40,8 @@ class LoggedLLMChain(LLMChain):
         res = await self.llm.agenerate_prompt(prompts, stop, callbacks=run_manager.get_child() if run_manager else None)
         if is_promptlayer_active:
             for index, inputs in enumerate(input_list):
-                request_id = res.generations[index][0].generation_info["pl_request_id"]
-                self.prompt.track_request(request_id, inputs)
+                generation_info = res.generations[index][0].generation_info
+                if generation_info is not None:
+                    request_id = generation_info["pl_request_id"]
+                    self.prompt.track_request(request_id, inputs)
         return res

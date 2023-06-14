@@ -57,7 +57,7 @@ class HumanConvoMessage(_ConvoMessage):
 
     type: str = "HUMAN"
     prefix: str = "You:"
-    text_color: TerminalColors = TerminalColors.YELLOW
+    text_color: str = TerminalColors.YELLOW
 
 
 @dataclass
@@ -71,4 +71,4 @@ class AIConvoMessage(_ConvoMessage):
 
     type: str = "AI"
     prefix: str = "Assistant:"
-    text_color: TerminalColors = TerminalColors.GREEN
+    text_color: str = TerminalColors.GREEN

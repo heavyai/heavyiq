@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from chromadb.api import Where
 from langchain.vectorstores import Chroma
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.indexes import VectorstoreIndexCreator
@@ -23,9 +24,11 @@ def update_tables_in_index(index_creator: VectorstoreIndexCreator, vectorstore: 
         raise ValueError("Not all provided tables have documents. Aborting.")
     print("Deleting existing table documents from index...")
     if len(tables_to_update) == 1:
-        vectorstore._collection.delete(where={"source": tables_to_update[0]})
+        where: Where = {"source": tables_to_update[0]}
+        vectorstore._collection.delete(where=where)
     else:
-        vectorstore._collection.delete(where={"$or": [{"source": table_name} for table_name in tables_to_update]})
+        where: Where = {"$or": [{"source": table_name} for table_name in tables_to_update]}
+        vectorstore._collection.delete(where=where)
     print("Splitting documents...")
     sub_docs = index_creator.text_splitter.split_documents(docs)
     print(f"Indexing documents with {huggingface_model_name}...")
@@ -59,7 +62,7 @@ def create_index_if_nonexistent() -> HeavyDBMetadataIndex:
     persist_path = Path(metadata_index_dir)
     if persist_path.exists():
         print("Index already exists. Returning existing index.")
-        vectorstore: Chroma = Chroma(embedding_function=index_creator.embedding, persist_directory=metadata_index_dir)
+        vectorstore = Chroma(embedding_function=index_creator.embedding, persist_directory=metadata_index_dir)
         if len(tables_with_new_summaries) > 0:
             update_tables_in_index(index_creator, vectorstore, tables_with_new_summaries)
     else:
@@ -75,4 +78,4 @@ def create_index_if_nonexistent() -> HeavyDBMetadataIndex:
         )
         print("Done")
 
-    return HeavyDBMetadataIndex(vectorstore=vectorstore, text_splitter=index_creator.text_splitter)
+    return HeavyDBMetadataIndex(vectorstore=vectorstore, text_splitter=index_creator.text_splitter)  # type: ignore
