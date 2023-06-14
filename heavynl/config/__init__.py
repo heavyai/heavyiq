@@ -3,9 +3,10 @@ from urllib.parse import urlparse
 from confz import ConfZFileSource
 import openai
 
-from .config_schema import AppConfig, HeavyNLConfig
+from .config_schema import AppConfig, HeavyNLConfig, LogConfig
 
 _config = None
+_log_config = None
 
 
 def split_url_port(url: str) -> tuple[str, int]:
@@ -44,3 +45,16 @@ def get_config(file: str = "./config.toml") -> HeavyNLConfig:
         app_config.nl.heavydb_port = app_config.http_port
     _config = app_config.nl
     return _config
+
+
+def get_log_config(file: str = "./config.toml") -> LogConfig:
+    """
+    Get config related to logging.
+    """
+    global _log_config
+    if _log_config:
+        return _log_config
+
+    app_config = AppConfig(config_sources=ConfZFileSource(file=file))
+    _log_config = app_config.log
+    return _log_config
