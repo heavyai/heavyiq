@@ -2,7 +2,7 @@ import click
 
 from heavynl.langchain import HeavyDB
 from heavynl.langchain.logging import log_chain_call
-from heavynl.langchain.index import get_heavydb_index
+from heavynl.langchain.index import get_heavydb_index, SearchType
 from heavynl.langchain.chains import (
     NLtoSQLChain,
     NLtoAnswerChain,
@@ -77,11 +77,13 @@ def question_rephraser(ctx: click.Context, question: str, model: str, temperatur
 
 @chain.command()
 @click.argument("question", type=str)
-@click.option("--search-type", default="similarity", help="Defaults to similarity. Can also be 'mmr'.", type=str)
+@click.option(
+    "--search-type", default=SearchType.SIMILARITY, help="Defaults to similarity. Can also be 'mmr'.", type=SearchType
+)
 @click.option("--k", default=5, help="Number of Documents vector store will retrieve. Defaults to 5.", type=int)
 @click.option("--fetch-k", default=20, help="Number of Documents passed to MMR algorithm. Defaults to 20.", type=int)
 @click.pass_context
-def ask_heavydb_index(ctx: click.Context, question: str, search_type: str, k: int, fetch_k: int) -> None:
+def ask_heavydb_index(ctx: click.Context, question: str, search_type: SearchType, k: int, fetch_k: int) -> None:
     """Ask the HeavyDB Metadata Index"""
     retriever = get_heavydb_index().as_retriever(search_type=search_type, k=k, fetch_k=fetch_k)
     chain = AskHeavyDBMetadataIndexChain.create(retriever=retriever)

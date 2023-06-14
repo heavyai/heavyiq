@@ -10,5 +10,6 @@
     ],
     "python.linting.flake8Enabled": true,
     "python.linting.mypyEnabled": true,
-    "python.linting.enabled": true
+    "python.linting.enabled": true,
+    "python.analysis.typeCheckingMode": "basic"
 }

@@ -131,7 +131,7 @@ def generate_table_documents() -> list[str]:
     table_names_to_generate = heavydb.get_usable_table_names()
     with ThreadPoolExecutor() as executor:
         executor.map(process_func, table_names_to_generate)
-    print(f"Finished generating summaries and column descriptions for {len(table_names_to_generate)} tables.")
+    print(f"Finished generating summaries and column descriptions for {len(list(table_names_to_generate))} tables.")
 
     return list(table_names_to_generate)
 
