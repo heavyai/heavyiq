@@ -1,10 +1,11 @@
-import os
+from typing import Any
 
 import connexion
-from flask import Flask, redirect
+from flask import Flask, redirect, request, Response
 from flask_cors import CORS
 
 from heavynl.config import get_config
+from heavynl.logging_utils import _app_logger, heavynl_logger
 
 
 def get_app(config_path: str = "./config.toml") -> Flask:
@@ -19,4 +20,25 @@ def get_app(config_path: str = "./config.toml") -> Flask:
 
     app.add_url_rule("/", "redirect_ui", lambda: redirect("/api/v1/ui/", code=302))
 
-    return app.app
+    flask_app = app.app
+
+    @flask_app.after_request
+    def log_request(response: Response) -> Response:
+        """
+        Called after the handler method of the corresponding endpoint.
+
+        This method specificall logs the http request calls using app_logger.
+        """
+        request.response = response
+        _app_logger.info("Request:", extra={"response": response})
+        return response
+
+    @flask_app.before_request
+    def log_request_body():
+        """
+        Called before the handler method of the corresponding endpoint.
+        Here we just log the request body using heavynl_logger.
+        """
+        heavynl_logger.debug("Request Body: %s", request.get_data(as_text=True))
+
+    return flask_app

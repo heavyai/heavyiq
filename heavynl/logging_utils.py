@@ -45,8 +45,13 @@ class HeavyNLFilter(logging.Filter):
     """
 
     def filter(self, record: Any) -> bool:
-        record.remote_addr = request.remote_addr
-        record.username = request.remote_user or "-"
+        try:
+            record.remote_addr = request.remote_addr or "-"
+            record.username = request.remote_user or "-"
+        except RuntimeError:
+            # accessing through CLI
+            record.remote_addr = "-"
+            record.username = "CLI"
         return True
 
 
@@ -99,9 +104,6 @@ def create_custom_logger(name: str, log_file_path: str | None = None) -> logging
     return logger
 
 
-default_logger = create_custom_logger("default")
-
-
 class BaseLogger(logging.Logger):
     def __init__(
         self,
@@ -128,6 +130,20 @@ class BaseLogger(logging.Logger):
 class HeavyNLLogger(BaseLogger):
     """
     HeavyNL Logger class specifically used for logging intermediate messages.
+    This is the default logger which has to be used throughout the application.
+
+    This log contain the following parts,
+
+        - date time
+        - remote_address
+        - username
+        - log level
+        - file name path where the corresponding log method gets called along with the lineno
+        - message
+
+    Since it's the default logger, interactions made through the CLI are handled by this logger.
+
+    By default all the logs produced by this logger gets stored inside "heavynl.log" file.
     """
 
     def __init__(self, name: str = "heavynl", log_file_path: str | None = None, level: str | None = None):
@@ -136,9 +152,27 @@ class HeavyNLLogger(BaseLogger):
         )
 
 
-class AppLogger(BaseLogger):
+class _AppLogger(BaseLogger):
     """
-    Flask App logger class specifically used for logging http request calls.
+    Flask App logger class specifically used for logging http request calls which
+    gets triggered after every api request.
+
+    This logger is private and can't be used for general logging.
+    Main purpose of this logger is to store all the information related to a http request/response cycle, including
+        - remote_address
+        - logged in username (prints "-" for unauthorized user)
+        - date time
+        - request_method
+        - request_uri
+        - protocol
+        - referrer
+        - user_agent
+        - response status_code
+        - response size in bytes
+    Example:
+        127.0.0.1 - - [2023-06-14 18:16:23] "POST /api/v1/query? HTTP/1.1" "http://localhost:5000/api/v1/ui/" "Safari/537.36" 500 21
+
+    By default all the logs produced by this logger gets stored inside "access.log" file.
     """
 
     def __init__(self, name: str = "app", log_file_path: str | None = None, level: str | None = None):
@@ -147,5 +181,6 @@ class AppLogger(BaseLogger):
         )
 
 
-app_logger = AppLogger(log_file_path=LOG_CONFIG.app_log_file, level=LOG_CONFIG.app_log_level)
+_app_logger = _AppLogger(log_file_path=LOG_CONFIG.app_log_file, level=LOG_CONFIG.app_log_level)
 heavynl_logger = HeavyNLLogger(log_file_path=LOG_CONFIG.heavynl_log_file, level=LOG_CONFIG.heavynl_log_level)
+default_logger = heavynl_logger

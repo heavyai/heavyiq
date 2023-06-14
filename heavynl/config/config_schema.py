@@ -4,6 +4,13 @@ from confz import ConfZ
 from pydantic import Field
 
 
+class LogConfig(ConfZ):  # type: ignore
+    app_log_file: Optional[str] = None
+    app_log_level: Optional[str] = None
+    heavynl_log_file: Optional[str] = None
+    heavynl_log_level: Optional[str] = None
+
+
 class HeavyNLConfig(ConfZ):  # type: ignore
     port: int = 6275
     openai_api_key: str
@@ -19,21 +26,14 @@ class HeavyNLConfig(ConfZ):  # type: ignore
     promptlayer_api_key: Optional[str] = None
     promptwatch_api_key: Optional[str] = None
     promptwatch_tracking_project: Optional[str] = None
+    log: LogConfig = LogConfig()
 
 
 class HeavyWebConfig(ConfZ):  # type: ignore
     backend_url: Optional[str] = Field(alias="backend-url")
 
 
-class LogConfig(ConfZ):  # type: ignore
-    app_log_file: Optional[str] = None
-    app_log_level: Optional[str] = None
-    heavynl_log_file: Optional[str] = None
-    heavynl_log_level: Optional[str] = None
-
-
 class AppConfig(ConfZ):  # type: ignore
     http_port: Optional[int] = Field(alias="http-port")
     nl: HeavyNLConfig
     web: Optional[HeavyWebConfig] = None
-    log: LogConfig
