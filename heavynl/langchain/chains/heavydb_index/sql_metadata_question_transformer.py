@@ -148,7 +148,7 @@ example_prompt = PromptTemplate(
     template="Input: {input}\nOutput: {output}",
 )
 
-_example_selector: MaxMarginalRelevanceExampleSelector = None
+_example_selector: MaxMarginalRelevanceExampleSelector | None = None
 
 
 def get_example_selector() -> MaxMarginalRelevanceExampleSelector:

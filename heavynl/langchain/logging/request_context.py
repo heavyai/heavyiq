@@ -74,7 +74,7 @@ class RequestContext:
             self.langchain_name,
             self.start_time,
             end_time,
-            self.input,
+            self.input,  # type: ignore
             self.model,
             self.output,
             self.error_msg,

@@ -19,4 +19,4 @@ def get_app(config_path: str = "./config.toml") -> Flask:
 
     app.add_url_rule("/", "redirect_ui", lambda: redirect("/api/v1/ui/", code=302))
 
-    return app.app
+    return app.app  # type: ignore

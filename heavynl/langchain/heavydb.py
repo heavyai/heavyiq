@@ -150,8 +150,8 @@ class HeavyDB:
         create_command = f"SHOW CREATE TABLE {table};"
         with self.lock:
             cursor = self._conn.execute(create_command)
-        table_schema = cursor.fetchone()[0]
-        table_schema = re.sub(r" ENCODING .*\)([,\)])", r"\1", table_schema)
+        table_schema = cursor.fetchone()[0]  # type: ignore
+        table_schema = re.sub(r" ENCODING .*\)([,\)])", r"\1", table_schema)  # type: ignore
         table_schema = re.sub(r",\n.*SHARED DICTIONARY.*REFERENCES.*\([A-Za-z0-9_]*\)", "", table_schema)
         table_schema = re.sub(r"\n", "", table_schema)
         return table_schema
@@ -171,7 +171,7 @@ class HeavyDB:
         top_k_statement = f"SELECT {column}, COUNT(*) as cnt FROM {table} WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {k};"
         with self.lock:
             cursor = self._conn.execute(top_k_statement)
-        top_k_res: list[str] = [v[0] for v in cursor.fetchall()]
+        top_k_res: list[str] = [str(v[0]) for v in cursor.fetchall()]
         if not any([v for v in top_k_res if v.startswith("MULTIPOLYGON")]):
             return top_k_res
         return None
