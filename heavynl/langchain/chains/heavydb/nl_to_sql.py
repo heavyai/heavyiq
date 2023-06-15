@@ -3,11 +3,11 @@ from typing import Any, Optional
 
 from langchain.chains.base import Chain
 from langchain.callbacks.manager import CallbackManagerForChainRun
-from langchain.chat_models import ChatOpenAI
 from langchain.base_language import BaseLanguageModel
 from pydantic import BaseModel, Extra, Field
 
 from heavynl.langchain import HeavyDB
+from heavynl.langchain.utils import get_token_limit
 from heavynl.langchain.prompts import LoggedPromptTemplate
 from ..logged_llm import LoggedLLMChain
 
@@ -114,10 +114,7 @@ class NLtoSQLChain(Chain, BaseModel):
         table_names_to_use = inputs.get("tables")
         table_info = self.database.get_table_info(table_names=table_names_to_use)
 
-        # we should be smarter about this.
-        token_limit = 3800
-        if isinstance(self.llm, ChatOpenAI) and self.llm.model_name == "gpt-4":
-            token_limit = 7800
+        token_limit = get_token_limit(self.llm.model_name)  # type: ignore
         if (
             self.llm.get_num_tokens(
                 self.prompt.format(input=input_text, dialect=self.database.dialect, table_info=table_info)
