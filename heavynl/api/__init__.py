@@ -22,23 +22,26 @@ def get_app(config_path: str = "./config.toml") -> Flask:
 
     flask_app = app.app
 
-    @flask_app.after_request
+    @flask_app.after_request  # type: ignore
     def log_request(response: Response) -> Response:
         """
         Called after the handler method of the corresponding endpoint.
 
-        This method specificall logs the http request calls using app_logger.
+        This method specifically logs the http request calls using app_logger.
         """
-        request.response = response
+        request.response = response  # type: ignore
+        heavynl_logger.debug("Response Content: %s", response.get_data(as_text=True))
+        heavynl_logger.debug("Response Status Code: %d", response.status_code)
         _app_logger.info("Request:", extra={"response": response})
         return response
 
-    @flask_app.before_request
+    @flask_app.before_request  # type: ignore
     def log_request_body():
         """
         Called before the handler method of the corresponding endpoint.
         Here we just log the request body using heavynl_logger.
         """
+        heavynl_logger.debug("Request Path: %s", request.path)
         heavynl_logger.debug("Request Body: %s", request.get_data(as_text=True))
 
     return flask_app  # type: ignore
