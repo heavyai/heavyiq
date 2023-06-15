@@ -20,6 +20,9 @@ def get_app(config_path: str = "./config.toml") -> Flask:
 
     app.add_url_rule("/", "redirect_ui", lambda: redirect("/api/v1/ui/", code=302))
 
+    ui_path = "/api/v1/ui/"
+    open_ai_path = "/api/v1/openapi.json"
+
     flask_app = app.app
 
     @flask_app.after_request  # type: ignore
@@ -29,6 +32,9 @@ def get_app(config_path: str = "./config.toml") -> Flask:
 
         This method specifically logs the http request calls using app_logger.
         """
+        # do nothing for ui request
+        if ui_path in request.path or open_ai_path in request.path:
+            return response
         request.response = response  # type: ignore
         heavynl_logger.debug("Response Content: %s", response.get_data(as_text=True))
         heavynl_logger.debug("Response Status Code: %d", response.status_code)
@@ -41,6 +47,9 @@ def get_app(config_path: str = "./config.toml") -> Flask:
         Called before the handler method of the corresponding endpoint.
         Here we just log the request body using heavynl_logger.
         """
+        # do nothing for ui request
+        if ui_path in request.path or open_ai_path in request.path:
+            return
         heavynl_logger.debug("Request Path: %s", request.path)
         heavynl_logger.debug("Request Body: %s", request.get_data(as_text=True))
 
