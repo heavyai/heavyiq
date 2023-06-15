@@ -10,13 +10,13 @@ metadata_index_dir = "db"
 table_documents_dir = "table_documents"
 openai_gpt_model = "gpt-3.5-turbo"
 
+# optional, don't copy to your config if you don't have these
+promptlayer_api_key = ""
+promptwatch_api_key = ""
+promptwatch_tracking_project = "<name>_dev" # i.e. "bfturner_dev"
+
 [nl.log]
 app_log_level = "DEBUG"
 app_log_file = "access.log"
 heavynl_log_level = "DEBUG"
 heavynl_log_file = "heavynl.log"
-
-# optional, don't copy to your config if you don't have these
-promptlayer_api_key = ""
-promptwatch_api_key = ""
-promptwatch_tracking_project = "<name>_dev" # i.e. "bfturner_dev"
