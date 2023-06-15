@@ -7,7 +7,7 @@ COPY requirements.txt ./
 COPY requirements-dev.txt ./
 COPY heavynl/ ./heavynl/
 
-RUN pip install --no-cache-dir -r requirements-dev.txt
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
 RUN pyarmor reg pyarmor-regfile-5130.zip
 RUN pyarmor gen ./heavynl
 
