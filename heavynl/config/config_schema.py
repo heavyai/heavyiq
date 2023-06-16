@@ -5,10 +5,10 @@ from pydantic import Field
 
 
 class LogConfig(ConfZ):  # type: ignore
-    app_log_file: Optional[str] = None
-    app_log_level: Optional[str] = None
-    heavynl_log_file: Optional[str] = None
-    heavynl_log_level: Optional[str] = None
+    app_log_file: str = "access.log"
+    app_log_level: str = "DEBUG"
+    heavynl_log_file: str = "heavynl.log"
+    heavynl_log_level: str = "DEBUG"
 
 
 class HeavyNLConfig(ConfZ):  # type: ignore
