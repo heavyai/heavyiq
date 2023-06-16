@@ -2,12 +2,13 @@ FROM python:3.10 AS obfuscator
 
 WORKDIR /usr/src/app
 
+COPY config.toml ./
 COPY pyarmor-regfile-5130.zip ./
 COPY requirements.txt ./
 COPY requirements-dev.txt ./
 COPY heavynl/ ./heavynl/
 
-RUN pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
+RUN pip install --no-cache-dir pyarmor
 RUN pyarmor reg pyarmor-regfile-5130.zip
 RUN pyarmor gen ./heavynl
 
@@ -17,8 +18,9 @@ WORKDIR /usr/src/app
 
 COPY --from=obfuscator /usr/src/app/dist/ ./
 COPY --from=obfuscator /usr/src/app/requirements.txt ./requirements.txt
+COPY --from=obfuscator /usr/src/app/config.toml ./config.toml
+COPY --from=obfuscator /usr/src/app/heavynl/api/heavyanalyst.yaml ./heavynl/api/heavyanalyst.yaml
 RUN pip install --no-cache-dir --upgrade -r ./requirements.txt
 
 EXPOSE 8000
-# config_path needs to be given to get_app as a string (get_app(config_path="config.toml"))
-CMD ["gunicorn", "-w", "4", "heavynl.api:get_app()"]
+CMD ["gunicorn", "-b", ":8000", "-w", "1", "heavynl.api:get_app()"]
