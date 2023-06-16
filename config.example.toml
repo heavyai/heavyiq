@@ -14,3 +14,9 @@ openai_gpt_model = "gpt-3.5-turbo-16k"
 promptlayer_api_key = ""
 promptwatch_api_key = ""
 promptwatch_tracking_project = "<name>_dev" # i.e. "bfturner_dev"
+
+[nl.log]
+app_log_level = "DEBUG"
+app_log_file = "access.log"
+heavynl_log_level = "DEBUG"
+heavynl_log_file = "heavynl.log"
