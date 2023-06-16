@@ -67,13 +67,11 @@ components:
           type: string
           description: Valid HeavyDB Session ID
       required:
-        - database_name
         - tables
         - session_id
       example:
         tables:
           - usa_states
-        database_name: heavynl
         session_id: xxxxx
     DatabaseQuestionAndTablesRequest:
       allOf:

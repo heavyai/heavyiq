@@ -15,8 +15,7 @@ MODEL_NAME = get_config().openai_gpt_model
 def query(body: dict) -> dict:
     db_session_id = body["session_id"]
     tables = body["tables"]
-    dbname = body["database_name"]
-    db = HeavyDB.from_session(db_session_id, include_tables=tables, dbname=dbname)
+    db = HeavyDB.from_session(db_session_id, include_tables=tables)
     question = body["question"]
     logger.info("Request Received")
     logger.info(f"Table(s): {', '.join(tables)}")
@@ -32,8 +31,7 @@ def query(body: dict) -> dict:
 def question(body: dict) -> dict:
     db_session_id = body["session_id"]
     tables = body["tables"]
-    dbname = body["database_name"]
-    db = HeavyDB.from_session(db_session_id, include_tables=tables, dbname=dbname)
+    db = HeavyDB.from_session(db_session_id, include_tables=tables)
     question = body["question"]
     logger.info("Request Received")
     logger.info(f"Table(s): {', '.join(tables)}")
