@@ -6,8 +6,6 @@ info:
 paths:
   /query:
     post:
-      tags:
-        - OptionalTables
       summary: Provided a question and (optionally) table(s), returns SQL that can be used to answer the question
       operationId: heavynl.api.handlers.query
       requestBody:
@@ -31,8 +29,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
   /question:
     post:
-      tags:
-        - OptionalTables
       summary: Provided a question and (optionally) tables(s), returns SQL and a NL Answer to the question
       operationId: heavynl.api.handlers.question
       requestBody:
@@ -67,13 +63,18 @@ components:
         database_name:
           type: string
           description: Name of the database
+        session_id:
+          type: string
+          description: Valid HeavyDB Session ID
       required:
         - database_name
         - tables
+        - session_id
       example:
         tables:
           - usa_states
         database_name: heavynl
+        session_id: xxxxx
     DatabaseQuestionAndTablesRequest:
       allOf:
         - $ref: '#/components/schemas/DatabaseTables'

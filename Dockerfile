@@ -23,4 +23,4 @@ COPY --from=obfuscator /usr/src/app/heavynl/api/heavyanalyst.yaml ./heavynl/api/
 RUN pip install --no-cache-dir --upgrade -r ./requirements.txt
 
 EXPOSE 8000
-CMD ["gunicorn", "-b", ":8000", "-w", "1", "heavynl.api:get_app()"]
+CMD ["gunicorn", "-b", ":8000", "-w", "4", "heavynl.api:get_app()"]
