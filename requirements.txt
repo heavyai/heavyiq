@@ -5,7 +5,7 @@ Flask==2.2.4 # cannot upgrade to 2.3.x because of connexion
 Flask-Cors==3.0.10
 gunicorn==20.1.0
 heavyai==1.1.0
-langchain==0.0.200
+langchain==0.0.201
 openai==0.27.8
 promptlayer==0.1.87
 promptwatch==0.2.4
