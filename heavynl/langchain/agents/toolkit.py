@@ -3,7 +3,14 @@ from langchain.tools import BaseTool
 from pydantic import Field
 
 from heavynl.langchain import HeavyDB
-from heavynl.langchain.agents.tools import QueryHeavyDBTool, RetrieveRelevantSchemasTool, RetrieveTableSchemasTool
+from heavynl.langchain.agents.tools import (
+    QueryHeavyDBTool,
+    RetrieveRelevantSchemasTool,
+    RetrieveTableSchemasTool,
+    NewQueryHeavyDBTool,
+    NewRetrieveRelevantSchemasTool,
+    NewRetrieveTableSchemasTool,
+)
 
 
 class HeavyDBToolkit(BaseToolkit):
@@ -45,4 +52,11 @@ class HeavyDBToolkit(BaseToolkit):
             RetrieveTableSchemasTool(db=self.db),
             RetrieveRelevantSchemasTool(db=self.db),
             QueryHeavyDBTool(db=self.db),
+        ]
+
+    def get_new_tools(self) -> list[BaseTool]:
+        return [
+            NewRetrieveTableSchemasTool(db=self.db),
+            NewRetrieveRelevantSchemasTool(db=self.db),
+            NewQueryHeavyDBTool(db=self.db),
         ]
