@@ -74,8 +74,8 @@ def conversational(
 @agent.command()
 @click.option(
     "--model",
-    default="gpt-4-0613",
-    help="Specify the model to use for the LLM. (Defaults to 'gpt-3.5-turbo-0613', use 'gpt-4' for best results)",
+    default="gpt-3.5-turbo-0613",
+    help="Specify the model to use for the LLM. (Defaults to 'gpt-3.5-turbo-0613', use 'gpt-4-0613' for best results)",
 )
 @click.option("--temperature", default=0.0, type=float, help="What sampling temperature to use.")
 @click.option("--verbose", default=False, help="Verbose output", type=bool)
