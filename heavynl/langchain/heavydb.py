@@ -155,6 +155,8 @@ class HeavyDB:
         query = strip_sql_comments(query)
         if is_destructive_sql(query):
             raise ValueError("Destructive SQL is not allowed")
+        if "::" in query:
+            raise ValueError("Double colon cast syntax is not allowed. Use CAST() instead.")
         with self.lock:
             return self._conn._client.sql_validate(self._conn._session, query)
 
