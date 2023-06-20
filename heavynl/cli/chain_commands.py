@@ -34,7 +34,7 @@ def nl_to_sql(ctx: click.Context, question: str, model: str, tables: str, verbos
 
     heavydb = HeavyDB.from_env(include_tables=[t.strip() for t in tables.split(",")])
     llm = get_llm_by_model_name(model, ["cli", "chain", "nl_to_sql_chain"], temperature=temperature, client=None)
-    chain = get_nl_to_sql_chain_by_llm(llm)(database=heavydb, llm=llm, verbose=verbose)
+    chain = get_nl_to_sql_chain_by_llm(llm)(database=heavydb, llm=llm, verbose=verbose)  # type: ignore
     click.echo(log_chain_call(chain, question, ""))
 
 

@@ -2,15 +2,15 @@ from uuid import uuid4
 from contextlib import nullcontext
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
+import time
 
 import click
 from langchain.callbacks import get_openai_callback
+from langchain.base_language import BaseLanguageModel
 from promptwatch import PromptWatch
 
 from heavynl.langchain import HeavyDB
-from heavynl.langchain.chains import (
-    NLtoSQLChain,
-)
+from heavynl.langchain.chains import get_nl_to_sql_chain_by_llm
 from heavynl.config import get_config
 from heavynl.langchain.llms import get_llm_by_model_name
 from heavynl.utils import strip_sql_comments
@@ -46,12 +46,13 @@ def run_model_on_questions(
 ) -> None:
     """Call the NL to SQL Chain on each question in eval_questions.tsv. Provides tables to LLM"""
 
-    def process_question(heavydb: HeavyDB, index: int, question: str) -> int:
+    def process_question(heavydb: HeavyDB, llm: BaseLanguageModel, index: int, question: str) -> tuple[int, float]:
+        start_time = time.time()
         primary_table, is_multi_table, secondary_table, question, reference_sql = question.split("\t")
         tables = [primary_table]
         if is_multi_table.upper() == "TRUE":
             tables.append(secondary_table)
-        chain = NLtoSQLChain(database=heavydb, llm=llm, verbose=verbose)
+        chain = get_nl_to_sql_chain_by_llm(llm)(database=heavydb, llm=llm, verbose=verbose)  # type: ignore
         with promptwatch_context("nl_to_sql_eval", str(eval_id)), get_openai_callback() as cb:
             try:
                 res = chain({"query": question, "tables": tables})
@@ -60,12 +61,14 @@ def run_model_on_questions(
             except Exception as e:
                 sql = f"ERROR: {e}".replace("\n", " ")
                 num_of_successes = 0
+            elapsed_time = time.time() - start_time
 
             with open(f"./eval/results/{eval_str}_results.tsv", "a") as f:
                 f.write(
                     f"{eval_id}\t{model}\t{temperature}\t{primary_table}\t{is_multi_table}\t{secondary_table}\t{question.strip()}\t{sql}\t{cb.total_tokens}\t{cb.prompt_tokens}\t{cb.completion_tokens}\t{cb.successful_requests}\t{round(cb.total_cost, 4)}\t{reference_sql.strip()}\n"
                 )
-        return num_of_successes
+
+        return num_of_successes, elapsed_time
 
     eval_id = uuid4().hex[:8]
     eval_str = f"eval_{eval_id}"
@@ -76,10 +79,10 @@ def run_model_on_questions(
         )
 
     heavydb = HeavyDB.from_env()
-    llm = get_llm_by_model_name(
+    runner_llm = get_llm_by_model_name(
         model, [eval_str, "cli", "chain", "nl_to_sql_chain"], temperature=temperature, client=None
     )
-    process_func = partial(process_question, heavydb)
+    process_func = partial(process_question, heavydb, runner_llm)
 
     with open("./eval/questions.tsv") as f:
         f.readline()  # skip the header
@@ -89,13 +92,24 @@ def run_model_on_questions(
             print(f"=========== Run {i+1} of {n} ===========")
             num_of_questions = len(questions)
             total_num_of_successes = 0
+            total_time = 0
+            min_time = float("inf")
+            max_time = 0
+
             with ThreadPoolExecutor(max_workers=max_threads) as executor:
                 future_results = {
                     executor.submit(process_func, index, question): question for index, question in enumerate(questions)
                 }
                 for future in as_completed(future_results):
-                    num_of_successes = future.result()
+                    num_of_successes, elapsed_time = future.result()
+                    total_time += elapsed_time
+                    min_time = min(min_time, elapsed_time)
+                    max_time = max(max_time, elapsed_time)
                     total_num_of_successes += num_of_successes
             print(
                 f"Generated SQL for {total_num_of_successes}/{num_of_questions} questions. ({round((total_num_of_successes/num_of_questions)*100, 2)}%)"
             )
+            print(f"Total time: {round(total_time, 2)}s")
+            print(f"Min time: {round(min_time, 2)}s")
+            print(f"Max time: {round(max_time, 2)}s")
+            print(f"Avg time: {round(total_time/num_of_questions, 2)}s")
