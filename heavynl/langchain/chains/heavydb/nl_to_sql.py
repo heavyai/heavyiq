@@ -330,7 +330,7 @@ class NLtoSQLChatChain(BaseNltoSQLChain):
         return chain_result
 
 
-def get_nl_to_sql_chain_by_llm(llm: BaseLanguageModel) -> type[NLtoSQLChain] | type[NLtoSQLChatChain]:
+def get_nl_to_sql_chain_by_llm(llm: BaseLanguageModel) -> type[BaseNltoSQLChain]:
     """
     Gets the appropriate nt_to_sql chain class based upon the llm passed.
     """
