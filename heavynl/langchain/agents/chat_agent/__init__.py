@@ -18,7 +18,7 @@ Before executing any queries, please consider if the question can be answered by
 
 Available tables: {tables}
 
-Given an input question, you may need to create one or more syntactically correct ANSI SQL queries to run.
+Given an input question, you may need to create one or more syntactically correct ANSI SQL queries to run and it must endswith semicolon (;).
 You can order the results by a relevant column to return the most interesting examples in the database.
 NEVER query for all the columns from a specific table, ONLY ask for the few relevant columns given the question.
 If the user doesn't specify a specific number of examples they wish to obtain, please limit your query to at most {top_k} results.
