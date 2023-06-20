@@ -102,7 +102,8 @@ class CustomConversationalChatAgent(ConversationalChatAgent):
 
     @classmethod
     def create_prompt(cls, *args, **kwargs) -> ChatPromptTemplate:
-        chat_prompt = super().create_prompt(*args, **kwargs)
+        # super().create_prompt returns ChatPromptTemplate. Signature mismatch
+        chat_prompt: ChatPromptTemplate = super().create_prompt(*args, **kwargs)  # type: ignore
         messages: list = chat_prompt.messages
         messages.insert(2, MessagesPlaceholder(variable_name="last_run_sql"))
         return ChatPromptTemplate(input_variables=chat_prompt.input_variables, messages=chat_prompt.messages)
