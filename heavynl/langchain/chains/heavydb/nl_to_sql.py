@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Optional, Type
+from typing import Any, Optional
 
 from langchain.base_language import BaseLanguageModel
 from langchain.callbacks.manager import CallbackManagerForChainRun
-from langchain.llms.openai import OpenAI
 from langchain.chat_models import ChatOpenAI
 from langchain.chat_models.base import BaseChatModel
 from langchain.prompts import HumanMessagePromptTemplate, SystemMessagePromptTemplate
 from langchain.schema import AIMessage, BaseMessage, HumanMessage
-from pydantic import BaseModel, Extra, Field
+from pydantic import Extra, Field
 
 from heavynl.langchain import HeavyDB
 from heavynl.langchain.utils import get_token_limit
@@ -25,8 +24,8 @@ Only query relevant columns, avoiding SELECT * for any table.
 Only create one query.
 These functions DO NOT EXIST: STRING_AGG, GROUP_CONCAT
 Use only existing column names from the schema description, ensuring they are from the correct table.
-Exclude null values from the results. Do not use reserved SQL keywords as aliases.
-Do not use double colon cast operators ("::"); instead use the CAST function if needed.
+Exclude null values from the results. DO NOT use reserved SQL keywords as aliases.
+DO NOT use double colon cast operators ("::"); instead use the CAST function if needed.
 Explain your thinking step-by-step in a block comment before the query. Provide your response using the format below:
 Question: [QUESTION]
 SQLQuery: /* step-by-step reasoning */ [SINGLE SQL QUERY]
@@ -46,8 +45,8 @@ Only query relevant columns, avoiding SELECT * for any table.
 Only create one query.
 These functions DO NOT EXIST: STRING_AGG, GROUP_CONCAT
 Use only existing column names from the schema description, ensuring they are from the correct table.
-Exclude null values from the results. Do not use reserved SQL keywords as aliases.
-Do not use double colon cast operators ("::"); instead use the CAST function if needed.
+Exclude null values from the results. DO NOT use reserved SQL keywords as aliases.
+DO NOT use double colon cast operators ("::"); instead use the CAST function if needed.
 Explain your thinking step-by-step in a block comment before the query. Provide your response using the format below:
 Question: [QUESTION]
 SQLQuery: /* step-by-step reasoning */ [SINGLE SQL QUERY]
@@ -57,7 +56,7 @@ Only use the tables listed below. Some of the tables may not be relevant.
 """
 NL_TO_SQL_CHAT_ERROR_TEMPLATE = """
 DO NOT USE "STRING_AGG", "GROUP_CONCAT" functions.
-Do not use reserved SQL keywords as aliases.
+DO NOT use reserved SQL keywords as aliases.
 Following exception appears after running your previous SQL query.
 
 {exception}
@@ -97,7 +96,7 @@ NL_TO_SQL_ERROR_PROMPT = LoggedPromptTemplate(
 )
 
 
-class NLtoSQLChain(BaseChain, BaseModel):
+class BaseNltoSQLChain(BaseChain):
     """
     Chain for converting a natural language question to a SQL query designed to answer the question with its results.
 
@@ -114,21 +113,15 @@ class NLtoSQLChain(BaseChain, BaseModel):
         extra = Extra.forbid
         arbitrary_types_allowed = True
 
-    llm: BaseLanguageModel
+    llm: BaseLanguageModel | BaseChatModel
     """LLM wrapper to use."""
+    prompt: LoggedPromptTemplate | LoggedChatPromptTemplate
+    """Prompt to use to translate natural language to SQL."""
     database: HeavyDB = Field(exclude=True)
     """HeavyDB Database to connect to."""
-    prompt: LoggedPromptTemplate = NL_TO_SQL_PROMPT
-    """Prompt to use to translate natural language to SQL."""
-    error_prompt: LoggedPromptTemplate = NL_TO_SQL_ERROR_PROMPT
-    """Prompt to use to fix SQL errors."""
     input_key: str = "query"  #: :meta private:
     output_key: str = "sql"  #: :meta private:
     max_retries: int = 3
-
-    @property
-    def _chain_type(self) -> str:
-        return "nl_to_sql_chain"
 
     @property
     def input_keys(self) -> list[str]:
@@ -144,15 +137,14 @@ class NLtoSQLChain(BaseChain, BaseModel):
         """
         return [self.output_key]
 
-    def _call(self, inputs: dict[str, Any], run_manager: Optional[CallbackManagerForChainRun] = None) -> dict[str, Any]:
-        llm_chain = LoggedLLMChain(llm=self.llm, prompt=self.prompt)
-        error_recovery_chain = LoggedLLMChain(llm=self.llm, prompt=self.error_prompt)
-        input_text = f"{inputs[self.input_key]} \nSQLQuery:"
-        self.write_callback_message(input_text, run_manager=run_manager)
-        # If not present, then defaults to None which is all tables available to HeavyDB wrapper instance
-        table_names_to_use = inputs.get("tables")
-        table_info = self.database.get_table_info(table_names=table_names_to_use)
+    def _get_table_info_wrt_token_limit(self, input_text: str, table_names_to_use: list[str] | None) -> str:
+        """
+        Gets the info of all the tables with respect to the token limit.
 
+        Args:
+            table_names_to_use (list[str] | None): Get table info for the list of table names.
+        """
+        table_info = self.database.get_table_info(table_names=table_names_to_use)
         token_limit = get_token_limit(self.llm.model_name)  # type: ignore
         if (
             self.llm.get_num_tokens(
@@ -177,6 +169,41 @@ class NLtoSQLChain(BaseChain, BaseModel):
             table_info = self.database.get_table_info(
                 table_names=table_names_to_use, include_samples=False, include_top_k=False
             )
+
+        return table_info
+
+
+class NLtoSQLChain(BaseNltoSQLChain):
+    """
+    Chain for converting a natural language question to a SQL query designed to answer the question with its results.
+
+    Note: You MUST restrict the tables that are used by either:
+        1. Passing in a list of table names to use in the `tables` input key.
+        2. Setting the `database` attribute to a HeavyDB object with the `include_tables` or `ignore_tables` attribute set.
+
+        If you do not restrict the tables you risk exceeding the token limit of the LLM.
+    """
+
+    llm: BaseLanguageModel
+    prompt: LoggedPromptTemplate = NL_TO_SQL_PROMPT
+    """Prompt to use to translate natural language to SQL."""
+    error_prompt: LoggedPromptTemplate = NL_TO_SQL_ERROR_PROMPT
+    """Prompt to use to fix SQL errors."""
+    error_prompt: LoggedPromptTemplate
+    """Prompt to use to fix SQL errors."""
+
+    @property
+    def _chain_type(self) -> str:
+        return "nl_to_sql_chain"
+
+    def _call(self, inputs: dict[str, Any], run_manager: Optional[CallbackManagerForChainRun] = None) -> dict[str, Any]:
+        llm_chain = LoggedLLMChain(llm=self.llm, prompt=self.prompt)
+        error_recovery_chain = LoggedLLMChain(llm=self.llm, prompt=self.error_prompt)
+        input_text = f"{inputs[self.input_key]} \nSQLQuery:"
+        self.write_callback_message(input_text, run_manager=run_manager)
+        # If not present, then defaults to None which is all tables available to HeavyDB wrapper instance
+        table_names_to_use = inputs.get("tables")
+        table_info = self._get_table_info_wrt_token_limit(input_text, table_names_to_use)
         llm_inputs = {
             "input": input_text,
             "dialect": self.database.dialect,
@@ -217,7 +244,7 @@ class NLtoSQLChain(BaseChain, BaseModel):
         return chain_result
 
 
-class NLtoSQLChatChain(BaseChain):
+class NLtoSQLChatChain(BaseNltoSQLChain):
     """
     Chain for converting a natural language question to a SQL query designed to answer the question with its results.
 
@@ -231,93 +258,30 @@ class NLtoSQLChatChain(BaseChain):
         If you do not restrict the tables you risk exceeding the token limit of the LLM.
     """
 
-    class Config:
-        """Configuration for this pydantic object."""
-
-        extra = Extra.forbid
-        arbitrary_types_allowed = True
-
     llm: BaseChatModel
     """LLM wrapper to use."""
-    database: HeavyDB = Field(exclude=True)
-    """HeavyDB Database to connect to."""
     prompt: LoggedChatPromptTemplate = NL_TO_SQL_CHAT_PROMPT
     """Prompt to use to translate natural language to SQL."""
-    input_key: str = "query"  #: :meta private:
-    output_key: str = "sql"  #: :meta private:
-    max_retries: int = 3
     messages_with_comments: bool = True  # helps to keep comments on the messages that we going to stack up
 
     @property
     def _chain_type(self) -> str:
         return "nl_to_sql_chat_chain"
 
-    @property
-    def input_keys(self) -> list[str]:
-        """Return the input key(s).
-        :meta private:
-        """
-        return [self.input_key]
-
-    @property
-    def output_keys(self) -> list[str]:
-        """Return the output keys.
-        :meta private:
-        """
-        return [self.output_key]
-
-    def _get_table_info_wrt_token_limit(self, input_text: str, table_names_to_use: list[str] | None) -> str:
-        """
-        Gets the info of all the tables with respect to the token limit.
-
-        Args:
-            table_names_to_use (List[str]): Get table info for the list of table names.
-        """
-        # history = self.memory.load_memory_variables({})[self.memory.memory_key]
-        table_info = self.database.get_table_info(table_names=table_names_to_use)
-        token_limit = 3800
-        if isinstance(self.llm, ChatOpenAI) and self.llm.model_name == "gpt-4":
-            token_limit = 7800
-        if (
-            self.llm.get_num_tokens(
-                self.prompt.format(input=input_text, dialect=self.database.dialect, table_info=table_info)
-            )
-            > token_limit
-        ):
-            table_info = self.database.get_table_info(table_names=table_names_to_use, include_top_k=False)
-        if (
-            self.llm.get_num_tokens(
-                self.prompt.format(input=input_text, dialect=self.database.dialect, table_info=table_info)
-            )
-            > token_limit
-        ):
-            table_info = self.database.get_table_info(table_names=table_names_to_use, include_samples=False)
-        if (
-            self.llm.get_num_tokens(
-                self.prompt.format(input=input_text, dialect=self.database.dialect, table_info=table_info)
-            )
-            > token_limit
-        ):
-            table_info = self.database.get_table_info(
-                table_names=table_names_to_use, include_samples=False, include_top_k=False
-            )
-
-        return table_info
-
     def get_sql_query(self, return_message: BaseMessage) -> str:
         """
         Helps to parse out SQL query from the llm response message.
         """
-        return strip_sql_comments(return_message.content)
+        return strip_sql_comments(return_message.content.split("\nSQLQuery:")[1].strip())
 
-    def build_ai_message(self, return_message: BaseMessage):
+    def build_ai_message(self, return_message: BaseMessage) -> AIMessage:
         """
         Helps to build AI Message from the llm returned response message.
         """
         if self.messages_with_comments:
             return AIMessage(content=return_message.content)
         # don't allow comments on messages
-        return AIMessage(content=f"SQL Query: {self.get_sql_query(return_message)}")
+        return AIMessage(content=f"SQLQuery: {self.get_sql_query(return_message)}")
 
     def _call(self, inputs: dict[str, Any], run_manager: CallbackManagerForChainRun | None = None) -> dict[str, str]:
         table_names_to_use: list[str] | None = inputs.get("tables")  # type: ignore
@@ -330,7 +294,6 @@ class NLtoSQLChatChain(BaseChain):
         messages = messages_prompt.to_messages()
         self.write_callback_message(f"Question: {input_text}\n", run_manager=run_manager, color="yellow")
         sql_message: BaseMessage = self.llm(messages)
-
         self.write_callback_message("\n" + sql_message.content, run_manager=run_manager, color="blue")
 
         sql_valid = False
@@ -367,7 +330,7 @@ class NLtoSQLChatChain(BaseChain):
         return chain_result
 
 
-def get_nl_to_sql_chain_by_llm(llm: OpenAI | ChatOpenAI) -> Type[NLtoSQLChain] | Type[NLtoSQLChatChain]:
+def get_nl_to_sql_chain_by_llm(llm: BaseLanguageModel) -> type[NLtoSQLChain] | type[NLtoSQLChatChain]:
     """
     Gets the appropriate nt_to_sql chain class based upon the llm passed.
     """

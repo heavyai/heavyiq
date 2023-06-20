@@ -10,12 +10,16 @@ def strip_sql_comments(sql: str) -> str:
     sql = re.sub(r"--.*$", "", sql, flags=re.MULTILINE)
     # Remove anything after the last semicolon
     sql = re.sub(r";[^;]*$", ";", sql, flags=re.DOTALL)
-    # Remove triple backticks
-    sql = re.sub(r"```", "", sql)
+    # Remove triple backticks, and ```sql if present
+    sql = re.sub(r"```(sql)?", "", sql)
     # Remove leading and trailing double-quotes and single quotes
     sql = sql.strip("'\"")
     # Remove leading and trailing newlines
-    return re.sub(r"^\n+|\n+$", "", sql).strip()
+    sql = re.sub(r"^\n+|\n+$", "", sql).strip()
+    # If SQL doesn't end with a semicolon, add one
+    if not sql.endswith(";"):
+        sql += ";"
+    return sql
 
 
 def is_destructive_sql(sql: str) -> bool:
