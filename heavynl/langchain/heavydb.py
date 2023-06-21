@@ -6,7 +6,7 @@ from typing import Optional, Any, Iterable, TYPE_CHECKING
 
 from heavyai import connect
 from heavynl.config import get_config
-from heavynl.utils import strip_sql_comments, is_destructive_sql
+from heavynl.utils import strip_sql_comments, is_destructive_sql, rate_sql_complexity
 
 if TYPE_CHECKING:
     from heavyai import Connection
@@ -264,6 +264,19 @@ class HeavyDB:
         else:
             raise ValueError("Fetch parameter must be either 'one' or 'all'")
         return str(result)
+
+    def explain(self, command: str) -> str:
+        command = strip_sql_comments(command)
+        if is_destructive_sql(command):
+            raise ValueError("Destructive SQL is not allowed")
+        with self.lock:
+            cursor = self._conn.execute(f"EXPLAIN plan {command}")
+        result: tuple[str] = cursor.fetchone()  # type: ignore
+        return str(result[0])
+
+    def complexity(self, command: str) -> int:
+        plan = self.explain(command)
+        return rate_sql_complexity(plan)
 
     def get_table_info_no_throw(self, table_names: Optional[list[str]] = None) -> str:
         """Get information about specified tables.

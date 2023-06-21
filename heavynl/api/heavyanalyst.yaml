@@ -93,8 +93,12 @@ components:
       properties:
         sql:
           type: string
+        sql_complexity:
+          type: integer
+          description: The complexity level of the SQL statement
       example:
         sql: SELECT COUNT(*) AS num_states, STATE_NAME FROM usa_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;
+        sql_complexity: 3
     Answer:
       type: object
       description: Natural language answer
