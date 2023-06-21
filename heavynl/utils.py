@@ -40,3 +40,29 @@ def is_destructive_sql(sql: str) -> bool:
 
     # Check if the first part of the SQL statement is in the destructive_statements set
     return sql_parts[0] in destructive_statements
+
+
+def rate_sql_complexity(plan: str) -> int:
+    """
+    Rates the complexity of a SQL query based on the provided plan string.
+    """
+
+    # define patterns for each level of complexity
+    patterns = {
+        5: r"LogicalJoin|LogicalCorrelate|LogicalUnion|RelLeftDeepInnerJoin|RexWindowFunctionOperator",
+        4: r"LogicalProject|RexSubQuery",
+        3: r"LogicalAggregate|RexAgg",
+        2: r"LogicalFilter|RexLiteral|RexOperator",
+    }
+
+    # start with the lowest complexity
+    complexity = 1
+
+    # check for features indicating higher complexity
+    for level in range(5, 1, -1):
+        if re.search(patterns[level], plan, re.IGNORECASE):
+            complexity = level
+            break
+
+    # return the final complexity rating
+    return complexity

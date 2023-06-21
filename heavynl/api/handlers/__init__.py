@@ -24,7 +24,9 @@ def query(body: dict) -> dict:
     chain = chain_cls(llm=llm, database=db, verbose=True)  # type: ignore
     chain_input = {chain.input_key: question, "tables": tables}
     res = log_chain_call(chain, chain_input, MODEL_NAME)
-    response = {"sql": strip_sql_comments(res[chain.output_key])}
+    sql = strip_sql_comments(res[chain.output_key])
+    sql_complexity = db.complexity(sql)
+    response = {"sql": sql, "sql_complexity": sql_complexity}
     return response
 
 
@@ -40,7 +42,9 @@ def question(body: dict) -> dict:
     chain = NLtoAnswerChain(llm=llm, database=db, verbose=True)
     chain_input = {chain.input_key: question, "tables": tables}
     res = log_chain_call(chain, chain_input, MODEL_NAME)
-    return {"answer": res[chain.output_answer_key], "sql": strip_sql_comments(res[chain.output_sql_key])}
+    sql = strip_sql_comments(res[chain.output_sql_key])
+    sql_complexity = db.complexity(sql)
+    return {"answer": res[chain.output_answer_key], "sql": sql, "sql_complexity": sql_complexity}
 
 
 # @handle_errors

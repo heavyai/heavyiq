@@ -113,3 +113,25 @@ def run_model_on_questions(
             print(f"Min time: {round(min_time, 2)}s")
             print(f"Max time: {round(max_time, 2)}s")
             print(f"Avg time: {round(total_time/num_of_questions, 2)}s")
+
+
+@eval.command()
+@click.pass_context
+def run_complexity_rater(ctx: click.Context) -> None:
+    """Call the rate_sql_complexity utility on each reference SQL in eval/questions.tsv."""
+
+    heavydb = HeavyDB.from_env()
+
+    from heavynl.utils import rate_sql_complexity
+
+    with open("./eval/questions.tsv") as f:
+        f.readline()  # skip the header
+        questions = f.readlines()
+
+        for line in questions:
+            primary_table, is_multi_table, secondary_table, question, reference_sql = line.split("\t")
+            print(f"Reference SQL: {reference_sql}\n")
+            plan = heavydb.explain(reference_sql)
+            print(f"Plan: {plan}\n")
+            print(f"Complexity: {rate_sql_complexity(plan)}\n")
+            print("====================================")
