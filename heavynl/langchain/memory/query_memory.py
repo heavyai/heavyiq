@@ -10,8 +10,8 @@ class HeavyNLQueryBufferWindowMemory(BaseChatMemory):
     input_key: str = "question"
     output_key: str = "query"
     memory_key: str = "queries"
-    human_prefix: str = "user"
-    ai_prefix: str = "ai"
+    human_prefix: str = "Recent Question"
+    ai_prefix: str = "Recently executed SQL"
     k: int = 5
 
     @property

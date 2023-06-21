@@ -1,20 +1,30 @@
 import json
-from typing import Optional, Any
+from typing import Any, List, Optional, Sequence, Union, Type
 
-from langchain.prompts.chat import ChatPromptTemplate, MessagesPlaceholder
-from langchain.memory import ConversationBufferMemory, CombinedMemory
-from langchain.chat_models.base import BaseChatModel
-from langchain.agents import AgentExecutor
-from langchain.schema import AgentAction, AgentFinish
+from langchain.agents import AgentExecutor, AgentOutputParser, BaseMultiActionAgent, BaseSingleActionAgent
 from langchain.agents.conversational_chat.base import ConversationalChatAgent
-from langchain.agents import AgentOutputParser
+from langchain.agents.conversational_chat.prompt import PREFIX, SUFFIX
+from langchain.callbacks.base import BaseCallbackManager
+from langchain.callbacks.manager import Callbacks
+from langchain.chat_models.base import BaseChatModel
+from langchain.memory import CombinedMemory, ConversationBufferMemory
+from langchain.prompts.base import BasePromptTemplate
+from langchain.prompts.chat import (
+    ChatPromptTemplate,
+    HumanMessagePromptTemplate,
+    MessagesPlaceholder,
+    SystemMessagePromptTemplate,
+)
+from langchain.schema import AgentAction, AgentFinish, BaseOutputParser
+from langchain.tools import BaseTool
 
 from heavynl.config import get_config
 from heavynl.langchain import HeavyDB
 from heavynl.langchain.agents import HeavyDBToolkit
-from heavynl.langchain.memory import HeavyNLQueryBufferWindowMemory
 from heavynl.langchain.callbacks import ConvoAgentCallbackHandler
 from heavynl.langchain.llms import get_chat_llm
+from heavynl.langchain.memory import HeavyNLQueryBufferWindowMemory
+from heavynl.logging_utils import heavynl_logger as logger
 
 SYSTEM_MESSAGE = """Assistant is a large language model trained by OpenAI.
 
@@ -101,12 +111,124 @@ class CustomConversationalChatAgent(ConversationalChatAgent):
     """
 
     @classmethod
-    def create_prompt(cls, *args, **kwargs) -> ChatPromptTemplate:
-        # super().create_prompt returns ChatPromptTemplate. Signature mismatch
-        chat_prompt: ChatPromptTemplate = super().create_prompt(*args, **kwargs)  # type: ignore
-        messages: list = chat_prompt.messages
-        messages.insert(2, MessagesPlaceholder(variable_name="last_run_sql"))
-        return ChatPromptTemplate(input_variables=chat_prompt.input_variables, messages=chat_prompt.messages)
+    def create_prompt(
+        cls: Type["CustomConversationalChatAgent"],
+        tools: Sequence[BaseTool],
+        system_message: str = PREFIX,
+        human_message: str = SUFFIX,
+        input_variables: Optional[List[str]] = None,
+        output_parser: Optional[BaseOutputParser] = None,
+    ) -> BasePromptTemplate:
+        tool_strings = "\n".join([f"> {tool.name}: {tool.description}" for tool in tools])
+        tool_names = ", ".join([tool.name for tool in tools])
+        _output_parser = output_parser or cls._get_default_output_parser()
+        format_instructions = human_message.format(format_instructions=_output_parser.get_format_instructions())
+        final_prompt = format_instructions.format(tool_names=tool_names, tools=tool_strings)
+        if input_variables is None:
+            input_variables = ["input", "chat_history", "agent_scratchpad", "last_run_sql"]
+        messages = [
+            SystemMessagePromptTemplate.from_template(system_message),
+            MessagesPlaceholder(variable_name="chat_history"),
+            MessagesPlaceholder(variable_name="last_run_sql"),
+            HumanMessagePromptTemplate.from_template(final_prompt),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ]
+        return ChatPromptTemplate(input_variables=input_variables, messages=messages)
+
+
+class SaveSuccessQueryAgentExecutor(AgentExecutor):
+    """
+    An agent executor which stores n success queries on a special HeavyNLQueryBufferWindowMemory memory.
+    This memory got retained and will be used upon every run.
+    """
+
+    @property
+    def _heavynl_buffer_memory(self) -> HeavyNLQueryBufferWindowMemory:
+        """
+        Gets the instance of heavynl buffer memory.
+        """
+        return next(i for i in self.memory.memories if isinstance(i, HeavyNLQueryBufferWindowMemory))
+
+    def _save_to_sql_memory(self, response: dict[str, Any]) -> bool:
+        """
+        Helps to save the agentexecutor return to HeavyNLQueryBufferWindowMemory.
+        """
+        heavynl_buffer_memory = self._heavynl_buffer_memory
+        # save the intermediate success query inside HeavyNLQueryBufferWindowMemory memory
+        for agent_action, output in response["intermediate_steps"][::-1]:
+            if agent_action.tool == "run_sql_query" and not output.startswith("Error:"):
+                inputs = {heavynl_buffer_memory.input_key: response["input"]}
+                outputs = {heavynl_buffer_memory.output_key: agent_action.tool_input}
+                heavynl_buffer_memory.save_context(inputs, outputs, manual_save=True)
+                return True
+        return False
+
+    def run(self, question: str, callbacks: Callbacks = None, tags: List[str] | None = None, **kwargs: Any) -> str:
+        """
+        Custom run method for storing successful query returned from intermediate steps.
+        """
+        inputs = {"input": question}
+        response = self.__call__(inputs=inputs, callbacks=callbacks, tags=tags, **kwargs)
+        status = self._save_to_sql_memory(response=response)
+        if status:
+            logger.debug("Saved the last success query")
+        return response["output"]
+
+    @classmethod
+    def from_agent_and_tools(
+        cls: Type["SaveSuccessQueryAgentExecutor"],
+        agent: Union[BaseSingleActionAgent, BaseMultiActionAgent],
+        tools: Sequence[BaseTool],
+        callback_manager: Optional[BaseCallbackManager] = None,
+        last_k: int = 1,
+        **kwargs: Any,
+    ) -> AgentExecutor:
+        """
+        Create from agent and tools.
+        Any memory or return_intermediate_steps passed or befing popped out and the
+        relevant default values has to be used. Why because, we need the executor to
+        return intermediate_steps for catching the right query and also the memory should
+        be an instance of CombinedMemory
+            1. ConversationBufferMemory used for storing chat history.
+            2. HeavyNLQueryBufferWindowMemory used for storing n successful queries.
+
+        Args:
+            last_k [int] - last n successfull queries to save to the buffer.
+        """
+        # pop out any memory being passed
+        kwargs.pop("memory", None)
+        kwargs.pop("return_intermediate_steps", None)
+        convo_memory = ConversationBufferMemory(
+            memory_key="chat_history",
+            return_messages=True,
+            ai_prefix="Assistant",
+            input_key="input",
+            output_key="output",
+        )
+        latest_run_sql_memory = HeavyNLQueryBufferWindowMemory(
+            memory_key="last_run_sql", k=last_k, input_key="input", return_messages=True, output_key="output"
+        )
+        memory = CombinedMemory(memories=[convo_memory, latest_run_sql_memory])
+        return cls(
+            agent=agent,
+            tools=tools,
+            callback_manager=callback_manager,
+            memory=memory,
+            return_intermediate_steps=True,
+            **kwargs,
+        )
+
+    @classmethod
+    def initialize(cls: Type["SaveSuccessQueryAgentExecutor"], agent_kwargs: dict[str, Any], **kwargs) -> AgentExecutor:
+        """
+        Initializes SaveSuccessQueryAgentExecutor class.
+
+        parameters:
+            agent_kwargs - Dict of kwargs passed to the agent.
+        """
+        tools = kwargs.pop("tools") or agent_kwargs.pop("tools")
+        agent = CustomConversationalChatAgent.from_llm_and_tools(tools=tools, **agent_kwargs)  # type: ignore
+        return SaveSuccessQueryAgentExecutor.from_agent_and_tools(agent=agent, tools=tools, **kwargs)
 
 
 def create_conversational_agent(
@@ -135,43 +257,15 @@ def create_conversational_agent(
     heavydb = heavydb or HeavyDB.from_env()
     toolkit = HeavyDBToolkit(db=heavydb)
     tools = toolkit.get_tools()
-    memory = ConversationBufferMemory(
-        memory_key="chat_history", return_messages=True, ai_prefix="Assistant", input_key="input", output_key="output"
-    )
-    latest_run_sql_memeory = HeavyNLQueryBufferWindowMemory(
-        memory_key="last_run_sql", k=1, input_key="input", return_messages=True, output_key="output"
-    )
-    memory = CombinedMemory(memories=[memory, latest_run_sql_memeory])
-
-    agent = CustomConversationalChatAgent.from_llm_and_tools(
-        llm=chat_llm,
+    return SaveSuccessQueryAgentExecutor.initialize(
+        agent_kwargs=dict(
+            llm=chat_llm,
+            system_message=SYSTEM_MESSAGE,
+            human_message=HUMAN_MESSAGE,
+            output_parser=CustomOutputParser(),
+        ),
         tools=tools,
-        system_message=SYSTEM_MESSAGE,
-        human_message=HUMAN_MESSAGE,
-        input_variables=["input", "chat_history", "last_run_sql", "agent_scratchpad"],
-        output_parser=CustomOutputParser(),
-    )
-    return AgentExecutor.from_agent_and_tools(
-        agent=agent,
-        tools=tools,
-        memory=memory,
+        last_k=1,
         verbose=verbose,
-        return_intermediate_steps=True,
         callbacks=[ConvoAgentCallbackHandler()],
     )
-
-
-def run_conversational_agent(sql_agent: AgentExecutor, question: str) -> str:
-    """
-    Function responsible for running the conversational agent.
-    """
-    heavynl_buffer_memory = next(i for i in sql_agent.memory.memories if isinstance(i, HeavyNLQueryBufferWindowMemory))
-    response = sql_agent({"input": question})
-    # save the intermediate success query on HeavyNLQueryBufferWindowMemory memory
-    for agent_action, output in response["intermediate_steps"][::-1]:
-        if agent_action.tool == "run_sql_query" and not output.startswith("Error:"):
-            inputs = {heavynl_buffer_memory.input_key: response["input"]}
-            outputs = {heavynl_buffer_memory.output_key: agent_action.tool_input}
-            heavynl_buffer_memory.save_context(inputs, outputs, manual_save=True)
-            break
-    return response["output"]
