@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any, List, Optional, Sequence, Union, Type
 
 from langchain.agents import AgentExecutor, AgentOutputParser, BaseMultiActionAgent, BaseSingleActionAgent
@@ -25,6 +26,7 @@ from heavynl.langchain.callbacks import ConvoAgentCallbackHandler
 from heavynl.langchain.llms import get_chat_llm
 from heavynl.langchain.memory import HeavyNLQueryBufferWindowMemory
 from heavynl.logging_utils import heavynl_logger as logger
+
 
 SYSTEM_MESSAGE = """Assistant is a large language model trained by OpenAI.
 
@@ -126,11 +128,15 @@ class CustomConversationalChatAgent(ConversationalChatAgent):
         final_prompt = format_instructions.format(tool_names=tool_names, tools=tool_strings)
         if input_variables is None:
             input_variables = ["input", "chat_history", "agent_scratchpad", "last_run_sql"]
+        message_without_input, input_message = re.split(r"\b(?=USER'S INPUT)", final_prompt)
         messages = [
             SystemMessagePromptTemplate.from_template(system_message),
+            HumanMessagePromptTemplate.from_template(message_without_input),
+            SystemMessagePromptTemplate.from_template("Chat History:\n------------------\n"),
             MessagesPlaceholder(variable_name="chat_history"),
+            SystemMessagePromptTemplate.from_template("\nSQL History:\n------------------\n"),
             MessagesPlaceholder(variable_name="last_run_sql"),
-            HumanMessagePromptTemplate.from_template(final_prompt),
+            HumanMessagePromptTemplate.from_template("\n" + input_message),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ]
         return ChatPromptTemplate(input_variables=input_variables, messages=messages)
