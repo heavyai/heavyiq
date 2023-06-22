@@ -1,6 +1,7 @@
 import json
 import re
-from typing import Any, List, Optional, Sequence, Union, Type
+from typing import Any, Optional
+from collections.abc import Sequence
 
 from langchain.agents import AgentExecutor, AgentOutputParser, BaseMultiActionAgent, BaseSingleActionAgent
 from langchain.agents.conversational_chat.base import ConversationalChatAgent
@@ -114,11 +115,11 @@ class CustomConversationalChatAgent(ConversationalChatAgent):
 
     @classmethod
     def create_prompt(
-        cls: Type["CustomConversationalChatAgent"],
+        cls: type["CustomConversationalChatAgent"],
         tools: Sequence[BaseTool],
         system_message: str = PREFIX,
         human_message: str = SUFFIX,
-        input_variables: Optional[List[str]] = None,
+        input_variables: Optional[list[str]] = None,
         output_parser: Optional[BaseOutputParser] = None,
     ) -> BasePromptTemplate:
         tool_strings = "\n".join([f"> {tool.name}: {tool.description}" for tool in tools])
@@ -169,7 +170,7 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
                 return True
         return False
 
-    def run(self, question: str, callbacks: Callbacks = None, tags: List[str] | None = None, **kwargs: Any) -> str:
+    def run(self, question: str, callbacks: Callbacks = None, tags: list[str] | None = None, **kwargs: Any) -> str:
         """
         Custom run method for storing successful query returned from intermediate steps.
         """
@@ -182,8 +183,8 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
 
     @classmethod
     def from_agent_and_tools(
-        cls: Type["SaveSuccessQueryAgentExecutor"],
-        agent: Union[BaseSingleActionAgent, BaseMultiActionAgent],
+        cls: type["SaveSuccessQueryAgentExecutor"],
+        agent: BaseSingleActionAgent | BaseMultiActionAgent,
         tools: Sequence[BaseTool],
         callback_manager: Optional[BaseCallbackManager] = None,
         last_k: int = 1,
@@ -225,7 +226,7 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
         )
 
     @classmethod
-    def initialize(cls: Type["SaveSuccessQueryAgentExecutor"], agent_kwargs: dict[str, Any], **kwargs) -> AgentExecutor:
+    def initialize(cls: type["SaveSuccessQueryAgentExecutor"], agent_kwargs: dict[str, Any], **kwargs) -> AgentExecutor:
         """
         Initializes SaveSuccessQueryAgentExecutor class.
 
