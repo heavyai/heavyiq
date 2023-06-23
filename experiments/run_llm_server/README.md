@@ -41,6 +41,8 @@ a. **For CPU**
     CMAKE_ARGS="-DLLAMA_METAL=on" FORCE_CMAKE=1 pip install -r requirements.txt
     ```
 
+    Detailed MacOS documentation [available here](https://github.com/abetlen/llama-cpp-python/blob/main/docs/macos_install.md)
+
 3. Download a model
 For example, [this one](https://huggingface.co/TheBloke/open-llama-7b-open-instruct-GGML/blob/main/open-llama-7B-open-instruct.ggmlv3.q4_0.bin)
 
