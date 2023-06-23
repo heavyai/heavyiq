@@ -116,4 +116,8 @@ content.gsub!(Regexp.new "^(#{syntax_rules.keys.join('|')})\\s+::=.*", 'm') { "#
 # Quote Interfaces.SQL to satisfy parser.
 content.gsub! 'Interfaces.SQL', '"\&"'
 
+# Define root as required by parser
+# direct-SQL-statement ::= directly-executable-statement semicolon
+content += "\nroot ::= directly-executable-statement\n"
+
 puts content
