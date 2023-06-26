@@ -59,10 +59,10 @@ content.gsub!(rule_regex) { $&.sub(%r{(.*?\n)(.*)}m, "\\1(\\2\n)") }
 
 # Quote single-character definitions
 # and SQL-92: <> >= <= || ..
-content.gsub!(Regexp.new "^(#{name_class} ::= )(\\S\\W?)(?=\\n\\n)", 'm') { "#$1#{$2.inspect}" }
+content.gsub!(Regexp.new '^(%s ::= )(\S\W?)(?=\n\n)' % name_class, 'm') { "#$1#{$2.inspect}" }
 
 # Quote trigraphs
-content.gsub!(Regexp.new "^(#{name_class}?-trigraph ::= )(\\S+)(?=\\n\\n)", 'm') { "#$1#{$2.inspect}" }
+content.gsub!(Regexp.new '^(%s?-trigraph ::= )(\S+)(?=\n\n)' % name_class, 'm') { "#$1#{$2.inspect}" }
 
 # Quote tokens in Ada-qualified-type-specification
 content.gsub! 'Interfaces.SQL', '"\&"'
@@ -75,17 +75,17 @@ content.gsub! '{', '('
 content.gsub! '}', ')'
 
 # Use * and + instead of ...
-content.gsub!(Regexp.new "\\[ (#{name_class})\\s*\\.\\.\\. \\]") { "#$1*" }
-content.gsub!(Regexp.new "\\[ (\\([^\\[()\\]]+\\))\\s*\\.\\.\\. \\]") { "#$1*" }
-content.gsub!(Regexp.new "(#{name_class})\\s*\\.\\.\\.") { "#$1+" }
-content.gsub!(Regexp.new "(\\([^()]+\\))\\s*\\.\\.\\.") { "#$1+" }
+content.gsub!(Regexp.new '\[ (%s)\s*\.\.\. \]' % name_class) { "#$1*" }
+content.gsub!(Regexp.new '\[ (\([^\[()\]]+\))\s*\.\.\. \]') { "#$1*" }
+content.gsub!(Regexp.new '(%s)\s*\.\.\.' % name_class) { "#$1+" }
+content.gsub!(Regexp.new '(\([^()]+\))\s*\.\.\.') { "#$1+" }
 # Special case for binary-string-literal
-content.gsub!(Regexp.new "\\[ (\\(.+?\\))\\s*\\.\\.\\. \\]") { "#$1*" }
+content.gsub!(Regexp.new '\[ (\(.+?\))\s*\.\.\. \]') { "#$1*" }
 
 # Replace [] w/ ()?
-content.gsub!(Regexp.new "\\[([^\\[\\]]+)\\]") { "(#$1)?" }
-content.gsub!(Regexp.new "\\[([^\\[\\]]+)\\]") { "(#$1)?" }
-content.gsub!(Regexp.new "\\[([^\\[\\]]+)\\]") { "(#$1)?" }
+content.gsub!(Regexp.new '\[([^\[\]]+)\]') { "(#$1)?" }
+content.gsub!(Regexp.new '\[([^\[\]]+)\]') { "(#$1)?" }
+content.gsub!(Regexp.new '\[([^\[\]]+)\]') { "(#$1)?" }
 
 # Words in ALLCAPS are assumed to be string values, not names
 # Exceptions: hexit and simple-Latin-lower-case-letter have single lower case letters,
@@ -128,7 +128,7 @@ syntax_rules = {
   'PL-I-host-identifier' => '"TODO"',
   'direct-implementation-defined-statement' => '"TODO"'
 }
-content.gsub!(Regexp.new "^(#{syntax_rules.keys.join('|')})\\s+::=.*", 'm') { "#$1 ::= #{syntax_rules[$1]}" }
+content.gsub!(Regexp.new '^(%s)\s+::=.*' % syntax_rules.keys.join('|'), 'm') { "#$1 ::= #{syntax_rules[$1]}" }
 
 # Define root as required by parser
 content += "\nroot ::= direct-SQL-statement\n"
