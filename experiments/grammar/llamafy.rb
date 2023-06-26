@@ -17,6 +17,7 @@
 # Transform the BNF Grammar for ISO/IEC 9075-2:2003 to be compatible w/ llama.cpp.
 #
 # Usage: ./llamafy.rb < sql-2003-2.bnf > sql-2003-2.gbnf
+# Also works with sql-92.bnf.
 
 content = ARGF.read
 
@@ -29,14 +30,20 @@ content.gsub! /\t/, '    '
 # Comment comment lines.
 content.gsub! /^--/, '#--'
 
-# Comment lines betweep --p and --/p.
-content.gsub! %r{(^#--p\n)(.*?)(^#--/p\n)}m do
-  comment = $2.gsub(%r{(?!^#).*$}, '#\&')
-  "#--p\n#{comment}#--/p\n"
+# Comment lines betweep --p and --/p
+# and for SQL-92: lines betweep --small and --/small
+content.gsub! %r{(^#--(p|small)\n)(.*?)(^#--/\2\n)}m do
+  tag = $2
+  comment = $3.gsub(%r{^(?!#).*$}, '#\&')
+  "#--#{tag}\n#{comment}#--/#{tag}\n"
 end
 
-# Separate adjacent names
 angle_rule_regex = %r{(?<=\n\n)<.*?(?=\n\n)}m
+# Count number of rules
+nrules = content.scan(angle_rule_regex).size
+STDERR.puts "nrules=#{nrules}"
+
+# Separate adjacent names
 content.gsub!(angle_rule_regex) { $&.gsub '><', '> <' }
 
 # Remove angle brackets from names.
@@ -51,10 +58,17 @@ rule_regex = %r{(?<=\n\n)\w.*?(?=\n\n)}m
 content.gsub!(rule_regex) { $&.sub(%r{(.*?\n)(.*)}m, "\\1(\\2\n)") }
 
 # Quote single-character definitions
-content.gsub!(Regexp.new "^(#{name_class} ::= )(\\S)(?=\\n\\n)", 'm') { "#$1#{$2.inspect}" }
+# and SQL-92: <> >= <= || ..
+content.gsub!(Regexp.new "^(#{name_class} ::= )(\\S\\W?)(?=\\n\\n)", 'm') { "#$1#{$2.inspect}" }
 
 # Quote trigraphs
 content.gsub!(Regexp.new "^(#{name_class}?-trigraph ::= )(\\S+)(?=\\n\\n)", 'm') { "#$1#{$2.inspect}" }
+
+# Quote tokens in Ada-qualified-type-specification
+content.gsub! 'Interfaces.SQL', '"\&"'
+content.gsub! /\bSQL_STANDARD\.\w+/, '"\&"' # SQL-92
+
+content.gsub! '...omitted...', '"\&"' # SQL-92
 
 # Replace {} w/ ()
 content.gsub! '{', '('
@@ -81,16 +95,17 @@ content.gsub!(rule_regex) { $&.gsub(/(?<=\s)([-A-Z0-9_]+|[a-z,=])(?=\s|$)/m, '"\
 
 # Fix "!! See the Syntax Rules"
 syntax_rules = {
-  'space' => '[ \t\n]*',
+  'space' => '[ \t\n]+',
   'identifier-start' => '[a-zA-Z_]',
   'identifier-extend' => '[a-zA-Z0-9_]',
-  'Unicode-escape-character' => '"?"',
+  'Unicode-escape-character' => '"TODO"',
   'nondoublequote-character' => '[^\"]', # ?
-  'newline' => '[\n]',
+  'newline' => '"\n"',
   'nonquote-character' => "[^']",
   'non-escaped-character' => 'SQL-language-identifier-part', # TODO
   'escaped-character' => 'SQL-language-identifier-part', # TODO
   'preparable-implementation-defined-statement' => '"TODO"',
+  'preparable-SQL-implementation-defined-statement' => '"TODO"', # SQL-92
   'SQLSTATE-class-value' => '"TODO"',
   'SQLSTATE-subclass-value' => '"TODO"',
   'host-label-identifier' => '"TODO"',
@@ -100,7 +115,9 @@ syntax_rules = {
   'embedded-SQL-C-program' => '"TODO"',
   'C-host-identifier' => '"TODO"',
   'embedded-SQL-COBOL-program' => '"TODO"',
+  'embedded-SQL-Cobol-program' => '"TODO"', # SQL-92
   'COBOL-host-identifier' => '"TODO"',
+  'Cobol-host-identifier' => '"TODO"', # SQL-92
   'embedded-SQL-Fortran-program' => '"TODO"',
   'Fortran-host-identifier' => '"TODO"',
   'embedded-SQL-MUMPS-program' => '"TODO"',
@@ -113,11 +130,7 @@ syntax_rules = {
 }
 content.gsub!(Regexp.new "^(#{syntax_rules.keys.join('|')})\\s+::=.*", 'm') { "#$1 ::= #{syntax_rules[$1]}" }
 
-# Quote Interfaces.SQL to satisfy parser.
-content.gsub! 'Interfaces.SQL', '"\&"'
-
 # Define root as required by parser
-# direct-SQL-statement ::= directly-executable-statement semicolon
-content += "\nroot ::= directly-executable-statement\n"
+content += "\nroot ::= direct-SQL-statement\n"
 
 puts content
