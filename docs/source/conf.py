@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.abspath("../.."))
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = "HeavyNL"
+project = "HeavyIQ"
 copyright = "2023, HEAVY.AI"
 author = "HEAVY.AI"
 release = "0.1"
