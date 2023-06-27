@@ -25,7 +25,7 @@ def split_url_port(url: str) -> tuple[str, int]:
     return parsed.hostname, parsed.port
 
 
-def get_config(file: str = "./config.toml") -> HeavyNLConfig:
+def get_config(file: str = "./config.conf") -> HeavyNLConfig:
     """If called with a non-default file path, must be called before importing any other modules that use the config."""
     global _config
     if _config:
