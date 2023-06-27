@@ -7,9 +7,9 @@ from .overrides import OverrideConfZ
 
 class LogConfig(OverrideConfZ):  # type: ignore
     app_log_file: str = "access.log"
-    app_log_level: str = "DEBUG"
+    app_log_level: str = "INFO"
     heavyiq_log_file: str = "heavyiq.log"
-    heavyiq_log_level: str = "DEBUG"
+    heavyiq_log_level: str = "INFO"
 
 
 class HeavyNLConfig(OverrideConfZ):  # type: ignore
