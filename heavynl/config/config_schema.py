@@ -1,17 +1,18 @@
 from typing import Optional
 
-from confz import ConfZ
 from pydantic import Field
 
+from .overrides import OverrideConfZ
 
-class LogConfig(ConfZ):  # type: ignore
+
+class LogConfig(OverrideConfZ):  # type: ignore
     app_log_file: str = "access.log"
     app_log_level: str = "DEBUG"
     heavynl_log_file: str = "heavynl.log"
     heavynl_log_level: str = "DEBUG"
 
 
-class HeavyNLConfig(ConfZ):  # type: ignore
+class HeavyNLConfig(OverrideConfZ):  # type: ignore
     port: int = 6275
     openai_api_key: str
     openai_gpt_model: str = "gpt-3.5-turbo"
@@ -29,11 +30,11 @@ class HeavyNLConfig(ConfZ):  # type: ignore
     log: LogConfig = LogConfig()
 
 
-class HeavyWebConfig(ConfZ):  # type: ignore
+class HeavyWebConfig(OverrideConfZ):  # type: ignore
     backend_url: Optional[str] = Field(alias="backend-url")
 
 
-class AppConfig(ConfZ):  # type: ignore
+class AppConfig(OverrideConfZ):  # type: ignore
     http_port: Optional[int] = Field(alias="http-port")
     nl: HeavyNLConfig
     web: Optional[HeavyWebConfig] = None
