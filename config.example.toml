@@ -26,6 +26,7 @@ type = "LOCAL" # LOCAL or API or AZURE
 
 # LOCAL
 local_llm_path = "" # path to local LLM model (.bin)
+local_llm_n_ctx = 2048 # context window limit
 # how many layers of the model are offloaded to your GPU based on your model and your GPU VRAM pool
 local_llm_n_gpu_layers = 40
 # how many tokens are processed in parallel
