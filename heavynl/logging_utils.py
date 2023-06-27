@@ -190,7 +190,7 @@ def init_logs():
     LOG_CONFIG = get_log_config()
 
     _app_logger = _AppLogger(log_file_path=LOG_CONFIG.app_log_file, level=LOG_CONFIG.app_log_level)
-    heavynl_logger = HeavyNLLogger(log_file_path=LOG_CONFIG.heavynl_log_file, level=LOG_CONFIG.heavynl_log_level)
+    heavynl_logger = HeavyNLLogger(log_file_path=LOG_CONFIG.heavyiq_log_file, level=LOG_CONFIG.heavyiq_log_level)
     default_logger = heavynl_logger
 
 
