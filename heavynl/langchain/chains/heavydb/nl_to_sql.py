@@ -10,6 +10,7 @@ from langchain.prompts import HumanMessagePromptTemplate, SystemMessagePromptTem
 from langchain.schema import AIMessage, BaseMessage, HumanMessage
 from pydantic import Extra, Field
 
+from heavynl.config import get_config
 from heavynl.langchain import HeavyDB
 from heavynl.langchain.utils import get_token_limit
 from heavynl.langchain.chains import BaseChain
@@ -144,28 +145,34 @@ class BaseNltoSQLChain(BaseChain):
         Args:
             table_names_to_use (list[str] | None): Get table info for the list of table names.
         """
-        table_info = self.database.get_table_info(table_names=table_names_to_use)
-        token_limit = get_token_limit(self.llm.model_name)  # type: ignore
-        if (
-            self.llm.get_num_tokens(
-                self.prompt.format(input=input_text, dialect=self.database.dialect, table_info=table_info)
-            )
-            > token_limit
-        ):
-            table_info = self.database.get_table_info(table_names=table_names_to_use, include_top_k=False)
-        if (
-            self.llm.get_num_tokens(
-                self.prompt.format(input=input_text, dialect=self.database.dialect, table_info=table_info)
-            )
-            > token_limit
-        ):
-            table_info = self.database.get_table_info(table_names=table_names_to_use, include_samples=False)
-        if (
-            self.llm.get_num_tokens(
-                self.prompt.format(input=input_text, dialect=self.database.dialect, table_info=table_info)
-            )
-            > token_limit
-        ):
+        config = get_config()
+        if config.custom_llm is None or config.custom_llm.type == "AZURE":
+            table_info = self.database.get_table_info(table_names=table_names_to_use)
+            token_limit = get_token_limit(self.llm.model_name)  # type: ignore
+            if (
+                self.llm.get_num_tokens(
+                    self.prompt.format(input=input_text, dialect=self.database.dialect, table_info=table_info)
+                )
+                > token_limit
+            ):
+                table_info = self.database.get_table_info(table_names=table_names_to_use, include_top_k=False)
+            if (
+                self.llm.get_num_tokens(
+                    self.prompt.format(input=input_text, dialect=self.database.dialect, table_info=table_info)
+                )
+                > token_limit
+            ):
+                table_info = self.database.get_table_info(table_names=table_names_to_use, include_samples=False)
+            if (
+                self.llm.get_num_tokens(
+                    self.prompt.format(input=input_text, dialect=self.database.dialect, table_info=table_info)
+                )
+                > token_limit
+            ):
+                table_info = self.database.get_table_info(
+                    table_names=table_names_to_use, include_samples=False, include_top_k=False
+                )
+        else:
             table_info = self.database.get_table_info(
                 table_names=table_names_to_use, include_samples=False, include_top_k=False
             )

@@ -16,7 +16,25 @@ promptwatch_api_key = ""
 promptwatch_tracking_project = "<name>_dev" # i.e. "bfturner_dev"
 
 [iq.log] # these are defaults and can be omitted from config file unless modified
-app_log_level = "DEBUG"
+app_log_level = "INFO"
 app_log_file = "access.log"
-heavyiq_log_level = "DEBUG"
+heavyiq_log_level = "INFO" # DEBUG is recommended for development
 heavyiq_log_file = "heavyiq.log"
+
+[nl.custom_llm] # optional, don't copy to your config if you aren't using a custom LLM
+type = "LOCAL" # LOCAL or API or AZURE
+
+# LOCAL
+local_llm_path = "" # path to local LLM model (.bin)
+# how many layers of the model are offloaded to your GPU based on your model and your GPU VRAM pool
+local_llm_n_gpu_layers = 40
+# how many tokens are processed in parallel
+local_llm_n_batch = 512 # Should be between 1 and n_ctx, consider the amount of VRAM in your GPU.
+
+# API
+api_base = "" # base url of API
+
+# AZURE
+openai_api_version = "2023-03-15-preview" # API specification version
+openai_api_base = "" # base url of API
+azure_deployment_name = "" # name of deployment

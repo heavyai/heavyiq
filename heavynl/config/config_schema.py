@@ -12,6 +12,19 @@ class LogConfig(OverrideConfZ):  # type: ignore
     heavyiq_log_level: str = "INFO"
 
 
+class CustomLLMConfig(OverrideConfZ):  # type: ignore
+    type: str
+    """ 'API' or 'LOCAL' or 'AZURE' """
+    local_llm_path: str = ""
+    local_llm_n_gpu_layers: int = 40
+    local_llm_n_batch: int = 512
+    local_llm_n_ctx: int = 2048
+    api_base: str = ""
+    openai_api_version: str = "2023-03-15-preview"
+    openai_api_base: str = ""
+    azure_deployment_name: str = ""
+
+
 class HeavyNLConfig(OverrideConfZ):  # type: ignore
     port: int = 6275
     openai_api_key: str
@@ -28,6 +41,7 @@ class HeavyNLConfig(OverrideConfZ):  # type: ignore
     promptwatch_api_key: Optional[str] = None
     promptwatch_tracking_project: Optional[str] = None
     log: LogConfig = LogConfig()
+    custom_llm: Optional[CustomLLMConfig] = None
 
 
 class HeavyWebConfig(OverrideConfZ):  # type: ignore
