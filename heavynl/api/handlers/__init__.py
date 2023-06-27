@@ -49,6 +49,11 @@ def question(body: dict) -> dict:
     return {"answer": res[chain.output_answer_key], "sql": sql, "sql_complexity": sql_complexity}
 
 
+@handle_errors
+def health():
+    return
+
+
 # @handle_errors
 # def add_tables(body: dict) -> dict:
 #    tables = body["tables"]
