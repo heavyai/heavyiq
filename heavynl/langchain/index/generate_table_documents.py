@@ -20,6 +20,8 @@ Keywords: Identify a set of essential keywords and relationships that facilitate
 Upon completion, evaluate the coherence, accuracy, and relevance of the generated response to ensure that it adheres to the requirements outlined above,
 maximizing its value and usefulness for search and retrieval tasks."""
 
+CONFIG = get_config()
+
 
 def get_table_summary_document(heavydb: HeavyDB, table: str) -> Document:
     """
@@ -32,9 +34,8 @@ def get_table_summary_document(heavydb: HeavyDB, table: str) -> Document:
     Returns:
         Document: A Document object containing the table summary and metadata.
     """
-    with heavydb.lock:
-        table_info = heavydb.get_table_info([table])
-    llm = get_chat_llm(["metadata_index", "table_summary"], model_name="gpt-4", temperature=0.2)
+    table_info = heavydb.get_table_info([table])
+    llm = get_chat_llm(["metadata_index", "table_summary"], model=CONFIG.openai_gpt_model, temperature=0.2)
     messages = [
         SystemMessage(content=table_summary_prompt),
         HumanMessage(content=table_info),
@@ -62,9 +63,8 @@ def get_table_column_description_document(heavydb: HeavyDB, table: str) -> Docum
     Returns:
         Document: A Document object containing the column descriptions and metadata.
     """
-    with heavydb.lock:
-        table_info = heavydb.get_table_info([table])
-    llm = get_chat_llm(["metadata_index", "table_columns_description"], model_name="gpt-3.5-turbo", temperature=0.2)
+    table_info = heavydb.get_table_info([table])
+    llm = get_chat_llm(["metadata_index", "table_columns_description"], model=CONFIG.openai_gpt_model, temperature=0.2)
     messages = [
         SystemMessage(content=column_description_prompt),
         HumanMessage(content=table_info),
@@ -123,7 +123,7 @@ def generate_table_documents() -> list[str]:
     Saves them to the table_documents directory.
     Returns a list of tables that had summaries generated.
     """
-    tables_with_documents_already = get_table_names_from_documents(get_config().table_documents_dir)
+    tables_with_documents_already = get_table_names_from_documents(CONFIG.table_documents_dir)
     print("Generating summaries and column descriptions.")
     print(f"Tables with documents already (skipping): {tables_with_documents_already}")
     heavydb = HeavyDB.from_env(ignore_tables=tables_with_documents_already)
@@ -131,7 +131,7 @@ def generate_table_documents() -> list[str]:
     table_names_to_generate = heavydb.get_usable_table_names()
     with ThreadPoolExecutor() as executor:
         executor.map(process_func, table_names_to_generate)
-    print(f"Finished generating summaries and column descriptions for {len(table_names_to_generate)} tables.")
+    print(f"Finished generating summaries and column descriptions for {len(list(table_names_to_generate))} tables.")
 
     return list(table_names_to_generate)
 

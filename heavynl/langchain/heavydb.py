@@ -6,7 +6,7 @@ from typing import Optional, Any, Iterable, TYPE_CHECKING
 
 from heavyai import connect
 from heavynl.config import get_config
-from heavynl.utils import strip_sql_comments, is_destructive_sql
+from heavynl.utils import strip_sql_comments, is_destructive_sql, rate_sql_complexity
 
 if TYPE_CHECKING:
     from heavyai import Connection
@@ -40,7 +40,7 @@ class HeavyDB:
         if self._ignore_tables:
             missing_tables = self._ignore_tables - self._all_tables
             if missing_tables:
-                print("WARNING: ignore_tables {missing_tables} not found in database")
+                print(f"WARNING: ignore_tables {missing_tables} not found in database")
 
         if not isinstance(sample_rows_in_table_info, int):
             raise TypeError("sample_rows_in_table_info must be an integer")
@@ -74,6 +74,8 @@ class HeavyDB:
     def from_env(cls: type[HeavyDB], **kwargs: Any) -> HeavyDB:
         """Create a database connection from environment variables."""
         config = get_config()
+        if not config.heavydb_username or not config.heavydb_password or not config.heavydb_dbname:
+            raise ValueError("Please set the config variables heavydb_username, heavydb_password and heavydb_dbname")
         conn: Connection = connect(
             user=config.heavydb_username,
             password=config.heavydb_password,
@@ -84,14 +86,13 @@ class HeavyDB:
         return cls(conn, **kwargs)
 
     @classmethod
-    def from_session(cls: type[HeavyDB], session_id: str, dbname: Optional[str] = None, **kwargs: Any) -> HeavyDB:
+    def from_session(cls: type[HeavyDB], session_id: str, **kwargs: Any) -> HeavyDB:
         """Create a database connection from a session id."""
         config = get_config()
         conn: Connection = connect(
             sessionid=session_id,
             host=config.heavydb_host,
             port=config.heavydb_port,
-            dbname=dbname or config.heavydb_dbname,
         )
         return cls(conn, **kwargs)
 
@@ -101,6 +102,10 @@ class HeavyDB:
     ) -> HeavyDB:
         """Create a database connection from username and password."""
         config = get_config()
+        if not config.heavydb_dbname and not dbname:
+            raise ValueError(
+                "Please set the config variable heavydb_dbname or provide a dbname as an argument to HeavyDB.from_creds"
+            )
         conn: Connection = connect(
             user=username,
             password=password,
@@ -138,8 +143,8 @@ class HeavyDB:
         create_command = f"SHOW CREATE TABLE {table};"
         with self.lock:
             cursor = self._conn.execute(create_command)
-        table_schema = cursor.fetchone()[0]
-        table_schema = re.sub(r" ENCODING .*\)([,\)])", r"\1", table_schema)
+        table_schema = cursor.fetchone()[0]  # type: ignore
+        table_schema = re.sub(r" ENCODING .*\)([,\)])", r"\1", table_schema)  # type: ignore
         table_schema = re.sub(r",\n.*SHARED DICTIONARY.*REFERENCES.*\([A-Za-z0-9_]*\)", "", table_schema)
         table_schema = re.sub(r"\n", "", table_schema)
         return table_schema
@@ -150,6 +155,8 @@ class HeavyDB:
         query = strip_sql_comments(query)
         if is_destructive_sql(query):
             raise ValueError("Destructive SQL is not allowed")
+        if "::" in query:
+            raise ValueError("Double colon cast syntax is not allowed. Use CAST() instead.")
         with self.lock:
             return self._conn._client.sql_validate(self._conn._session, query)
 
@@ -159,7 +166,7 @@ class HeavyDB:
         top_k_statement = f"SELECT {column}, COUNT(*) as cnt FROM {table} WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {k};"
         with self.lock:
             cursor = self._conn.execute(top_k_statement)
-        top_k_res: list[str] = [v[0] for v in cursor.fetchall()]
+        top_k_res: list[str] = [str(v[0]) for v in cursor.fetchall()]
         if not any([v for v in top_k_res if v.startswith("MULTIPOLYGON")]):
             return top_k_res
         return None
@@ -257,6 +264,19 @@ class HeavyDB:
         else:
             raise ValueError("Fetch parameter must be either 'one' or 'all'")
         return str(result)
+
+    def explain(self, command: str) -> str:
+        command = strip_sql_comments(command)
+        if is_destructive_sql(command):
+            raise ValueError("Destructive SQL is not allowed")
+        with self.lock:
+            cursor = self._conn.execute(f"EXPLAIN plan {command}")
+        result: tuple[str] = cursor.fetchone()  # type: ignore
+        return str(result[0])
+
+    def complexity(self, command: str) -> int:
+        plan = self.explain(command)
+        return rate_sql_complexity(plan)
 
     def get_table_info_no_throw(self, table_names: Optional[list[str]] = None) -> str:
         """Get information about specified tables.

@@ -9,7 +9,8 @@ from langchain.chains.base import Chain
 from promptwatch import PromptWatch
 
 from heavynl.config import get_config
-from .database import Session, RequestLog
+
+# from .database import Session, RequestLog
 from .enums import LangChainType
 
 
@@ -74,7 +75,7 @@ class RequestContext:
             self.langchain_name,
             self.start_time,
             end_time,
-            self.input,
+            self.input,  # type: ignore
             self.model,
             self.output,
             self.error_msg,
@@ -103,26 +104,27 @@ def log_request(
     successful_requests: Optional[int] = None,
     total_cost: Optional[float] = None,
 ) -> None:
-    new_request = RequestLog(
-        langchain_type=langchain_type,
-        langchain_name=langchain_name,
-        start_time=start_time,
-        end_time=end_time,
-        input=input,
-        output=output,
-        model=model,
-        error=error,
-        agent_log=agent_log,
-        prompt_tokens=prompt_tokens,
-        completion_tokens=completion_tokens,
-        total_tokens=total_tokens,
-        successful_requests=successful_requests,
-        total_cost=total_cost,
-    )
+    pass
+    # new_request = RequestLog(
+    #    langchain_type=langchain_type,
+    #    langchain_name=langchain_name,
+    #    start_time=start_time,
+    #    end_time=end_time,
+    #    input=input,
+    #    output=output,
+    #    model=model,
+    #    error=error,
+    #    agent_log=agent_log,
+    #    prompt_tokens=prompt_tokens,
+    #    completion_tokens=completion_tokens,
+    #    total_tokens=total_tokens,
+    #    successful_requests=successful_requests,
+    #    total_cost=total_cost,
+    # )
 
-    with Session() as session:
-        session.add(new_request)
-        session.commit()
+    # with Session() as session:
+    #     session.add(new_request)
+    #     session.commit()
 
 
 @contextmanager

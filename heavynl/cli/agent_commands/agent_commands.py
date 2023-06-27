@@ -5,6 +5,8 @@ from heavynl.langchain.agents.convo_agent import create_conversational_agent
 from heavynl.langchain.logging import log_agent_call
 from heavynl.langchain.llms import get_chat_llm
 
+from .agent_messages import HumanConvoMessage, AIConvoMessage
+
 
 @click.group()
 def agent():
@@ -29,9 +31,7 @@ def one_time(
 ) -> None:
     """Call SQL Agent with a question"""
 
-    chat_llm = get_chat_llm(
-        ["cli", "agent", "one_time_sql_agent"], model_name=model, temperature=temperature, client=None
-    )
+    chat_llm = get_chat_llm(["cli", "agent", "one_time_sql_agent"], model=model, temperature=temperature, client=None)
     sql_agent = create_sql_agent(chat_llm=chat_llm)
     log_agent_call(sql_agent, question, model)
 
@@ -54,15 +54,18 @@ def conversational(
     """Begin a conversation with an Agent with access to HeavyDB"""
 
     chat_llm = get_chat_llm(
-        ["cli", "agent", "conversational_sql_agent"], model_name=model, temperature=temperature, client=None
+        ["cli", "agent", "conversational_sql_agent"], model=model, temperature=temperature, client=None
     )
     sql_agent = create_conversational_agent(chat_llm=chat_llm, verbose=verbose)
     # start a loop that asks for input and then calls the agent, break the loop on EXIT
+    is_first_message = True
     while True:
-        question = input("You (type EXIT to break loop): ")
-        if question == "EXIT":
+        question = input(HumanConvoMessage(is_first_message=is_first_message).colorize())
+        if is_first_message:
+            is_first_message = False
+        if question.upper() == "EXIT":
             break
         # show "Processing..." until the answer returns and then show the answer in its place
         print("Processing...", end="\r")
         answer = sql_agent.run(input=question)
-        print(f"Assistant: {answer}")
+        print(AIConvoMessage(message=answer).colorize())

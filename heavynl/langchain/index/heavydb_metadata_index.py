@@ -1,5 +1,7 @@
-from typing import Literal, Optional
+from enum import Enum
+from typing import Optional
 
+from chromadb.api import Where
 from langchain.vectorstores import Chroma
 from langchain.indexes.vectorstore import VectorStoreIndexWrapper
 from langchain.schema import Document, BaseRetriever
@@ -13,7 +15,9 @@ from heavynl.langchain.logging import log_chain_call
 from .utils import read_table_documents, apply_retriever_filter
 
 
-search_types = Literal["similarity", "mmr"]
+class SearchType(Enum):
+    SIMILARITY = "similarity"
+    MMR = "mmr"
 
 
 class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
@@ -110,13 +114,14 @@ class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
         docs = list(read_table_documents(include=[table_name]))
         if len(docs) == 0:
             raise Exception(f"No document found for table {table_name}")
-        self.vectorstore._collection.delete(where={"source": table_name})
+        where: Where = {"source": table_name}
+        self.vectorstore._collection.delete(where=where)
         sub_docs = self.text_splitter.split_documents(docs)
         self.vectorstore.add_documents(sub_docs)
 
     def as_retriever(
         self,
-        search_type: search_types = "similarity",
+        search_type: SearchType = SearchType.SIMILARITY,
         k: int = 6,
         fetch_k: int = 20,
         allowable_tables: Optional[list[str]] = None,
@@ -135,4 +140,4 @@ class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
         """
         search_kwargs = {"k": k, "fetch_k": fetch_k}
         search_kwargs = apply_retriever_filter(search_kwargs, allowable_tables)
-        return self.vectorstore.as_retriever(search_type=search_type, search_kwargs=search_kwargs)
+        return self.vectorstore.as_retriever(search_type=search_type.value, search_kwargs=search_kwargs)

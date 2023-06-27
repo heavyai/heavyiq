@@ -47,9 +47,9 @@ Example Input: 'Which table contains information on [topic]? What are the releva
             if res["answer"] == chain.no_results_answer:
                 return "Error: No relevant tables found for provided query. Feel free to rephrase and try again."
             if len(res["tables"]) > 2:
-                table_info = self.db.get_table_info(res["tables"], include_samples=False, include_top_k=False)
+                table_info = self.db.get_table_info(res["tables"], include_samples=False, include_top_k=False)  # type: ignore
             else:
-                table_info = self.db.get_table_info(res["tables"])
+                table_info = self.db.get_table_info(res["tables"])  # type: ignore
             return f"{res['answer']}\n{table_info}"
         except Exception as e:
             print(e)

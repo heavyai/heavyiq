@@ -25,7 +25,7 @@ $ . venv/bin/activate
 5. Install the requirements:
 
 ```bash
-$ pip install -r requirements.txt
+$ pip install -r requirements.txt -r requirements-dev.txt
 # it may be necessary to `export HNSWLIB_NO_NATIVE=1` to install chromadb on Mac
 ```
 
@@ -49,3 +49,27 @@ You should now be able to access the API Documentation at [http://localhost:5000
 ```bash
 $ python cli.py --help
 ```
+
+## Integration Tests
+```bash
+# App must be running locally
+$ python -m unittest discover
+```
+
+## Deployment
+
+### Create Obfuscated Build
+
+```bash
+pyarmor gen ./modules
+cp app.py ./dist/app.py
+```
+
+### Run Production Server Process
+
+```bash
+$ gunicorn -w 4 'heavynl.api:get_app("./path/to/heavy.conf")'
+```
+
+Port can be specified in above command with command line flag `-b :8080`
+

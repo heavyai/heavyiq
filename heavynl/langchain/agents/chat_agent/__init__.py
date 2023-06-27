@@ -6,8 +6,9 @@ from langchain.tools import BaseTool
 from langchain.chat_models.base import BaseChatModel
 from langchain import LLMChain
 from langchain.prompts import BaseChatPromptTemplate
-from langchain.schema import AgentAction, AgentFinish, HumanMessage
+from langchain.schema import AgentAction, AgentFinish, HumanMessage, BaseMessage
 
+from heavynl.config import get_config
 from heavynl.langchain import HeavyDB
 from heavynl.langchain.agents import HeavyDBToolkit
 from heavynl.langchain.llms import get_chat_llm
@@ -58,7 +59,7 @@ class ChatAgentPromptTemplate(BaseChatPromptTemplate):
     # The limit as to how many rows the agent should return
     top_k: int = 10
 
-    def format_messages(self, **kwargs) -> str:
+    def format_messages(self, **kwargs) -> list[BaseMessage]:
         # Get the intermediate steps (AgentAction, Observation tuples)
         # Format them in a particular way
         intermediate_steps = kwargs.pop("intermediate_steps")
@@ -118,7 +119,9 @@ def create_sql_agent(
     Returns:
     - AgentExecutor: An AgentExecutor instance configured with the SQL agent and the set of tools
     for interacting with the database."""
-    chat_llm = chat_llm or get_chat_llm(["agent", "one_time_sql_agent"], temperature=0, model_name="gpt-4")
+    chat_llm = chat_llm or get_chat_llm(
+        ["agent", "one_time_sql_agent"], temperature=0, model=get_config().openai_gpt_model
+    )
     heavydb = heavydb or HeavyDB.from_env()
     toolkit = HeavyDBToolkit(db=heavydb)
     tools = toolkit.get_tools()
@@ -136,6 +139,5 @@ def create_sql_agent(
         llm_chain=llm_chain,
         output_parser=output_parser,
         stop=["\nObservation:"],
-        allowed_tools=[tool.name for tool in tools],
     )
     return AgentExecutor.from_agent_and_tools(agent=agent, tools=tools, verbose=True)

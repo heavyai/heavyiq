@@ -1,7 +1,26 @@
-FROM tiangolo/uwsgi-nginx-flask:python3.10
+FROM python:3.10 AS obfuscator
 
-COPY ./requirements.txt /app/requirements.txt
-COPY ./modules /app/modules
-COPY ./app.py /app/main.py
+WORKDIR /usr/src/app
 
-RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
+COPY config.toml ./
+COPY pyarmor-regfile-5130.zip ./
+COPY requirements.txt ./
+COPY requirements-dev.txt ./
+COPY heavynl/ ./heavynl/
+
+RUN pip install --no-cache-dir pyarmor
+RUN pyarmor reg pyarmor-regfile-5130.zip
+RUN pyarmor gen ./heavynl
+
+FROM python:3.10 AS runner
+
+WORKDIR /usr/src/app
+
+COPY --from=obfuscator /usr/src/app/dist/ ./
+COPY --from=obfuscator /usr/src/app/requirements.txt ./requirements.txt
+COPY --from=obfuscator /usr/src/app/config.toml ./config.toml
+COPY --from=obfuscator /usr/src/app/heavynl/api/heavyanalyst.yaml ./heavynl/api/heavyanalyst.yaml
+RUN pip install --no-cache-dir --upgrade -r ./requirements.txt
+
+EXPOSE 8000
+CMD ["gunicorn", "-b", ":8000", "-w", "4", "heavynl.api:get_app()"]

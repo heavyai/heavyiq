@@ -1,0 +1,44 @@
+Description: The Electric_Power_Transmission_Lines table stores information about electric power transmission lines, including their circuit type, comments, legend, length in feet and miles, name, object ID, owner, shape length, status, type, and various environmental and risk factors. The primary functionality of this table is to store and manage data related to electric power transmission lines, while the secondary functionality is to provide insights into environmental factors and risks associated with these lines.
+
+Applications: Potential use cases and applications for this table include:
+1. Power grid management: Utility companies can use this data to monitor and manage their power transmission lines, ensuring efficient and reliable power distribution.
+2. Infrastructure planning: Government agencies and utility companies can use this data to plan for future infrastructure development and upgrades.
+3. Risk assessment: Utility companies and emergency management agencies can use the environmental and risk factors to assess potential hazards and develop strategies to mitigate them.
+4. Asset management: Utility companies can use this data to track the status and ownership of transmission lines, facilitating maintenance and repair activities.
+5. Geographic analysis: Researchers and analysts can use the geographic data to study the spatial distribution of power transmission lines and their relationship with other environmental factors.
+
+Keywords: electric power, transmission lines, infrastructure, power grid, risk assessment, environmental factors, asset management, geographic analysis.
+
+Column descriptions for Electric_Power_Transmission_Lines table:
+- Electric_Power_Transmission_Lines.circuit: Indicates whether the transmission line is a single or double circuit.
+- Electric_Power_Transmission_Lines.comments: Contains additional information or notes about the transmission line.
+- Electric_Power_Transmission_Lines.legend: Categorizes the transmission line based on voltage and owner.
+- Electric_Power_Transmission_Lines.length_feet: Length of the transmission line in feet.
+- Electric_Power_Transmission_Lines.length_miles: Length of the transmission line in miles.
+- Electric_Power_Transmission_Lines.name: Name of the transmission line, usually indicating the owner and voltage.
+- Electric_Power_Transmission_Lines.objectid: Unique identifier for each transmission line.
+- Electric_Power_Transmission_Lines.owner: Owner of the transmission line, such as a utility company.
+- Electric_Power_Transmission_Lines.shape_len: Represents the shape length of the transmission line.
+- Electric_Power_Transmission_Lines.status: Operational status of the transmission line.
+- Electric_Power_Transmission_Lines.type: Indicates the type of transmission line, such as overhead (OH).
+- Electric_Power_Transmission_Lines.eAccessibility: Accessibility value for the transmission line.
+- Electric_Power_Transmission_Lines.eFire_ROS: Rate of spread for fire along the transmission line.
+- Electric_Power_Transmission_Lines.eFire_flamlen: Flame length of fire along the transmission line.
+- Electric_Power_Transmission_Lines.eFuel_1hr_moisture: One-hour fuel moisture value for the transmission line.
+- Electric_Power_Transmission_Lines.eFuel_fine_moisture: Fine fuel moisture value for the transmission line.
+- Electric_Power_Transmission_Lines.eTerrain_Slope_Percent: Slope percentage of the terrain where the transmission line is located.
+- Electric_Power_Transmission_Lines.eWind_MPH: Wind speed in miles per hour along the transmission line.
+- Electric_Power_Transmission_Lines.omnisci_geo: Geometry of the transmission line in LINESTRING format.
+- Electric_Power_Transmission_Lines.kV: Voltage of the transmission line in kilovolts.
+- Electric_Power_Transmission_Lines.kV_sort: Sorted voltage value for the transmission line.
+- Electric_Power_Transmission_Lines.line_segid: Unique identifier for each line segment within the transmission line.
+- Electric_Power_Transmission_Lines.pBurnin: Probability of burn-in for the transmission line.
+- Electric_Power_Transmission_Lines.pContainment: Probability of containment for the transmission line.
+- Electric_Power_Transmission_Lines.pFallin: Probability of fall-in for the transmission line.
+- Electric_Power_Transmission_Lines.pGrowin: Probability of grow-in for the transmission line.
+- Electric_Power_Transmission_Lines.pIgnition: Probability of ignition for the transmission line.
+- Electric_Power_Transmission_Lines.pWind: Probability of wind-related issues for the transmission line.
+- Electric_Power_Transmission_Lines.spConsequence: Consequence value for the transmission line.
+- Electric_Power_Transmission_Lines.spOccurence: Occurrence value for the transmission line.
+- Electric_Power_Transmission_Lines.spRisk: Risk value for the transmission line.
+
