@@ -1,8 +1,8 @@
 openapi: '3.0.0'
 info:
-  title: HeavyAnalyst API
+  title: HeavyIQ API
   version: "0.1"
-  description: A simple REST API for interacting with HeavyNL
+  description: A simple REST API for interacting with HeavyIQ
 paths:
   /query:
     post:
