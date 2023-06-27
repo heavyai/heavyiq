@@ -1,4 +1,4 @@
-[nl]
+[iq]
 heavydb_host = "localhost"
 heavydb_port = 6274
 heavydb_dbname = "heavyai"
@@ -15,8 +15,8 @@ promptlayer_api_key = ""
 promptwatch_api_key = ""
 promptwatch_tracking_project = "<name>_dev" # i.e. "bfturner_dev"
 
-[nl.log] # these are defaults and can be omitted from config file unless modified
+[iq.log] # these are defaults and can be omitted from config file unless modified
 app_log_level = "DEBUG"
 app_log_file = "access.log"
-heavynl_log_level = "DEBUG"
-heavynl_log_file = "heavynl.log"
+heavyiq_log_level = "DEBUG"
+heavyiq_log_file = "heavyiq.log"
