@@ -28,6 +28,7 @@ def get_token_limit(model_name: str, response_tokens: int = 256) -> int:
     and subtracts the `response_tokens` and a buffer of 50 tokens from the corresponding limit.
     If the model_name does not start with any of the known prefixes, it defaults to a limit of 4096 tokens.
     """
+
     model_limits = {
         "gpt-3.5-turbo-16k": 16384,
         "gpt-3.5-turbo": 4096,

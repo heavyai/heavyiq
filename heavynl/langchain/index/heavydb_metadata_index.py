@@ -11,6 +11,7 @@ from heavynl.langchain.chains import (
     SQLMetadataQuestionTransformerChain,
     AskHeavyDBMetadataIndexChain,
 )
+from heavynl.langchain.llms import get_llm
 from heavynl.langchain.logging import log_chain_call
 from .utils import read_table_documents, apply_retriever_filter
 
@@ -93,7 +94,8 @@ class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
         Returns:
             Rephrased question.
         """
-        chain = SQLMetadataQuestionTransformerChain()
+        llm = get_llm(["chain", "sql_metadata_question_transformer_chain"], temperature=0)
+        chain = SQLMetadataQuestionTransformerChain(llm=llm)
         return log_chain_call(chain, {chain.input_key: question}, "")[chain.output_key]
 
     def ask_using_rephrased_question(self, question: str, **kwargs) -> dict[str, str]:

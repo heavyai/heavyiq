@@ -11,7 +11,6 @@ from langchain.base_language import BaseLanguageModel
 from pydantic import BaseModel, Extra
 
 from heavynl.config import get_config
-from heavynl.langchain.llms import get_llm
 
 rephrase_question_examples = [
     {
@@ -178,7 +177,7 @@ class SQLMetadataQuestionTransformerChain(Chain, BaseModel):
         extra = Extra.forbid
         arbitrary_types_allowed = True
 
-    llm: BaseLanguageModel = get_llm(["chain", "sql_metadata_question_transformer_chain"], temperature=0)
+    llm: BaseLanguageModel
     """LLM wrapper to use."""
     input_key: str = "input"  #: :meta private:
     output_key: str = "sql_metadata_question"  #: :meta private:

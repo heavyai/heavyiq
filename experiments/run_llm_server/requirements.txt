@@ -1,2 +1,1 @@
-llama-cpp-python[server]==0.1.65
-
+llama-cpp-python[server]==0.1.66
