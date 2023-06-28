@@ -2,6 +2,7 @@ import json
 from typing import Optional, Any
 
 from langchain.memory import ConversationBufferMemory
+from langchain.memory.chat_memory import BaseChatMemory
 from langchain.chat_models.base import BaseChatModel
 from langchain.agents import AgentExecutor
 from langchain.schema import AgentAction, AgentFinish
@@ -92,7 +93,10 @@ class CustomOutputParser(AgentOutputParser):
 
 
 def create_conversational_agent(
-    heavydb: Optional[HeavyDB] = None, chat_llm: Optional[BaseChatModel] = None, verbose: bool = False
+    heavydb: Optional[HeavyDB] = None,
+    chat_llm: Optional[BaseChatModel] = None,
+    verbose: bool = False,
+    memory: Optional[BaseChatMemory] = None,
 ) -> AgentExecutor:
     """This function creates an AgentExecutor instance that uses a language model to generate responses
     based on user inputs. The agent is designed to interact with a HeavyDB instance and has access
@@ -117,7 +121,7 @@ def create_conversational_agent(
     heavydb = heavydb or HeavyDB.from_env()
     toolkit = HeavyDBToolkit(db=heavydb)
     tools = toolkit.get_tools()
-    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True, ai_prefix="Assistant")
+    memory = memory or ConversationBufferMemory(memory_key="chat_history", return_messages=True, ai_prefix="Assistant")
     agent = ConversationalChatAgent.from_llm_and_tools(
         llm=chat_llm,
         tools=tools,

@@ -1,22 +1,39 @@
 from typing import Any
-from flask_login import current_user, login_user
 
 import connexion
-from flask import Flask, redirect, jsonify, request, session, Response, render_template, make_response
+from flask import Flask, Response, redirect, render_template, request
 from flask_cors import CORS
 from flask_socketio import SocketIO
-from flask_session import Session
 
+from flask_session import Session
+from heavynl.api.models import db
 from heavynl.config import get_config
 from heavynl.logging_utils import _app_logger, heavynl_logger
-from .handlers.ws_handlers import ChatNamespace
-from .utils import generate_session_id
 
+from .handlers.ws_handlers import ChatNamespace
 
 socketio = SocketIO(manage_session=False, cors_allowed_origins="*")
 
 
+def set_config(app: Flask):
+    """
+    Here module related configs are being appended to app config.
+    """
+    app.secret_key = "123456789012345678901234"  # TODO: fixme
+    app.config["SESSION_TYPE"] = "filesystem"
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///sessions.db"
+
+
 def get_app(config_path: str = "./config.toml") -> Flask:
+    """
+    Gets the Flask App instance.
+
+    Args:
+        config_path (str, optional): Config path. Defaults to "./config.toml".
+
+    Returns:
+        Flask: Final Flask instance after in-corporated all the modules.
+    """
     get_config(config_path)  # loads config using specified path
 
     # see heavynl/ui/README.md
@@ -25,21 +42,18 @@ def get_app(config_path: str = "./config.toml") -> Flask:
         server_args={"static_folder": "../ui/build", "static_url_path": "/"},
     )
 
-    app.app.secret_key = "123456789012345678901234"  # TODO: replace this
-    app.app.config["SESSION_TYPE"] = "filesystem"
+    flask_app: Flask = app.app
+    set_config(flask_app)
 
-    CORS(app.app, resources={r"*": {"origins": "*"}}, origins="http://localhost:3000")
+    CORS(flask_app, resources={r"*": {"origins": "*"}}, origins="http://localhost:3000")  # TODO: allow specific origins
 
     sess = Session()
-    sess.init_app(app.app)
+    sess.init_app(flask_app)
+    db.init_app(flask_app)
 
-    @app.app.route("/index")
+    @flask_app.route("/index")
     def index() -> Any:
-        return app.app.send_static_file("index.html")
-
-    @app.app.route("/session", methods=["GET"])
-    def session_access():
-        return jsonify({"session": session.get("value", "")})
+        return flask_app.send_static_file("index.html")
 
     # for some reason the servers base url is not set to the full url, just "/api/v1"
     # maybe it's set when deployed for production? in any case, must be resolved for LLM schema discovery
@@ -49,8 +63,6 @@ def get_app(config_path: str = "./config.toml") -> Flask:
 
     ui_path = "/api/v1/ui/"
     open_ai_path = "/api/v1/openapi.json"
-
-    flask_app = app.app
 
     @flask_app.after_request  # type: ignore
     def log_response(response: Response) -> Response:
@@ -88,6 +100,9 @@ def get_app(config_path: str = "./config.toml") -> Flask:
     # socket endpoints
     socketio.init_app(flask_app)
 
-    socketio.on_namespace(ChatNamespace(flask_app, namespace="/chat"))
+    socketio.on_namespace(ChatNamespace(namespace="/chat"))
+
+    with flask_app.app_context():
+        db.create_all()
 
     return flask_app  # type: ignore

@@ -1,49 +1,67 @@
 from typing import Any
-from flask import request, session
+
+from flask import request
+from flask_socketio import Namespace, close_room, emit, join_room
+from langchain.memory import ConversationBufferMemory
+from langchain.memory.chat_message_histories.in_memory import ChatMessageHistory
+
+from heavynl.api.models import SessionInfo
 from heavynl.langchain.agents.convo_agent import create_conversational_agent
-from heavynl.langchain.llms import get_chat_llm
-from flask_socketio import Namespace, emit, join_room, leave_room, close_room, rooms, disconnect
-from ..utils import generate_session_id
 
 
 class ChatNamespace(Namespace):
     """
-    Chat Namespace
+    All the chat related web socket requests are handled here.
     """
 
-    def __init__(self, app, namespace=None):
-        super().__init__(namespace)
-        self.app = app
-
-    def on_message(self, message: dict[str, Any]):
-        emit("response", {"data": message["data"]})
-
     def on_question(self, message: dict[str, Any]):
+        """
+        Handles all the question events emitted by WebSocket client.
+        """
         question = message["question"]
-        sql_agent = create_conversational_agent()
-
+        session_id = message["sessionID"]
+        user_session = SessionInfo.query.filter_by(session_id=session_id).first()
+        retrieved_messages = user_session.get_chat_messages()
+        retrieved_chat_history = ChatMessageHistory(messages=retrieved_messages)
+        retrieved_memory = ConversationBufferMemory(
+            chat_memory=retrieved_chat_history, memory_key="chat_history", return_messages=True, ai_prefix="Assistant"
+        )
+        sql_agent = create_conversational_agent(memory=retrieved_memory)
+        # generate answer
         answer = sql_agent.run(input=question)
+        # save the along with the question and session id to SessionInfo db table.
+        user_session.add_message(question)
+        user_session.add_message(answer)
+        user_session.save()
+        # emits answer event to WS client for displaying
         emit("answer", {"data": answer})
 
-    def on_connect(self, *args):
-        session_id = session.get("session_id")
+    def on_connect(self):
+        """
+        Triggerd immediately upon ws client connect event.
+        """
+        session_id = request.sid  # type: ignore
+        # store the session id to db
+        user_session = SessionInfo(session_id=session_id)  # type: ignore
+        user_session.save()
 
-        if not session_id:
-            # Generate a new session ID only if it doesn't exist
-            session_id = generate_session_id()
-            session["session_id"] = session_id
-            session.modified = True
-
-        print(session_id)
+        # join chat room with the session id as room name
         join_room(session_id)
 
         print(f"Client connected: {session_id}")
+        # emits setSession event, so that the client can store the session id to localstorage
         emit("setSession", {"data": session_id})
 
     def on_disconnect(self):
-        session_id = session.get("session_id")  # Assuming the session ID is passed as a query parameter
+        """
+        Triggerd immediately upon ws client disconnect event like browser tab, window close events.
+        """
+        session_id = request.sid  # type: ignore
         close_room(session_id)
 
-        session.clear()
+        # delete all the data relevevant to the particular session id upon diconnect
+        user_session = SessionInfo.query.filter_by(session_id=session_id).first()
+        if user_session:
+            user_session.delete()
 
         print(f"Client disconnected: {session_id}")
