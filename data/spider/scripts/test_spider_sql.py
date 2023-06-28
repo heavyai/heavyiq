@@ -409,7 +409,9 @@ def main(argv):
                     if options.write_prompts:
                         instruction = generate_instruction(table_schemas, query["question"])
                         # sql_query_with_semicolon = sql_query + ";" if sql_query[-1] != ";" else sql_query
-                        prompts.append({"instruction": instruction, "input": "", "output": sql_query})
+                        prompts.append(
+                            {"instruction": instruction, "output": sql_query, "db_id": db_id, "query_id": query_id}
+                        )
                 except Exception as e:
                     query_fixed = False
                     if options.fix_queries:
