@@ -22,4 +22,5 @@ config.toml
 .chroma/
 
 eval/results/
-*.log
+*.log*
+flask_session/

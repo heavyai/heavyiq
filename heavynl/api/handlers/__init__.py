@@ -32,9 +32,10 @@ def query(body: dict) -> dict:
 
 @handle_errors
 def question(body: dict) -> dict:
-    db_session_id = body["session_id"]
+    # db_session_id = body["session_id"]
     tables = body["tables"]
-    db = HeavyDB.from_session(db_session_id, include_tables=tables)
+    # db = HeavyDB.from_session(db_session_id, include_tables=tables)
+    db = HeavyDB.from_env()
     question = body["question"]
     logger.info("Request Received")
     logger.info("Table(s): %s", ", ".join(tables))

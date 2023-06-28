@@ -1,23 +1,45 @@
 from typing import Any
+from flask_login import current_user, login_user
 
 import connexion
-from flask import Flask, redirect, request, Response
+from flask import Flask, redirect, jsonify, request, session, Response, render_template, make_response
 from flask_cors import CORS
+from flask_socketio import SocketIO
+from flask_session import Session
 
 from heavynl.config import get_config
 from heavynl.logging_utils import _app_logger, heavynl_logger
+from .handlers.ws_handlers import ChatNamespace
+from .utils import generate_session_id
+
+
+socketio = SocketIO(manage_session=False, cors_allowed_origins="*")
 
 
 def get_app(config_path: str = "./config.toml") -> Flask:
     get_config(config_path)  # loads config using specified path
 
     # see heavynl/ui/README.md
-    app = connexion.FlaskApp(__name__, server_args={"static_folder": "../ui/build", "static_url_path": "/"})
-    CORS(app.app)
+    app = connexion.FlaskApp(
+        __name__,
+        server_args={"static_folder": "../ui/build", "static_url_path": "/"},
+    )
 
-    @app.app.route("/chat")
+    app.app.secret_key = "123456789012345678901234"  # TODO: replace this
+    app.app.config["SESSION_TYPE"] = "filesystem"
+
+    CORS(app.app, resources={r"*": {"origins": "*"}}, origins="http://localhost:3000")
+
+    sess = Session()
+    sess.init_app(app.app)
+
+    @app.app.route("/index")
     def index() -> Any:
         return app.app.send_static_file("index.html")
+
+    @app.app.route("/session", methods=["GET"])
+    def session_access():
+        return jsonify({"session": session.get("value", "")})
 
     # for some reason the servers base url is not set to the full url, just "/api/v1"
     # maybe it's set when deployed for production? in any case, must be resolved for LLM schema discovery
@@ -62,5 +84,10 @@ def get_app(config_path: str = "./config.toml") -> Flask:
             return
         heavynl_logger.debug("Request Path: %s", request.path)
         heavynl_logger.debug("Request Body: %s", request.get_data(as_text=True))
+
+    # socket endpoints
+    socketio.init_app(flask_app)
+
+    socketio.on_namespace(ChatNamespace(flask_app, namespace="/chat"))
 
     return flask_app  # type: ignore

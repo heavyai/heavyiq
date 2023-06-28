@@ -1,6 +1,6 @@
 from functools import wraps
 from typing import Any, Callable
-
+import uuid
 from heavynl.logging_utils import heavynl_logger as logger
 
 
@@ -14,3 +14,7 @@ def handle_errors(func: Callable[..., Any]) -> Callable[..., tuple[Any | dict, i
             return {"error": str(e)}, 500
 
     return wrapper
+
+
+def generate_session_id():
+    return str(uuid.uuid4())
