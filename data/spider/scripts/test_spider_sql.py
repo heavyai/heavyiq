@@ -6,7 +6,10 @@ import json
 import openai
 import pandas as pd
 import re
+import sqlparse
 import sys
+
+from collections.abc import Iterable
 
 
 def getOptions(argv=None):
@@ -26,6 +29,101 @@ def getOptions(argv=None):
     parser.add_argument("--fix-queries-gpt", help="Try to fix failed queries with ChatGPT API", action="store_true")
     parser.add_argument("--write-prompts", help="Write prompts to file for successful queries", action="store_true")
     return parser.parse_args(argv)
+
+
+# List of SQL keywords to be capitalized
+sql_keywords = [
+    "SELECT",
+    "AS",
+    "FROM",
+    "JOIN",
+    "ON",
+    "INNER",
+    "LEFT",
+    "RIGHT",
+    "OUTER",
+    "WHERE",
+    "AND",
+    "OR",
+    "IN",
+    "NOT",
+    "NULL",
+    "IS",
+    "LIKE",
+    "EXISTS",
+    "ALL",
+    "ANY",
+    "DISTINCT",
+    "GROUP BY",
+    "ORDER BY",
+    "ASC",
+    "DESC",
+    "LIMIT",
+    "AVG",
+    "SUM",
+    "COUNT",
+    "MAX",
+    "MIN",
+    "ROUND",
+    "LENGTH",
+    "LOWER",
+    "UPPER",
+    "COALESCE",
+    "IFNULL",
+    "NULLIF",
+    "CAST",
+    "CONVERT",
+    "CASE",
+    "WHEN",
+    "THEN",
+    "ELSE",
+    "END",
+    "BETWEEN",
+]
+
+
+def flatten(xs):
+    for x in xs:
+        if isinstance(x, Iterable) and not isinstance(x, (str, bytes)):
+            yield from flatten(x)
+        else:
+            yield x
+
+
+def parse_keyword(token):
+    parsed_tokens = []
+    if token.is_group:
+        # Recursively handle keywords in the group
+        for inner in token.tokens:
+            parsed_tokens.append(parse_keyword(inner))
+    else:
+        if token.value.upper() in sql_keywords:
+            parsed_tokens.append(token.value.upper())
+        else:
+            parsed_tokens.append(token.value)
+    return parsed_tokens
+
+
+def uppercase_sql_keywords(sql):
+    # Parse the SQL
+    parsed = sqlparse.parse(sql)
+    # For each token in the parsed SQL
+    parsed_tokens = []
+    for stmt in parsed:
+        for token in stmt.tokens:
+            parsed_tokens.append(parse_keyword(token))
+
+    parsed_tokens = flatten(parsed_tokens)
+    new_sql = "".join(token for token in parsed_tokens)
+    return new_sql
+
+
+# def uppercase_sql_keywords(sql):
+#    formatted_sql = sqlparse.format(sql, keyword_case="upper")
+#    sub_list = ["sum(", "Sum(", "avg(", "Avg(", "count(", "Count(", "min(", "Min(", "max(", "Max("]
+#    for sub in sub_list:
+#        formatted_sql = formatted_sql.replace(sub, sub.upper())
+#    return formatted_sql
 
 
 def getQueriesByDB(queries_file):
@@ -171,22 +269,17 @@ def fix_failed_query_unquoted_keyword(con, query_id, failed_query, error):
     reserved_keywords = [
         "YEAR",
         "year",
-        "Year"
-        "DATE",
+        "Year" "DATE",
         "date",
-        "Date"
-        "MONTH",
+        "Date" "MONTH",
         "month",
-        "Month"
-        "DAY",
+        "Month" "DAY",
         "day",
-        "Day"
-        "RANK",
+        "Day" "RANK",
         "rank",
-        "Rank"
-        "LENGTH",
+        "Rank" "LENGTH",
         "length",
-        "Length"
+        "Length",
     ]
     sql_query = copy.deepcopy(failed_query)
     for reserved_keyword in reserved_keywords:
@@ -306,6 +399,7 @@ def main(argv):
                 sql_query = re.sub(" +", " ", sql_query)
                 sql_query = re.sub(" ,", ",", sql_query)
                 sql_query = sql_query + ";" if sql_query[-1] != ";" else sql_query
+                sql_query = uppercase_sql_keywords(sql_query)
 
                 # print(f"Query ID: {query_id}")
                 # print(f"SQL Query: {sql_query}")
