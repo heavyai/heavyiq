@@ -36,5 +36,5 @@ class HeavyWebConfig(OverrideConfZ):  # type: ignore
 
 class AppConfig(OverrideConfZ):  # type: ignore
     http_port: Optional[int] = Field(alias="http-port")
-    nl: HeavyNLConfig
+    iq: HeavyNLConfig
     web: Optional[HeavyWebConfig] = None

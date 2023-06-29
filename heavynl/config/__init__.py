@@ -31,18 +31,19 @@ def get_config(file: str = "./config.toml") -> HeavyNLConfig:
     if _config:
         return _config
     app_config = AppConfig(config_sources=ConfZFileSource(file=file))
-    openai.api_key = app_config.nl.openai_api_key
+    openai.api_key = app_config.iq.openai_api_key
     try:
         openai.Model.list()
     except Exception as e:
         raise ValueError(f"Unable to communicate with OpenAI: {e}")
     if app_config.web and app_config.web.backend_url:
         hostname, port = split_url_port(app_config.web.backend_url)
-        app_config.nl.heavydb_host = hostname
-        app_config.nl.heavydb_port = port
+        app_config.iq.heavydb_host = hostname
+        app_config.iq.heavydb_port = port
     elif app_config.http_port:
-        app_config.nl.heavydb_port = app_config.http_port
-    _config = app_config.nl
+        app_config.iq.heavydb_port = app_config.http_port
+        print("here")
+    _config = app_config.iq
     return _config
 
 
