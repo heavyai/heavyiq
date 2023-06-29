@@ -8,7 +8,7 @@ from flask_socketio import SocketIO
 from flask_session import Session
 from heavynl.api.models import db
 from heavynl.config import get_config
-from heavynl.logging_utils import _app_logger, heavynl_logger
+from heavynl.logging_utils import _get_app_logger, get_heavynl_logger, init_logs
 
 from .handlers.ws_handlers import ChatNamespace
 
@@ -35,6 +35,7 @@ def get_app(config_path: str = "./config.toml") -> Flask:
         Flask: Final Flask instance after in-corporated all the modules.
     """
     get_config(config_path)  # loads config using specified path
+    init_logs()  # initializes logs using config
 
     # see heavynl/ui/README.md
     app = connexion.FlaskApp(
@@ -57,7 +58,7 @@ def get_app(config_path: str = "./config.toml") -> Flask:
 
     # for some reason the servers base url is not set to the full url, just "/api/v1"
     # maybe it's set when deployed for production? in any case, must be resolved for LLM schema discovery
-    app.add_api("heavyanalyst.yaml", strict_validation=True, base_path="/api/v1")
+    app.add_api("heavyiq-spec.yaml", strict_validation=True, base_path="/api/v1")
 
     app.add_url_rule("/", "redirect_ui", lambda: redirect("/api/v1/ui/", code=302))
 
@@ -72,17 +73,17 @@ def get_app(config_path: str = "./config.toml") -> Flask:
         This method specifically logs the http request calls using app_logger.
         """
         request.response = response  # type: ignore
-        _app_logger.info("", extra={"response": response})
+        _get_app_logger().info("", extra={"response": response})
         # do nothing for ui request
         if ui_path in request.path or open_ai_path in request.path:
             return response
         # otherwise log response of every request.
         try:
-            heavynl_logger.debug("Response Content: %s", response.get_data(as_text=True))
+            get_heavynl_logger().debug("Response Content: %s", response.get_data(as_text=True))
         except RuntimeError:
             # skip writing response data in-case of runtime error
             pass
-        heavynl_logger.debug("Response Status Code: %d", response.status_code)
+        get_heavynl_logger().debug("Response Status Code: %d", response.status_code)
         return response
 
     @flask_app.before_request  # type: ignore
@@ -94,8 +95,8 @@ def get_app(config_path: str = "./config.toml") -> Flask:
         # do nothing for ui request
         if ui_path in request.path or open_ai_path in request.path:
             return
-        heavynl_logger.debug("Request Path: %s", request.path)
-        heavynl_logger.debug("Request Body: %s", request.get_data(as_text=True))
+        get_heavynl_logger().debug("Request Path: %s", request.path)
+        get_heavynl_logger().debug("Request Body: %s", request.get_data(as_text=True))
 
     # socket endpoints
     socketio.init_app(flask_app)

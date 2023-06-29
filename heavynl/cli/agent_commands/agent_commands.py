@@ -67,5 +67,5 @@ def conversational(
             break
         # show "Processing..." until the answer returns and then show the answer in its place
         print("Processing...", end="\r")
-        answer = sql_agent.run(input=question)
+        answer = sql_agent.run(question)  # type: ignore
         print(AIConvoMessage(message=answer).colorize())

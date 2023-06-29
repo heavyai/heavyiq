@@ -1,6 +1,6 @@
 from heavynl.api.utils import handle_errors
 from heavynl.config import get_config
-from heavynl.logging_utils import heavynl_logger as logger
+from heavynl.logging_utils import get_heavynl_logger
 from heavynl.langchain import HeavyDB
 from heavynl.langchain.chains import NLtoAnswerChain, get_nl_to_sql_chain_by_llm
 from heavynl.langchain.llms import get_llm_by_model_name
@@ -13,6 +13,7 @@ MODEL_NAME = get_config().openai_gpt_model
 
 @handle_errors
 def query(body: dict) -> dict:
+    logger = get_heavynl_logger()
     db_session_id = body["session_id"]
     tables = body["tables"]
     db = HeavyDB.from_session(db_session_id, include_tables=tables)
@@ -32,9 +33,10 @@ def query(body: dict) -> dict:
 
 @handle_errors
 def question(body: dict) -> dict:
-    # db_session_id = body["session_id"]
+    logger = get_heavynl_logger()
+    db_session_id = body["session_id"]
     tables = body["tables"]
-    # db = HeavyDB.from_session(db_session_id, include_tables=tables)
+    db = HeavyDB.from_session(db_session_id, include_tables=tables)
     db = HeavyDB.from_env()
     question = body["question"]
     logger.info("Request Received")
@@ -46,6 +48,11 @@ def question(body: dict) -> dict:
     sql = strip_sql_comments(res[chain.output_sql_key])
     sql_complexity = db.complexity(sql)
     return {"answer": res[chain.output_answer_key], "sql": sql, "sql_complexity": sql_complexity}
+
+
+@handle_errors
+def health():
+    return
 
 
 # @handle_errors

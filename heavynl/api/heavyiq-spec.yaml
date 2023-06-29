@@ -1,8 +1,8 @@
 openapi: '3.0.0'
 info:
-  title: HeavyAnalyst API
+  title: HeavyIQ API
   version: "0.1"
-  description: A simple REST API for interacting with HeavyNL
+  description: A simple REST API for interacting with HeavyIQ
 paths:
   /query:
     post:
@@ -50,6 +50,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /health:
+    get:
+      summary: Health check endpoint
+      operationId: heavynl.api.handlers.health
+      responses:
+        200:
+          description: Success, the service is healthy
 components:
   schemas:
     DatabaseTables:

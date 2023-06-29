@@ -19,7 +19,7 @@ WORKDIR /usr/src/app
 COPY --from=obfuscator /usr/src/app/dist/ ./
 COPY --from=obfuscator /usr/src/app/requirements.txt ./requirements.txt
 COPY --from=obfuscator /usr/src/app/config.toml ./config.toml
-COPY --from=obfuscator /usr/src/app/heavynl/api/heavyanalyst.yaml ./heavynl/api/heavyanalyst.yaml
+COPY --from=obfuscator /usr/src/app/heavynl/api/heavyiq-spec.yaml ./heavynl/api/heavyiq-spec.yaml
 RUN pip install --no-cache-dir --upgrade -r ./requirements.txt
 
 EXPOSE 8000

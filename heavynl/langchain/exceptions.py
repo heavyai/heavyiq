@@ -6,10 +6,10 @@ class HeavyNLBaseException(Exception):
     def __init__(self, message: str | None = None):
         self.message = message
 
-    def get_child_class(self):
+    def get_child_class(self) -> type:
         return type(self)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.get_child_class()}: {self.message}"
 
 
