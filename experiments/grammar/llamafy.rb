@@ -22,13 +22,13 @@
 content = ARGF.read
 
 # Comment header lines prior to first comment
-content.sub!(%r{\A.*?(?=^--)}m) { $&.gsub /^\S/, '--\0' }
+content.sub!(%r{\A.*?(?=^--)}m) { $&.gsub(/^\S/, '--\0') }
 
 # Remove tabs.
-content.gsub! /\t/, '    '
+content.gsub!(/\t/, '    ')
 
 # Comment comment lines.
-content.gsub! /^--/, '#--'
+content.gsub!(/^--/, '#--')
 
 # Comment lines betweep --p and --/p
 # and for SQL-92: lines betweep --small and --/small
@@ -44,11 +44,14 @@ nrules = content.scan(angle_rule_regex).size
 STDERR.puts "nrules=#{nrules}"
 
 # Separate adjacent names
-content.gsub!(angle_rule_regex) { $&.gsub '><', '> <' }
+name_class = '[-/: \w]+'
+content.gsub!(angle_rule_regex) do |rule|
+  rule.gsub(Regexp.new('(\S)(<%s>)' % name_class), '\1 \2').
+       gsub(Regexp.new('(<%s>)(\S)' % name_class), '\1 \2')
+end
 
 # Remove angle brackets from names.
 # Replace non-alphanumeric characters (spaces, dashes, slashes, colons) w/ dashes.
-name_class = '[-/: \w]+'
 content.gsub!(angle_rule_regex) do |rule|
   rule.gsub(Regexp.new "<(#{name_class})>") { $1.gsub(/\W/, '-') }
 end
@@ -66,7 +69,7 @@ content.gsub!(Regexp.new '^(%s?-trigraph ::= )(\S+)(?=\n\n)' % name_class, 'm') 
 
 # Quote tokens in Ada-qualified-type-specification
 content.gsub! 'Interfaces.SQL', '"\&"'
-content.gsub! /\bSQL_STANDARD\.\w+/, '"\&"' # SQL-92
+content.gsub!(/\bSQL_STANDARD\.\w+/, '"\&"') # SQL-92
 
 content.gsub! '...omitted...', '"\&"' # SQL-92
 
