@@ -50,6 +50,14 @@ content.gsub!(angle_rule_regex) do |rule|
        gsub(Regexp.new('(<%s>)(\S)' % name_class), '\1 \2')
 end
 
+# Quote C keywords
+keywords = "auto|char|const|double|extern|float|long|short|static|volatile"
+# and misc unquoted strings for SQL-92
+keywords += "|edition1987|edition1989|edition1992|iso|standard|IntegrityNo|IntegrityYes|Low|Intermediate|High"
+content.gsub!(angle_rule_regex) do |rule|
+  rule.gsub Regexp.new('(\s)(%s)(\s|$)' % keywords, 'm'), '\1"\2"\3'
+end
+
 # Remove angle brackets from names.
 # Replace non-alphanumeric characters (spaces, dashes, slashes, colons) w/ dashes.
 content.gsub!(angle_rule_regex) do |rule|
