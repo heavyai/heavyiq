@@ -9,6 +9,8 @@ def getOptions(argv=None):
     parser = argparse.ArgumentParser(description="Eval SQL queries against ground truth queries in HeavyDB")
     parser.add_argument("-p", "--prompts", help="Test queries json file")
     parser.add_argument("-m", "--model", help="Path to model")
+    parser.add_argument("--prefix", help="Optional prefix for prompt", default=None)
+    parser.add_argument("--suffix", help="Optional suffix for prompt", default=None)
     return parser.parse_args(argv)
 
 
@@ -27,16 +29,30 @@ def main(argv):
     options = getOptions(argv)
     prompts = getPrompts(options.prompts)
     model = Llama(model_path=options.model)
-    for idx, prompt in enumerate(prompts):
-        completion = gen_completion(prompt["instruction"], model)
+    eval_outputs = []
+    for idx, prompt_example in enumerate(prompts):
+        prompt = prompt_example["instruction"]
+        if options.prefix is not None:
+            prompt = options.prefix + prompt
+        if options.suffix is not None:
+            prompt = prompt + options.suffix 
+        completion = gen_completion(prompt, model)
         response = completion["choices"][0]["text"]
-        print(response)
+        eval_output = {"query_id": prompt_example["query_id"], "prompt": prompt, "gold_sql_query": prompt_example["output"]}
         sql = re.sub(".*(SELECT.*;).*", r"\1", response, count=0, flags=0)
         if sql is not None:
             print(sql)
+            eval_output["gen_sql_query"] = sql
+        else:
+            eval_output["gen_sql_query"] = None
+        eval_outputs.append(eval_output)
         if idx > 10:
             break
+    with open("eval_queries.json", "w") as file:
+        json.dump(eval_outputs, file, indent=4)
+
 
 
 if __name__ == "__main__":
     main(sys.argv[1:])
+
