@@ -6,7 +6,10 @@ from langchain.memory import ConversationBufferMemory
 from langchain.memory.chat_message_histories.in_memory import ChatMessageHistory
 
 from heavynl.api.models import SessionInfo
+from heavynl.config import get_config
+from heavynl.langchain.llms import get_chat_llm
 from heavynl.langchain.agents.convo_agent import create_conversational_agent
+from heavynl.langchain.callbacks import StreamingChatCallbackHandler
 
 
 class ChatNamespace(Namespace):
@@ -26,7 +29,16 @@ class ChatNamespace(Namespace):
         retrieved_memory = ConversationBufferMemory(
             chat_memory=retrieved_chat_history, memory_key="chat_history", return_messages=True, ai_prefix="Assistant"
         )
-        sql_agent = create_conversational_agent(memory=retrieved_memory)
+        stream_handler = StreamingChatCallbackHandler()
+        chat_llm = get_chat_llm(
+            ["agent", "conversational_sql_agent"],
+            temperature=0,
+            model=get_config().openai_gpt_model,
+            streaming=True,
+            callbacks=[stream_handler],
+        )
+        sql_agent = create_conversational_agent(chat_llm=chat_llm, memory=retrieved_memory, verbose=True)
+
         # generate answer
         answer = sql_agent.run(input=question)
         # save the along with the question and session id to SessionInfo db table.
@@ -35,6 +47,7 @@ class ChatNamespace(Namespace):
         user_session.save()
         # emits answer event to WS client for displaying
         emit("answer", {"data": answer})
+        emit("endToken", {"data": answer})
 
     def on_connect(self):
         """
