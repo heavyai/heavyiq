@@ -77,7 +77,7 @@ keywords = "auto|char|const|double|extern|float|long long|long|short|static|unsi
 # and misc unquoted strings for SQL-92
 keywords += "|edition1987|edition1989|edition1992|iso|standard|IntegrityNo|IntegrityYes|Low|Intermediate|High"
 content.gsub!(rule_regex) do |rule|
-  rule.gsub Regexp.new('(\s)(%s)(\s|$)' % keywords, 'm'), '\1"\2"\3'
+  rule.gsub Regexp.new('(\s)(%s)(\s|$)' % keywords, Regexp::MULTILINE), '\1"\2"\3'
 end
 
 # Parenthesize multi-line definitions
@@ -86,10 +86,10 @@ content.gsub!(rule_regex) { $&.sub(%r{(.*?\n)(.*)}m, "\\1(\\2\n)") }
 
 # Quote single-character definitions
 # and SQL-92: <> >= <= || ..
-content.gsub!(Regexp.new '^(%s ::= )(\S\W?)(?=\n\n)' % name_class, 'm') { "#$1#{$2.inspect}" }
+content.gsub!(Regexp.new '^(%s ::= )(\S\W?)(?=\n\n)' % name_class, Regexp::MULTILINE) { "#$1#{$2.inspect}" }
 
 # Quote trigraphs
-content.gsub!(Regexp.new '^(%s?-trigraph ::= )(\S+)(?=\n\n)' % name_class, 'm') { "#$1#{$2.inspect}" }
+content.gsub!(Regexp.new '^(%s?-trigraph ::= )(\S+)(?=\n\n)' % name_class, Regexp::MULTILINE) { "#$1#{$2.inspect}" }
 
 # Quote tokens in Ada-qualified-type-specification
 content.gsub! 'Interfaces.SQL', '"\&"'
@@ -155,7 +155,7 @@ syntax_rules = {
   'PL-I-host-identifier' => '"TODO"',
   'direct-implementation-defined-statement' => '"TODO"'
 }
-content.gsub!(Regexp.new '^(%s)\s+::=.*' % syntax_rules.keys.join('|'), 'm') { "#$1 ::= #{syntax_rules[$1]}" }
+content.gsub!(Regexp.new '^(%s)\s+::=.*' % syntax_rules.keys.join('|')) { "#$1 ::= #{syntax_rules[$1]}" }
 
 # Define rules if they were invoked but not defined.
 undefined_sql_rules = {
