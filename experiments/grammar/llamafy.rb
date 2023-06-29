@@ -19,6 +19,8 @@
 # Usage: ./llamafy.rb < sql-2003-2.bnf > sql-2003-2.gbnf
 # Also works with sql-92.bnf.
 
+require 'set'
+
 content = ARGF.read
 
 # Comment header lines prior to first comment
@@ -50,18 +52,32 @@ content.gsub!(angle_rule_regex) do |rule|
        gsub(Regexp.new('(<%s>)(\S)' % name_class), '\1 \2')
 end
 
-# Quote C keywords
-keywords = "auto|char|const|double|extern|float|long|short|static|volatile"
-# and misc unquoted strings for SQL-92
-keywords += "|edition1987|edition1989|edition1992|iso|standard|IntegrityNo|IntegrityYes|Low|Intermediate|High"
-content.gsub!(angle_rule_regex) do |rule|
-  rule.gsub Regexp.new('(\s)(%s)(\s|$)' % keywords, 'm'), '\1"\2"\3'
-end
-
 # Remove angle brackets from names.
 # Replace non-alphanumeric characters (spaces, dashes, slashes, colons) w/ dashes.
+defined_rules = Set.new
+invoked_rules = Set.new
 content.gsub!(angle_rule_regex) do |rule|
-  rule.gsub(Regexp.new "<(#{name_class})>") { $1.gsub(/\W/, '-') }
+  is_definition = true
+  rule.gsub(Regexp.new "<(#{name_class})>") do
+    name = $1.gsub(/\W/, '-')
+    if is_definition
+      defined_rules << name
+      is_definition = false
+    else
+      invoked_rules << name
+    end
+    name
+  end
+end
+undefined_rules = invoked_rules - defined_rules
+rule_regex = %r{(?<=\n\n)\w.*?(?=\n\n)}m
+
+# Quote C keywords
+keywords = "auto|char|const|double|extern|float|long long|long|short|static|unsigned char|unsigned short|unsigned|volatile"
+# and misc unquoted strings for SQL-92
+keywords += "|edition1987|edition1989|edition1992|iso|standard|IntegrityNo|IntegrityYes|Low|Intermediate|High"
+content.gsub!(rule_regex) do |rule|
+  rule.gsub Regexp.new('(\s)(%s)(\s|$)' % keywords, 'm'), '\1"\2"\3'
 end
 
 # Parenthesize multi-line definitions
@@ -140,6 +156,27 @@ syntax_rules = {
   'direct-implementation-defined-statement' => '"TODO"'
 }
 content.gsub!(Regexp.new '^(%s)\s+::=.*' % syntax_rules.keys.join('|'), 'm') { "#$1 ::= #{syntax_rules[$1]}" }
+
+# Define rules if they were invoked but not defined.
+undefined_sql_rules = {
+  "bit-string-literal" => '"TODO"', # SQL-2003
+  "handler-declaration" => '"TODO"', # SQL-2003
+  "hex-string-literal" => '"TODO"', # SQL-2003
+  "numeric-value-expression-dividend" => '"TODO"', # SQL-2003
+  "numeric-value-expression-divisor" => '"TODO"', # SQL-2003
+  "slash" => '"/"', # SQL-2003
+  "unqualified-schema-name" => '"TODO"', # SQL-2003
+  "white-space" => '[ \t\n]+' # SQL-2003
+}
+undefined_rules.each do |name|
+  if definition = undefined_sql_rules[name]
+    content += "\n#{name} ::= #{definition}\n"
+    undefined_rules.delete name
+  end
+end
+
+# Abort if any rules remain undefined and list them.
+abort "Some rules are undefined: #{undefined_rules}" if !undefined_rules.empty?
 
 # Define root as required by parser
 content += "\nroot ::= direct-SQL-statement\n"
