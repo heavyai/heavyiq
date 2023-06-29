@@ -8,6 +8,10 @@ from confz.exceptions import ConfZException, ConfZFileException
 from confz.loaders.file_loader import FileLoader
 from pydantic import BaseModel
 
+# These overrides are responsible for modifying the default behaviour of the ConfZ library.
+# 1. Treating a .conf file as TOML
+# 2. Allowing the ConfZ class to be mutable
+
 
 class OverrideFileLoader(FileLoader):
     @classmethod
@@ -20,7 +24,7 @@ class OverrideFileLoader(FileLoader):
             ".yaml": FileFormat.YAML,
             ".json": FileFormat.JSON,
             ".toml": FileFormat.TOML,
-            ".conf": FileFormat.TOML,
+            ".conf": FileFormat.TOML,  # 1. Treat .conf as TOML
         }
         suffix = file_path.suffix
         try:
@@ -96,7 +100,7 @@ class OverrideConfZ(BaseModel, metaclass=OverrideConfZMetaclass):
     listeners: ClassVar[Optional[list[Any]]] = None  #: *for internal use only*
 
     class Config:
-        allow_mutation = False
+        allow_mutation = True  # 2. Allow ConfZ to be mutable
 
     @classmethod
     def change_config_sources(cls, config_sources: ConfZSources) -> AbstractContextManager:
