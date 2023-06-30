@@ -147,37 +147,35 @@ class BaseNltoSQLChain(BaseChain):
         """
         config = get_config()
         if config.custom_llm is None or config.custom_llm.type == "AZURE":
-            table_info = self.database.get_table_info(table_names=table_names_to_use)
             token_limit = get_token_limit(self.llm.model_name)  # type: ignore
-            if (
-                self.llm.get_num_tokens(
-                    self.prompt.format(input=input_text, dialect=self.database.dialect, table_info=table_info)
-                )
-                > token_limit
-            ):
-                table_info = self.database.get_table_info(table_names=table_names_to_use, include_top_k=False)
-            if (
-                self.llm.get_num_tokens(
-                    self.prompt.format(input=input_text, dialect=self.database.dialect, table_info=table_info)
-                )
-                > token_limit
-            ):
-                table_info = self.database.get_table_info(table_names=table_names_to_use, include_samples=False)
-            if (
-                self.llm.get_num_tokens(
-                    self.prompt.format(input=input_text, dialect=self.database.dialect, table_info=table_info)
-                )
-                > token_limit
-            ):
-                table_info = self.database.get_table_info(
-                    table_names=table_names_to_use, include_samples=False, include_top_k=False
-                )
+            token_counter = self.llm.get_num_tokens
         else:
-            table_info = self.database.get_table_info(
-                table_names=table_names_to_use, include_samples=False, include_top_k=False
-            )
+            from transformers import LlamaTokenizer
 
-        return table_info
+            tokenizer = LlamaTokenizer.from_pretrained("./heavynl/langchain/llama_model", local_files_only=True)
+            token_limit = config.custom_llm.api_context_window - 306  # (256 response + 50 buffer)
+
+            def token_counter(text: str) -> int:
+                """Token counter for the Llama model."""
+                return len(tokenizer.tokenize(text))
+
+        table_info_options = [
+            {},
+            {"include_top_k": False},
+            {"include_samples": False},
+            {"include_samples": False, "include_top_k": False},
+        ]
+
+        for options in table_info_options:
+            table_info = self.database.get_table_info(table_names=table_names_to_use, **options)
+            formatted_prompt = self.prompt.format(
+                input=input_text, dialect=self.database.dialect, table_info=table_info
+            )
+            if token_counter(formatted_prompt) <= token_limit:
+                print(token_counter(formatted_prompt))
+                break
+
+        return table_info  # type: ignore
 
 
 class NLtoSQLChain(BaseNltoSQLChain):
@@ -230,7 +228,7 @@ class NLtoSQLChain(BaseNltoSQLChain):
                 retry_llm_inputs = {
                     "input": input_text,
                     "sql_cmd": sql_cmd,
-                    "error": f"{str(e)} \nNewSQLQuery:",
+                    "error": f"{str(e)[0:150]} \nNewSQLQuery:",
                     "dialect": self.database.dialect,
                     "table_info": table_info,
                     "stop": ["\nNewSQLQuery:"],

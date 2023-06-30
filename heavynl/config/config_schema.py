@@ -15,11 +15,8 @@ class LogConfig(OverrideConfZ):  # type: ignore
 class CustomLLMConfig(OverrideConfZ):  # type: ignore
     type: str
     """ 'API' or 'LOCAL' or 'AZURE' """
-    local_llm_path: str = ""
-    local_llm_n_gpu_layers: int = 40
-    local_llm_n_batch: int = 512
-    local_llm_n_ctx: int = 2048
     api_base: str = ""
+    api_context_window: int = 2048
     openai_api_version: str = "2023-03-15-preview"
     openai_api_base: str = ""
     azure_deployment_name: str = ""
