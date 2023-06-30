@@ -1,4 +1,4 @@
-from langchain.llms import AzureOpenAI, OpenAI, LlamaCpp
+from langchain.llms import AzureOpenAI, OpenAI
 from langchain.llms.base import BaseLLM
 from langchain.llms.promptlayer_openai import PromptLayerOpenAI
 from langchain.chat_models import PromptLayerChatOpenAI, ChatOpenAI, AzureChatOpenAI
@@ -38,14 +38,6 @@ def get_llm(tags: list[str] = [], **kwargs) -> BaseLLM:
                 )
             else:
                 return OpenAI(openai_api_key="nothing", openai_api_base=custom.api_base, **kwargs)
-        elif custom.type == "LOCAL":
-            return LlamaCpp(
-                model_path=custom.local_llm_path,
-                n_gpu_layers=custom.local_llm_n_gpu_layers,
-                n_batch=custom.local_llm_n_batch,
-                n_ctx=custom.local_llm_n_ctx,
-                **kwargs
-            )
     if is_promptlayer_active:
         return PromptLayerOpenAI(pl_tags=tags, return_pl_id=True, openai_api_key=config.openai_api_key, **kwargs)
     else:

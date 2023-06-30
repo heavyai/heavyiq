@@ -27,7 +27,12 @@ def get_token_limit(model_name: str, response_tokens: int = 256) -> int:
     The function checks if the model_name starts with any of the known prefixes defined in the `model_limits` dictionary,
     and subtracts the `response_tokens` and a buffer of 50 tokens from the corresponding limit.
     If the model_name does not start with any of the known prefixes, it defaults to a limit of 4096 tokens.
+    If a custom API LLM is being used, `custom_llm.api_context_window` is used as the limit.
     """
+
+    config = get_config()
+    if config.custom_llm is not None and config.custom_llm.type == "API":
+        return config.custom_llm.api_context_window - response_tokens - 50
 
     model_limits = {
         "gpt-3.5-turbo-16k": 16384,
