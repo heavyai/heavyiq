@@ -117,14 +117,60 @@ def uppercase_sql_keywords(sql):
     new_sql = "".join(token for token in parsed_tokens)
     return new_sql
 
+def adjust_identifier_case(table_statements: list[str], query: str) -> str:
+    # Build a map for all column names
+    column_map = {}
+    table_map = {}
+    for statement in table_statements:
+        parsed = sqlparse.parse(statement)[0]
 
-# def uppercase_sql_keywords(sql):
-#    formatted_sql = sqlparse.format(sql, keyword_case="upper")
-#    sub_list = ["sum(", "Sum(", "avg(", "Avg(", "count(", "Count(", "min(", "Min(", "max(", "Max("]
-#    for sub in sub_list:
-#        formatted_sql = formatted_sql.replace(sub, sub.upper())
-#    return formatted_sql
+        # Extract and add the table name to the table map
+        table_name = str(parsed.tokens[4]).split("(")[0]
+        table_map[table_name.lower()] = table_name
 
+        # Extract the column definitions from the statement using a regex
+        # The regex matches any string that does not contain parentheses
+        columns_and_definitions = re.findall(r"\((.*?)\)\s*;", statement)[-1]
+        columns = columns_and_definitions.split(",")
+
+        # Add the columns to the column map
+        for column in columns:
+            column_name = column.split()[0]
+            column_map[column_name.lower()] = column_name
+
+    # Split the query and replace column names with their original case
+    select_parts = query.split()
+    for i, part in enumerate(select_parts):
+        # Strip trailing commas if they exist
+        part_stripped = part.rstrip(",;")
+        # Check if the part is a function call
+        if "(" in part_stripped and ")" in part_stripped:
+            function_name, rest = part_stripped.split("(", 1)
+            column_name, rest = rest.rsplit(")", 1)
+            if column_name.lower() in column_map:
+                select_parts[i] = (
+                    function_name
+                    + "("
+                    + column_map[column_name.lower()]
+                    + ")"
+                    + rest
+                    + ("," if part[-1] == "," else "")
+                    + (";" if part[-1] == ";" else "")
+                )
+        elif "." in part_stripped:
+            table, column = part_stripped.split(".")
+            if column.lower() in column_map:
+                # Preserve the trailing comma if it was present
+                select_parts[i] = f"{table}.{column_map[column.lower()]}" + ("," if part[-1] == "," else "")
+        elif part_stripped.lower() in column_map:
+            # Preserve the trailing comma if it was present
+            select_parts[i] = column_map[part_stripped.lower()] + ("," if part[-1] == "," else "")
+        elif part_stripped.lower() in table_map:
+            select_parts[i] = table_map[part_stripped.lower()] + (";" if part[-1] == ";" else "")
+
+    # Combine the parts again
+    output_query = " ".join(select_parts)
+    return output_query
 
 def getQueriesByDB(queries_file):
     queries_df = pd.read_csv(queries_file)
@@ -139,7 +185,7 @@ def getQueriesByDB(queries_file):
         if db_id not in queries_by_db:
             queries_by_db[db_id] = [
                 {
-                    "query_id": query_id,
+                    "query_id": str(query_id),
                     "question": question,
                     "original_sql_query": original_sql_query,
                     "modified_sql_query": modified_sql_query,
@@ -148,7 +194,7 @@ def getQueriesByDB(queries_file):
         else:
             queries_by_db[db_id].append(
                 {
-                    "query_id": query_id,
+                    "query_id": str(query_id),
                     "question": question,
                     "original_sql_query": original_sql_query,
                     "modified_sql_query": modified_sql_query,
@@ -400,6 +446,7 @@ def main(argv):
                 sql_query = re.sub(" ,", ",", sql_query)
                 sql_query = sql_query + ";" if sql_query[-1] != ";" else sql_query
                 sql_query = uppercase_sql_keywords(sql_query)
+                sql_query = adjust_identifier_case(table_schemas, sql_query)
 
                 # print(f"Query ID: {query_id}")
                 # print(f"SQL Query: {sql_query}")
@@ -457,9 +504,9 @@ def main(argv):
         fixes_df = pd.DataFrame(fixed_queries)
         fixes_df.to_csv("fixed_queries.csv", index=False)
     if options.write_prompts:
-        with open("sql_training_prompts.json", "w") as file:
+        with open("sql_all_prompts.json", "w") as file:
             json.dump(prompts, file, indent=4)
-        write_prompts_to_csv(prompts, "sql_training_prompts.csv")
+        write_prompts_to_csv(prompts, "sql_all_prompts.csv")
     print(f"\n\nTotal successful queries: {total_successful_queries}/{total_queries}")
     print(f"Total successful fixed queries: {len(fixed_queries)}/{total_queries}")
     # print(f"Total successful altered queries: {total_successful_altered_queries}/{total_queries}")
