@@ -14,7 +14,7 @@ class LogConfig(OverrideConfZ):  # type: ignore
 
 class CustomLLMConfig(OverrideConfZ):  # type: ignore
     type: str
-    """ 'API' or 'LOCAL' or 'AZURE' """
+    """ 'API' or 'AZURE' """
     api_base: str = ""
     api_context_window: int = 2048
     openai_api_version: str = "2023-03-15-preview"
