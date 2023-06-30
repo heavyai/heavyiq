@@ -20,6 +20,7 @@ COPY --from=obfuscator /usr/src/app/dist/ ./
 COPY --from=obfuscator /usr/src/app/requirements.txt ./requirements.txt
 COPY --from=obfuscator /usr/src/app/config.toml ./config.toml
 COPY --from=obfuscator /usr/src/app/heavynl/api/heavyiq-spec.yaml ./heavynl/api/heavyiq-spec.yaml
+COPY --from=obfuscator /usr/src/app/heavynl/langchain/llama_model/ ./heavynl/langchain/llama_model/
 RUN pip install --no-cache-dir --upgrade -r ./requirements.txt
 
 EXPOSE 8000
