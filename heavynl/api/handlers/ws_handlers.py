@@ -2,9 +2,9 @@ from typing import Any
 
 from flask import request
 from flask_socketio import Namespace, close_room, emit, join_room
-from langchain.memory import ConversationBufferMemory
 from langchain.memory.chat_message_histories.in_memory import ChatMessageHistory
 
+from heavynl.logging_utils import get_heavynl_logger
 from heavynl.api.models import SessionInfo
 from heavynl.config import get_config
 from heavynl.langchain.llms import get_chat_llm
@@ -24,11 +24,9 @@ class ChatNamespace(Namespace):
         question = message["question"]
         session_id = message["sessionID"]
         user_session = SessionInfo.query.filter_by(session_id=session_id).first()
-        retrieved_messages = user_session.get_chat_messages()
-        retrieved_chat_history = ChatMessageHistory(messages=retrieved_messages)
-        retrieved_memory = ConversationBufferMemory(
-            chat_memory=retrieved_chat_history, memory_key="chat_history", return_messages=True, ai_prefix="Assistant"
-        )
+        retrieved_chat_history = ChatMessageHistory(messages=user_session.get_chat_messages())
+        retrieved_sql_history = ChatMessageHistory(messages=user_session.get_sql_messages())
+
         stream_handler = StreamingChatCallbackHandler()
         chat_llm = get_chat_llm(
             ["agent", "conversational_sql_agent"],
@@ -37,14 +35,23 @@ class ChatNamespace(Namespace):
             streaming=True,
             callbacks=[stream_handler],
         )
-        sql_agent = create_conversational_agent(chat_llm=chat_llm, memory=retrieved_memory, verbose=True)
+        sql_agent = create_conversational_agent(
+            chat_llm=chat_llm, chat_history=retrieved_chat_history, sql_history=retrieved_sql_history, verbose=True
+        )
 
         # generate answer
-        answer = sql_agent.run(input=question)
-        # save the along with the question and session id to SessionInfo db table.
-        user_session.add_message(question)
-        user_session.add_message(answer)
-        user_session.save()
+        answer = sql_agent.run(question)
+        try:
+            # save the chat and sql history along with the question and session id to SessionInfo db table.
+            message_history = sql_agent.memory.load_memory_variables({})
+            chat_message_history, sql_message_history = message_history["chat_history"], message_history["last_run_sql"]
+            user_session.add_chat_message((chat_message_history[-2], chat_message_history[-1]))
+            if sql_message_history:
+                user_session.add_sql_message((sql_message_history[-2], sql_message_history[-1]))
+
+            user_session.save()
+        except Exception as e:
+            get_heavynl_logger().error(f"Failed to save chat and sql history, {e}")
         # emits answer event to WS client for displaying
         emit("answer", {"data": answer})
         emit("endToken", {"data": answer})

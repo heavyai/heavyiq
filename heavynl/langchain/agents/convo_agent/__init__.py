@@ -1,12 +1,9 @@
 import json
 import re
-from typing import Any, Optional
 from collections.abc import Sequence
+from typing import Any, Optional
 
-from langchain.memory import ConversationBufferMemory
-from langchain.memory.chat_memory import BaseChatMemory
-from langchain.chat_models.base import BaseChatModel
-from langchain.schema import AgentAction, AgentFinish
+from langchain.memory.chat_message_histories.in_memory import ChatMessageHistory
 from langchain.agents import AgentExecutor, AgentOutputParser, BaseMultiActionAgent, BaseSingleActionAgent
 from langchain.agents.conversational_chat.base import ConversationalChatAgent
 from langchain.agents.conversational_chat.prompt import PREFIX, SUFFIX
@@ -14,6 +11,7 @@ from langchain.callbacks.base import BaseCallbackManager
 from langchain.callbacks.manager import Callbacks
 from langchain.chat_models.base import BaseChatModel
 from langchain.memory import CombinedMemory, ConversationBufferMemory
+from langchain.memory.chat_memory import BaseChatMemory
 from langchain.prompts.base import BasePromptTemplate
 from langchain.prompts.chat import (
     ChatPromptTemplate,
@@ -30,8 +28,7 @@ from heavynl.langchain.agents import HeavyDBToolkit
 from heavynl.langchain.callbacks import ConvoAgentCallbackHandler
 from heavynl.langchain.llms import get_chat_llm
 from heavynl.langchain.memory import HeavyNLQueryBufferWindowMemory
-from heavynl.logging_utils import heavynl_logger as logger
-
+from heavynl.logging_utils import get_heavynl_logger
 
 SYSTEM_MESSAGE = """Assistant is a large language model trained by OpenAI.
 
@@ -160,7 +157,7 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
         """
         return next(i for i in self.memory.memories if isinstance(i, HeavyNLQueryBufferWindowMemory))
 
-    def _save_to_sql_memory(self, response: dict[str, Any]) -> bool:
+    def _save_to_sql_memory(self, response: dict[str, Any]) -> Optional[str]:
         """
         Helps to save the agentexecutor return to HeavyNLQueryBufferWindowMemory.
         """
@@ -171,8 +168,8 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
                 inputs = {heavynl_buffer_memory.input_key: response["input"]}
                 outputs = {heavynl_buffer_memory.output_key: agent_action.tool_input}
                 heavynl_buffer_memory.save_context(inputs, outputs, manual_save=True)
-                return True
-        return False
+                return agent_action.tool_input
+        return None
 
     def run(self, question: str, callbacks: Callbacks = None, tags: list[str] | None = None, **kwargs: Any) -> str:
         """
@@ -180,9 +177,9 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
         """
         inputs = {"input": question}
         response = self.__call__(inputs=inputs, callbacks=callbacks, tags=tags, **kwargs)
-        status = self._save_to_sql_memory(response=response)
-        if status:
-            logger.debug("Saved the last success query")
+        saved_query = self._save_to_sql_memory(response=response)
+        if saved_query:
+            get_heavynl_logger().debug(f"Saved the last success query, \n{saved_query}")
         return response["output"]
 
     @classmethod
@@ -190,7 +187,6 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
         cls: type["SaveSuccessQueryAgentExecutor"],
         agent: BaseSingleActionAgent | BaseMultiActionAgent,
         tools: Sequence[BaseTool],
-        memory: Optional[BaseChatMemory] = None,
         callback_manager: Optional[BaseCallbackManager] = None,
         last_k: int = 1,
         **kwargs: Any,
@@ -207,8 +203,11 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
         Args:
             last_k [int] - last n successfull queries to save to the buffer.
         """
+        kwargs.pop("memory", None)
         kwargs.pop("return_intermediate_steps", None)
-        convo_memory = memory or ConversationBufferMemory(
+        chat_history, sql_history = kwargs.pop("chat_history", None), kwargs.pop("sql_history", None)
+        convo_memory = ConversationBufferMemory(
+            chat_memory=chat_history or ChatMessageHistory(),
             memory_key="chat_history",
             return_messages=True,
             ai_prefix="Assistant",
@@ -216,7 +215,12 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
             output_key="output",
         )
         latest_run_sql_memory = HeavyNLQueryBufferWindowMemory(
-            memory_key="last_run_sql", k=last_k, input_key="input", return_messages=True, output_key="output"
+            chat_memory=sql_history or ChatMessageHistory(),
+            memory_key="last_run_sql",
+            k=last_k,
+            input_key="input",
+            return_messages=True,
+            output_key="output",
         )
         combined_memory = CombinedMemory(memories=[convo_memory, latest_run_sql_memory])
         return cls(
@@ -244,8 +248,9 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
 def create_conversational_agent(
     heavydb: Optional[HeavyDB] = None,
     chat_llm: Optional[BaseChatModel] = None,
+    chat_history: Optional[ChatMessageHistory] = None,
+    sql_history: Optional[ChatMessageHistory] = None,
     verbose: bool = False,
-    memory: Optional[BaseChatMemory] = None,
 ) -> AgentExecutor:
     """This function creates an AgentExecutor instance that uses a language model to generate responses
     based on user inputs. The agent is designed to interact with a HeavyDB instance and has access
@@ -260,8 +265,8 @@ def create_conversational_agent(
     responses. If not provided, a default ChatOpenAI instance with GPT-4 will be used.
     - verbose (bool, optional): If True, the AgentExecutor will print additional information during
     execution. Defaults to False.
-    - memory (Optional[BaseChatMemory]): Support for passing memory to the agent executor. ie,
-    we can passed retrieved memory to the agent executor to pre-load prompt with saved chat history.
+    - chat_history (ChatMessageHistory, optional): history of chat messages for pre-loading
+    - sql_history (ChatMessageHistory, optional): history of sql messages for pre-loading
 
     Returns:
     - AgentExecutor: An AgentExecutor instance configured with the conversational agent and the set
@@ -282,6 +287,7 @@ def create_conversational_agent(
         tools=tools,
         last_k=1,
         verbose=verbose,
-        memory=memory,
+        chat_history=chat_history,
+        sql_history=sql_history,
         callbacks=[ConvoAgentCallbackHandler()],
     )
