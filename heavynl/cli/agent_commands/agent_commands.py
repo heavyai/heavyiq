@@ -1,11 +1,12 @@
 import click
+
 from heavynl.langchain.agents.chat_agent import create_sql_agent
 from heavynl.langchain.agents.convo_agent import create_conversational_agent
 from heavynl.langchain.agents.convo_functions_agent import create_conversational_function_agent
 from heavynl.langchain.logging import log_agent_call
 from heavynl.langchain.llms import get_chat_llm
+
 from .agent_messages import HumanConvoMessage, AIConvoMessage
-from heavynl.logging_utils import default_logger as logger
 
 
 @click.group()
@@ -67,7 +68,7 @@ def conversational(
             break
         # show "Processing..." until the answer returns and then show the answer in its place
         print("Processing...", end="\r")
-        answer = sql_agent.run(input=question)
+        answer = sql_agent.run(question)  # type: ignore
         print(AIConvoMessage(message=answer).colorize())
 
 

@@ -10,12 +10,16 @@ def strip_sql_comments(sql: str) -> str:
     sql = re.sub(r"--.*$", "", sql, flags=re.MULTILINE)
     # Remove anything after the last semicolon
     sql = re.sub(r";[^;]*$", ";", sql, flags=re.DOTALL)
-    # Remove triple backticks
-    sql = re.sub(r"```", "", sql)
+    # Remove triple backticks, and ```sql if present
+    sql = re.sub(r"```(sql)?", "", sql)
     # Remove leading and trailing double-quotes and single quotes
     sql = sql.strip("'\"")
     # Remove leading and trailing newlines
-    return re.sub(r"^\n+|\n+$", "", sql).strip()
+    sql = re.sub(r"^\n+|\n+$", "", sql).strip()
+    # If SQL doesn't end with a semicolon, add one
+    if not sql.endswith(";"):
+        sql += ";"
+    return sql
 
 
 def is_destructive_sql(sql: str) -> bool:
@@ -36,3 +40,29 @@ def is_destructive_sql(sql: str) -> bool:
 
     # Check if the first part of the SQL statement is in the destructive_statements set
     return sql_parts[0] in destructive_statements
+
+
+def rate_sql_complexity(plan: str) -> int:
+    """
+    Rates the complexity of a SQL query based on the provided plan string.
+    """
+
+    # define patterns for each level of complexity
+    patterns = {
+        5: r"LogicalJoin|LogicalCorrelate|LogicalUnion|RelLeftDeepInnerJoin|RexWindowFunctionOperator",
+        4: r"LogicalProject|RexSubQuery",
+        3: r"LogicalAggregate|RexAgg",
+        2: r"LogicalFilter|RexLiteral|RexOperator",
+    }
+
+    # start with the lowest complexity
+    complexity = 1
+
+    # check for features indicating higher complexity
+    for level in range(5, 1, -1):
+        if re.search(patterns[level], plan, re.IGNORECASE):
+            complexity = level
+            break
+
+    # return the final complexity rating
+    return complexity

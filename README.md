@@ -1,7 +1,7 @@
-# HeavyNL - Natural Language Interface for HeavyDB
+# HeavyIQ - Natural Language Interface for HeavyDB
 
-HeavyNL is a python module that serves as a natural language interface to interact with HeavyDB. The application uses [LangChain](https://python.langchain.com/en/latest/index.html) and Large Language Models to process user’s natural language questions and provide corresponding answers based on the data in the database. The module provides a simple REST API for querying the database using natural language questions.
-The application also provides a CLI interface for quick interactions with the HeavyNL agent.
+HeavyIQ is a python module that serves as a natural language interface to interact with HeavyDB. The application uses [LangChain](https://python.langchain.com/en/latest/index.html) and Large Language Models to process user’s natural language questions and provide corresponding answers based on the data in the database. The module provides a simple REST API for querying the database using natural language questions.
+The application also provides a CLI interface for quick interactions with the HeavyIQ agent.
 
 ## Setup
 
@@ -49,3 +49,27 @@ You should now be able to access the API Documentation at [http://localhost:5000
 ```bash
 $ python cli.py --help
 ```
+
+## Integration Tests
+```bash
+# App must be running locally
+$ python -m unittest discover
+```
+
+## Deployment
+
+### Create Obfuscated Build
+
+```bash
+pyarmor gen ./modules
+cp app.py ./dist/app.py
+```
+
+### Run Production Server Process
+
+```bash
+$ gunicorn -w 4 'heavynl.api:get_app("./path/to/heavy.conf")'
+```
+
+Port can be specified in above command with command line flag `-b :8080`
+

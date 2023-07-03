@@ -5,8 +5,6 @@ from logging.handlers import RotatingFileHandler
 import sys
 from heavynl.config import get_log_config
 
-LOG_CONFIG = get_log_config()
-
 
 def get_default_formatter() -> logging.Formatter:
     log_format = "%(asctime)s %(remote_addr)s - %(username)s [%(levelname)s] %(pathname)s:%(lineno)d - %(message)s"
@@ -181,6 +179,30 @@ class _AppLogger(BaseLogger):
         )
 
 
-_app_logger = _AppLogger(log_file_path=LOG_CONFIG.app_log_file, level=LOG_CONFIG.app_log_level)
-heavynl_logger = HeavyNLLogger(log_file_path=LOG_CONFIG.heavynl_log_file, level=LOG_CONFIG.heavynl_log_level)
-default_logger = heavynl_logger
+_app_logger = None
+heavynl_logger = None
+default_logger = None
+
+
+# had to add this so the logs didn't init the config before we passed the config path
+def init_logs():
+    global _app_logger, heavynl_logger, default_logger
+    LOG_CONFIG = get_log_config()
+
+    _app_logger = _AppLogger(log_file_path=LOG_CONFIG.app_log_file, level=LOG_CONFIG.app_log_level)
+    heavynl_logger = HeavyNLLogger(log_file_path=LOG_CONFIG.heavyiq_log_file, level=LOG_CONFIG.heavyiq_log_level)
+    default_logger = heavynl_logger
+
+
+def _get_app_logger() -> _AppLogger:
+    global _app_logger
+    if _app_logger is None:
+        init_logs()
+    return _app_logger  # type: ignore
+
+
+def get_heavynl_logger() -> HeavyNLLogger:
+    global heavynl_logger
+    if heavynl_logger is None:
+        init_logs()
+    return heavynl_logger  # type: ignore

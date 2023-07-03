@@ -1,13 +1,11 @@
 openapi: '3.0.0'
 info:
-  title: HeavyAnalyst API
+  title: HeavyIQ API
   version: "0.1"
-  description: A simple REST API for interacting with HeavyNL
+  description: A simple REST API for interacting with HeavyIQ
 paths:
   /query:
     post:
-      tags:
-        - OptionalTables
       summary: Provided a question and (optionally) table(s), returns SQL that can be used to answer the question
       operationId: heavynl.api.handlers.query
       requestBody:
@@ -31,8 +29,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
   /question:
     post:
-      tags:
-        - OptionalTables
       summary: Provided a question and (optionally) tables(s), returns SQL and a NL Answer to the question
       operationId: heavynl.api.handlers.question
       requestBody:
@@ -54,35 +50,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /metadata-index/add-tables:
-    post:
-      tags:
-        - Metadata
-      summary: Generate summary docs and add them to metadata index. Overwrites existing docs if present.
-      operationId: heavynl.api.handlers.add_tables
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DatabaseTables'
+  /health:
+    get:
+      summary: Health check endpoint
+      operationId: heavynl.api.handlers.health
       responses:
         200:
-          description: Success
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: Tables successfully added to Metadata Index
-        500:
-          description: Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          description: Success, the service is healthy
 components:
   schemas:
     DatabaseTables:
@@ -93,16 +67,19 @@ components:
           type: array
           items:
             type: string
-        databaseName:
+        database_name:
           type: string
           description: Name of the database
+        session_id:
+          type: string
+          description: Valid HeavyDB Session ID
       required:
-        - databaseName
         - tables
+        - session_id
       example:
         tables:
           - usa_states
-        databaseName: heavynl
+        session_id: xxxxx
     DatabaseQuestionAndTablesRequest:
       allOf:
         - $ref: '#/components/schemas/DatabaseTables'
@@ -123,8 +100,12 @@ components:
       properties:
         sql:
           type: string
+        sql_complexity:
+          type: integer
+          description: The complexity level of the SQL statement
       example:
         sql: SELECT COUNT(*) AS num_states, STATE_NAME FROM usa_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;
+        sql_complexity: 3
     Answer:
       type: object
       description: Natural language answer

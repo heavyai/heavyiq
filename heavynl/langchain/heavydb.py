@@ -6,7 +6,7 @@ from typing import Optional, Any, Iterable, TYPE_CHECKING
 
 from heavyai import connect
 from heavynl.config import get_config
-from heavynl.utils import strip_sql_comments, is_destructive_sql
+from heavynl.utils import strip_sql_comments, is_destructive_sql, rate_sql_complexity
 
 if TYPE_CHECKING:
     from heavyai import Connection
@@ -86,20 +86,13 @@ class HeavyDB:
         return cls(conn, **kwargs)
 
     @classmethod
-    def from_session(cls: type[HeavyDB], session_id: str, dbname: Optional[str] = None, **kwargs: Any) -> HeavyDB:
+    def from_session(cls: type[HeavyDB], session_id: str, **kwargs: Any) -> HeavyDB:
         """Create a database connection from a session id."""
         config = get_config()
-        if not config.heavydb_username or not config.heavydb_password:
-            raise ValueError("Please set the config variables heavydb_username, heavydb_password")
-        if not config.heavydb_dbname and not dbname:
-            raise ValueError(
-                "Please set the config variable heavydb_dbname or provide a dbname as an argument to HeavyDB.from_session"
-            )
         conn: Connection = connect(
             sessionid=session_id,
             host=config.heavydb_host,
             port=config.heavydb_port,
-            dbname=dbname or config.heavydb_dbname,
         )
         return cls(conn, **kwargs)
 
@@ -162,6 +155,8 @@ class HeavyDB:
         query = strip_sql_comments(query)
         if is_destructive_sql(query):
             raise ValueError("Destructive SQL is not allowed")
+        if "::" in query:
+            raise ValueError("Double colon cast syntax is not allowed. Use CAST() instead.")
         with self.lock:
             return self._conn._client.sql_validate(self._conn._session, query)
 
@@ -269,6 +264,19 @@ class HeavyDB:
         else:
             raise ValueError("Fetch parameter must be either 'one' or 'all'")
         return str(result)
+
+    def explain(self, command: str) -> str:
+        command = strip_sql_comments(command)
+        if is_destructive_sql(command):
+            raise ValueError("Destructive SQL is not allowed")
+        with self.lock:
+            cursor = self._conn.execute(f"EXPLAIN plan {command}")
+        result: tuple[str] = cursor.fetchone()  # type: ignore
+        return str(result[0])
+
+    def complexity(self, command: str) -> int:
+        plan = self.explain(command)
+        return rate_sql_complexity(plan)
 
     def get_table_info_no_throw(self, table_names: Optional[list[str]] = None) -> str:
         """Get information about specified tables.
