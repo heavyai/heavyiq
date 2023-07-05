@@ -31,11 +31,12 @@ def get_config(file: str = "./config.toml") -> HeavyNLConfig:
     if _config:
         return _config
     app_config = AppConfig(config_sources=ConfZFileSource(file=file))
-    openai.api_key = app_config.iq.openai_api_key
-    try:
-        openai.Model.list()
-    except Exception as e:
-        raise ValueError(f"Unable to communicate with OpenAI: {e}")
+    if app_config.iq.custom_llm is None or app_config.iq.custom_llm.type == "AZURE":
+        openai.api_key = app_config.iq.openai_api_key
+        try:
+            openai.Model.list()
+        except Exception as e:
+            raise ValueError(f"Unable to communicate with OpenAI: {e}")
     if app_config.web and app_config.web.backend_url:
         hostname, port = split_url_port(app_config.web.backend_url)
         app_config.iq.heavydb_host = hostname
