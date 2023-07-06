@@ -17,27 +17,26 @@ def get_llm_by_model_name(model: str, tags: list[str] = [], **kwargs) -> BaseLLM
 
 def get_llm(tags: list[str] = [], **kwargs) -> BaseLLM:
     config = get_config()
-    if config.custom_llm is not None:
-        custom = config.custom_llm
-        if custom.type == "AZURE":
+    if config.custom_llm_type is not None:
+        if config.custom_llm_type == "AZURE":
             return AzureOpenAI(
-                openai_api_base=config.custom_llm.openai_api_base,
+                openai_api_base=config.custom_llm_azure_openai_api_base,
                 openai_api_key=config.openai_api_key,
-                openai_api_version=config.custom_llm.openai_api_version,
-                deployment_name=custom.azure_deployment_name,
+                openai_api_version=config.custom_llm_azure_openai_api_version,
+                deployment_name=config.custom_llm_azure_deployment_name,
                 **kwargs
             )
-        elif custom.type == "API":
+        elif config.custom_llm_type == "API":
             if is_promptlayer_active:
                 return PromptLayerOpenAI(
                     pl_tags=tags,
                     return_pl_id=True,
                     openai_api_key="not_necessary",
-                    openai_api_base=custom.api_base,
+                    openai_api_base=config.custom_llm_api_base,
                     **kwargs
                 )
             else:
-                return OpenAI(openai_api_key="nothing", openai_api_base=custom.api_base, **kwargs)
+                return OpenAI(openai_api_key="nothing", openai_api_base=config.custom_llm_api_base, **kwargs)
     if is_promptlayer_active:
         return PromptLayerOpenAI(pl_tags=tags, return_pl_id=True, openai_api_key=config.openai_api_key, **kwargs)
     else:
@@ -46,15 +45,13 @@ def get_llm(tags: list[str] = [], **kwargs) -> BaseLLM:
 
 def get_chat_llm(tags: list[str] = [], **kwargs) -> ChatOpenAI:
     config = get_config()
-    if config.custom_llm is not None:
-        custom = config.custom_llm
-        if custom.type == "AZURE":
+    if config.custom_llm_type is not None:
+        if config.custom_llm_type == "AZURE":
             return AzureChatOpenAI(
-                openai_api_base=config.custom_llm.openai_api_base,
+                openai_api_base=config.custom_llm_azure_openai_api_base,
                 openai_api_key=config.openai_api_key,
-                openai_api_version=config.custom_llm.openai_api_version,
-                deployment_name=custom.azure_deployment_name,
-                tiktoken_model_name=config.openai_gpt_model if not config.custom_llm else "gpt-3.5-turbo",
+                openai_api_version=config.custom_llm_azure_openai_api_version,
+                deployment_name=config.custom_llm_azure_deployment_name,
                 **kwargs
             )
         else:
