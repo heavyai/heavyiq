@@ -42,12 +42,11 @@ def get_config(file: str = "./config.toml") -> HeavyNLConfig:
                 "Custom LLM type is set to 'AZURE', but deployment name or API base URL or API Version is not set."
             )
         openai.api_key = app_config.iq.openai_api_key
-        try:
-            openai.Model.list()
-        except Exception as e:
-            raise ValueError(
-                f"Unable to communicate with {'Azure' if app_config.iq.custom_llm_type == 'AZURE' else ''} OpenAI API: {e}"
-            )
+        if app_config.iq.custom_llm_type is None:
+            try:
+                openai.Model.list()
+            except Exception as e:
+                raise ValueError(f"Unable to communicate with OpenAI API: {e}")
     elif app_config.iq.custom_llm_type == "API":
         if app_config.iq.custom_llm_api_base.strip() == "":
             raise ValueError("Custom LLM type is set to 'API', but API base URL is not set.")
