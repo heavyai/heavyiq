@@ -31,8 +31,8 @@ def get_token_limit(model_name: str, response_tokens: int = 256) -> int:
     """
 
     config = get_config()
-    if config.custom_llm is not None and config.custom_llm.type == "API":
-        return config.custom_llm.api_context_window - response_tokens - 50
+    if config.custom_llm is not None and config.custom_llm.custom_llm_type == "API":
+        return config.custom_llm.custom_llm_api_context_window - response_tokens - 50
 
     model_limits = {
         "gpt-3.5-turbo-16k": 16384,

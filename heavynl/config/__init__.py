@@ -1,9 +1,10 @@
+import os
 from urllib.parse import urlparse
 
 from confz import ConfZFileSource
 import openai
 
-from .config_schema import AppConfig, HeavyNLConfig, LogConfig
+from .config_schema import AppConfig, HeavyNLConfig
 
 _config = None
 
@@ -31,25 +32,39 @@ def get_config(file: str = "./config.toml") -> HeavyNLConfig:
     if _config:
         return _config
     app_config = AppConfig(config_sources=ConfZFileSource(file=file))
-    if app_config.iq.custom_llm is None or app_config.iq.custom_llm.type == "AZURE":
+    if app_config.iq.custom_llm_type is None or app_config.iq.custom_llm_type == "AZURE":
+        if app_config.iq.custom_llm_type == "AZURE" and (
+            app_config.iq.custom_llm_azure_deployment_name.strip() == ""
+            or app_config.iq.custom_llm_azure_openai_api_base.strip() == ""
+            or app_config.iq.custom_llm_azure_openai_api_version.strip() == ""
+        ):
+            raise ValueError(
+                "Custom LLM type is set to 'AZURE', but deployment name or API base URL or API Version is not set."
+            )
         openai.api_key = app_config.iq.openai_api_key
         try:
             openai.Model.list()
         except Exception as e:
-            raise ValueError(f"Unable to communicate with OpenAI: {e}")
+            raise ValueError(
+                f"Unable to communicate with {'Azure' if app_config.iq.custom_llm_type == 'AZURE' else ''} OpenAI API: {e}"
+            )
+    elif app_config.iq.custom_llm_type == "API":
+        if app_config.iq.custom_llm_api_base.strip() == "":
+            raise ValueError("Custom LLM type is set to 'API', but API base URL is not set.")
+    else:
+        raise ValueError(f"Invalid custom LLM type (valid options are AZURE or API): {app_config.iq.custom_llm_type}")
     if app_config.web and app_config.web.backend_url:
         hostname, port = split_url_port(app_config.web.backend_url)
         app_config.iq.heavydb_host = hostname
         app_config.iq.heavydb_port = port
     elif app_config.http_port:
         app_config.iq.heavydb_port = app_config.http_port
-        print("here")
+    if app_config.iq.data is None:
+        if app_config.web and app_config.web.data:
+            app_config.iq.data = app_config.web.data
+        else:
+            app_config.iq.data = "./storage"
+    if not os.path.exists(app_config.iq.data):
+        os.makedirs(app_config.iq.data)
     _config = app_config.iq
     return _config
-
-
-def get_log_config(file: str = "./config.toml") -> LogConfig:
-    """
-    Get config related to logging.
-    """
-    return get_config(file).log

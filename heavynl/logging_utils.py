@@ -1,9 +1,15 @@
 import logging
-from typing import Any
-from flask import request
 from logging.handlers import RotatingFileHandler
+import getpass
+import time
+import socket
+import os
+from typing import Any
 import sys
-from heavynl.config import get_log_config
+
+from flask import request
+
+from heavynl.config import get_config
 
 
 def get_default_formatter() -> logging.Formatter:
@@ -184,14 +190,42 @@ heavynl_logger = None
 default_logger = None
 
 
+def get_log_name(lvl: str) -> str:
+    """
+    Constructs a log name based on the system's metadata and current time.
+
+    Parameters:
+    lvl (str): Log level.
+
+    Returns:
+    str: A log name in the following format:
+    heavyiq.{hostname}.{username}.log.{log_level}.{timestamp}
+    """
+    h = socket.gethostname()
+    u = getpass.getuser()
+    t = time.strftime("%Y%m%d-%H%M%S")
+
+    data: str = get_config().data  # type: ignore
+    log_dir = os.path.join(data, "log")
+
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+
+    log_file = os.path.join(log_dir, f"heavyiq.{h}.{u}.log.{lvl}.{t}")
+
+    return log_file
+
+
 # had to add this so the logs didn't init the config before we passed the config path
 def init_logs():
     global _app_logger, heavynl_logger, default_logger
-    LOG_CONFIG = get_log_config()
+    LOG_CONFIG = get_config()
 
-    _app_logger = _AppLogger(log_file_path=LOG_CONFIG.app_log_file, level=LOG_CONFIG.app_log_level)
-    heavynl_logger = HeavyNLLogger(log_file_path=LOG_CONFIG.heavyiq_log_file, level=LOG_CONFIG.heavyiq_log_level)
-    default_logger = heavynl_logger
+    if _app_logger is None:
+        _app_logger = _AppLogger(log_file_path=get_log_name("ACCESS"), level=LOG_CONFIG.app_log_level)
+    if heavynl_logger is None:
+        heavynl_logger = HeavyNLLogger(log_file_path=get_log_name("APP"), level=LOG_CONFIG.heavyiq_log_level)
+        default_logger = heavynl_logger
 
 
 def _get_app_logger() -> _AppLogger:

@@ -5,25 +5,9 @@ from pydantic import Field
 from .overrides import OverrideConfZ
 
 
-class LogConfig(OverrideConfZ):  # type: ignore
-    app_log_file: str = "access.log"
-    app_log_level: str = "INFO"
-    heavyiq_log_file: str = "heavyiq.log"
-    heavyiq_log_level: str = "INFO"
-
-
-class CustomLLMConfig(OverrideConfZ):  # type: ignore
-    type: str
-    """ 'API' or 'AZURE' """
-    api_base: str = ""
-    api_context_window: int = 2048
-    openai_api_version: str = "2023-03-15-preview"
-    openai_api_base: str = ""
-    azure_deployment_name: str = ""
-
-
 class HeavyNLConfig(OverrideConfZ):  # type: ignore
     port: int = 6275
+    data: Optional[str] = None
     openai_api_key: str
     openai_gpt_model: str = "gpt-3.5-turbo"
     heavydb_dbname: Optional[str] = None
@@ -37,12 +21,22 @@ class HeavyNLConfig(OverrideConfZ):  # type: ignore
     promptlayer_api_key: Optional[str] = None
     promptwatch_api_key: Optional[str] = None
     promptwatch_tracking_project: Optional[str] = None
-    log: LogConfig = LogConfig()
-    custom_llm: Optional[CustomLLMConfig] = None
+    # LOGGING
+    app_log_level: str = "INFO"
+    heavyiq_log_level: str = "INFO"
+    # CUSTOM LLM
+    custom_llm_type: Optional[str] = None
+    """ 'API' or 'AZURE' """
+    custom_llm_api_base: str = ""
+    custom_llm_api_context_window: int = 2048
+    custom_llm_azure_openai_api_version: str = "2023-03-15-preview"
+    custom_llm_azure_openai_api_base: str = ""
+    custom_llm_azure_deployment_name: str = ""
 
 
 class HeavyWebConfig(OverrideConfZ):  # type: ignore
     backend_url: Optional[str] = Field(alias="backend-url")
+    data: Optional[str] = None
 
 
 class AppConfig(OverrideConfZ):  # type: ignore

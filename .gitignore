@@ -1,5 +1,7 @@
 venv/
 
+storage/
+
 *.pyc
 __pycache__/
 
