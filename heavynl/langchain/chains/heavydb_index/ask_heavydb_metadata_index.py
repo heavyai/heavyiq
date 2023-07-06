@@ -1,10 +1,11 @@
 import re
-from typing import Any
+from typing import Any, Optional
 
 from langchain.chains.qa_with_sources.retrieval import RetrievalQAWithSourcesChain
 from langchain.chains.combine_documents.map_reduce import MapReduceDocumentsChain
 from langchain.chains.combine_documents.stuff import StuffDocumentsChain
 from langchain.schema import BaseRetriever
+from langchain.callbacks.manager import CallbackManagerForChainRun, AsyncCallbackManagerForChainRun
 from pydantic import Field
 
 from heavynl.langchain.llms import get_llm
@@ -131,8 +132,13 @@ class AskHeavyDBMetadataIndexChain(RetrievalQAWithSourcesChain):
             **kwargs,
         )
 
-    def _call(self, inputs: dict[str, Any]) -> dict[str, Any]:
-        docs = self._get_docs(inputs)
+    def _call(
+        self,
+        inputs: dict[str, Any],
+        run_manager: Optional[CallbackManagerForChainRun] = None,
+    ) -> dict[str, Any]:
+        _run_manager = run_manager or CallbackManagerForChainRun.get_noop_manager()
+        docs = self._get_docs(inputs, run_manager=_run_manager)
         answer = self.combine_documents_chain.run(input_documents=docs, **inputs)
         if re.search(r"SOURCES:\s", answer):
             answer, tables = re.split(r"SOURCES:\s", answer)
@@ -147,8 +153,11 @@ class AskHeavyDBMetadataIndexChain(RetrievalQAWithSourcesChain):
         # TODO?: fallback options if no results (rephrase / simple search)
         return result
 
-    async def _acall(self, inputs: dict[str, Any]) -> dict[str, Any]:
-        docs = await self._aget_docs(inputs)
+    async def _acall(
+        self, inputs: dict[str, Any], run_manager: Optional[AsyncCallbackManagerForChainRun]
+    ) -> dict[str, Any]:
+        _run_manager = run_manager or AsyncCallbackManagerForChainRun.get_noop_manager()
+        docs = await self._aget_docs(inputs, run_manager=_run_manager)
         answer = await self.combine_documents_chain.arun(input_documents=docs, **inputs)
         if re.search(r"SOURCES:\s", answer):
             answer, tables = re.split(r"SOURCES:\s", answer)

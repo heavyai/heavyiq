@@ -8,7 +8,7 @@ flake8-pep585==0.1.7
 furo==2023.5.20
 liccheck==0.9.1
 mypy==1.4.1
-pyarmor==8.2.8
+pyarmor==8.2.9
 sentence_transformers==2.2.2
 sphinx==7.0.1
 sphinx-click==4.4.0
