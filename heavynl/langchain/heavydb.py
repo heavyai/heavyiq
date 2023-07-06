@@ -126,6 +126,24 @@ class HeavyDB:
             return self._include_tables
         return self._all_tables - self._ignore_tables
 
+    @classmethod
+    def create_session_id(cls: type["HeavyDB"], db_name: str | None = None) -> str:
+        """
+        Create a new db session and return it's id.
+        """
+        config = get_config()
+        if not config.heavydb_username or not config.heavydb_password:
+            raise ValueError("Please set the config variables heavydb_username and heavydb_password")
+
+        conn: Connection = connect(
+            user=config.heavydb_username,
+            password=config.heavydb_password,
+            host=config.heavydb_host,
+            port=config.heavydb_port,
+            dbname=db_name or config.heavydb_dbname,
+        )
+        return conn._session
+
     @property
     def table_info(self) -> str:
         """Information about all usable tables in the database."""
