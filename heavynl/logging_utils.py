@@ -222,7 +222,7 @@ def init_logs():
     LOG_CONFIG = get_config()
 
     if _app_logger is None:
-        _app_logger = _AppLogger(log_file_path=get_log_name("ACCESS"), level=LOG_CONFIG.app_log_level)
+        _app_logger = _AppLogger(log_file_path=get_log_name("ACCESS"), level=LOG_CONFIG.access_log_level)
     if heavynl_logger is None:
         heavynl_logger = HeavyNLLogger(log_file_path=get_log_name("APP"), level=LOG_CONFIG.heavyiq_log_level)
         default_logger = heavynl_logger

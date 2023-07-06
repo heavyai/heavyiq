@@ -18,12 +18,15 @@ class HeavyNLConfig(OverrideConfZ):  # type: ignore
     huggingface_embed_model: str = "sentence-transformers/all-mpnet-base-v2"
     metadata_index_dir: str = "db"
     table_documents_dir: str = "table_documents"
+    # TELEMETRICS
     promptlayer_api_key: Optional[str] = None
     promptwatch_api_key: Optional[str] = None
     promptwatch_tracking_project: Optional[str] = None
     # LOGGING
-    app_log_level: str = "INFO"
+    access_log_level: str = "INFO"
+    """Used for the access log of the web server."""
     heavyiq_log_level: str = "INFO"
+    """Used for the log of the application code."""
     # CUSTOM LLM
     custom_llm_type: Optional[str] = None
     """ 'API' or 'AZURE' """
