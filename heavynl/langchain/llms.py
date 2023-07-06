@@ -9,7 +9,7 @@ from heavynl.langchain.utils import is_promptlayer_active
 
 
 def get_llm_by_model_name(model: str, tags: list[str] = [], **kwargs) -> BaseLLM | BaseChatModel:
-    if model.startswith("gpt-3.5") or model.startswith("gpt-4"):
+    if model.startswith("gpt-3.5") or model.startswith("gpt-4") or model.startswith("gpt-35"):
         return get_chat_llm(tags=tags, model=model, **kwargs)
     else:
         return get_llm(tags=tags, model=model, **kwargs)
@@ -43,7 +43,13 @@ def get_llm(tags: list[str] = [], **kwargs) -> BaseLLM:
         return OpenAI(openai_api_key=config.openai_api_key, **kwargs)
 
 
-def get_chat_llm(tags: list[str] = [], **kwargs) -> ChatOpenAI:
+def azure_model_to_openai(model: str) -> str:
+    if model.startswith("gpt-35"):
+        return model.replace("gpt-35", "gpt-3.5")
+    return model
+
+
+def get_chat_llm(tags: list[str], model: str, **kwargs) -> ChatOpenAI:
     config = get_config()
     if config.custom_llm_type is not None:
         if config.custom_llm_type == "AZURE":
@@ -52,11 +58,15 @@ def get_chat_llm(tags: list[str] = [], **kwargs) -> ChatOpenAI:
                 openai_api_key=config.openai_api_key,
                 openai_api_version=config.custom_llm_azure_openai_api_version,
                 deployment_name=config.custom_llm_azure_deployment_name,
+                tiktoken_model_name=azure_model_to_openai(model),
+                model=model,
                 **kwargs
             )
         else:
             raise NotImplementedError("Custom LLMs are not supported for chat models yet.")
     if is_promptlayer_active:
-        return PromptLayerChatOpenAI(pl_tags=tags, return_pl_id=True, openai_api_key=config.openai_api_key, **kwargs)
+        return PromptLayerChatOpenAI(
+            model=model, pl_tags=tags, return_pl_id=True, openai_api_key=config.openai_api_key, **kwargs
+        )
     else:
-        return ChatOpenAI(openai_api_key=config.openai_api_key, **kwargs)
+        return ChatOpenAI(model=model, openai_api_key=config.openai_api_key, **kwargs)

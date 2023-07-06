@@ -25,6 +25,6 @@ custom_llm_type = "API" # API or AZURE
 custom_llm_api_base = "" # base url of API
 custom_llm_api_context_window = 2048 # context window limit
 # Custom LLM AZURE
-custom_llm_azure_openai_api_version = "2023-03-15-preview" # API specification version
+custom_llm_azure_openai_api_version = "2023-05-15" # API specification version
 custom_llm_azure_openai_api_base = "" # base url of API
 custom_llm_azure_deployment_name = "" # name of deployment

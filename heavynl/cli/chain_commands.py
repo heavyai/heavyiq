@@ -54,7 +54,7 @@ def nl_to_answer(ctx: click.Context, question: str, model: str, tables: str, ver
     heavydb = HeavyDB.from_env(include_tables=[t.strip() for t in tables.split(",")])
     llm = get_llm_by_model_name(model, ["cli", "chain", "nl_to_answer_chain"], temperature=temperature, client=None)
     chain = NLtoAnswerChain(database=heavydb, llm=llm, verbose=verbose)
-    click.echo(log_chain_call(chain, question, llm.model_name))
+    click.echo(log_chain_call(chain, question, model))
 
 
 @chain.command()

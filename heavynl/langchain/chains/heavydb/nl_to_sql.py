@@ -146,14 +146,14 @@ class BaseNltoSQLChain(BaseChain):
             table_names_to_use (list[str] | None): Get table info for the list of table names.
         """
         config = get_config()
-        if config.custom_llm is None or config.custom_llm.custom_llm_type == "AZURE":
+        if config.custom_llm_type is None or config.custom_llm_type == "AZURE":
             token_limit = get_token_limit(self.llm.model_name)  # type: ignore
             token_counter = self.llm.get_num_tokens
         else:
             from transformers import LlamaTokenizer
 
             tokenizer = LlamaTokenizer.from_pretrained("./heavynl/langchain/llama_model", local_files_only=True)
-            token_limit = config.custom_llm.custom_llm_api_context_window - 306  # (256 response + 50 buffer)
+            token_limit = config.custom_llm_api_context_window - 306  # (256 response + 50 buffer)
 
             def token_counter(text: str) -> int:
                 """Token counter for the Llama model."""
@@ -172,7 +172,6 @@ class BaseNltoSQLChain(BaseChain):
                 input=input_text, dialect=self.database.dialect, table_info=table_info
             )
             if token_counter(formatted_prompt) <= token_limit:
-                print(token_counter(formatted_prompt))
                 break
 
         return table_info  # type: ignore
