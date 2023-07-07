@@ -2,6 +2,7 @@ import argparse
 import csv
 import heavyai
 import json
+import re
 import sys
 
 def getQueriesByDB(prompts_filename):
@@ -31,7 +32,7 @@ def getOptions(argv=None):
 
 def writeQueryResultsCsv(filename, query_results):
     # Specify the fieldnames (headers of the CSV)
-    fieldnames = ["query_id", "db_id", "prompt", "gold_sql_query", "gen_sql_query", "gold_run_success", "gen_run_success"]
+    fieldnames = ["query_id", "db_id", "prompt", "gold_sql_query", "gen_sql_query", "gold_run_success", "gen_run_success", "gold_row_count", "gold_col_count", "gen_row_count", "gen_col_count", "gold_gen_match"]
 
     # Write the dictionaries to a CSV file
     with open(filename, "w", newline="") as csvfile:
@@ -68,20 +69,38 @@ def main(argv):
             prompt = query["prompt"]
             gold_sql_query = query["gold_sql_query"]
             gen_sql_query = query["gen_sql_query"]
+            #if not gen_sql_query.lower().startswith("select"):
+            #    match = re.search(r"(SELECT.*FROM.*$)", gen_sql_query, re.DOTALL | re.MULTILINE | re.IGNORECASE)
+            #    if match:
+            #        gen_sql_query = match.group(1)
+            if not gen_sql_query.endswith(";"):
+                gen_sql_query += ";"
             gold_result = None
             gen_result = None
             gold_run_success = False
             gen_run_success = False
+            gold_row_count = None
+            gold_col_count = None
+            gen_row_count = None
+            gen_col_count = None
+            gold_gen_match = False
             try:
-                gold_result = con.execute(gold_sql_query)
+                gold_cur = con.execute(gold_sql_query)
                 gold_run_success = True
+                gold_row_count = gold_cur.rowcount
+                gold_col_count = len(gold_cur.description)
             except Exception as e:
                 print(f"Error executing gold query {query_id} on database {db_id}: {e}")
             try:
-                gen_result = con.execute(gen_sql_query)
+                gen_cur = con.execute(gen_sql_query)
                 gen_run_success = True
+                gen_row_count = gen_cur.rowcount
+                gen_col_count = len(gen_cur.description)
             except Exception as e:
                 print(f"Error executing generated query {query_id} on database {db_id}: {e}")
+                print(gen_sql_query)
+            if gold_run_success and gen_run_success and gold_row_count == gen_row_count and gold_col_count == gen_col_count: 
+                gold_gen_match = True
             query_results.append(
                 {
                     "query_id": query_id,
@@ -91,6 +110,11 @@ def main(argv):
                     "gen_sql_query": gen_sql_query,
                     "gold_run_success": gold_run_success,
                     "gen_run_success": gen_run_success,
+                    "gold_row_count": gold_row_count,
+                    "gold_col_count": gold_col_count,
+                    "gen_row_count": gen_row_count,
+                    "gen_col_count": gen_col_count,
+                    "gold_gen_match": gold_gen_match
                 }
             )
             print(query_idx)

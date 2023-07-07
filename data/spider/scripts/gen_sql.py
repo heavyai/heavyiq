@@ -27,8 +27,10 @@ def gen_transformers_cpp_completion(prompt, model, tokenizer, use_gpu):
     input_ids = tokenizer.encode(prompt, return_tensors="pt")
     if use_gpu:
         input_ids = input_ids.to('cuda')
-    completion_tokens = model.generate(input_ids, max_length=1280, temperature=0.0, do_sample=False, num_beams=1, repetition_penalty=1.0, pad_token_id=tokenizer.eos_token_id)
-    completion = tokenizer.decode(completion_tokens[0], skip_special_tokens=True)
+    completion_tokens = model.generate(input_ids, max_length=1280, temperature=0.0, do_sample=False, num_beams=2, repetition_penalty=1.0, pad_token_id=tokenizer.eos_token_id)
+    prompt_tokens = len(input_ids[0])
+    # decode only the completion tokens (excluding the prompt tokens)
+    completion = tokenizer.decode(completion_tokens[0][prompt_tokens:], skip_special_tokens=True)
     return completion
 
 def gen_llama_cpp_completion(prompt, model):
