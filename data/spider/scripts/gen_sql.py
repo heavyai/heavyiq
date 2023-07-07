@@ -1,9 +1,10 @@
 import argparse
 import json
 from llama_cpp import Llama
-from transformers import LlamaForCausalLM, LlamaTokenizer
+import openai
 import re
 import sys
+from transformers import LlamaForCausalLM, LlamaTokenizer
 
 
 def getOptions(argv=None):
@@ -14,7 +15,8 @@ def getOptions(argv=None):
     parser.add_argument("--suffix", help="Optional suffix for prompt", default=None)
     parser.add_argument("-o", "--output", help="Output File", default="eval_queries.json")
     parser.add_argument("-g", "--gpu", help="Use CUDA GPU", action="store_true")
-    parser.add_argument("-t", "--transformers", help="Use Transformers", action="store_true")
+    parser.add_argument("--transformers", help="Use Transformers", action="store_true")
+    parser.add_argument("--openai", help="Use OpenAI", action="store_true")
     return parser.parse_args(argv)
 
 
@@ -37,6 +39,22 @@ def gen_llama_cpp_completion(prompt, model):
     completion = model(prompt, max_tokens=256, temperature=0.0, stop=[";"])
     return completion
 
+def gen_openai_completion(prompt, model):
+    try:
+        sql_completion = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+        )
+        sql = sql_completion["choices"][0]["message"]["content"].replace("\n", " ").replace("\r", " ")
+        sql = re.sub(".*(SELECT.*;).*", r"\1", sql, count=0, flags=0)
+    except Exception as e:
+        print(e)
+
+
+
+
+    
+
 def main(argv):
     options = getOptions(argv)
     prompts = getPrompts(options.prompts)
@@ -46,6 +64,8 @@ def main(argv):
     if options.transformers:
         tokenizer = LlamaTokenizer.from_pretrained(options.model)
         model = LlamaForCausalLM.from_pretrained(options.model, device_map='auto')
+    elif options.openai:
+        model = options.model
     else:
         model = Llama(model_path=options.model, n_gpu_layers=num_gpu_layers, n_ctx=1280)
     eval_outputs = []
@@ -59,6 +79,9 @@ def main(argv):
         response = None
         if options.transformers:
             completion = gen_transformers_cpp_completion(prompt, model, tokenizer, options.gpu)
+            response = completion
+        elif options.openai:
+            completion = gen_openai_completion(prompt, model)
             response = completion
         else:
             completion = gen_llama_cpp_completion(prompt, model)
