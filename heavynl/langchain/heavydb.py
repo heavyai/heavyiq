@@ -4,13 +4,29 @@ import re
 from threading import Lock
 from typing import Optional, Any, Iterable, TYPE_CHECKING
 
-from heavyai import connect
+from heavyai import connect, Connection
 from heavynl.config import get_config
 from heavynl.utils import strip_sql_comments, is_destructive_sql, rate_sql_complexity
 
 if TYPE_CHECKING:
-    from heavyai import Connection
     from heavydb._parsers import ColumnDetails
+
+
+class PersistantConnection(Connection):
+    """
+    Helps to establish heavydb connection which persists for atleast an hour.
+
+    Default heavyai.Connection gets closed once the corresponding __del__ method being called (ie. upon garbage collection).
+    So we can't re-use the same session_id on `/query`, `/question` endpoints.
+
+    This class helps to overcome the above issue, and the created session gets auto expire after certain limit
+    (Default session-timeout-value set on server side is 60 mins).
+    """
+
+    def close(self):
+        """Don't disconnect from the database. Let the session expire automatically."""
+        self._closed = 1
+        self._rbc = None
 
 
 class HeavyDB:
@@ -135,7 +151,7 @@ class HeavyDB:
         if not config.heavydb_username or not config.heavydb_password:
             raise ValueError("Please set the config variables heavydb_username and heavydb_password")
 
-        conn: Connection = connect(
+        conn: PersistantConnection = PersistantConnection(
             user=config.heavydb_username,
             password=config.heavydb_password,
             host=config.heavydb_host,
