@@ -1,6 +1,7 @@
 DROP DATABASE IF EXISTS department_store;
 CREATE DATABASE department_store;
 ALTER SESSION SET CURRENT_DATABASE = 'department_store';
+
 CREATE TABLE Addresses (
 address_id INTEGER ,
 address_details TEXT
@@ -21,7 +22,7 @@ INSERT INTO Addresses (address_id, address_details) VALUES (11, '0258 Kessler Mo
 INSERT INTO Addresses (address_id, address_details) VALUES (12, '69275 Mose Drive Wilkinsonstad, CO 79055-7622');
 INSERT INTO Addresses (address_id, address_details) VALUES (13, '8207 Morissette Lakes East Rheaview, ID 47493');
 INSERT INTO Addresses (address_id, address_details) VALUES (14, '145 Alice Corners Willmsport, NV 36680');
-INSERT INTO Addresses (address_id, address_details) VALUES (15, '521 Molly Harbors Apt. 567 Reingerland, HI 97099-1005');
+INSERT INTO Addresses (address_id, ) VALUES (15, '521 Molly Harbors Apt. 567 Reingerland, HI 97099-1005');
 
 CREATE TABLE Staff (
 staff_id INTEGER ,
@@ -76,44 +77,30 @@ customer_address TEXT,
 customer_phone TEXT,
 customer_email TEXT
 );
-INSERT INTO Customers (customer_id, payment_method_code, customer_code, customer_name, customer_address, customer_phone, customer_email) VALUES (1, 'Credit Card', '401', 'Ahmed', '75099 Tremblay Port Apt. 1);
-South Norrisland, SC 80546', '254-072-4068x33935', 'margarett.vonrueden@example.com');
-INSERT INTO Customers (customer_id, payment_method_code, customer_code, customer_name, customer_address, customer_phone, customer_email) VALUES (2, 'Credit Card', '665', 'Chauncey', '8408 Lindsay Cou);
-East Dasiabury, IL 72656-3552', '+41(8)1897032009', 'stiedemann.sigrid@example.com');
-INSERT INTO Customers (customer_id, payment_method_code, customer_code, customer_name, customer_address, customer_phone, customer_email) VALUES (3, 'Direct Debit', '844', 'Lukas', '7162 Rodolfo Knoll Apt. 5);
-Lake Annalise, TN 35791-8871', '197-417-3557', 'joelle.monahan@example.com');
-INSERT INTO Customers (customer_id, payment_method_code, customer_code, customer_name, customer_address, customer_phone, customer_email) VALUES (4, 'Direct Debit', '662', 'Lexus', '9581 Will Flat Suite 2);
-East Cathryn, WY 30751-4404', '+08(3)8056580281', 'gbrekke@example.com');
-INSERT INTO Customers (customer_id, payment_method_code, customer_code, customer_name, customer_address, customer_phone, customer_email) VALUES (5, 'Credit Card', '848', 'Tara', '5065 Mraz Fields Apt. 0);
-East Chris, NH 41624', '1-064-498-6609x051', 'nicholas44@example.com');
-INSERT INTO Customers (customer_id, payment_method_code, customer_code, customer_name, customer_address, customer_phone, customer_email) VALUES (6, 'Credit Card', '916', 'Jon', '841 Goyette Unio);
-South Dionbury, NC 62021', '(443)013-3112x528', 'cconroy@example.net');
-INSERT INTO Customers (customer_id, payment_method_code, customer_code, customer_name, customer_address, customer_phone, customer_email) VALUES (7, 'Credit Card', '172', 'Cristobal', '8327 Christiansen Lakes Suite 4);
-Schneiderland, IA 93624', '877-150-8674x63517', 'shawna.cummerata@example.net');
-INSERT INTO Customers (customer_id, payment_method_code, customer_code, customer_name, customer_address, customer_phone, customer_email) VALUES (8, 'Direct Debit', '927', 'Adah', '5049 Hand La);
-Coymouth, IL 97300-7731', '1-695-364-7586x59256', 'kathlyn24@example.org');
-INSERT INTO Customers (customer_id, payment_method_code, customer_code, customer_name, customer_address, customer_phone, customer_email) VALUES (9, 'Credit Card', '808', 'Yasmeen', '3558 Witting Meadow Apt. 4);
-Lake Moriahbury, OH 91556-2122', '587.398.2400x31176', 'ludwig54@example.net');
-INSERT INTO Customers (customer_id, payment_method_code, customer_code, customer_name, customer_address, customer_phone, customer_email) VALUES (10, 'Credit Card', '887', 'Karson', '7308 Joan Lake Suite 3);
-Lizethtown, DE 56522', '857-844-9339x40140', 'moriah91@example.com');
-INSERT INTO Customers (customer_id, payment_method_code, customer_code, customer_name, customer_address, customer_phone, customer_email) VALUES (11, 'Direct Debit', '611', 'Cordell', '362 Fisher Forge Apt. 9);
-New Mckenna, CA 98525-5674', '(730)934-8249', 'qstokes@example.org');
-INSERT INTO Customers (customer_id, payment_method_code, customer_code, customer_name, customer_address, customer_phone, customer_email) VALUES (12, 'Credit Card', '182', 'Darron', '84445 Elinor Gle);
-Port Zita, SD 39410', '117.822.3577', 'gwisozk@example.net');
-INSERT INTO Customers (customer_id, payment_method_code, customer_code, customer_name, customer_address, customer_phone, customer_email) VALUES (13, 'Credit Card', '589', 'Kenya', '338 Floy Mountains Suite 5);
-Yesseniaville, TN 60847', '08023680831', 'maxime86@example.net');
-INSERT INTO Customers (customer_id, payment_method_code, customer_code, customer_name, customer_address, customer_phone, customer_email) VALUES (14, 'Direct Debit', '240', 'Abbie', '983 Elinore Passa);
-Darrionborough, SC 53915-0479', '07594320656', 'celine.bogan@example.com');
-INSERT INTO Customers (customer_id, payment_method_code, customer_code, customer_name, customer_address, customer_phone, customer_email) VALUES (15, 'Credit Card', '980', 'Lyric', '649 Ocie Ligh);
-Wyatttown, UT 12697', '1-472-036-0434', 'schultz.arnoldo@example.net');
 
+INSERT INTO Customers VALUES(1,'Credit Card','401','Ahmed','75099 Tremblay Port Apt. 163 South Norrisland, SC 80546','254-072-4068x33935','margarett.vonrueden@example.com');
+INSERT INTO Customers VALUES(2,'Credit Card','665','Chauncey','8408 Lindsay Court East Dasiabury, IL 72656-3552','+41(8)1897032009','stiedemann.sigrid@example.com');
+INSERT INTO Customers VALUES(3,'Direct Debit','844','Lukas','7162 Rodolfo Knoll Apt. 502 Lake Annalise, TN 35791-8871','197-417-3557','joelle.monahan@example.com');
+INSERT INTO Customers VALUES(4,'Direct Debit','662','Lexus','9581 Will Flat Suite 272 East Cathryn, WY 30751-4404','+08(3)8056580281','gbrekke@example.com');
+INSERT INTO Customers VALUES(5,'Credit Card','848','Tara','5065 Mraz Fields Apt. 041 East Chris, NH 41624','1-064-498-6609x051','nicholas44@example.com');
+INSERT INTO Customers VALUES(6,'Credit Card','916','Jon','841 Goyette Unions South Dionbury, NC 62021','(443)013-3112x528','cconroy@example.net');
+INSERT INTO Customers VALUES(7,'Credit Card','172','Cristobal','8327 Christiansen Lakes Suite 409 Schneiderland, IA 93624','877-150-8674x63517','shawna.cummerata@example.net');
+INSERT INTO Customers VALUES(8,'Direct Debit','927','Adah','5049 Hand Land Coymouth, IL 97300-7731','1-695-364-7586x59256','kathlyn24@example.org');
+INSERT INTO Customers VALUES(9,'Credit Card','808','Yasmeen','3558 Witting Meadow Apt. 483 Lake Moriahbury, OH 91556-2122','587.398.2400x31176','ludwig54@example.net');
+INSERT INTO Customers VALUES(10,'Credit Card','887','Karson','7308 Joan Lake Suite 346 Lizethtown, DE 56522','857-844-9339x40140','moriah91@example.com');
+INSERT INTO Customers VALUES(11,'Direct Debit','611','Cordell','362 Fisher Forge Apt. 900 New Mckenna, CA 98525-5674','(730)934-8249','qstokes@example.org');
+INSERT INTO Customers VALUES(12,'Credit Card','182','Darron','84445 Elinor Glens Port Zita, SD 39410','117.822.3577','gwisozk@example.net');
+INSERT INTO Customers VALUES(13,'Credit Card','589','Kenya','338 Floy Mountains Suite 589 Yesseniaville, TN 60847','08023680831','maxime86@example.net');
+INSERT INTO Customers VALUES(14,'Direct Debit','240','Abbie','983 Elinore Passage Darrionborough, SC 53915-0479','07594320656','celine.bogan@example.com');
+INSERT INTO Customers VALUES(15,'Credit Card','980','Lyric','649 Ocie Lights Wyatttown, UT 12697','1-472-036-0434','schultz.arnoldo@example.net');
 
 CREATE TABLE Products (
 product_id INTEGER ,
 product_type_code TEXT NOT NULL,
 product_name TEXT,
-product_price DECIMAL(19,4)
+product_price DECIMAL(18,4)
 );
+
 INSERT INTO Products (product_id, product_type_code, product_name, product_price) VALUES (1, 'Clothes', 'red jeans', '734.7300');
 INSERT INTO Products (product_id, product_type_code, product_name, product_price) VALUES (2, 'Clothes', 'yellow jeans', '687.2300');
 INSERT INTO Products (product_id, product_type_code, product_name, product_price) VALUES (3, 'Clothes', 'black jeans', '695.1600');
@@ -198,37 +185,21 @@ store_address TEXT,
 store_phone TEXT,
 store_email TEXT);
 
-
-INSERT INTO Department_Stores (dept_store_id, dept_store_chain_id, store_name, store_address, store_phone, store_email) VALUES (1, 1, 'store_name', '01290 Jeremie Parkway Suite 7);
-North Arielle, MS 51249', '(948)944-5099x2027', 'bmaggio@example.com');
-INSERT INTO Department_Stores (dept_store_id, dept_store_chain_id, store_name, store_address, store_phone, store_email) VALUES (2, 3, 'store_name', '082 Purdy Expressw);
-O''Connellshire, IL 31732', '877-917-5029', 'larissa10@example.org');
-INSERT INTO Department_Stores (dept_store_id, dept_store_chain_id, store_name, store_address, store_phone, store_email) VALUES (3, 4, 'store_name', '994 Travis Plai);
-North Wadeton, WV 27575-3951', '1-216-312-0375', 'alexandro.mcclure@example.net');
-INSERT INTO Department_Stores (dept_store_id, dept_store_chain_id, store_name, store_address, store_phone, store_email) VALUES (4, 2, 'store_name', '93472 Mayert Shore Apt. 3);
-Mitchellton, TN 84209', '670-466-6367', 'bryon24@example.org');
-INSERT INTO Department_Stores (dept_store_id, dept_store_chain_id, store_name, store_address, store_phone, store_email) VALUES (5, 3, 'store_name', '88112 Parisian Ligh);
-Sporermouth, MN 25962', '01399327266', 'creola23@example.org');
-INSERT INTO Department_Stores (dept_store_id, dept_store_chain_id, store_name, store_address, store_phone, store_email) VALUES (6, 4, 'store_name', '49708 Marcella Valleys Suite 1);
-Ninamouth, WA 86667', '1-859-843-1957', 'jerod.reynolds@example.net');
-INSERT INTO Department_Stores (dept_store_id, dept_store_chain_id, store_name, store_address, store_phone, store_email) VALUES (7, 4, 'store_name', '41924 Alfredo Cli);
-New Eviestad, NY 17573', '1-109-872-9142x77078', 'ihamill@example.org');
-INSERT INTO Department_Stores (dept_store_id, dept_store_chain_id, store_name, store_address, store_phone, store_email) VALUES (8, 4, 'store_name', '7081 Shanna Ca);
-West Zacheryshire, NC 17408', '+67(5)4983519062', 'casper.adolfo@example.org');
-INSERT INTO Department_Stores (dept_store_id, dept_store_chain_id, store_name, store_address, store_phone, store_email) VALUES (9, 4, 'store_name', '5288 Kaia Stre);
-Devonton, NJ 61782-9006', '(723)503-7086x356', 'selmer.stiedemann@example.org');
-INSERT INTO Department_Stores (dept_store_id, dept_store_chain_id, store_name, store_address, store_phone, store_email) VALUES (10, 3, 'store_name', '00578 Lisa Gateway Suite 4);
-Strosinville, VA 03998-3292', '07126036440', 'luisa57@example.org');
-INSERT INTO Department_Stores (dept_store_id, dept_store_chain_id, store_name, store_address, store_phone, store_email) VALUES (11, 2, 'store_name', '34894 Everett Ro);
-South Jeremiehaven, GA 08730', '611-037-9309', 'vonrueden.vern@example.org');
-INSERT INTO Department_Stores (dept_store_id, dept_store_chain_id, store_name, store_address, store_phone, store_email) VALUES (12, 4, 'store_name', '2676 Cruickshank Garde);
-North Ginahaven, CT 85046', '(626)763-7031', 'freda.toy@example.org');
-INSERT INTO Department_Stores (dept_store_id, dept_store_chain_id, store_name, store_address, store_phone, store_email) VALUES (13, 2, 'store_name', '29297 West Road Suite 2);
-West Dulceside, UT 58085-8998', '1-764-126-7567x0795', 'katlynn62@example.com');
-INSERT INTO Department_Stores (dept_store_id, dept_store_chain_id, store_name, store_address, store_phone, store_email) VALUES (14, 1, 'store_name', '16650 Lysanne River Apt. 2);
-North Garettton, AL 84756-4375', '319.331.3397', 'mohr.elwin@example.net');
-INSERT INTO Department_Stores (dept_store_id, dept_store_chain_id, store_name, store_address, store_phone, store_email) VALUES (15, 3, 'store_name', '82470 Hansen Squares Suite 1);
-Wehnermouth, NC 76791', '(587)993-3604x3077', 'kelly30@example.com');
+INSERT INTO Department_Stores VALUES(1,1,'store_name','01290 Jeremie Parkway Suite 753 North Arielle, MS 51249','(948)944-5099x2027','bmaggio@example.com');
+INSERT INTO Department_Stores VALUES(2,3,'store_name','082 Purdy Expressway O''Connellshire, IL 31732','877-917-5029','larissa10@example.org');
+INSERT INTO Department_Stores VALUES(3,4,'store_name','994 Travis Plains North Wadeton, WV 27575-3951','1-216-312-0375','alexandro.mcclure@example.net');
+INSERT INTO Department_Stores VALUES(4,2,'store_name','93472 Mayert Shore Apt. 360 Mitchellton, TN 84209','670-466-6367','bryon24@example.org');
+INSERT INTO Department_Stores VALUES(5,3,'store_name','88112 Parisian Lights Sporermouth, MN 25962','01399327266','creola23@example.org');
+INSERT INTO Department_Stores VALUES(6,4,'store_name','49708 Marcella Valleys Suite 181 Ninamouth, WA 86667','1-859-843-1957','jerod.reynolds@example.net');
+INSERT INTO Department_Stores VALUES(7,4,'store_name','41924 Alfredo Cliff New Eviestad, NY 17573','1-109-872-9142x77078','ihamill@example.org');
+INSERT INTO Department_Stores VALUES(8,4,'store_name','7081 Shanna Cape West Zacheryshire, NC 17408','+67(5)4983519062','casper.adolfo@example.org');
+INSERT INTO Department_Stores VALUES(9,4,'store_name','5288 Kaia Street Devonton, NJ 61782-9006','(723)503-7086x356','selmer.stiedemann@example.org');
+INSERT INTO Department_Stores VALUES(10,3,'store_name','00578 Lisa Gateway Suite 476 Strosinville, VA 03998-3292','07126036440','luisa57@example.org');
+INSERT INTO Department_Stores VALUES(11,2,'store_name','34894 Everett Road South Jeremiehaven, GA 08730','611-037-9309','vonrueden.vern@example.org');
+INSERT INTO Department_Stores VALUES(12,4,'store_name','2676 Cruickshank Gardens North Ginahaven, CT 85046','(626)763-7031','freda.toy@example.org');
+INSERT INTO Department_Stores VALUES(13,2,'store_name','29297 West Road Suite 210 West Dulceside, UT 58085-8998','1-764-126-7567x0795','katlynn62@example.com');
+INSERT INTO Department_Stores VALUES(14,1,'store_name','16650 Lysanne River Apt. 281 North Garettton, AL 84756-4375','319.331.3397','mohr.elwin@example.net');
+INSERT INTO Department_Stores VALUES(15,3,'store_name','82470 Hansen Squares Suite 190 Wehnermouth, NC 76791','(587)993-3604x3077','kelly30@example.com');
 
 
 CREATE TABLE Departments (
@@ -246,6 +217,7 @@ CREATE TABLE Order_Items (
 order_item_id INTEGER ,
 order_id INTEGER NOT NULL,
 product_id INTEGER NOT NULL);
+
 INSERT INTO Order_Items (order_item_id, order_id, product_id) VALUES (1, 9, 7);
 INSERT INTO Order_Items (order_item_id, order_id, product_id) VALUES (2, 1, 3);
 INSERT INTO Order_Items (order_item_id, order_id, product_id) VALUES (3, 5, 2);
@@ -261,13 +233,14 @@ INSERT INTO Order_Items (order_item_id, order_id, product_id) VALUES (12, 14, 14
 INSERT INTO Order_Items (order_item_id, order_id, product_id) VALUES (13, 15, 5);
 INSERT INTO Order_Items (order_item_id, order_id, product_id) VALUES (14, 8, 10);
 INSERT INTO Order_Items (order_item_id, order_id, product_id) VALUES (15, 5, 4);
+
 CREATE TABLE Product_Suppliers (
 product_id INTEGER NOT NULL,
 supplier_id INTEGER NOT NULL,
 date_supplied_from TIMESTAMP(0) NOT NULL,
 date_supplied_to TIMESTAMP(0),
 total_amount_purchased TEXT,
-total_value_purchased DECIMAL(19,4));
+total_value_purchased DECIMAL(18,4));
 
 
 CREATE TABLE Staff_Department_Assignments (
