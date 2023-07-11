@@ -10,7 +10,7 @@ from heavynl.langchain import HeavyDB
 from heavynl.langchain.prompts import LoggedPromptTemplate
 from ..logged_llm import LoggedLLMChain
 
-from .nl_to_sql import NLtoSQLChain
+from .nl_to_sql import get_nl_to_sql_chain_by_llm
 
 ANSWER_TEMPLATE = """Given an input question, first create a syntactically correct {dialect} query to run, then look at the results of the query and return the answer.
 Use the following format:
@@ -18,15 +18,13 @@ Question: Question here
 SQLQuery: /* step-by-step thought process */ SQL Query to run
 SQLResult: Result of the SQLQuery
 Answer: Final answer here
-Only use the tables listed below.
-{table_info}
 Question: {input}
 SQLQuery: {sql_cmd}
 SQLResult: {sql_result}"""
 ANSWER_PROMPT = LoggedPromptTemplate(
     name="nl_to_answer_chain",
     tags=["chain", "nl_to_answer_chain"],
-    input_variables=["input", "table_info", "dialect", "sql_cmd", "sql_result"],
+    input_variables=["input", "dialect", "sql_cmd", "sql_result"],
     template=ANSWER_TEMPLATE,
     version=1,
 )
@@ -85,14 +83,13 @@ class NLtoAnswerChain(Chain, BaseModel):
 
     def _call(self, inputs: dict[str, Any], run_manager: Optional[CallbackManagerForChainRun] = None) -> dict[str, Any]:
         table_names_to_use = inputs.get("tables")
-        nl_sql_chain = NLtoSQLChain(llm=self.llm, database=self.database, verbose=self.verbose)
+        nl_sql_chain = get_nl_to_sql_chain_by_llm(self.llm)(llm=self.llm, database=self.database, verbose=self.verbose)
         nl_sql_inputs = {
             nl_sql_chain.input_key: inputs[self.input_key],
             "tables": table_names_to_use,
         }
         nl_sql_results = nl_sql_chain(nl_sql_inputs)
         sql_cmd = nl_sql_results[nl_sql_chain.output_key]
-        table_info = self.database.get_table_info(table_names=table_names_to_use)
         if run_manager:
             run_manager.on_text(sql_cmd, color="green", verbose=self.verbose)
         result = self.database.run(sql_cmd)
@@ -113,11 +110,11 @@ class NLtoAnswerChain(Chain, BaseModel):
                 "input": inputs[self.input_key],
                 "dialect": self.database.dialect,
                 "sql_cmd": sql_cmd,
-                "table_info": table_info,
                 "sql_result": f"{result} \nAnswer:",
                 "stop": ["\nAnswer:"],
             }
             final_result = llm_chain.predict(**llm_inputs)
+
             if run_manager:
                 run_manager.on_text(final_result, color="green", verbose=self.verbose)
             return {

@@ -49,7 +49,7 @@ def azure_model_to_openai(model: str) -> str:
     return model
 
 
-def get_chat_llm(tags: list[str], model: str, **kwargs) -> ChatOpenAI:
+def get_chat_llm(tags: list[str], model: str, **kwargs) -> BaseChatModel:
     config = get_config()
     if config.custom_llm_type is not None:
         if config.custom_llm_type == "AZURE":

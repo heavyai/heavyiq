@@ -1,6 +1,5 @@
 from __future__ import annotations
-from pydantic import BaseModel, Extra
-from typing import Any, Sequence, Union
+from typing import Any, Callable
 
 from langchain.prompts import PromptTemplate, ChatPromptTemplate
 from langchain.prompts.chat import BaseMessagePromptTemplate
@@ -19,7 +18,7 @@ class LoggedPromptMixin:
 
     def __post_init__(self):
         config = get_config()
-        if config.promptwatch_api_key is not None and config.promptwatch_api_key != "":
+        if is_promptlayer_active:
             with PromptWatch(
                 api_key=config.promptwatch_api_key, tracking_project=config.promptwatch_tracking_project
             ) as pw:
@@ -50,6 +49,13 @@ class LoggedPromptTemplate(BaseLoggedPrompt, PromptTemplate):
     tags: list[str]
     version: int = 1
 
+    def partial(self, **kwargs: str | Callable[[], str]) -> LoggedPromptTemplate:
+        """Return a partial of the prompt template."""
+        prompt_dict = self.__dict__.copy()
+        prompt_dict["input_variables"] = list(set(self.input_variables).difference(kwargs))
+        prompt_dict["partial_variables"] = {**self.partial_variables, **kwargs}
+        return type(self)(**prompt_dict)
+
 
 class LoggedChatPromptTemplate(BaseLoggedPrompt, ChatPromptTemplate):
     name: str
@@ -63,13 +69,18 @@ class LoggedChatPromptTemplate(BaseLoggedPrompt, ChatPromptTemplate):
     @classmethod
     def from_messages(
         cls,
-        messages: Sequence[Union[BaseMessagePromptTemplate, BaseMessage]],
+        messages: list[BaseMessagePromptTemplate | BaseMessage],
         name: str,
         tags: list[str],
         version: int = 1,
+        input_variables: list[str] = [],
+        partial_variables: dict[str, str | Callable[[], str]] = {},
     ) -> LoggedChatPromptTemplate:
-        input_vars = set()
-        for message in messages:
-            if isinstance(message, BaseMessagePromptTemplate):
-                input_vars.update(message.input_variables)
-        return cls(name, tags, version=version, input_variables=list(input_vars), messages=messages)
+        return cls(
+            name=name,
+            tags=tags,
+            version=version,
+            input_variables=input_variables,
+            messages=messages,
+            partial_variables=partial_variables,
+        )
