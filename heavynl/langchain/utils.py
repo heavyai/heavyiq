@@ -1,8 +1,11 @@
 import os
 
 import promptlayer
+from langchain.base_language import BaseLanguageModel
+from langchain.prompts import BasePromptTemplate, BaseChatPromptTemplate
 
 from heavynl.config import get_config
+from heavynl.langchain import HeavyDB
 
 is_promptlayer_active = False
 
@@ -51,3 +54,47 @@ def get_token_limit(model_name: str, response_tokens: int = 256) -> int:
             return limit - response_tokens - 50
 
     return 4096 - response_tokens - 50
+
+
+def get_table_info_wrt_token_limit(
+    llm: BaseLanguageModel,
+    heavydb: HeavyDB,
+    prompt: BasePromptTemplate | BaseChatPromptTemplate,
+    table_names_to_use: list[str] | None,
+) -> str:
+    """
+    Gets the info of all the tables with respect to the token limit.
+
+    Args:
+        table_names_to_use (list[str] | None): Get table info for the list of table names.
+    """
+    config = get_config()
+    if config.custom_llm_type is None or config.custom_llm_type == "AZURE":
+        token_limit = get_token_limit(llm.model_name)  # type: ignore
+        token_counter = llm.get_num_tokens
+    else:
+        from transformers import LlamaTokenizer
+
+        tokenizer = LlamaTokenizer.from_pretrained("./heavynl/langchain/llama_model", local_files_only=True)
+        token_limit = config.custom_llm_api_context_window - 306  # (256 response + 50 buffer)
+
+        def token_counter(text: str) -> int:
+            """Token counter for the Llama model."""
+            return len(tokenizer.tokenize(text))
+
+    table_info_options = [
+        {},
+        {"include_top_k": False},
+        {"include_samples": False},
+        {"include_samples": False, "include_top_k": False},
+    ]
+
+    for options in table_info_options:
+        table_info = heavydb.get_table_info(table_names=table_names_to_use, **options)
+        formatted_prompt = prompt.format(table_info=table_info)
+        if token_counter(formatted_prompt) <= token_limit:
+            break
+    else:  # executed if the loop finished normally (no break)
+        raise RuntimeError("Couldn't find suitable prompt provided token limit")
+
+    return table_info
