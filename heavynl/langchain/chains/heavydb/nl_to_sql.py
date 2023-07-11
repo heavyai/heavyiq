@@ -181,7 +181,7 @@ class NLtoSQLChain(BaseNltoSQLChain):
                     dialect=self.database.dialect,
                 )
                 table_info = get_table_info_wrt_token_limit(self.llm, self.database, error_prompt, table_names_to_use)
-                error_recovery_chain = LoggedLLMChain(llm=self.llm, prompt=self.error_prompt)
+                error_recovery_chain = LoggedLLMChain(llm=self.llm, prompt=error_prompt)
                 retry_llm_inputs = {
                     "table_info": table_info,
                     "stop": ["\nNewSQLQuery:"],
