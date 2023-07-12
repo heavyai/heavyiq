@@ -9,7 +9,7 @@ class HeavyNLConfig(OverrideConfZ):  # type: ignore
     port: int = 6275
     data: Optional[str] = None
     openai_api_key: str
-    openai_gpt_model: str = "gpt-3.5-turbo"
+    openai_gpt_model: str = "gpt-3.5-turbo-16k"
     heavydb_dbname: Optional[str] = None
     heavydb_username: Optional[str] = None
     heavydb_password: Optional[str] = None
