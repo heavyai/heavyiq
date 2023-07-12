@@ -141,32 +141,34 @@ def adjust_identifier_case(table_statements: list[str], query: str) -> str:
     # Split the query and replace column names with their original case
     select_parts = query.split()
     for i, part in enumerate(select_parts):
-        # Strip trailing commas if they exist
         part_stripped = part.rstrip(",;")
-        # Check if the part is a function call
-        if "(" in part_stripped and ")" in part_stripped:
-            function_name, rest = part_stripped.split("(", 1)
-            column_name, rest = rest.rsplit(")", 1)
-            if column_name.lower() in column_map:
-                select_parts[i] = (
-                    function_name
-                    + "("
-                    + column_map[column_name.lower()]
-                    + ")"
-                    + rest
-                    + ("," if part[-1] == "," else "")
-                    + (";" if part[-1] == ";" else "")
-                )
-        elif "." in part_stripped:
-            table, column = part_stripped.split(".")
-            if column.lower() in column_map:
+        # Only apply transformations if the part is not a string literal
+        if not (part_stripped.startswith("'") and part_stripped.endswith("'")):
+            # Strip trailing commas if they exist
+            # Check if the part is a function call
+            if "(" in part_stripped and ")" in part_stripped:
+                function_name, rest = part_stripped.split("(", 1)
+                column_name, rest = rest.rsplit(")", 1)
+                if column_name.lower() in column_map:
+                    select_parts[i] = (
+                        function_name
+                        + "("
+                        + column_map[column_name.lower()]
+                        + ")"
+                        + rest
+                        + ("," if part[-1] == "," else "")
+                        + (";" if part[-1] == ";" else "")
+                    )
+            elif "." in part_stripped:
+                table, column = part_stripped.split(".")
+                if column.lower() in column_map:
+                    # Preserve the trailing comma if it was present
+                    select_parts[i] = f"{table}.{column_map[column.lower()]}" + ("," if part[-1] == "," else "")
+            elif part_stripped.lower() in column_map:
                 # Preserve the trailing comma if it was present
-                select_parts[i] = f"{table}.{column_map[column.lower()]}" + ("," if part[-1] == "," else "")
-        elif part_stripped.lower() in column_map:
-            # Preserve the trailing comma if it was present
-            select_parts[i] = column_map[part_stripped.lower()] + ("," if part[-1] == "," else "")
-        elif part_stripped.lower() in table_map:
-            select_parts[i] = table_map[part_stripped.lower()] + (";" if part[-1] == ";" else "")
+                select_parts[i] = column_map[part_stripped.lower()] + ("," if part[-1] == "," else "")
+            elif part_stripped.lower() in table_map:
+                select_parts[i] = table_map[part_stripped.lower()] + (";" if part[-1] == ";" else "")
 
     # Combine the parts again
     output_query = " ".join(select_parts)
@@ -185,7 +187,7 @@ def getQueriesByDB(queries_file):
         if db_id not in queries_by_db:
             queries_by_db[db_id] = [
                 {
-                    "query_id": str(query_id),
+                    "query_id": query_id,
                     "question": question,
                     "original_sql_query": original_sql_query,
                     "modified_sql_query": modified_sql_query,
@@ -194,7 +196,7 @@ def getQueriesByDB(queries_file):
         else:
             queries_by_db[db_id].append(
                 {
-                    "query_id": str(query_id),
+                    "query_id": query_id,
                     "question": question,
                     "original_sql_query": original_sql_query,
                     "modified_sql_query": modified_sql_query,
@@ -227,8 +229,8 @@ Write a SQL query to answer the following question:\n
 
 
 def write_prompts_to_csv(prompts, output_file):
-    fieldnames = ["instruction", "output"]
-    prompts_to_write = [(obj["instruction"], obj["output"]) for obj in prompts]
+    fieldnames = ["query_id", "db_id", "instruction", "output"]
+    prompts_to_write = [(obj["query_id"], obj["db_id"], obj["instruction"], obj["output"]) for obj in prompts]
     with open(output_file, mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(fieldnames)
@@ -442,11 +444,20 @@ def main(argv):
                 original_sql_query = query["original_sql_query"]
                 modified_sql_query = query["modified_sql_query"]
                 sql_query = modified_sql_query if len(str(modified_sql_query)) > 3 else original_sql_query
+                #print(query_id)
+                #print(sql_query)
                 sql_query = re.sub(" +", " ", sql_query)
                 sql_query = re.sub(" ,", ",", sql_query)
                 sql_query = sql_query + ";" if sql_query[-1] != ";" else sql_query
                 sql_query = uppercase_sql_keywords(sql_query)
-                sql_query = adjust_identifier_case(table_schemas, sql_query)
+                #print(sql_query)
+                try:
+                    sql_query = adjust_identifier_case(table_schemas, sql_query)
+                except Exception as e:
+                    print(f"Query ID: {query_id} DB: {db_id} Query: {sql_query}")
+                    print(e)
+                    continue
+                #print(f"Query ID: {query_id} DB: {db_id} Query: {sql_query}")
 
                 # print(f"Query ID: {query_id}")
                 # print(f"SQL Query: {sql_query}")
@@ -513,7 +524,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    try:
-        main(sys.argv[1:])
-    except Exception as e:
-        pass
+    main(sys.argv[1:])
