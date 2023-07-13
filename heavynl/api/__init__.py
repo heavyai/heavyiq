@@ -34,17 +34,19 @@ def get_app(config_path: str = "./config.toml") -> Flask:
         This method specifically logs the http request calls using app_logger.
         """
         request.response = response  # type: ignore
-        _get_app_logger().info("", extra={"response": response})
+        _get_app_logger().info("", extra={"response": response, "request": request})
         # do nothing for ui request
         if ui_path in request.path or open_ai_path in request.path:
             return response
         # otherwise log response of every request.
         try:
-            get_heavynl_logger().debug("Response Content: %s", response.get_data(as_text=True))
+            get_heavynl_logger().debug(
+                "Response Content: %s", response.get_data(as_text=True), extra={"request": request}
+            )
         except RuntimeError:
             # skip writing response data in-case of runtime error
             pass
-        get_heavynl_logger().debug("Response Status Code: %d", response.status_code)
+        get_heavynl_logger().debug("Response Status Code: %d", response.status_code, extra={"request": request})
         return response
 
     @flask_app.before_request  # type: ignore

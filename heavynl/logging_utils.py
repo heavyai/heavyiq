@@ -6,8 +6,8 @@ import socket
 import os
 from typing import Any
 import sys
+from fastapi import FastAPI
 
-from flask import request
 
 from heavynl.config import get_config
 
@@ -42,6 +42,15 @@ def get_console_handler(formatter: logging.Formatter | None = None, level: str =
     return console_handler
 
 
+def is_fast_app(request: Any) -> bool:
+    """
+    Function to find whether fastapi app or not.
+    """
+    if request and getattr(request, "app", False) and isinstance(request.app, FastAPI):
+        return True
+    return False
+
+
 # Define a custom filter to extract remote_addr and username from the Flask request object
 class HeavyNLFilter(logging.Filter):
     """
@@ -50,12 +59,23 @@ class HeavyNLFilter(logging.Filter):
 
     def filter(self, record: Any) -> bool:
         try:
-            record.remote_addr = request.remote_addr or "-"
-            record.username = request.remote_user or "-"
+            request = getattr(record, "request")
+            # handles both flask and fastapi logs
+            if is_fast_app(request):
+                record.remote_addr = request.client.host
+                record.username = request.headers.get("X-Remote-User") or "-"
+            else:
+                record.remote_addr = request.remote_addr
+                record.username = request.remote_user or "-"
         except RuntimeError:
             # accessing through CLI
             record.remote_addr = "-"
             record.username = "CLI"
+        except AttributeError:
+            # request object not been attached to the log record
+            record.remote_addr = "-"
+            record.username = "-"
+
         return True
 
 
@@ -65,18 +85,34 @@ class AppFilter(logging.Filter):
     """
 
     def filter(self, record: logging.LogRecord) -> bool:
-        # Get the response from the Flask context
-        response: Any | None = getattr(request, "response", None)
-        record.remote_addr = request.remote_addr
-        record.username = request.remote_user or "-"
-        record.request_method = request.method
-        record.request_uri = request.full_path
-        record.referrer = request.referrer
-        record.user_agent = request.user_agent
-        record.protocol = request.environ.get("SERVER_PROTOCOL", "-")
-        # Include the response in the log record
-        record.status_code = response.status_code if response else "-"
-        record.response_size = response.content_length if response else "-"
+        # Get the request, response from record
+        request: Any = getattr(record, "request", None)
+        response: Any | None = getattr(record, "response", None)
+
+        if is_fast_app(request):
+            # fast api request
+            record.remote_addr = request.client.host
+            record.username = request.headers.get("X-Remote-User") or "-"
+            record.request_method = request.method
+            record.request_uri = str(request.url)
+            record.referrer = request.headers.get("Referer")
+            record.user_agent = request.headers.get("User-Agent")
+            record.protocol = request.scope.get("scheme")
+            record.status_code = response.status_code if response else "-"
+            record.response_size = response.headers["Content-Length"] if response else "-"
+
+        else:
+            # flask request
+            record.remote_addr = request.remote_addr
+            record.username = request.remote_user or "-"
+            record.request_method = request.method
+            record.request_uri = request.full_path
+            record.referrer = request.referrer
+            record.user_agent = request.user_agent
+            record.protocol = request.environ.get("SERVER_PROTOCOL", "-")
+            # Include the response in the log record
+            record.status_code = response.status_code if response else "-"
+            record.response_size = response.content_length if response else "-"
 
         return True
 
