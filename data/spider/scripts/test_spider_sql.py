@@ -8,6 +8,7 @@ import pandas as pd
 import re
 import sqlparse
 import sys
+from transformers import LlamaTokenizer
 
 from collections.abc import Iterable
 
@@ -117,6 +118,7 @@ def uppercase_sql_keywords(sql):
     new_sql = "".join(token for token in parsed_tokens)
     return new_sql
 
+
 def adjust_identifier_case(table_statements: list[str], query: str) -> str:
     # Build a map for all column names
     column_map = {}
@@ -137,6 +139,9 @@ def adjust_identifier_case(table_statements: list[str], query: str) -> str:
         for column in columns:
             column_name = column.split()[0]
             column_map[column_name.lower()] = column_name
+
+    # used_tables = set()
+    # used_tables_list = []
 
     # Split the query and replace column names with their original case
     select_parts = query.split()
@@ -169,10 +174,15 @@ def adjust_identifier_case(table_statements: list[str], query: str) -> str:
                 select_parts[i] = column_map[part_stripped.lower()] + ("," if part[-1] == "," else "")
             elif part_stripped.lower() in table_map:
                 select_parts[i] = table_map[part_stripped.lower()] + (";" if part[-1] == ";" else "")
+                # if part_stripped.lower() not in used_tables:
+                #    used_tables_list.append(table_map[part_stripped.lower()])
+                #    used_tables.add(table_map[part_stripped.lower()])
 
     # Combine the parts again
     output_query = " ".join(select_parts)
     return output_query
+    # return {"query": output_query, "tables": used_tables_list}
+
 
 def getQueriesByDB(queries_file):
     queries_df = pd.read_csv(queries_file)
@@ -184,10 +194,12 @@ def getQueriesByDB(queries_file):
         original_sql_query = row["original_sql_query"]
         modified_sql_query = row["modified_sql_query"]
         question = row["question"]
+        data_split = row["dataset"]
         if db_id not in queries_by_db:
             queries_by_db[db_id] = [
                 {
                     "query_id": query_id,
+                    "data_split": data_split,
                     "question": question,
                     "original_sql_query": original_sql_query,
                     "modified_sql_query": modified_sql_query,
@@ -197,6 +209,7 @@ def getQueriesByDB(queries_file):
             queries_by_db[db_id].append(
                 {
                     "query_id": query_id,
+                    "data_split": data_split,
                     "question": question,
                     "original_sql_query": original_sql_query,
                     "modified_sql_query": modified_sql_query,
@@ -228,9 +241,47 @@ Write a SQL query to answer the following question:\n
     return instruction
 
 
+def extract_tables_from_query(con, query):
+    explain_query = "EXPLAIN CALCITE " + query
+    query_plan = con.execute(explain_query)
+    query_plan = list(query_plan)[0][0]
+    pattern = r"LogicalTableScan\(table=\[\[(.*?)\]\]\)"
+    matches = re.findall(pattern, query_plan)
+    tables = []
+    for match in matches:
+        table = match.split(", ")[1]
+        tables.append(table)
+    return list(set(tables))  # remove duplicates
+
+
 def write_prompts_to_csv(prompts, output_file):
-    fieldnames = ["query_id", "db_id", "instruction", "output"]
-    prompts_to_write = [(obj["query_id"], obj["db_id"], obj["instruction"], obj["output"]) for obj in prompts]
+    fieldnames = [
+        "query_id",
+        "db_id",
+        "tables",
+        "data_split",
+        "instruction_tokens",
+        "targeted_instruction_tokens",
+        "output_tokens",
+        "instruction",
+        "targeted_instruction",
+        "output",
+    ]
+    prompts_to_write = [
+        (
+            obj["query_id"],
+            obj["db_id"],
+            obj["tables"],
+            obj["data_split"],
+            obj["instruction_tokens"],
+            obj["targeted_instruction_tokens"],
+            obj["output_tokens"],
+            obj["instruction"],
+            obj["targeted_instruction"],
+            obj["output"],
+        )
+        for obj in prompts
+    ]
     with open(output_file, mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(fieldnames)
@@ -422,6 +473,7 @@ def main(argv):
     failed_queries = []
     prompts = []
     con = None
+    tokenizer = LlamaTokenizer.from_pretrained("test_model")
     for db_id, queries in queries_by_db.items():
         try:
             if db_num < options.start_db:
@@ -437,27 +489,32 @@ def main(argv):
             successful_queries = 0
             db_tables = con.get_tables()
             table_schemas = []
+            table_schemas_map = {}
             for db_table in db_tables:
-                table_schemas.append(get_table_schema(con, db_table))
+                table_schema = get_table_schema(con, db_table)
+                table_schemas.append(table_schema)
+                table_schemas_map[db_table.lower()] = table_schema
             for query in queries:
                 query_id = query["query_id"]
                 original_sql_query = query["original_sql_query"]
                 modified_sql_query = query["modified_sql_query"]
+                data_split = query["data_split"]
                 sql_query = modified_sql_query if len(str(modified_sql_query)) > 3 else original_sql_query
-                #print(query_id)
-                #print(sql_query)
                 sql_query = re.sub(" +", " ", sql_query)
                 sql_query = re.sub(" ,", ",", sql_query)
                 sql_query = sql_query + ";" if sql_query[-1] != ";" else sql_query
                 sql_query = uppercase_sql_keywords(sql_query)
-                #print(sql_query)
+                filtered_tables = None
                 try:
                     sql_query = adjust_identifier_case(table_schemas, sql_query)
+                    # query_and_tables = adjust_identifier_case(table_schemas, sql_query)
+                    # sql_query = query_and_tables["query"]
+                    # filtered_tables = query_and_tables["tables"]
                 except Exception as e:
-                    print(f"Query ID: {query_id} DB: {db_id} Query: {sql_query}")
-                    print(e)
+                    print(f"Exception Query ID: {query_id} DB: {db_id} Query: {sql_query}")
                     continue
-                #print(f"Query ID: {query_id} DB: {db_id} Query: {sql_query}")
+                # print(f"Query ID: {query_id} DB: {db_id} Query: {sql_query}")
+                sql_query = sql_query + ";" if sql_query[-1] != ";" else sql_query
 
                 # print(f"Query ID: {query_id}")
                 # print(f"SQL Query: {sql_query}")
@@ -465,10 +522,35 @@ def main(argv):
                     results = list(con.execute(sql_query))
                     successful_queries += 1
                     if options.write_prompts:
+                        filtered_tables = extract_tables_from_query(con, sql_query)
+                        # print(f"Query ID: {query_id} Tables: {filtered_tables} Query: {sql_query}")
+                        sql_query_tokens = tokenizer.tokenize(sql_query)
+                        num_sql_query_tokens = len(sql_query_tokens)
+                        filtered_table_schemas = []
+                        for db_table in filtered_tables:
+                            filtered_table_schemas.append(table_schemas_map[db_table.lower()])
                         instruction = generate_instruction(table_schemas, query["question"])
+                        targeted_instruction = generate_instruction(filtered_table_schemas, query["question"])
+                        instruction_tokens = tokenizer.tokenize(instruction)
+                        num_instruction_tokens = len(instruction_tokens)
+                        targeted_instruction_tokens = tokenizer.tokenize(targeted_instruction)
+                        num_targeted_instruction_tokens = len(targeted_instruction_tokens)
+                        sql_query_tokens = tokenizer.tokenize(sql_query)
+                        num_sql_query_tokens = len(sql_query_tokens)
                         # sql_query_with_semicolon = sql_query + ";" if sql_query[-1] != ";" else sql_query
                         prompts.append(
-                            {"instruction": instruction, "output": sql_query, "db_id": db_id, "query_id": query_id}
+                            {
+                                "db_id": db_id,
+                                "query_id": query_id,
+                                "data_split": data_split,
+                                "tables": filtered_tables,
+                                "instruction": instruction,
+                                "targeted_instruction": targeted_instruction,
+                                "output": sql_query,
+                                "instruction_tokens": num_instruction_tokens,
+                                "targeted_instruction_tokens": num_targeted_instruction_tokens,
+                                "output_tokens": num_sql_query_tokens,
+                            }
                         )
                 except Exception as e:
                     query_fixed = False
@@ -487,20 +569,6 @@ def main(argv):
                             query_fixed = True
                     if not query_fixed:
                         failed_queries.append({"query_id": query_id, "db_id": db_id, "sql_query": sql_query})
-
-                    # if '"' in sql_query:
-                    #    sql_query = sql_query.replace('"', "'")
-                    #    try:
-                    #        results = list(con.execute(sql_query))
-                    #        successful_queries += 1
-                    #        total_successful_altered_queries += 1
-                    #    except Exception as e:
-                    #        failed_queries.append({"query_id": query_id, "db_id": db_id, "sql_query": sql_query})
-                    #        continue
-                    # else:
-                    #    # failed_queries.append({"query_id": query_id, "db_id": db_id, "sql_query": sql_query, "error": e})
-                    #    failed_queries.append({"query_id": query_id, "db_id": db_id, "sql_query": sql_query})
-                    #    continue
             total_queries += num_queries
             total_successful_queries += successful_queries
             print(f"{db_num}: {db_id} successful queries: {successful_queries}/{num_queries}")
