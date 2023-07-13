@@ -33,10 +33,10 @@ CREATE TABLE "car_names" (
 
 CREATE TABLE "cars_data" (
 	"Id" INTEGER , 
-	"MPG" TEXT, 
+	"MPG" FLOAT, 
 	"Cylinders" INTEGER, 
 	"Edispl" FLOAT, 
-	"Horsepower" TEXT, 
+	"Horsepower" INTEGER, 
 	"Weight" INTEGER, 
 	"Accelerate" FLOAT, 
 	"Year" INTEGER);
