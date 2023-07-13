@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from heavydb.exceptions import Error as HeavyDBError
 from pydantic import ValidationError
@@ -7,9 +8,9 @@ from starlette.exceptions import HTTPException
 
 from heavynl.config import get_config
 from heavynl.fastapi.handlers import exception_handler as exh
-from heavynl.fastapi.routes import defaultrouter, iqrouter
 from heavynl.fastapi.middlewares import LoggingMiddleware
-from heavynl.logging_utils import _get_app_logger, get_heavynl_logger, init_logs
+from heavynl.fastapi.routes import defaultrouter, iqrouter
+from heavynl.logging_utils import init_logs
 
 
 def create_app(config_path: str = "./config.toml") -> FastAPI:
@@ -21,9 +22,21 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
     get_config(config_path)  # loads config using specified path
     init_logs()  # initializes logs using config
 
-    app = FastAPI(title="HeavyIQ", debug=True)
+    app = FastAPI(title="HeavyIQ")
+
+    cors_origins = [
+        "http://localhost",
+        "http://localhost:8000",
+    ]
 
     # add middlewares
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.add_middleware(LoggingMiddleware)
 
     # add exception handlers
