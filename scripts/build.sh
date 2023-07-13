@@ -1,6 +1,5 @@
 # ENV Requirements
 ## python3.10 (Installed)
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/jenkins/tmp/Python-3.10.12
 
 # Create New Virtual Environment
 python3.10 -m venv venv
