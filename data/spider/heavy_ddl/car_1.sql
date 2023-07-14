@@ -16,7 +16,7 @@ CREATE TABLE "car_makers" (
 	"Id" INTEGER , 
 	"Maker" TEXT, 
 	"FullName" TEXT, 
-	"Country" TEXT);
+	"CountryId" INT);
 
 
 CREATE TABLE "model_list" ( 
@@ -40,5 +40,8 @@ CREATE TABLE "cars_data" (
 	"Weight" INTEGER, 
 	"Accelerate" FLOAT, 
 	"Year" INTEGER);
+
+INSERT INTO car_names VALUES (1,'chevrolet chevelle malibu','chevrolet'); 
+INSERT INTO cars_data VALUES (1,18,8,307,130,3504,12,70);
 
 

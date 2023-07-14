@@ -50,7 +50,15 @@ CREATE TABLE river (
 INSERT INTO highlow VALUES ('colorado', 14440, 'Yuma County', 'Mount Elbert', 3317);
 INSERT INTO highlow VALUES ('alabama', 2407, 'Gulf of Mexico', 'Cheaha Mountain', 60);
 INSERT INTO highlow VALUES ('new york', 5344, 'Atlantic Ocean', 'Mount Marcy', 0);
+INSERT INTO highlow VALUES ('massachusetts', 1063, 'Atlantic Ocean', 'Mount Greylock', 0);
 INSERT INTO state VALUES ('texas', 28296099, 65.05964231171514, 'united states', 'austin', 435.015);
-INSERT INTO state VALUES ('new york', 19570261, 54.556, 'united states', 'new york', 358.9);
+INSERT INTO state VALUES ('new york', 19570261, 54.556, 'united states', 'new york city', 358.9);
 INSERT INTO state VALUES ('massachusetts', 6692824, 10.555, 'united states', 'boston', 633.9);
+INSERT INTO state VALUES ('alabama', 4858979, 52.419, 'united states', 'montgomery', 92.8);
+INSERT INTO state VALUES ('mississippi', 2976149, 48.432, 'united states', 'jackson', 61.4);
 INSERT INTO city VALUES ('new york city', 8175133, 'united states', 'new york');
+INSERT INTO city VALUES ('austin', 790390, 'united states', 'texas');
+INSERT INTO city VALUES ('boston', 617594, 'united states', 'massachusetts'); 
+INSERT INTO city VALUES ('birmingham', 212237, 'united states', 'alabama');
+INSERT INTO city VALUES ('jackson', 173514, 'united states', 'mississippi');
+INSERT INTO river VALUES('mississippi', 3734, 'united states', 'mississippi');

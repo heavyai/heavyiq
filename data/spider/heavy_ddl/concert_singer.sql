@@ -46,8 +46,8 @@ CREATE TABLE "concert" (
 "concert_ID" int,
 "concert_Name" text,
 "Theme" text,
-"Stadium_ID" text,
-"Year" text);
+"Stadium_ID" int,
+"Year" int);
 
 
 
@@ -61,7 +61,7 @@ INSERT INTO  "concert" VALUES (6,'Week 2','Party All Night',7,2015);
 
 CREATE TABLE "singer_in_concert" (
 "concert_ID" int,
-"Singer_ID" text);
+"Singer_ID" int);
 
 INSERT INTO  "singer_in_concert" VALUES (1, 2);
 INSERT INTO  "singer_in_concert" VALUES (1, 3);

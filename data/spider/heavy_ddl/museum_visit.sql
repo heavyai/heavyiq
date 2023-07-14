@@ -7,7 +7,7 @@ CREATE TABLE "museum" (
 "Museum_ID" int,
 "Name" text,
 "Num_of_Staff" int,
-"Open_Year" text);
+"Open_Year" int);
 
 
 
@@ -35,7 +35,7 @@ INSERT INTO  "visitor" VALUES (6,'Rafael van der Vaart',1,25);
 
 CREATE TABLE "visit" (
 "Museum_ID" int,
-"visitor_ID" text,
+"visitor_ID" int,
 "Num_of_Ticket" int,
 "Total_spent" FLOAT);
 
