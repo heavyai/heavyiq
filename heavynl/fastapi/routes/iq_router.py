@@ -1,12 +1,12 @@
 from fastapi import APIRouter
-from heavynl.fastapi.models import QueryRequest, QueryResponse
-from heavynl.fastapi.handlers import handle_query_request
+from heavynl.fastapi.models import QueryRequest, QueryResponse, QuestionResponse, QuestionRequest
+from heavynl.fastapi.handlers import handle_query_request, handle_question_request
 
 iqrouter = APIRouter()
 
 
 @iqrouter.post("/query", response_model=QueryResponse)
-async def query(request: QueryRequest):
+async def query(request: QueryRequest) -> QueryResponse:
     """
     Request for sql query with all the information:
 
@@ -19,7 +19,15 @@ async def query(request: QueryRequest):
     return handle_query_request(request)
 
 
-@iqrouter.post("/question")
-def question():
-    # Handle POST request for endpoint2
-    pass
+@iqrouter.post("/question", response_model=QuestionResponse)
+async def question(request: QuestionRequest) -> QuestionResponse:
+    """
+    Request for answer and sql with all the information:
+
+    - **question**: Actual NL question asked.
+    - **tables**: List of tables to consider.
+    - **session_id**: HeavyDB session id.
+    \f
+    :param QuestionRequest request: Request Body
+    """
+    return handle_question_request(request)

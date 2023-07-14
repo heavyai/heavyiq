@@ -10,6 +10,17 @@ class QueryRequest(BaseModel):
     tables: list[str] = Field(..., min_items=1)
     session_id: str = Field(..., max_length=32, min_length=32)
 
+    class Config:
+        schema_extra = {
+            "examples": [
+                {
+                    "session_id": "xxxxxxxx",
+                    "question": "What is the total population in the USA according to the data in the usa_states table?",
+                    "tables": ["usa_states"],
+                }
+            ]
+        }
+
 
 class QueryResponse(BaseModel):
     """
