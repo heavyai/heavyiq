@@ -4,12 +4,12 @@ import connexion
 from flask import Flask, redirect, request, Response
 from flask_cors import CORS
 
-from heavynl.config import get_config
+from heavynl.config import get_config, get_heavydb_license_claims
 from heavynl.logging_utils import _get_app_logger, get_heavynl_logger, init_logs
 
 
 def get_app(config_path: str = "./config.toml") -> Flask:
-    get_config(config_path)  # loads config using specified path
+    config = get_config(config_path)  # loads config using specified path
     init_logs()  # initializes logs using config
 
     app = connexion.FlaskApp(__name__, server_args={"static_folder": "../../public", "static_url_path": "/"})
@@ -25,6 +25,14 @@ def get_app(config_path: str = "./config.toml") -> Flask:
     open_ai_path = "/api/v1/openapi.json"
 
     flask_app = app.app
+
+    @flask_app.before_first_request
+    def initialize():
+        from heavynl.logging_utils import heavynl_logger as logger
+
+        logger.info("Connecting to heavydb...")
+        get_heavydb_license_claims(config)
+        logger.info("Successfully connected to heavydb...")
 
     @flask_app.after_request  # type: ignore
     def log_response(response: Response) -> Response:
