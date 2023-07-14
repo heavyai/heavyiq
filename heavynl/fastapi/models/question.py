@@ -14,7 +14,7 @@ class QuestionRequest(BaseModel):
         schema_extra = {
             "examples": [
                 {
-                    "session_id": "xxxxxxxx",
+                    "session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
                     "question": "What is the total population in the USA according to the data in the usa_states table?",
                     "tables": ["usa_states"],
                 }
