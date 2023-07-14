@@ -54,6 +54,27 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
     app.include_router(defaultrouter)
     app.include_router(iqrouter, prefix="/api/v1", tags=["api.v1"])
 
+    # check heavydb connection
+    @app.on_event("startup")
+    async def initialize():
+        """
+        Code to be executed when application starts.
+        """
+        from heavynl.logging_utils import heavynl_logger as logger
+
+        logger.info("Connecting to heavydb...")
+        # TODO: add code to check heavydb availability
+        logger.info("Successfully connected to heavydb...")
+
+    @app.on_event("shutdown")
+    async def shutdown():
+        """
+        Code to be executed before FastAPI application ends.
+        """
+        from heavynl.logging_utils import heavynl_logger as logger
+
+        logger.info("Shutting down FastAPI app.")
+
     def custom_openapi():
         if app.openapi_schema:
             return app.openapi_schema
