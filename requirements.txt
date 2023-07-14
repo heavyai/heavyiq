@@ -1,6 +1,7 @@
 # All dependencies required to run the REST API in Production
 confz==2.0.0
 connexion[swagger-ui]==2.14.2
+fastapi==0.100.0
 Flask==2.2.4 # cannot upgrade to 2.3.x because of connexion
 Flask-Cors==3.0.10
 gunicorn==20.1.0
@@ -11,7 +12,4 @@ promptlayer==0.1.92
 promptwatch==0.2.5
 pydantic==1.10.11
 SQLAlchemy==2.0.16
-fastapi==0.100.0
-pydantic==1.10.11
-pydantic_core==2.1.2
 uvicorn==0.22.0
