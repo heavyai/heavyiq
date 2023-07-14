@@ -9,6 +9,9 @@ from heavynl.langchain.utils import is_promptlayer_active
 
 
 def get_llm_by_model_name(model: str, tags: list[str] = [], **kwargs) -> BaseLLM | BaseChatModel:
+    config = get_config()
+    if config.custom_llm_type is not None and config.custom_llm_type == "API":
+        return get_llm(tags=tags, **kwargs)
     if model.startswith("gpt-3.5") or model.startswith("gpt-4") or model.startswith("gpt-35"):
         return get_chat_llm(tags=tags, model=model, **kwargs)
     else:
