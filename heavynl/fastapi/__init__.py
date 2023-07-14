@@ -1,12 +1,13 @@
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.concurrency import run_in_threadpool
 from fastapi.openapi.utils import get_openapi
 from heavydb.exceptions import Error as HeavyDBError
 from pydantic import ValidationError
 from starlette.exceptions import HTTPException
 
-from heavynl.config import get_config
+from heavynl.config import get_config, get_heavydb_license_claims
 from heavynl.fastapi.handlers import exception_handler as exh
 from heavynl.fastapi.middlewares import LoggingMiddleware
 from heavynl.fastapi.routes import defaultrouter, iqrouter
@@ -19,7 +20,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
 
     :return FastAPI: instance of fastapi with custom openapi scehma.
     """
-    get_config(config_path)  # loads config using specified path
+    config = get_config(config_path)  # loads config using specified path
     init_logs()  # initializes logs using config
 
     app = FastAPI(title="HeavyIQ")
@@ -63,7 +64,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         from heavynl.logging_utils import heavynl_logger as logger
 
         logger.info("Connecting to heavydb...")
-        # TODO: add code to check heavydb availability
+        await run_in_threadpool(get_heavydb_license_claims, config)
         logger.info("Successfully connected to heavydb...")
 
     @app.on_event("shutdown")
