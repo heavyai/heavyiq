@@ -174,10 +174,11 @@ class NLtoSQLChain(BaseNltoSQLChain):
                 verified = True
             except Exception as e:
                 self.write_callback_message(f"Invalid SQL Query: {e}.", run_manager=run_manager, color="red")
+                truncated_error = str(e)[0:150] if len(str(e)) > 150 else str(e)
                 error_prompt = self.error_prompt.partial(
                     input=input_text,
                     sql_cmd=sql_cmd,
-                    error=f"{str(e)[0:150]} \nNewSQLQuery:",
+                    error=f"{truncated_error} \nNewSQLQuery:",
                     dialect=self.database.dialect,
                 )
                 table_info = get_table_info_wrt_token_limit(self.llm, self.database, error_prompt, table_names_to_use)
@@ -230,7 +231,7 @@ class NLtoSQLChatChain(BaseNltoSQLChain):
         """
         Helps to parse out SQL query from the llm response message.
         """
-        return strip_sql_comments(return_message.content.split("\nSQLQuery:")[1].strip())
+        return strip_sql_comments(return_message.content.split("SQLQuery:")[1].strip())
 
     def build_ai_message(self, return_message: BaseMessage) -> AIMessage:
         """
@@ -271,7 +272,8 @@ class NLtoSQLChatChain(BaseNltoSQLChain):
                 self.database.validate_query(sql_query)
                 sql_valid = True
             except Exception as exc:
-                messages.append(HumanMessage(content=NL_TO_SQL_CHAT_ERROR_TEMPLATE.format(exception=str(exc)[0:150])))
+                truncated_exc = str(exc)[0:150] if len(str(exc)) > 150 else str(exc)
+                messages.append(HumanMessage(content=NL_TO_SQL_CHAT_ERROR_TEMPLATE.format(exception=truncated_exc)))
                 self.write_callback_message(
                     f"\nInvalid SQL,\n{sql_query} \n\nException:\n{exc}\nAttempt {retries}. Retrying ....",
                     run_manager=run_manager,

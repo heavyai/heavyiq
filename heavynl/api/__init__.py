@@ -12,7 +12,7 @@ def get_app(config_path: str = "./config.toml") -> Flask:
     get_config(config_path)  # loads config using specified path
     init_logs()  # initializes logs using config
 
-    app = connexion.FlaskApp(__name__)
+    app = connexion.FlaskApp(__name__, server_args={"static_folder": "../../public", "static_url_path": "/"})
     CORS(app.app)
 
     # for some reason the servers base url is not set to the full url, just "/api/v1"

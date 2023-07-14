@@ -2,7 +2,12 @@ import os
 from urllib.parse import urlparse
 
 from confz import ConfZFileSource
+from heavydb.thrift.Heavy import Client
+from heavydb.thrift.ttypes import TLicenseInfo
+from thrift.protocol import TBinaryProtocol
+from thrift.transport import TSocket, TTransport
 import openai
+
 
 from .config_schema import AppConfig, HeavyNLConfig
 
@@ -24,6 +29,23 @@ def split_url_port(url: str) -> tuple[str, int]:
         raise ValueError(f"Invalid URL contains either no hostname or port: {url}")
 
     return parsed.hostname, parsed.port
+
+
+def get_heavydb_license_claims(config: HeavyNLConfig) -> TLicenseInfo:
+    try:
+        socket = TSocket.TSocket(config.heavydb_host, config.heavydb_port)
+        socket.setTimeout(8000)  # try to connect for 8 seconds
+        transport = TTransport.TBufferedTransport(socket)
+        proto = TBinaryProtocol.TBinaryProtocolAccelerated(transport)
+        transport.open()
+        client = Client(proto)
+        res = client.get_license_claims(None, "")
+        transport.close()
+        return res
+    except Exception as e:
+        raise ValueError(
+            f"Unable to communicate with HeavyDB instance at {config.heavydb_host}:{config.heavydb_port}: {e}"
+        )
 
 
 def get_config(file: str = "./config.toml") -> HeavyNLConfig:
@@ -66,4 +88,7 @@ def get_config(file: str = "./config.toml") -> HeavyNLConfig:
     if not os.path.exists(app_config.iq.data):
         os.makedirs(app_config.iq.data)
     _config = app_config.iq
+
+    get_heavydb_license_claims(_config)
+
     return _config

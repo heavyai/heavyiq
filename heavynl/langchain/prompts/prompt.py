@@ -18,7 +18,7 @@ class LoggedPromptMixin:
 
     def __post_init__(self):
         config = get_config()
-        if is_promptlayer_active:
+        if config.promptwatch_api_key is not None and config.promptwatch_api_key != "":
             with PromptWatch(
                 api_key=config.promptwatch_api_key, tracking_project=config.promptwatch_tracking_project
             ) as pw:
