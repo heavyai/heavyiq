@@ -13,6 +13,8 @@ from heavynl.config import get_config, get_heavydb_license_claims
 from heavynl.fastapi.handlers import exception_handler as exh
 from heavynl.fastapi.middlewares import LoggingMiddleware
 from heavynl.fastapi.routes import defaultrouter, iqrouter
+from heavynl.fastapi.models.error import ErrorResponse
+from heavynl.langchain.exceptions import NLtoSQLException
 from heavynl.logging_utils import init_logs
 
 
@@ -48,6 +50,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
     app.add_exception_handler(HeavyDBError, exh.heavydb_exception_handler)
     app.add_exception_handler(ValueError, exh.value_error_handler)
     app.add_exception_handler(TypeError, exh.type_error_handler)
+    app.add_exception_handler(NLtoSQLException, exh.nl_to_sql_exception_handler)
     app.add_exception_handler(Exception, exh.unhandled_exception_handler)
 
     # Include your API routes
@@ -59,7 +62,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         responses={
             500: {
                 "description": "Internal Server Error",
-                "content": {"application/json": {"example": {"error": "division by zero"}}},
+                "model": ErrorResponse,
             }
         },
     )
