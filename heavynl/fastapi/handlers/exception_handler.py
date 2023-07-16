@@ -7,6 +7,7 @@ from starlette.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
 from heavynl.fastapi.models import ErrorResponse
+from heavynl.langchain.exceptions import NLtoSQLException
 
 
 logger = logging.getLogger(__name__)
@@ -55,4 +56,11 @@ async def attribute_error_handler(request: Request, exc: Exception) -> Response:
     return JSONResponse(
         status_code=HTTP_500_INTERNAL_SERVER_ERROR,
         content=jsonable_encoder(_build_error_response("Attribute Error", str(exc))),
+    )
+
+
+async def nl_to_sql_exception_handler(request: Request, exc: NLtoSQLException) -> Response:
+    return JSONResponse(
+        status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+        content=jsonable_encoder(_build_error_response("NLtoSQLException", exc.message or "")),
     )

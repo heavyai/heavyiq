@@ -7,3 +7,8 @@ class ErrorResponse(BaseModel):
     """
 
     error: str = Field(..., description="An error message")
+
+    class Config:
+        schema_extra = {
+            "example": {"error": "Internal Server Error"},
+        }
