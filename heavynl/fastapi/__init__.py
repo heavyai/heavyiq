@@ -43,10 +43,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
     app.add_middleware(LoggingMiddleware)
 
     # add exception handlers
-    app.add_exception_handler(RequestValidationError, exh.req_validation_handler)
-    app.add_exception_handler(ValidationError, exh.validation_handler)
     app.add_exception_handler(AttributeError, exh.attribute_error_handler)
-
     app.add_exception_handler(HTTPException, exh.http_exception_handler)
     app.add_exception_handler(HeavyDBError, exh.heavydb_exception_handler)
     app.add_exception_handler(ValueError, exh.value_error_handler)
@@ -55,7 +52,17 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
 
     # Include your API routes
     app.include_router(defaultrouter)
-    app.include_router(iqrouter, prefix="/api/v1", tags=["api.v1"])
+    app.include_router(
+        iqrouter,
+        prefix="/api/v1",
+        tags=["api.v1"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "content": {"application/json": {"example": {"error": "division by zero"}}},
+            }
+        },
+    )
 
     # check heavydb connection
     @app.on_event("startup")
@@ -88,6 +95,17 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
             description="",
             routes=app.routes,
         )
+
+        # hard way to remove certain schemas from default openapi schema
+        def remove_key(dictionary: dict, keys_to_remove: list):
+            for key, value in list(dictionary.items()):
+                if key in keys_to_remove:
+                    dictionary.pop(key)
+                elif isinstance(value, dict):
+                    remove_key(value, keys_to_remove)
+
+        remove_key(openapi_schema, ["422", "HTTPValidationError", "ValidationError"])
+
         app.openapi_schema = openapi_schema
         return app.openapi_schema
 
