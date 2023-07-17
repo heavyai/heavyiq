@@ -1,7 +1,7 @@
 import os
 from urllib.parse import urlparse
 
-from confz import ConfZFileSource
+from confz import FileSource
 from heavydb.thrift.Heavy import Client
 from heavydb.thrift.ttypes import TLicenseInfo
 from thrift.protocol import TBinaryProtocol
@@ -53,7 +53,7 @@ def get_config(file: str = "./config.toml") -> HeavyNLConfig:
     global _config
     if _config:
         return _config
-    app_config = AppConfig(config_sources=ConfZFileSource(file=file))
+    app_config = AppConfig(config_sources=FileSource(file=file))
     if app_config.iq.custom_llm_type is None or app_config.iq.custom_llm_type == "AZURE":
         if app_config.iq.custom_llm_type == "AZURE" and (
             app_config.iq.custom_llm_azure_deployment_name.strip() == ""
