@@ -3,8 +3,8 @@ from pathlib import Path
 from typing import Any, ClassVar, Optional
 
 from confz.change import SourceChangeManager
-from confz.confz_source import ConfZSources, FileFormat
-from confz.exceptions import ConfZException, ConfZFileException
+from confz.config_source import ConfigSources, FileFormat
+from confz.exceptions import ConfigException, FileException
 from confz.loaders.file_loader import FileLoader
 from pydantic import BaseModel
 
@@ -30,14 +30,14 @@ class OverrideFileLoader(FileLoader):
         try:
             suffix_format = suffix_formats[suffix]
         except KeyError as e:
-            raise ConfZFileException(
+            raise FileException(
                 f"File-ending '{suffix}' is not known. Supported are: " f"{', '.join(list(suffix_formats.keys()))}."
             ) from e
 
         return suffix_format
 
 
-def _load_config(config_kwargs: dict, confz_sources: ConfZSources) -> dict:
+def _load_config(config_kwargs: dict, confz_sources: ConfigSources) -> dict:
     config = config_kwargs.copy()
     if isinstance(confz_sources, list):
         for confz_source in confz_sources:
@@ -56,7 +56,7 @@ class OverrideConfZMetaclass(type(BaseModel)):  # type: ignore
     """ConfZ Meta Class, inheriting from the pydantic `BaseModel` MetaClass."""
 
     # pylint: disable=no-self-argument,no-member
-    def __call__(cls, config_sources: Optional[ConfZSources] = None, **kwargs):
+    def __call__(cls, config_sources: Optional[ConfigSources] = None, **kwargs):
         """Called every time an instance of any ConfZ object is created. Injects the
         config value population and singleton mechanism."""
         if config_sources is not None:
@@ -67,7 +67,7 @@ class OverrideConfZMetaclass(type(BaseModel)):  # type: ignore
             # pylint: disable=access-member-before-definition
             # pylint: disable=attribute-defined-outside-init
             if len(kwargs) > 0:
-                raise ConfZException(
+                raise ConfigException(
                     'Singleton mechanism enabled ("CONFIG_SOURCES" is defined), so '
                     "keyword arguments are not supported"
                 )
@@ -79,7 +79,7 @@ class OverrideConfZMetaclass(type(BaseModel)):  # type: ignore
         return super().__call__(**kwargs)
 
 
-class OverrideConfZ(BaseModel, metaclass=OverrideConfZMetaclass):
+class OverrideBaseConfig(BaseModel, metaclass=OverrideConfZMetaclass):
     """Base class, parent of every config class. Internally wraps :class:`BaseModel`of
     pydantic and behaves transparent except for two cases:
 
@@ -91,7 +91,7 @@ class OverrideConfZ(BaseModel, metaclass=OverrideConfZMetaclass):
     In the latter case, a singleton mechanism is activated, returning the same config
     class instance every time the constructor is called."""
 
-    CONFIG_SOURCES: ClassVar[Optional[ConfZSources]] = None  #: Sources to use as input.
+    CONFIG_SOURCES: ClassVar[Optional[ConfigSources]] = None  #: Sources to use as input.
 
     # type is ClassVar[Optional["ConfZ"]] (pydantic throws error with forward ref)
     confz_instance: ClassVar[Optional[Any]] = None  #: *for internal use only*
@@ -103,7 +103,7 @@ class OverrideConfZ(BaseModel, metaclass=OverrideConfZMetaclass):
         allow_mutation = True  # 2. Allow ConfZ to be mutable
 
     @classmethod
-    def change_config_sources(cls, config_sources: ConfZSources) -> AbstractContextManager:
+    def change_config_sources(cls, config_sources: ConfigSources) -> AbstractContextManager:
         """Change the `CONFIG_SOURCES` class variable within a controlled context.
         Within this context, the sources will be different and the singleton reset.
         This can be useful in unit tests to temporarily change a configuration.

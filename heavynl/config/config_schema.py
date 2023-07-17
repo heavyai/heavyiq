@@ -2,10 +2,10 @@ from typing import Optional
 
 from pydantic import Field
 
-from .overrides import OverrideConfZ
+from .overrides import OverrideBaseConfig
 
 
-class HeavyNLConfig(OverrideConfZ):  # type: ignore
+class HeavyNLConfig(OverrideBaseConfig):  # type: ignore
     port: int = 6275
     data: Optional[str] = None
     openai_api_key: str
@@ -37,12 +37,12 @@ class HeavyNLConfig(OverrideConfZ):  # type: ignore
     custom_llm_azure_deployment_name: str = ""
 
 
-class HeavyWebConfig(OverrideConfZ):  # type: ignore
+class HeavyWebConfig(OverrideBaseConfig):  # type: ignore
     backend_url: Optional[str] = Field(alias="backend-url")
     data: Optional[str] = None
 
 
-class AppConfig(OverrideConfZ):  # type: ignore
+class AppConfig(OverrideBaseConfig):  # type: ignore
     http_port: Optional[int] = Field(alias="http-port")
     iq: HeavyNLConfig
     web: Optional[HeavyWebConfig] = None
