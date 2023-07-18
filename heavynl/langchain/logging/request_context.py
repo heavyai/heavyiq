@@ -7,6 +7,7 @@ from langchain.agents.agent import AgentExecutor
 from langchain.callbacks import OpenAICallbackHandler, get_openai_callback
 from langchain.chains.base import Chain
 from promptwatch import PromptWatch
+from fastapi.concurrency import contextmanager_in_threadpool
 
 from heavynl.config import get_config
 
@@ -166,6 +167,26 @@ def log_chain_call(chain: Chain, input: str | dict, model: str = "", chain_name:
         with promptwatch_context(), get_openai_callback() as cb:
             try:
                 output = chain(input)
+                log_ctx.success(output, cb)
+                return output
+            except Exception as e:
+                log_ctx.error(str(e), cb)
+                raise e
+
+
+async def log_chain_call_async(
+    chain: Chain, input: str | dict, model: str = "", chain_name: Optional[str] = None
+) -> dict:
+    if isinstance(input, str):
+        input = {chain.input_keys[0]: input}
+    async with contextmanager_in_threadpool(
+        chain_log_request_ctx(chain_name or chain._chain_type, model, input)
+    ) as log_ctx:
+        async with contextmanager_in_threadpool(promptwatch_context()), contextmanager_in_threadpool(
+            get_openai_callback()
+        ) as cb:
+            try:
+                output = await chain.acall(input)
                 log_ctx.success(output, cb)
                 return output
             except Exception as e:

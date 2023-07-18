@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from heavynl.fastapi.models import QueryRequest, QueryResponse, QuestionResponse, QuestionRequest
-from heavynl.fastapi.handlers import handle_query_request, handle_question_request
+from heavynl.fastapi.handlers import handle_query_request, handle_question_request, handle_query_request_async
 
 iqrouter = APIRouter()
 
@@ -16,7 +16,7 @@ async def query(request: QueryRequest) -> QueryResponse:
     \f
     :param QueryRequest request: Request Body
     """
-    return handle_query_request(request)
+    return await handle_query_request_async(request)
 
 
 @iqrouter.post("/question", response_model=QuestionResponse)

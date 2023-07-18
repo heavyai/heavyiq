@@ -1,1 +1,1 @@
-from .iq_handler import handle_query_request, handle_question_request
+from .iq_handler import handle_query_request, handle_question_request, handle_query_request_async
