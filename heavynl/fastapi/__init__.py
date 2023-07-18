@@ -11,7 +11,7 @@ from starlette.exceptions import HTTPException
 
 from heavynl.config import get_config, get_heavydb_license_claims
 from heavynl.fastapi.handlers import exception_handler as exh
-from heavynl.fastapi.middlewares import LoggingMiddleware
+from heavynl.fastapi.middlewares import LoggingMiddleware, AsyncLoggingMiddleware
 from heavynl.fastapi.routes import defaultrouter, iqrouter
 from heavynl.fastapi.models.error import ErrorResponse
 from heavynl.langchain.exceptions import NLtoSQLException
@@ -42,7 +42,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    app.add_middleware(LoggingMiddleware)
+    app.add_middleware(AsyncLoggingMiddleware)
 
     # add exception handlers
     app.add_exception_handler(AttributeError, exh.attribute_error_handler)
