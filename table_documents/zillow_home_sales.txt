@@ -1,0 +1,88 @@
+Description:
+The "zillow_home_sales" table is designed to store information about home sales on the Zillow platform. It contains various columns that provide details about each home sale, including the property ID, image source, status, address, price, number of bedrooms and bathrooms, area, and other relevant information. The primary functionality of this table is to track and store data related to home sales on Zillow.
+
+Secondary functionality includes providing information about the property's location, ownership status, listing details, and additional features such as 3D models and videos. It also includes information about the status of the property, whether it is recently sold, a market update, or an open house.
+
+Applications:
+1. Real Estate Analysis: The table can be used for analyzing real estate trends, such as average sale prices, property types, and location preferences. This information can help real estate professionals and investors make informed decisions.
+
+2. Property Search: The table can be used to search for properties based on various criteria, such as location, price range, number of bedrooms and bathrooms, and property type. This can be useful for home buyers and renters looking for specific properties.
+
+3. Comparative Market Analysis: The table can be used to compare the sale prices of similar properties in a given area. This can help determine the fair market value of a property and assist in pricing strategies.
+
+4. Property Valuation: The table can be used to estimate the value of a property based on its characteristics, such as the number of bedrooms and bathrooms, area, and location. This can be useful for homeowners, real estate agents, and appraisers.
+
+Keywords:
+- Property ID
+- Image source
+- Status
+- Address
+- Price
+- Bedrooms
+- Bathrooms
+- Area
+- Ownership status
+- Listing details
+- 3D model
+- Video
+- Location
+- Property type
+- Recently sold
+- Market update
+- Open house
+- Non-owner occupied
+- Lot area
+- Living area
+- Price per square foot
+- Street view metadata URL
+- Street view URL
+
+Column descriptions for zillow_home_sales table:
+- zillow_home_sales.zpid: Unique identifier for each home sale.
+- zillow_home_sales.id: Unique identifier for each home sale.
+- zillow_home_sales.imgSrc: URL of the image source for the home.
+- zillow_home_sales.hasImage: Indicates whether the home has an image.
+- zillow_home_sales.detailUrl: URL of the detailed page for the home.
+- zillow_home_sales.statusType: Type of status for the home.
+- zillow_home_sales.statusText: Textual representation of the status for the home.
+- zillow_home_sales.countryCurrency: Currency used for the home sale.
+- zillow_home_sales.soldPrice: Price at which the home was sold.
+- zillow_home_sales.unformattedPrice: Unformatted price of the home.
+- zillow_home_sales.address: Full address of the home.
+- zillow_home_sales.addressStreet: Street address of the home.
+- zillow_home_sales.addressCity: City of the home.
+- zillow_home_sales.addressState: State of the home.
+- zillow_home_sales.addressZipcode: Zip code of the home.
+- zillow_home_sales.beds: Number of bedrooms in the home.
+- zillow_home_sales.baths: Number of bathrooms in the home.
+- zillow_home_sales.area: Area of the home in square feet.
+- zillow_home_sales.isZillowOwned: Indicates whether Zillow owns the home.
+- zillow_home_sales.commute: Information about the commute for the home.
+- zillow_home_sales.isSaved: Indicates whether the home is saved.
+- zillow_home_sales.isUserClaimingOwner: Indicates whether the user is claiming ownership of the home.
+- zillow_home_sales.isUserConfirmedClaim: Indicates whether the user's claim of ownership is confirmed.
+- zillow_home_sales.pgapt: Information about the home's recent sale.
+- zillow_home_sales.sgapt: Information about the home's listing agent.
+- zillow_home_sales.zestimate: Zillow's estimated value for the home.
+- zillow_home_sales.shouldShowZestimateAsPrice: Indicates whether the Zestimate should be shown as the price.
+- zillow_home_sales.has3DModel: Indicates whether the home has a 3D model.
+- zillow_home_sales.hasVideo: Indicates whether the home has a video.
+- zillow_home_sales.list: Indicates whether the home is listed.
+- zillow_home_sales.relaxed: Indicates whether the home is relaxed.
+- zillow_home_sales.street_name: Name of the street where the home is located.
+- zillow_home_sales.geo_lon: Longitude coordinate of the home's location.
+- zillow_home_sales.geo_lat: Latitude coordinate of the home's location.
+- zillow_home_sales.status: Status of the home.
+- zillow_home_sales.date_sold: Date when the home was sold.
+- zillow_home_sales.time_sold: Time when the home was sold.
+- zillow_home_sales.rent_zestimate: Zillow's estimated rent for the home.
+- zillow_home_sales.is_non_owner_occupied: Indicates whether the home is non-owner occupied.
+- zillow_home_sales.lot_area_acres: Area of the lot in acres.
+- zillow_home_sales.lot_area_sqft: Area of the lot in square feet.
+- zillow_home_sales.home_type: Type of the home.
+- zillow_home_sales.living_area_sqft: Living area of the home in square feet.
+- zillow_home_sales.price: Price of the home.
+- zillow_home_sales.price_per_sqft: Price per square foot of the home.
+- zillow_home_sales.streetViewMetadataURL: URL of the metadata for the street view of the home.
+- zillow_home_sales.streetViewURL: URL of the street view of the home.
+
