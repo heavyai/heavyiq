@@ -9,6 +9,7 @@ from heavynl.logging_utils import _get_app_logger, get_heavynl_logger, init_logs
 
 
 def get_app(config_path: str = "./config.toml") -> Flask:
+    print(f"Loading config from:{config_path}")
     get_config(config_path)  # loads config using specified path
     init_logs()  # initializes logs using config
 
