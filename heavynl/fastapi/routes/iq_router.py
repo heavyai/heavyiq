@@ -1,12 +1,17 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from heavynl.langchain import HeavyDB
+from heavynl.fastapi.dependencies import valid_query_db_session, valid_question_db_session
 from heavynl.fastapi.models import QueryRequest, QueryResponse, QuestionResponse, QuestionRequest
-from heavynl.fastapi.handlers import handle_query_request, handle_question_request, handle_query_request_async
+from heavynl.fastapi.handlers import (
+    handle_query_request_async,
+    handle_question_request_async,
+)
 
 iqrouter = APIRouter()
 
 
 @iqrouter.post("/query", response_model=QueryResponse)
-async def query(request: QueryRequest) -> QueryResponse:
+async def query(values: tuple[QueryRequest, HeavyDB] = Depends(valid_query_db_session)) -> QueryResponse:
     """
     Request for sql query with all the information:
 
@@ -16,11 +21,11 @@ async def query(request: QueryRequest) -> QueryResponse:
     \f
     :param QueryRequest request: Request Body
     """
-    return await handle_query_request_async(request)
+    return await handle_query_request_async(*values)
 
 
 @iqrouter.post("/question", response_model=QuestionResponse)
-async def question(request: QuestionRequest) -> QuestionResponse:
+async def question(values: tuple[QuestionRequest, HeavyDB] = Depends(valid_question_db_session)) -> QuestionResponse:
     """
     Request for answer and sql with all the information:
 
@@ -30,4 +35,4 @@ async def question(request: QuestionRequest) -> QuestionResponse:
     \f
     :param QuestionRequest request: Request Body
     """
-    return handle_question_request(request)
+    return await handle_question_request_async(*values)

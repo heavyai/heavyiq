@@ -1,9 +1,10 @@
 from __future__ import annotations
-from typing import Any, Optional
+from typing import Any, Dict, Optional
+from fastapi.concurrency import run_in_threadpool
 
-from langchain.chains.base import Chain
+from heavynl.langchain.chains import BaseChain
 from langchain.base_language import BaseLanguageModel
-from langchain.callbacks.manager import CallbackManagerForChainRun
+from langchain.callbacks.manager import AsyncCallbackManagerForChainRun, CallbackManagerForChainRun
 from pydantic import BaseModel, Extra, Field
 
 from heavynl.langchain import HeavyDB
@@ -30,7 +31,7 @@ ANSWER_PROMPT = LoggedPromptTemplate(
 )
 
 
-class NLtoAnswerChain(Chain, BaseModel):
+class NLtoAnswerChain(BaseChain, BaseModel):
     """
     Chain for translating natural language to an answer.
 
@@ -80,6 +81,50 @@ class NLtoAnswerChain(Chain, BaseModel):
     @property
     def _chain_type(self) -> str:
         return "nl_to_answer_chain"
+
+    async def _acall(
+        self, inputs: Dict[str, Any], run_manager: AsyncCallbackManagerForChainRun | None = None
+    ) -> dict[str, Any]:
+        table_names_to_use = inputs.get("tables")
+        nl_sql_chain = get_nl_to_sql_chain_by_llm(self.llm)(
+            llm=self.llm, database=self.database, verbose=self.verbose, metadata={"name": "Foo"}
+        )
+        nl_sql_inputs = {
+            nl_sql_chain.input_key: inputs[self.input_key],
+            "tables": table_names_to_use,
+        }
+        nl_sql_results = await nl_sql_chain.acall(nl_sql_inputs)
+        sql_cmd = nl_sql_results[nl_sql_chain.output_key]
+        await self.write_callback_message_async(sql_cmd, run_manager=run_manager, color="green")
+
+        result = await run_in_threadpool(self.database.run, sql_cmd)
+        if run_manager:
+            await self.write_callback_message_async("\nSQLResult: ", run_manager=run_manager)
+            await self.write_callback_message_async(result, run_manager=run_manager, color="yellow")
+
+        if self.return_direct:
+            return {
+                self.output_sql_key: sql_cmd,
+                self.output_results_key: result,
+            }
+        else:
+            await self.write_callback_message_async("\nAnswer:", run_manager=run_manager)
+            llm_chain = LoggedLLMChain(llm=self.llm, prompt=self.prompt, verbose=self.verbose, output_key="answer")
+            llm_inputs = {
+                "input": inputs[self.input_key],
+                "dialect": self.database.dialect,
+                "sql_cmd": sql_cmd,
+                "sql_result": f"{result} \nAnswer:",
+                "stop": ["\nAnswer:"],
+            }
+            final_result = await llm_chain.apredict(**llm_inputs)
+
+            await self.write_callback_message_async(final_result, run_manager=run_manager, color="green")
+            return {
+                self.output_sql_key: sql_cmd,
+                self.output_results_key: result,
+                self.output_answer_key: final_result.strip(),
+            }
 
     def _call(self, inputs: dict[str, Any], run_manager: Optional[CallbackManagerForChainRun] = None) -> dict[str, Any]:
         table_names_to_use = inputs.get("tables")
