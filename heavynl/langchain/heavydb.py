@@ -181,6 +181,8 @@ class HeavyDB:
         table_schema = re.sub(r" ENCODING .*\)([,\)])", r"\1", table_schema)  # type: ignore
         table_schema = re.sub(r",\n.*SHARED DICTIONARY.*REFERENCES.*\([A-Za-z0-9_]*\)", "", table_schema)
         table_schema = re.sub(r"\n", "", table_schema)
+        if "WITH (" in table_schema:
+            table_schema = table_schema[: table_schema.index("WITH (")]
         return table_schema
 
     def validate_query(self, query: str) -> list:
