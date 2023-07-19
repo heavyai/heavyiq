@@ -1,7 +1,7 @@
 # Remainder of dependencies used for dev and the command line interface
 black==23.7.0
 chromadb==0.3.29
-click==8.1.5
+click==8.1.6
 flake8==6.0.0
 flake8-annotations==3.0.1
 flake8-pep585==0.1.7
