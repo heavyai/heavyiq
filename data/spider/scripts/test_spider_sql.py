@@ -28,6 +28,7 @@ def getOptions(argv=None):
         "--fix-queries", help="Try to fix failed queries with automatically applied corrections", action="store_true"
     )
     parser.add_argument("--fix-queries-gpt", help="Try to fix failed queries with ChatGPT API", action="store_true")
+    parser.add_argument("--top-k-str-vals", help="Top K string values", type=int, default=0)
     parser.add_argument("--write-prompts", help="Write prompts to file for successful queries", action="store_true")
     return parser.parse_args(argv)
 
@@ -231,13 +232,41 @@ def get_table_schema(con, table_name):
     return table_schema
 
 
-def generate_instruction(table_schemas, user_question):
+def get_table_str_cols(con, table_name):
+    table_details = con.get_table_details(table_name)
+    return [col.name for col in table_details if col.type == "STR" and col.encoding == "DICT" and not col.is_array]
+
+
+def get_top_k_vals(con, table_name, column_name, top_k):
+    sql = f"""SELECT {column_name} FROM {table_name} WHERE {column_name} IS NOT NULL GROUP BY {column_name} ORDER BY COUNT(*) DESC LIMIT {top_k}"""
+    results = list(con.execute(sql))
+    return [r[0] for r in results]
+
+
+def get_top_k_vals_str(table_name, top_k_vals):
+    # top_k_vals_strs = [
+    #    f"The most common {len(values)} values for column {key} are: {', '.join(values)}."
+    #    for key, values in top_k_vals.items()
+    # ]
+    top_k_vals_strs = [f"{table_name}.{key}: {', '.join(values)}" for key, values in top_k_vals.items()]
+    return top_k_vals_strs
+    # return "\n".join(top_k_vals_strs)
+
+
+def generate_instruction(table_schemas, top_k_str_vals, user_question):
+    # print(top_k_str_vals)
+    top_k_str_vals_str = ""
+    if len(top_k_str_vals) > 0:
+        top_k_str_vals_str = "Sample values for TEXT columns (comma-separated):\n"
+        for table_top_k_str_vals in top_k_str_vals:
+            top_k_str_vals_str += "\n".join(table_top_k_str_vals)
+            top_k_str_vals_str += "\n"
     instruction = """You are a experienced data analyst adept at writing SQL queries to answer user questions.\n
 You have access to the following relational tables, with schemas below.\n
-{table_schemas}\n
+{table_schemas}\n\n{top_k_str_vals_str}
 Write a SQL query to answer the following question:\n
 {user_question}\n""".format(
-        table_schemas="\n\n".join(table_schemas), user_question=user_question
+        table_schemas="\n\n".join(table_schemas), top_k_str_vals_str=top_k_str_vals_str, user_question=user_question
     )
     return instruction
 
@@ -491,10 +520,25 @@ def main(argv):
             db_tables = con.get_tables()
             table_schemas = []
             table_schemas_map = {}
+            top_k_str_vals_map = {}
+            top_k_str_vals = []
+            strings_cols_top_k = 5
             for db_table in db_tables:
                 table_schema = get_table_schema(con, db_table)
                 table_schemas.append(table_schema)
                 table_schemas_map[db_table.lower()] = table_schema
+                if options.top_k_str_vals > 0:
+                    table_str_cols = get_table_str_cols(con, db_table)
+                    str_cols_top_k_vals = {
+                        str_col: get_top_k_vals(con, db_table, str_col, strings_cols_top_k)
+                        for str_col in table_str_cols
+                    }
+                    # print(str_cols_top_k_vals)
+                    top_k_str_col_vals_str = get_top_k_vals_str(db_table, str_cols_top_k_vals)
+                    # print(top_k_str_col_vals_str)
+                    top_k_str_vals_map[db_table] = top_k_str_col_vals_str
+                    top_k_str_vals.append(top_k_str_col_vals_str)
+
             for query in queries:
                 query_id = query["query_id"]
                 original_sql_query = query["original_sql_query"]
@@ -530,8 +574,14 @@ def main(argv):
                         filtered_table_schemas = []
                         for db_table in filtered_tables:
                             filtered_table_schemas.append(table_schemas_map[db_table.lower()])
-                        instruction = generate_instruction(table_schemas, query["question"])
-                        targeted_instruction = generate_instruction(filtered_table_schemas, query["question"])
+                        filtered_top_k_str_vals = []
+                        if options.top_k_str_vals > 0:
+                            for db_table in filtered_tables:
+                                filtered_top_k_str_vals.append(top_k_str_vals_map[db_table])
+                        instruction = generate_instruction(table_schemas, top_k_str_vals, query["question"])
+                        targeted_instruction = generate_instruction(
+                            filtered_table_schemas, filtered_top_k_str_vals, query["question"]
+                        )
                         instruction_tokens = tokenizer.tokenize(instruction)
                         num_instruction_tokens = len(instruction_tokens)
                         targeted_instruction_tokens = tokenizer.tokenize(targeted_instruction)
@@ -554,6 +604,7 @@ def main(argv):
                             }
                         )
                 except Exception as e:
+                    print(e)
                     query_fixed = False
                     if options.fix_queries:
                         fixed_query = fix_failed_query_unquoted_keyword(con, query_id, sql_query, e)
