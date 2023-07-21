@@ -226,6 +226,7 @@ def get_table_schema(con, table_name):
     table_schema = re.sub(r"\n", "", table_schema)
     table_schema = re.sub(r"\s+", " ", table_schema)
     table_schema = re.sub(r"\(\s+", "(", table_schema)
+    table_schema = re.sub(r"\s*WITH \(.*\);?", ";", table_schema)
 
     return table_schema
 
