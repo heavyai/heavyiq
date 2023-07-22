@@ -1,5 +1,5 @@
-from collections.abc import Generator
-from contextlib import contextmanager, nullcontext
+from collections.abc import Generator, AsyncGenerator
+from contextlib import contextmanager, nullcontext, asynccontextmanager
 from datetime import datetime
 from typing import Optional, Any
 
@@ -7,7 +7,6 @@ from langchain.agents.agent import AgentExecutor
 from langchain.callbacks import OpenAICallbackHandler, get_openai_callback
 from langchain.chains.base import Chain
 from promptwatch import PromptWatch
-from fastapi.concurrency import contextmanager_in_threadpool
 
 from heavynl.config import get_config
 
@@ -32,8 +31,14 @@ class RequestContext:
         self.agent_log = None
         self.error_msg = None
 
+    async def __aenter__(self) -> "RequestContext":
+        return self
+
     def __enter__(self) -> "RequestContext":
         return self
+
+    async def __aexit__(self, *args) -> Any:
+        pass
 
     def __exit__(self, *args: Any) -> None:
         pass
@@ -144,6 +149,14 @@ def chain_log_request_ctx(
     yield ctx
 
 
+@asynccontextmanager
+async def chain_log_request_ctx_async(
+    langchain_name: str, model: str = "", input: Optional[dict] = None
+) -> AsyncGenerator[RequestContext, None]:
+    ctx = RequestContext(LangChainType.Chain, langchain_name, model, input)
+    yield ctx
+
+
 @contextmanager
 def agent_log_request_ctx(
     langchain_name: str, model: str = "", input: Optional[dict] = None
@@ -152,7 +165,7 @@ def agent_log_request_ctx(
     yield ctx
 
 
-def promptwatch_context():
+def promptwatch_context() -> PromptWatch | nullcontext:
     config = get_config()
     if config.promptwatch_api_key and config.promptlayer_api_key != "":
         return PromptWatch(api_key=config.promptwatch_api_key, tracking_project=config.promptwatch_tracking_project)
@@ -179,12 +192,8 @@ async def log_chain_call_async(
 ) -> dict:
     if isinstance(input, str):
         input = {chain.input_keys[0]: input}
-    async with contextmanager_in_threadpool(
-        chain_log_request_ctx(chain_name or chain._chain_type, model, input)
-    ) as log_ctx:
-        async with contextmanager_in_threadpool(promptwatch_context()), contextmanager_in_threadpool(
-            get_openai_callback()
-        ) as cb:
+    async with chain_log_request_ctx_async(chain_name or chain._chain_type, model, input) as log_ctx:
+        with promptwatch_context(), get_openai_callback() as cb:
             try:
                 output = await chain.acall(input)
                 log_ctx.success(output, cb)
