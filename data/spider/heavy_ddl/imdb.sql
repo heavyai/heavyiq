@@ -14,7 +14,7 @@ CREATE TABLE "copyright" (
 "id" int,
 "msid" int,
 "cid" int);
-CREATE TABLE "cast" (
+CREATE TABLE "cast_" (
 "id" int,
 "msid" int,
 "aid" int,

@@ -11,7 +11,7 @@ CREATE TABLE players(
     "country_code" TEXT
 );
 
-CREATE TABLE "matches"(
+CREATE TABLE "matches_"(
   "best_of" INT,
   "draw_size" INT,
   "loser_age" FLOAT,

@@ -17,23 +17,23 @@ INSERT INTO  "college" VALUES ('4','Edmonton School','Samir Chahine','McGill');
 INSERT INTO  "college" VALUES ('5','Toronto School','Roger Dunbrack','Western Ontario');
 
 
-CREATE TABLE "member" (
+CREATE TABLE "member_" (
 "Member_ID" int,
 "Name" text,
 "Country" text,
 "College_ID" int);
 
 
-INSERT INTO  "member" VALUES ('1','Jack Nicklaus','United States',1);
-INSERT INTO  "member" VALUES ('2','Billy Casper','United States',1);
-INSERT INTO  "member" VALUES ('3','Arnold Palmer','Canada',4);
-INSERT INTO  "member" VALUES ('4','Tom Watson','United States',4);
-INSERT INTO  "member" VALUES ('5','Homero Blancas','United States',2);
-INSERT INTO  "member" VALUES ('6','Pat Fitzsimons','Canada',5);
-INSERT INTO  "member" VALUES ('7','Bobby Nichols','Canada',5);
-INSERT INTO  "member" VALUES ('8','J. C. Snead','Canada',4);
-INSERT INTO  "member" VALUES ('9','Lee Trevino','United States',3);
-INSERT INTO  "member" VALUES ('10','Tom Weiskopf','United States',3);
+INSERT INTO  "member_" VALUES ('1','Jack Nicklaus','United States',1);
+INSERT INTO  "member_" VALUES ('2','Billy Casper','United States',1);
+INSERT INTO  "member_" VALUES ('3','Arnold Palmer','Canada',4);
+INSERT INTO  "member_" VALUES ('4','Tom Watson','United States',4);
+INSERT INTO  "member_" VALUES ('5','Homero Blancas','United States',2);
+INSERT INTO  "member_" VALUES ('6','Pat Fitzsimons','Canada',5);
+INSERT INTO  "member_" VALUES ('7','Bobby Nichols','Canada',5);
+INSERT INTO  "member_" VALUES ('8','J. C. Snead','Canada',4);
+INSERT INTO  "member_" VALUES ('9','Lee Trevino','United States',3);
+INSERT INTO  "member_" VALUES ('10','Tom Weiskopf','United States',3);
 
 
 CREATE TABLE "round" (

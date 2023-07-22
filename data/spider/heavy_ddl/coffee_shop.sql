@@ -23,7 +23,7 @@ INSERT INTO  "shop" VALUES ('10','324 E. 11th Street','16','28','2008');
 
 
 
-CREATE TABLE "member" (
+CREATE TABLE member_ (
 "Member_ID" int,
 "Name" text,
 "Membership_card" text,
@@ -33,16 +33,16 @@ CREATE TABLE "member" (
 "Address" text);
 
 
-INSERT INTO  "member" VALUES (1,'Ashby, Lazale','Black','29','18','5','Hartford');
-INSERT INTO  "member" VALUES (2,'Breton, Robert','White','67','41','4','Waterbury');
-INSERT INTO  "member" VALUES (3,'Campbell, Jessie','Black','34','20','6','Hartford');
-INSERT INTO  "member" VALUES (4,'Cobb, Sedrick','Black','51','27','2','Waterbury');
-INSERT INTO  "member" VALUES (5,'Hayes, Steven','White','50','44','3','Cheshire');
-INSERT INTO  "member" VALUES (6,'Komisarjevsky, Joshua','White','33','26','2','Cheshire');
-INSERT INTO  "member" VALUES (7,'Peeler, Russell','Black','42','26','6','Bridgeport');
-INSERT INTO  "member" VALUES (8,'Reynolds, Richard','Black','45','24','1','Waterbury');
-INSERT INTO  "member" VALUES (9,'Rizzo, Todd','White','35','18','4','Waterbury');
-INSERT INTO  "member" VALUES (10,'Webb, Daniel','Black','51','27','22','Hartford');
+INSERT INTO  "member_" VALUES (1,'Ashby, Lazale','Black','29','18','5','Hartford');
+INSERT INTO  "member_" VALUES (2,'Breton, Robert','White','67','41','4','Waterbury');
+INSERT INTO  "member_" VALUES (3,'Campbell, Jessie','Black','34','20','6','Hartford');
+INSERT INTO  "member_" VALUES (4,'Cobb, Sedrick','Black','51','27','2','Waterbury');
+INSERT INTO  "member_" VALUES (5,'Hayes, Steven','White','50','44','3','Cheshire');
+INSERT INTO  "member_" VALUES (6,'Komisarjevsky, Joshua','White','33','26','2','Cheshire');
+INSERT INTO  "member_" VALUES (7,'Peeler, Russell','Black','42','26','6','Bridgeport');
+INSERT INTO  "member_" VALUES (8,'Reynolds, Richard','Black','45','24','1','Waterbury');
+INSERT INTO  "member_" VALUES (9,'Rizzo, Todd','White','35','18','4','Waterbury');
+INSERT INTO  "member_" VALUES (10,'Webb, Daniel','Black','51','27','22','Hartford');
 
 CREATE TABLE "happy_hour" (
 "HH_ID" int,

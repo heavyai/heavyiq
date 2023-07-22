@@ -84,7 +84,7 @@ CREATE TABLE inventory (
   store_id TINYINT NOT NULL,
   last_update TIMESTAMP NOT NULL DEFAULT '2020-01-01 00:00:00');
 
-CREATE TABLE "language" (
+CREATE TABLE language_ (
   language_id TINYINT NOT NULL,
   name CHAR(20) NOT NULL,
   last_update TIMESTAMP NOT NULL DEFAULT '2020-01-01 00:00:00');

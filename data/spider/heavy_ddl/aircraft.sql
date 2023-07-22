@@ -32,14 +32,14 @@ CREATE TABLE aircraft (
   "Max_disk_Loading" TEXT NOT NULL);
 
 
-CREATE TABLE "match" (
+CREATE TABLE "match_" (
 "Round" FLOAT,
 "Location" text,
 "Country" text,
 "Date" text,
 "Fastest_Qualifying" text,
-"Winning_Pilot" text,
-"Winning_Aircraft" text);
+"Winning_Pilot" int,
+"Winning_Aircraft" int);
 
 CREATE TABLE airport (
 "Airport_ID" int,
@@ -66,13 +66,13 @@ INSERT INTO  "aircraft" VALUES (4,'Mil Mi-26','Heavy-lift helicopter','123,500 l
 INSERT INTO  "aircraft" VALUES (5,'CH-53E Super Stallion','Heavy-lift helicopter','73,500 lb (33,300 kg)','4,900 ft² (460 m²)','15 lb/ft² (72 kg/m²)');
 
 
-INSERT INTO  "match" VALUES ('1','Mina'' Zayid , Abu Dhabi','United Arab Emirates','March 26–27','Hannes Arch',1,1);
-INSERT INTO  "match" VALUES ('2','Swan River , Perth','Australia','April 17–18','Paul Bonhomme',4,1);
-INSERT INTO  "match" VALUES ('3','Flamengo Beach , Rio de Janeiro','Brazil','May 8–9','Hannes Arch',6,2);
-INSERT INTO  "match" VALUES ('4','Windsor , Ontario','Canada','June 5–6','Nigel Lamb',4,4);
-INSERT INTO  "match" VALUES ('5','New York City','United States','June 19–20','Hannes Arch',9,3);
-INSERT INTO  "match" VALUES ('6','EuroSpeedway Lausitz','Germany','August 7–8','Paul Bonhomme',2,4);
-INSERT INTO  "match" VALUES ('7','River Danube , Budapest','Hungary','Cancelled','Cancelled',6,5);
+INSERT INTO  "match_" VALUES ('1','Mina'' Zayid , Abu Dhabi','United Arab Emirates','March 26–27','Hannes Arch',1,1);
+INSERT INTO  "match_" VALUES ('2','Swan River , Perth','Australia','April 17–18','Paul Bonhomme',4,1);
+INSERT INTO  "match_" VALUES ('3','Flamengo Beach , Rio de Janeiro','Brazil','May 8–9','Hannes Arch',6,2);
+INSERT INTO  "match_" VALUES ('4','Windsor , Ontario','Canada','June 5–6','Nigel Lamb',4,4);
+INSERT INTO  "match_" VALUES ('5','New York City','United States','June 19–20','Hannes Arch',9,3);
+INSERT INTO  "match_" VALUES ('6','EuroSpeedway Lausitz','Germany','August 7–8','Paul Bonhomme',2,4);
+INSERT INTO  "match_" VALUES ('7','River Danube , Budapest','Hungary','Cancelled','Cancelled',6,5);
 
 
 
@@ -86,8 +86,6 @@ INSERT INTO  "airport" VALUES (7,'Edinburgh','9006702','0.5%','3711140','5281038
 INSERT INTO  "airport" VALUES (8,'Glasgow International','8178891','7.0%','3943139','4192121','43631','100087','3546');
 INSERT INTO  "airport" VALUES (9,'Bristol','6267114','5.7%','5057051','1171605','38458','76517','3');
 INSERT INTO  "airport" VALUES (10,'East Midlands','5620673','3.8%','4870184','746094','4395','93038','261507');
-
-
 
 INSERT INTO  "airport_aircraft" VALUES (1,6,5);
 INSERT INTO  "airport_aircraft" VALUES (2,2,1);

@@ -24,40 +24,40 @@ INSERT INTO  "region" VALUES (5,'United States','16 July 2002','Astralwerks','CD
 CREATE TABLE "party" (
 "Party_ID" int,
 "Minister" text,
-"Took_office" text,
-"Left_office" text,
+"Took_office" int,
+"Left_office" int,
 "Region_ID" int,
 "Party_name" text);
 
-CREATE TABLE "member" (
+CREATE TABLE "member_" (
 "Member_ID" int,
 "Member_Name" text,
-"Party_ID" text,
+"Party_ID" int,
 "In_office" text);
 
 
-INSERT INTO  "party" VALUES ('1','Dr. Kwame Nkrumah (MP)','1957','1958',1,'Convention Peoples Party');
-INSERT INTO  "party" VALUES ('2','Kojo Botsio (MP)','1958','1959',2,'Progress Party');
-INSERT INTO  "party" VALUES ('3','Ebenezer Ako-Adjei (MP)','1959','1960',3,3);
-INSERT INTO  "party" VALUES ('4','Imoru Egala (MP)','1960','1961',4,'Convention Union Party');
-INSERT INTO  "party" VALUES ('5','Ebenezer Ako-Adjei (MP)','1961','1962',5,'Sinefine Party');
+INSERT INTO  "party" VALUES ('1','Dr. Kwame Nkrumah (MP)',1957,1958,1,'Convention Peoples Party');
+INSERT INTO  "party" VALUES ('2','Kojo Botsio (MP)',1958,1959,2,'Progress Party');
+INSERT INTO  "party" VALUES ('3','Ebenezer Ako-Adjei (MP)',1959,1960,3,3);
+INSERT INTO  "party" VALUES ('4','Imoru Egala (MP)',1960,1961,4,'Convention Union Party');
+INSERT INTO  "party" VALUES ('5','Ebenezer Ako-Adjei (MP)',1961,1962,5,'Sinefine Party');
 
 
-INSERT INTO  "member" VALUES (1,'Hon Tony Abbott',3,'1994–present');
-INSERT INTO  "member" VALUES (2,'Hon Dick Adams',2,'1993–2013');
-INSERT INTO  "member" VALUES (3,'Anthony Albanese',2,'1996–present');
-INSERT INTO  "member" VALUES (4,'Hon John Anderson',1,'1989–2007');
-INSERT INTO  "member" VALUES (5,'Peter Andren',3,'1996–2007');
-INSERT INTO  "member" VALUES (6,'Hon Kevin Andrews',3,'1991–present');
-INSERT INTO  "member" VALUES (7,'Hon Fran Bailey',3,'1990–1993, 1996–2010');
-INSERT INTO  "member" VALUES (8,'Hon Bruce Baird',3,'2001–2007');
-INSERT INTO  "member" VALUES (9,'Mark Baker',3,'2004–2007');
-INSERT INTO  "member" VALUES (10,'Hon Bob Baldwin',3,'2001–present');
-INSERT INTO  "member" VALUES (11,'Phil Barresi',3,'1996–2007');
-INSERT INTO  "member" VALUES (12,'Kerry Bartlett',1,'1996–2007');
-INSERT INTO  "member" VALUES (13,'Hon Kim Beazley',2,'1980–2007');
-INSERT INTO  "member" VALUES (14,'Hon Arch Bevis',2,'1990–2010');
-INSERT INTO  "member" VALUES (15,'Hon Bruce Billson',3,'1996–present');
+INSERT INTO  "member_" VALUES (1,'Hon Tony Abbott',3,'1994–present');
+INSERT INTO  "member_" VALUES (2,'Hon Dick Adams',2,'1993–2013');
+INSERT INTO  "member_" VALUES (3,'Anthony Albanese',2,'1996–present');
+INSERT INTO  "member_" VALUES (4,'Hon John Anderson',1,'1989–2007');
+INSERT INTO  "member_" VALUES (5,'Peter Andren',3,'1996–2007');
+INSERT INTO  "member_" VALUES (6,'Hon Kevin Andrews',3,'1991–present');
+INSERT INTO  "member_" VALUES (7,'Hon Fran Bailey',3,'1990–1993, 1996–2010');
+INSERT INTO  "member_" VALUES (8,'Hon Bruce Baird',3,'2001–2007');
+INSERT INTO  "member_" VALUES (9,'Mark Baker',3,'2004–2007');
+INSERT INTO  "member_" VALUES (10,'Hon Bob Baldwin',3,'2001–present');
+INSERT INTO  "member_" VALUES (11,'Phil Barresi',3,'1996–2007');
+INSERT INTO  "member_" VALUES (12,'Kerry Bartlett',1,'1996–2007');
+INSERT INTO  "member_" VALUES (13,'Hon Kim Beazley',2,'1980–2007');
+INSERT INTO  "member_" VALUES (14,'Hon Arch Bevis',2,'1990–2010');
+INSERT INTO  "member_" VALUES (15,'Hon Bruce Billson',3,'1996–present');
 
 
 CREATE TABLE "party_events" (

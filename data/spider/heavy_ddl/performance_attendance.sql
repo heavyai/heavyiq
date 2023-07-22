@@ -3,25 +3,25 @@ CREATE DATABASE performance_attendance;
 ALTER SESSION SET CURRENT_DATABASE = 'performance_attendance';
 
 
-CREATE TABLE "member" (
-    "Member_ID" text,
+CREATE TABLE "member_" (
+    "Member_ID" int,
     "Name" text,
     "Nationality" text,
     "Role" text);
 
 
 
-INSERT INTO  "member" VALUES ('1','Wilfredo Ruiz','Uruguay','Prime Violin');
-INSERT INTO  "member" VALUES ('2','Luis González','Argentina','Violin');
-INSERT INTO  "member" VALUES ('3','Héctor Campana','Argentina','Violin');
-INSERT INTO  "member" VALUES ('4','Héctor Campana','Argentina','Violin');
-INSERT INTO  "member" VALUES ('5','Juan Espil','Argentina','Viola');
-INSERT INTO  "member" VALUES ('6','Andrew Moten','United States','Viola');
-INSERT INTO  "member" VALUES ('7','Charlie Burke','United States','Viola');
-INSERT INTO  "member" VALUES ('8','Corey Allen','United States','Cello');
-INSERT INTO  "member" VALUES ('9','John Eubanks','United States','Cello');
-INSERT INTO  "member" VALUES ('10','Joshua Pittman','United States','Bass');
-INSERT INTO  "member" VALUES ('11','Joseph Bunn','United States','Bass');
+INSERT INTO  "member_" VALUES (1,'Wilfredo Ruiz','Uruguay','Prime Violin');
+INSERT INTO  "member_" VALUES (2,'Luis González','Argentina','Violin');
+INSERT INTO  "member_" VALUES (3,'Héctor Campana','Argentina','Violin');
+INSERT INTO  "member_" VALUES (4,'Héctor Campana','Argentina','Violin');
+INSERT INTO  "member_" VALUES (5,'Juan Espil','Argentina','Viola');
+INSERT INTO  "member_" VALUES (6,'Andrew Moten','United States','Viola');
+INSERT INTO  "member_" VALUES (7,'Charlie Burke','United States','Viola');
+INSERT INTO  "member_" VALUES (8,'Corey Allen','United States','Cello');
+INSERT INTO  "member_" VALUES (9,'John Eubanks','United States','Cello');
+INSERT INTO  "member_" VALUES (10,'Joshua Pittman','United States','Bass');
+INSERT INTO  "member_" VALUES (11,'Joseph Bunn','United States','Bass');
 
 CREATE TABLE "performance" (
     "Performance_ID" FLOAT,

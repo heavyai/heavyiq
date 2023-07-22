@@ -44,7 +44,7 @@ CREATE TABLE "performance" (
 "Weekly_rank" text,
 "Share" text);
 
-CREATE TABLE "show" (
+CREATE TABLE "show_" (
 "Show_ID" int,
 "Performance_ID" int,
 "If_first_show" boolean,
@@ -78,8 +78,8 @@ INSERT INTO  "performance" VALUES (8,8,'Live final','17 June','11.58','1','43.7%
 INSERT INTO  "performance" VALUES (9,9,'Live final results','17 June','11.45','2','44.7%');
 INSERT INTO  "performance" VALUES (10,10,'Series average','2007','8.38','TBC','34%');
 
-INSERT INTO  "show" VALUES (1,1,'T','Glebe Park','1026');
-INSERT INTO  "show" VALUES (2,2,'T','Fir Park','695');
-INSERT INTO  "show" VALUES (3,3,'F','St. Mirren Park','555');
-INSERT INTO  "show" VALUES (4,4,'F','St. Mirren Park','1925');
-INSERT INTO  "show" VALUES (5,5,'T','Hampden Park','2431');
+INSERT INTO  "show_" VALUES (1,1,'T','Glebe Park','1026');
+INSERT INTO  "show_" VALUES (2,2,'T','Fir Park','695');
+INSERT INTO  "show_" VALUES (3,3,'F','St. Mirren Park','555');
+INSERT INTO  "show_" VALUES (4,4,'F','St. Mirren Park','1925');
+INSERT INTO  "show_" VALUES (5,5,'T','Hampden Park','2431');

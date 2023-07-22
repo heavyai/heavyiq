@@ -17,7 +17,7 @@ CREATE TABLE "category" (
 "id" int,
 "business_id" text,
 "category_name" text);
-CREATE TABLE "user" (
+CREATE TABLE "user_" (
 "uid" int,
 "user_id" text,
 "name" text);

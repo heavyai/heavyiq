@@ -11,7 +11,7 @@ CREATE TABLE "city" (
 "Regional_Population" int,
 "GDP" FLOAT);
 
-CREATE TABLE "match" (
+CREATE TABLE "match_" (
 "Match_ID" int,
 "Date" text,
 "Venue" text,
@@ -58,12 +58,12 @@ INSERT INTO  "temperature" VALUES (10,26.7,27.2,27.8,27.8,30.0,30.6,31.1,31.1,30
 INSERT INTO  "temperature" VALUES (7,18.3,18.9,19.4,20.6,22.8,23.3,23.3,23.3,22.8,21.7,20.0);
 INSERT INTO  "temperature" VALUES (11,25.6,26.6,26.6,26.1,28.3,28.9,29.4,29.4,28.9,27.2,26.1);
 
-INSERT INTO  "match" VALUES (1,'18 February 1992','Estadio Cuscatlán , San Salvador , El Salvador','1-0','2-0','Friendly match');
-INSERT INTO  "match" VALUES (2,'19 July 1992','Estadio Rigoberto López , Managua , Nicaragua','3-0','5-0','1994 FIFA World Cup qualification');
-INSERT INTO  "match" VALUES (3,'23 July 1992','Estadio Cuscatlán , San Salvador , El Salvador','1-0','5-1','1994 FIFA World Cup qualification');
-INSERT INTO  "match" VALUES (4,'23 July 1992','Estadio Cuscatlán , San Salvador , El Salvador','3-0','5-1','1994 FIFA World Cup qualification');
-INSERT INTO  "match" VALUES (5,'4 April 1993','Estadio Cuscatlán , San Salvador , El Salvador','1–0','2–1','1994 FIFA World Cup qualification');
-INSERT INTO  "match" VALUES (6,'23 July 2000','Estadio Cuscatlán , San Salvador , El Salvador','2–1','7–1','2002 FIFA World Cup qualification');
+INSERT INTO  "match_" VALUES (1,'18 February 1992','Estadio Cuscatlán , San Salvador , El Salvador','1-0','2-0','Friendly match');
+INSERT INTO  "match_" VALUES (2,'19 July 1992','Estadio Rigoberto López , Managua , Nicaragua','3-0','5-0','1994 FIFA World Cup qualification');
+INSERT INTO  "match_" VALUES (3,'23 July 1992','Estadio Cuscatlán , San Salvador , El Salvador','1-0','5-1','1994 FIFA World Cup qualification');
+INSERT INTO  "match_" VALUES (4,'23 July 1992','Estadio Cuscatlán , San Salvador , El Salvador','3-0','5-1','1994 FIFA World Cup qualification');
+INSERT INTO  "match_" VALUES (5,'4 April 1993','Estadio Cuscatlán , San Salvador , El Salvador','1–0','2–1','1994 FIFA World Cup qualification');
+INSERT INTO  "match_" VALUES (6,'23 July 2000','Estadio Cuscatlán , San Salvador , El Salvador','2–1','7–1','2002 FIFA World Cup qualification');
 
 
 CREATE TABLE "hosting_city" (
