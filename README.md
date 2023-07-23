@@ -56,6 +56,15 @@ $ python cli.py --help
 $ python -m unittest discover
 ```
 
+or 
+
+Use `pytest`
+
+```bash
+# runs testcases specific to fastapi
+$ pytest tests/fastapi --disable-warnings
+```
+
 ## Deployment
 
 ### Create Obfuscated Build

@@ -13,3 +13,6 @@ sentence_transformers==2.2.2
 sphinx==7.0.1
 sphinx-click==4.4.0
 tiktoken==0.4.0
+httpx==0.24.1
+autoflake==2.2.0
+isort==5.12.0
