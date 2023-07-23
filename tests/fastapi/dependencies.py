@@ -1,17 +1,6 @@
 from typing import Any
-
-import pytest
-
 from heavynl.fastapi.models import QueryRequest
 from heavynl.langchain import HeavyDB
-
-
-@pytest.fixture
-def mock_database(mocker: Any) -> Any:
-    """
-    HeavyDB mock object
-    """
-    return mocker.MagicMock()
 
 
 def override_valid_query_db_session(
