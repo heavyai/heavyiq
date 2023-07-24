@@ -170,7 +170,7 @@ class NLtoSQLChain(BaseNltoSQLChain):
         if config.custom_llm_type == "API":
             prompt = CUSTOM_LLM_NL_TO_SQL_PROMPT
         else:
-            prompt = CUSTOM_LLM_NL_TO_SQL_PROMPT
+            prompt = NL_TO_SQL_PROMPT
         super().__init__(*args, prompt=prompt, **kwargs)  # type: ignore
 
     @property
