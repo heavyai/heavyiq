@@ -39,10 +39,10 @@ class HeavyNLConfig(OverrideBaseConfig):  # type: ignore
 
 class HeavyWebConfig(OverrideBaseConfig):  # type: ignore
     backend_url: Optional[str] = Field(alias="backend-url", default=None)
-    data: Optional[str] = None
 
 
 class AppConfig(OverrideBaseConfig):  # type: ignore
+    data: Optional[str] = None
     http_port: Optional[int] = Field(alias="http-port", default=None)
     iq: HeavyNLConfig
     web: Optional[HeavyWebConfig] = None
