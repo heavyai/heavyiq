@@ -35,10 +35,13 @@ def get_llm(tags: list[str] = [], **kwargs) -> BaseLLM:
                 return_pl_id=True,
                 openai_api_key="not_necessary",
                 openai_api_base=config.custom_llm_api_base,
+                model="CUSTOM_LLM",
                 **kwargs
             )
         else:
-            return OpenAI(openai_api_key="nothing", openai_api_base=config.custom_llm_api_base, **kwargs)
+            return OpenAI(
+                openai_api_key="nothing", openai_api_base=config.custom_llm_api_base, model="CUSTOM_LLM", **kwargs
+            )
     if is_promptlayer_active:
         return PromptLayerOpenAI(pl_tags=tags, return_pl_id=True, openai_api_key=config.openai_api_key, **kwargs)
     else:

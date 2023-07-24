@@ -20,7 +20,7 @@ def query(body: dict) -> dict:
     question = body["question"]
     logger.info("Request Received")
     logger.info("Table(s): %s", ", ".join(tables))
-    llm = get_llm_by_model_name(MODEL_NAME, ["rest_api", "query", "chain", "nl_to_sql_chain"])
+    llm = get_llm_by_model_name(MODEL_NAME, ["rest_api", "query", "chain", "nl_to_sql_chain"], temperature=0.0)
     chain_cls = get_nl_to_sql_chain_by_llm(llm=llm)
     chain = chain_cls(llm=llm, database=db, verbose=True)  # type: ignore
     chain_input = {chain.input_key: question, "tables": tables}
@@ -40,7 +40,7 @@ def question(body: dict) -> dict:
     question = body["question"]
     logger.info("Request Received")
     logger.info("Table(s): %s", ", ".join(tables))
-    llm = get_llm_by_model_name(MODEL_NAME, ["rest_api", "question", "chain", "nl_to_answer_chain"])
+    llm = get_llm_by_model_name(MODEL_NAME, ["rest_api", "question", "chain", "nl_to_answer_chain"], temperature=0.0)
     chain = NLtoAnswerChain(llm=llm, database=db, verbose=True)
     chain_input = {chain.input_key: question, "tables": tables}
     res = log_chain_call(chain, chain_input, MODEL_NAME)
