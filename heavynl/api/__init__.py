@@ -5,10 +5,11 @@ from flask import Flask, redirect, request, Response
 from flask_cors import CORS
 
 from heavynl.config import get_config, get_heavydb_license_claims
-from heavynl.logging_utils import _get_app_logger, get_heavynl_logger, init_logs
+from heavynl.logging_utils import _get_access_logger, get_heavynl_logger, init_logs
 
 
 def get_app(config_path: str = "./config.toml") -> Flask:
+    print(f"Loading config from:{config_path}")
     config = get_config(config_path)  # loads config using specified path
     init_logs()  # initializes logs using config
 
@@ -42,7 +43,7 @@ def get_app(config_path: str = "./config.toml") -> Flask:
         This method specifically logs the http request calls using app_logger.
         """
         request.response = response  # type: ignore
-        _get_app_logger().info("", extra={"response": response, "request": request})
+        _get_access_logger().info("", extra={"response": response, "request": request})
         # do nothing for ui request
         if ui_path in request.path or open_ai_path in request.path:
             return response

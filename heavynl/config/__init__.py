@@ -89,4 +89,7 @@ def get_config(file: str = "./config.toml") -> HeavyNLConfig:
         os.makedirs(app_config.iq.data)
     _config = app_config.iq
 
+    # disabled for now because HeavyIQ can startup before HeavyDB
+    # get_heavydb_license_claims(_config)
+
     return _config

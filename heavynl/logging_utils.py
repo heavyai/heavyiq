@@ -190,9 +190,10 @@ class HeavyNLLogger(BaseLogger):
         super().__init__(
             name, level=level, log_file_path=log_file_path, filter=HeavyNLFilter(), formatter=get_default_formatter()
         )
+        self.info("HeavyNL Logger initialized")
 
 
-class _AppLogger(BaseLogger):
+class _AccessLogger(BaseLogger):
     """
     Flask App logger class specifically used for logging http request calls which
     gets triggered after every api request.
@@ -221,7 +222,7 @@ class _AppLogger(BaseLogger):
         )
 
 
-_app_logger = None
+_access_logger = None
 heavynl_logger = None
 default_logger = None
 
@@ -241,34 +242,72 @@ def get_log_name(lvl: str) -> str:
     u = getpass.getuser()
     t = time.strftime("%Y%m%d-%H%M%S")
 
-    data: str = get_config().data  # type: ignore
-    log_dir = os.path.join(data, "log")
-
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-
-    log_file = os.path.join(log_dir, f"heavyiq.{h}.{u}.log.{lvl}.{t}")
-
-    return log_file
+    return f"heavyiq.{h}.{u}.log.{lvl}.{t}"
 
 
 # had to add this so the logs didn't init the config before we passed the config path
 def init_logs():
-    global _app_logger, heavynl_logger, default_logger
+    global _access_logger, heavynl_logger, default_logger
     LOG_CONFIG = get_config()
 
-    if _app_logger is None:
-        _app_logger = _AppLogger(log_file_path=get_log_name("ACCESS"), level=LOG_CONFIG.access_log_level)
+    if _access_logger is None:
+        access_log_name = get_log_name("ACCESS")
+        data: str = LOG_CONFIG.data  # type: ignore
+        log_dir = os.path.join(data, "log")
+
+        # Ensure log_dir exists
+        os.makedirs(log_dir, exist_ok=True)
+
+        _access_logger = _AccessLogger(
+            log_file_path=os.path.join(log_dir, access_log_name), level=LOG_CONFIG.access_log_level
+        )
+
+        access_symlink = os.path.join(log_dir, "heavyiq.ACCESS")
+
+        if os.path.islink(access_symlink):
+            try:
+                os.remove(access_symlink)
+            except OSError as e:
+                print(f"Failed to delete symlink: {e}")
+
+        try:
+            os.symlink(os.path.join("./", access_log_name), access_symlink)
+        except OSError as e:
+            print(f"Failed to create symlink: {e}")
+
     if heavynl_logger is None:
-        heavynl_logger = HeavyNLLogger(log_file_path=get_log_name("APP"), level=LOG_CONFIG.heavyiq_log_level)
+        app_log_name = get_log_name("APP")
+        data: str = LOG_CONFIG.data  # type: ignore
+        log_dir = os.path.join(data, "log")
+
+        # Ensure log_dir exists
+        os.makedirs(log_dir, exist_ok=True)
+
+        heavynl_logger = HeavyNLLogger(
+            log_file_path=os.path.join(log_dir, app_log_name), level=LOG_CONFIG.heavyiq_log_level
+        )
+
+        app_symlink = os.path.join(log_dir, "heavyiq.ALL")
+
+        if os.path.islink(app_symlink):
+            try:
+                os.remove(app_symlink)
+            except OSError as e:
+                print(f"Failed to delete symlink: {e}")
+
+        try:
+            os.symlink(os.path.join("./", app_log_name), app_symlink)
+        except OSError as e:
+            print(f"Failed to create symlink: {e}")
+
         default_logger = heavynl_logger
 
 
-def _get_app_logger() -> _AppLogger:
-    global _app_logger
-    if _app_logger is None:
+def _get_access_logger() -> _AccessLogger:
+    global _access_logger
+    if _access_logger is None:
         init_logs()
-    return _app_logger  # type: ignore
+    return _access_logger  # type: ignore
 
 
 def get_heavynl_logger() -> HeavyNLLogger:

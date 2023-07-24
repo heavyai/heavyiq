@@ -6,7 +6,7 @@ from starlette.responses import Response
 from starlette.types import Message
 from starlette.background import BackgroundTask
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from heavynl.logging_utils import _get_app_logger, get_heavynl_logger, HeavyNLLogger, _AppLogger
+from heavynl.logging_utils import _get_access_logger, get_heavynl_logger, HeavyNLLogger, _AccessLogger
 from heavynl.fastapi.utils import AsyncIteratorWrapper
 
 
@@ -65,7 +65,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
         response = await call_next(request)
 
-        _get_app_logger().info("", extra={"response": response, "request": request})
+        _get_access_logger().info("", extra={"response": response, "request": request})
         # Code executed after the request has been processed
         if not is_api_request:
             return response
@@ -82,7 +82,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
 
 class Log(BaseModel):
-    type: HeavyNLLogger | _AppLogger
+    type: HeavyNLLogger | _AccessLogger
     level: Literal["debug", "info", "error"]
     message: str
     values: list = []
@@ -124,7 +124,7 @@ class AsyncLoggingMiddleware(LoggingMiddleware):
 
         logs: list[Log] = []
         heavynl_logger: HeavyNLLogger = get_heavynl_logger()
-        app_logger: _AppLogger = _get_app_logger()
+        app_logger: _AccessLogger = _get_access_logger()
 
         if is_api_request:
             logs.extend(
