@@ -219,7 +219,9 @@ class NLtoSQLChain(BaseNltoSQLChain):
             self.write_callback_message(
                 f"Failed to verify SQL query after {self.max_retries} retries.", run_manager=run_manager, color="red"
             )
-            raise NLtoSQLException(f"Failed to verify SQL query after {self.max_retries} retries.")
+            raise NLtoSQLException(
+                f"Language model failed to generate a valid SQL query after {self.max_retries} tries."
+            )
 
         self.write_callback_message(sql_cmd, run_manager=run_manager, color="green")
 
@@ -318,7 +320,9 @@ class NLtoSQLChatChain(BaseNltoSQLChain):
                 run_manager=run_manager,
                 color="red",
             )
-            raise NLtoSQLException(f"Failed to verify SQL query after {self.max_retries} retries.")
+            raise NLtoSQLException(
+                f"Language model failed to generate a valid SQL query after {self.max_retries} tries."
+            )
 
         chain_result: dict[str, Any] = {self.output_key: sql_query}
         return chain_result
