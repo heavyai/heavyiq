@@ -69,7 +69,7 @@ INSERT INTO  "match_" VALUES (6,'23 July 2000','Estadio Cuscatlán , San Salvado
 CREATE TABLE "hosting_city" (
   "Year" int,
   "Match_ID" int,
-  "Host_City" text);
+  "Host_City" int);
 
 INSERT INTO  "hosting_city" VALUES ('2008',1,1);
 INSERT INTO  "hosting_city" VALUES ('2009',2,2);

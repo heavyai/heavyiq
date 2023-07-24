@@ -18,7 +18,7 @@ CREATE TABLE "cast_" (
 "id" int,
 "msid" int,
 "aid" int,
-"role" int);
+"role" text);
 
 CREATE TABLE "genre" (
 "gid" int,
@@ -86,7 +86,7 @@ CREATE TABLE "tv_series" (
 CREATE TABLE "writer" (
 "wid" int,
 "gender" text,
-"name" int,
+"name" text,
 "nationality" int,
 "num_of_episodes" int,
 "birth_city" text,
