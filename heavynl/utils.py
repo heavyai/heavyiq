@@ -1,4 +1,6 @@
+from collections import OrderedDict
 import re
+from typing import Generic, TypeVar, Optional
 
 
 def strip_sql_comments(sql: str) -> str:
@@ -66,3 +68,27 @@ def rate_sql_complexity(plan: str) -> int:
 
     # return the final complexity rating
     return complexity
+
+
+KT = TypeVar("KT")  # Key type
+VT = TypeVar("VT")  # Value type
+
+
+class LRUCache(Generic[KT, VT]):
+    def __init__(self, capacity: int = 100) -> None:
+        self.cache: OrderedDict[KT, VT] = OrderedDict()
+        self.capacity: int = capacity
+
+    def get(self, key: KT) -> Optional[VT]:
+        if key not in self.cache:
+            return None
+        else:
+            self.cache.move_to_end(key)  # move key to last to show it was recently used
+            return self.cache[key]
+
+    def put(self, key: KT, value: VT) -> None:
+        if key in self.cache:
+            self.cache.move_to_end(key)  # update the key's position
+        self.cache[key] = value
+        if len(self.cache) > self.capacity:
+            self.cache.popitem(last=False)  # remove the least recently used element
