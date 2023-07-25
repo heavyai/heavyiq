@@ -29,6 +29,7 @@ def getOptions(argv=None):
     )
     parser.add_argument("--fix-queries-gpt", help="Try to fix failed queries with ChatGPT API", action="store_true")
     parser.add_argument("--top-k-str-vals", help="Top K string values", type=int, default=0)
+    parser.add_argument("--max-instruction-tokens", help="Max instruction tokens", type=int, default=704)
     parser.add_argument("--write-prompts", help="Write prompts to file for successful queries", action="store_true")
     return parser.parse_args(argv)
 
@@ -238,7 +239,7 @@ def get_table_str_cols(con, table_name):
 
 
 def get_top_k_vals(con, table_name, column_name, top_k):
-    sql = f"""SELECT {column_name} FROM {table_name} WHERE {column_name} IS NOT NULL GROUP BY {column_name} ORDER BY COUNT(*) DESC LIMIT {top_k}"""
+    sql = f"""SELECT "{column_name}" FROM "{table_name}" WHERE "{column_name}" IS NOT NULL GROUP BY "{column_name}" ORDER BY COUNT(*) DESC LIMIT {top_k}"""
     results = list(con.execute(sql))
     return [r[0] for r in results]
 
@@ -505,6 +506,7 @@ def main(argv):
     con = None
     tokenizer = LlamaTokenizer.from_pretrained("test_model")
     for db_id, queries in queries_by_db.items():
+        print(db_id)
         try:
             if db_num < options.start_db:
                 db_num += 1
@@ -586,6 +588,10 @@ def main(argv):
                         num_instruction_tokens = len(instruction_tokens)
                         targeted_instruction_tokens = tokenizer.tokenize(targeted_instruction)
                         num_targeted_instruction_tokens = len(targeted_instruction_tokens)
+                        if num_targeted_instruction_tokens > options.max_instruction_tokens:
+                            targeted_instruction = generate_instruction(filtered_table_schemas, [], query["question"])
+                            targeted_instruction_tokens = tokenizer.tokenize(targeted_instruction)
+                            num_targeted_instruction_tokens = len(targeted_instruction_tokens)
                         sql_query_tokens = tokenizer.tokenize(sql_query)
                         num_sql_query_tokens = len(sql_query_tokens)
                         # sql_query_with_semicolon = sql_query + ";" if sql_query[-1] != ";" else sql_query
