@@ -14,8 +14,6 @@ def strip_sql_comments(sql: str) -> str:
     sql = re.sub(r";[^;]*$", ";", sql, flags=re.DOTALL)
     # Remove triple backticks, and ```sql if present
     sql = re.sub(r"```(sql)?", "", sql)
-    # Remove leading and trailing double-quotes and single quotes
-    sql = sql.strip("'\"")
     # Remove leading and trailing newlines
     sql = re.sub(r"^\n+|\n+$", "", sql).strip()
     # If SQL doesn't end with a semicolon, add one
