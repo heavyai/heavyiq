@@ -1,4 +1,5 @@
-import logging
+from typing import Callable
+from functools import wraps
 
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import Response
@@ -8,15 +9,28 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
 from heavynl.fastapi.models import ErrorResponse
 from heavynl.langchain.exceptions import NLtoSQLException
-
-
-logger = logging.getLogger(__name__)
+from heavynl.logging_utils import get_heavynl_logger
 
 
 def _build_error_response(title: str, msg: str) -> ErrorResponse:
     return ErrorResponse(error=f"{title}: {msg}")
 
 
+def log_exception(func: Callable) -> Callable:
+    """
+    Used as a decorator for exception handler functions to log exceptions.
+    """
+
+    @wraps(func)
+    async def wrapper(request: Request, exc: Exception) -> Response:
+        get_heavynl_logger().exception("Exception Occured: %s", str(exc))
+        result = await func(request, exc)
+        return result
+
+    return wrapper
+
+
+@log_exception
 async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> Response:
     return JSONResponse(
         status_code=HTTP_500_INTERNAL_SERVER_ERROR,
@@ -24,6 +38,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
     )
 
 
+@log_exception
 async def heavydb_exception_handler(request: Request, exc: Exception) -> Response:
     return JSONResponse(
         status_code=HTTP_500_INTERNAL_SERVER_ERROR,
@@ -31,6 +46,7 @@ async def heavydb_exception_handler(request: Request, exc: Exception) -> Respons
     )
 
 
+@log_exception
 async def value_error_handler(request: Request, exc: Exception) -> Response:
     return JSONResponse(
         status_code=HTTP_500_INTERNAL_SERVER_ERROR,
@@ -38,6 +54,7 @@ async def value_error_handler(request: Request, exc: Exception) -> Response:
     )
 
 
+@log_exception
 async def type_error_handler(request: Request, exc: Exception) -> Response:
     return JSONResponse(
         status_code=HTTP_500_INTERNAL_SERVER_ERROR,
@@ -45,6 +62,7 @@ async def type_error_handler(request: Request, exc: Exception) -> Response:
     )
 
 
+@log_exception
 async def unhandled_exception_handler(request: Request, exc: Exception) -> Response:
     return JSONResponse(
         status_code=HTTP_500_INTERNAL_SERVER_ERROR,
@@ -52,6 +70,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> Respo
     )
 
 
+@log_exception
 async def attribute_error_handler(request: Request, exc: Exception) -> Response:
     return JSONResponse(
         status_code=HTTP_500_INTERNAL_SERVER_ERROR,
@@ -59,6 +78,7 @@ async def attribute_error_handler(request: Request, exc: Exception) -> Response:
     )
 
 
+@log_exception
 async def nl_to_sql_exception_handler(request: Request, exc: NLtoSQLException) -> Response:
     return JSONResponse(
         status_code=HTTP_500_INTERNAL_SERVER_ERROR,
