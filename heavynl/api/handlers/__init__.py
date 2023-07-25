@@ -6,6 +6,8 @@ from heavynl.langchain.chains import NLtoAnswerChain, get_nl_to_sql_chain_by_llm
 from heavynl.langchain.llms import get_llm_by_model_name
 from heavynl.langchain.logging import log_chain_call
 from heavynl.utils import strip_sql_comments
+from langchain.callbacks.base import BaseCallbackHandler
+from heavynl.langchain.callbacks import FileCallbackHandler
 
 
 MODEL_NAME = get_config().openai_gpt_model
@@ -22,7 +24,9 @@ def query(body: dict) -> dict:
     logger.info("Table(s): %s", ", ".join(tables))
     llm = get_llm_by_model_name(MODEL_NAME, ["rest_api", "query", "chain", "nl_to_sql_chain"], temperature=0.0)
     chain_cls = get_nl_to_sql_chain_by_llm(llm=llm)
-    chain = chain_cls(llm=llm, database=db, verbose=True)  # type: ignore
+
+    file_callback_handler: BaseCallbackHandler = FileCallbackHandler(logger.handlers[-1].baseFilename)  # type: ignore
+    chain = chain_cls(llm=llm, database=db, callbacks=[file_callback_handler], verbose=True)  # type: ignore
     chain_input = {chain.input_key: question, "tables": tables}
     res = log_chain_call(chain, chain_input, MODEL_NAME)
     sql = strip_sql_comments(res[chain.output_key])
@@ -40,8 +44,9 @@ def question(body: dict) -> dict:
     question = body["question"]
     logger.info("Request Received")
     logger.info("Table(s): %s", ", ".join(tables))
+    file_callback_handler: BaseCallbackHandler = FileCallbackHandler(logger.handlers[-1].baseFilename)  # type: ignore
     llm = get_llm_by_model_name(MODEL_NAME, ["rest_api", "question", "chain", "nl_to_answer_chain"], temperature=0.0)
-    chain = NLtoAnswerChain(llm=llm, database=db, verbose=True)
+    chain = NLtoAnswerChain(llm=llm, database=db, callbacks=[file_callback_handler], verbose=True)
     chain_input = {chain.input_key: question, "tables": tables}
     res = log_chain_call(chain, chain_input, MODEL_NAME)
     sql = strip_sql_comments(res[chain.output_sql_key])
