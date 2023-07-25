@@ -83,7 +83,9 @@ class NLtoAnswerChain(Chain, BaseModel):
 
     def _call(self, inputs: dict[str, Any], run_manager: Optional[CallbackManagerForChainRun] = None) -> dict[str, Any]:
         table_names_to_use = inputs.get("tables")
-        nl_sql_chain = get_nl_to_sql_chain_by_llm(self.llm)(llm=self.llm, database=self.database, verbose=self.verbose)
+        nl_sql_chain = get_nl_to_sql_chain_by_llm(self.llm)(
+            llm=self.llm, callbacks=self.callbacks, database=self.database, verbose=self.verbose
+        )
         nl_sql_inputs = {
             nl_sql_chain.input_key: inputs[self.input_key],
             "tables": table_names_to_use,
@@ -105,7 +107,9 @@ class NLtoAnswerChain(Chain, BaseModel):
         else:
             if run_manager:
                 run_manager.on_text("\nAnswer:", verbose=self.verbose)
-            llm_chain = LoggedLLMChain(llm=self.llm, prompt=self.prompt, verbose=self.verbose, output_key="answer")
+            llm_chain = LoggedLLMChain(
+                llm=self.llm, prompt=self.prompt, callbacks=self.callbacks, verbose=self.verbose, output_key="answer"
+            )
             llm_inputs = {
                 "input": inputs[self.input_key],
                 "dialect": self.database.dialect,
