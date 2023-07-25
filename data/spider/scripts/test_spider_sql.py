@@ -22,6 +22,7 @@ def getOptions(argv=None):
     parser.add_argument("-q", "--queries", help="Queries CSV file", default="./spider_qa.csv")
     parser.add_argument("-d", "--database", help="HeavyDB database", default=None)
     parser.add_argument("-k", "--openai-api-key", help="OpenAI API Key", default=None)
+    parser.add_argument("-c", "--cache", help="Query cache file", default=None)
     parser.add_argument("--start-db", help="Start from this database idx", type=int, default=None)
     parser.add_argument("--num-dbs", help="Only process this many databases", type=int, default=0)
     parser.add_argument(
@@ -492,10 +493,28 @@ def fix_failed_query_gpt(con, query_id, failed_query, error):
         return sql
 
 
+def load_query_cache(cache_file):
+    queries = []
+    with open(cache_file, "r") as f:
+        queries = json.load(f)
+    query_cache_by_db = {}
+    for query in queries:
+        db_id = query["db_id"]
+        sql_query = query["output"]
+        if db_id not in query_cache_by_db:
+            query_cache_by_db[db_id] = set(sql_query)
+        else:
+            query_cache_by_db[db_id].add(sql_query)
+    return query_cache_by_db
+
+
 def main(argv):
     options = getOptions(argv)
     openai.api_key = options.openai_api_key
     queries_by_db = getQueriesByDB(options.queries)
+    query_cache_by_db = {}
+    if options.cache is not None:
+        query_cache_by_db = load_query_cache(options.cache)
     db_num = 0
     total_queries = 0
     total_successful_queries = 0
@@ -517,6 +536,7 @@ def main(argv):
                 print(f"Error connecting to database {db_id}: {e}")
                 db_num += 1
                 continue
+            db_query_cache = query_cache_by_db[db_id] if db_id in query_cache_by_db else set()
             num_queries = len(queries)
             successful_queries = 0
             db_tables = con.get_tables()
@@ -566,7 +586,9 @@ def main(argv):
                 # print(f"Query ID: {query_id}")
                 # print(f"SQL Query: {sql_query}")
                 try:
-                    results = list(con.execute(sql_query))
+                    if sql_query not in db_query_cache:
+                        con.execute(sql_query)
+                        print(f"Not in cache: {query_id}")
                     successful_queries += 1
                     if options.write_prompts:
                         filtered_tables = extract_tables_from_query(con, sql_query)
