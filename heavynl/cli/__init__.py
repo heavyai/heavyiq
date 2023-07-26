@@ -1,10 +1,14 @@
 import click
 
+from heavynl.langchain.utils import init_promptlayer
+
 from .agent_commands import agent
 from .chain_commands import chain
 from .eval_commands import eval
 from .metadata_index_commands import metadata_index
 from .heavydb_commands import db
+
+init_promptlayer()
 
 
 @click.group()
