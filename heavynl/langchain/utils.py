@@ -9,11 +9,17 @@ from heavynl.langchain import HeavyDB
 
 is_promptlayer_active = False
 
-config = get_config()
-if config.promptlayer_api_key is not None and config.promptlayer_api_key != "":
-    os.environ["PROMPTLAYER_API_KEY"] = config.promptlayer_api_key
-    promptlayer.api_key = config.promptlayer_api_key
-    is_promptlayer_active = True
+
+def init_promptlayer() -> None:
+    """
+    Initializes the promptlayer API key if it is present in the config.
+    """
+    global is_promptlayer_active
+    config = get_config()
+    if config.promptlayer_api_key is not None and config.promptlayer_api_key != "":
+        os.environ["PROMPTLAYER_API_KEY"] = config.promptlayer_api_key
+        promptlayer.api_key = config.promptlayer_api_key
+        is_promptlayer_active = True
 
 
 def get_token_limit(model_name: str, response_tokens: int = 256) -> int:
