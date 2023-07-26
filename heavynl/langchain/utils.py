@@ -78,6 +78,12 @@ def get_table_info_wrt_token_limit(
     if config.custom_llm_type is None or config.custom_llm_type == "AZURE":
         token_limit = get_token_limit(llm.model_name)  # type: ignore
         token_counter = llm.get_num_tokens
+        table_info_options: list[dict[str, bool]] = [
+            {},
+            {"include_top_k": False},
+            {"include_samples": False},
+            {"include_samples": False, "include_top_k": False},
+        ]
     else:
         from transformers import LlamaTokenizer
 
@@ -88,12 +94,10 @@ def get_table_info_wrt_token_limit(
             """Token counter for the Llama model."""
             return len(tokenizer.tokenize(text))
 
-    table_info_options = [
-        {},
-        {"include_top_k": False},
-        {"include_samples": False},
-        {"include_samples": False, "include_top_k": False},
-    ]
+        table_info_options = [
+            {"include_samples": False},
+            {"include_samples": False, "include_top_k": False},
+        ]
 
     for options in table_info_options:
         table_info = heavydb.get_table_info(table_names=table_names_to_use, **options)
