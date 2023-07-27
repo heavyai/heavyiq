@@ -194,8 +194,8 @@ def getQueriesByDB(queries_file):
     for index, row in queries_df.iterrows():
         query_id = row["query_id"]
         db_id = row["db_id"]
-        original_sql_query = row["original_sql_query"]
-        modified_sql_query = row["modified_sql_query"]
+        original_sql_query = row["original_sql_query"].strip()
+        modified_sql_query = row["modified_sql_query"].strip()
         question = row["question"]
         data_split = row["dataset"]
         if db_id not in queries_by_db:

@@ -73,8 +73,8 @@ def main(argv):
             #    match = re.search(r"(SELECT.*FROM.*$)", gen_sql_query, re.DOTALL | re.MULTILINE | re.IGNORECASE)
             #    if match:
             #        gen_sql_query = match.group(1)
-            if not gen_sql_query.endswith(";"):
-                gen_sql_query += ";"
+            #if not gen_sql_query.endswith(";"):
+            #    gen_sql_query += ";"
             gold_result = None
             gen_result = None
             gold_run_success = False
