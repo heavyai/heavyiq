@@ -6,6 +6,7 @@ from heavynl.langchain import HeavyDB
 from heavynl.langchain.chains import get_nl_to_sql_chain_by_llm, NLtoAnswerChain
 from heavynl.langchain.llms import get_llm_by_model_name
 from heavynl.langchain.logging import log_chain_call, log_chain_call_async
+from heavynl.langchain.callbacks import AsyncFileCallbackHandler
 from heavynl.utils import strip_sql_comments
 
 
@@ -45,9 +46,11 @@ async def handle_query_request_async(request: QueryRequest, db: HeavyDB) -> Quer
     Returns:
         QueryResponse: response content
     """
+    logger = get_heavynl_logger()
     llm = get_llm_by_model_name(MODEL_NAME, ["rest_api", "query", "chain", "nl_to_sql_chain_async"])
     chain_cls = get_nl_to_sql_chain_by_llm(llm=llm)
-    chain = chain_cls(llm=llm, database=db, verbose=True)  # type: ignore
+    file_callback_handler = AsyncFileCallbackHandler(logger.handlers[-1].baseFilename, to_stdout=False)  # type: ignore
+    chain = chain_cls(llm=llm, database=db, callbacks=[file_callback_handler], verbose=True)  # type: ignore
     chain_input = {chain.input_key: request.question, "tables": request.tables}
     res = await log_chain_call_async(chain, chain_input, MODEL_NAME)
     sql = strip_sql_comments(res[chain.output_key])
@@ -88,8 +91,10 @@ async def handle_question_request_async(request: QuestionRequest, db: HeavyDB) -
     Returns:
         QuestionResponse: response content
     """
+    logger = get_heavynl_logger()
+    file_callback_handler = AsyncFileCallbackHandler(logger.handlers[-1].baseFilename, to_stdout=False)  # type: ignore
     llm = get_llm_by_model_name(MODEL_NAME, ["rest_api", "question", "chain", "nl_to_answer_chain_async"])
-    chain = NLtoAnswerChain(llm=llm, database=db, verbose=True)
+    chain = NLtoAnswerChain(llm=llm, database=db, callbacks=[file_callback_handler], verbose=True)
     chain_input = {chain.input_key: request.question, "tables": request.tables}
     res = await log_chain_call_async(chain, chain_input, MODEL_NAME)
     sql = strip_sql_comments(res[chain.output_sql_key])
