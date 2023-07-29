@@ -122,6 +122,24 @@ def uppercase_sql_keywords(sql):
     return new_sql
 
 
+def normalize_order_by(sql):
+    pattern = re.compile(
+        r"ORDER BY (?:\w+\([^\)]*\)|\w+\.\w+|\w+)(?: (?:ASC|DESC) NULLS LAST)?(?:, (?:\w+\([^\)]*\)|\w+\.\w+|\w+)(?: (?:ASC|DESC) NULLS LAST)?)*"
+    )
+    if "ORDER BY" in sql and "ASC" not in sql and "DESC" not in sql:
+        for p_str in pattern.findall(sql):
+            sql = sql.replace(p_str, p_str + " ASC")
+    # Technically we could have a keyword start with ASC OR DESC,
+    # but that doesn't happen on the augmented Spider dataset so
+    # we don't handle that case for now
+    if " ASC" in sql and "ASC NULLS LAST" not in sql:
+        sql = sql.replace(" ASC", " ASC NULLS LAST")
+    if " DESC" in sql and "DESC NULLS LAST" not in sql:
+        sql = sql.replace(" DESC", " DESC NULLS LAST")
+
+    return sql
+
+
 def adjust_identifier_case(table_statements: list[str], query: str) -> str:
     # Build a map for all column names
     column_map = {}
@@ -574,6 +592,7 @@ def main(argv):
                 filtered_tables = None
                 try:
                     sql_query = adjust_identifier_case(table_schemas, sql_query)
+                    sql_query = normalize_order_by(sql_query)
                     # query_and_tables = adjust_identifier_case(table_schemas, sql_query)
                     # sql_query = query_and_tables["query"]
                     # filtered_tables = query_and_tables["tables"]
