@@ -80,6 +80,7 @@ class LRUCache(Generic[KT, VT]):
 
     def __init__(self, capacity: int = 100) -> None:
         self.capacity: int = capacity
+        # this should create seperate manager process
         manager = multiprocessing.Manager()
         # thread safe/process-safe shared dict which holds the key, value pair
         self.cache = manager.dict()
