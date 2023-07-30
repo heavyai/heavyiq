@@ -118,6 +118,35 @@ class TestLRUCache(unittest.TestCase):
         self.assertEqual(list(cache.order), ["key3", "key1", "key4"])
         self.assertEqual(cache.get("key3"), "newvalue3")
 
+    def test_should_pass_for_single_class_having_multiple_instances_of_lru_cache(self):
+        # create multiple instances of Test db
+        # define a sample DB class to test shared caching
+        class TestDB:
+            cache_top_k = LRUCache[str, str](capacity=2)
+            cache_table_schema = LRUCache[str, str](capacity=2)
+            cache_sample_rows = LRUCache[str, str](capacity=2)
+
+            def set_top_k(self, table_name, top_k):
+                self.cache_top_k.put(table_name, top_k)
+
+            def set_table_schema(self, table_name, schema):
+                self.cache_table_schema.put(table_name, schema)
+
+            def set_sample_rows(self, table_name, sample_rows):
+                self.cache_sample_rows.put(table_name, sample_rows)
+
+        db_1 = TestDB()
+        db_2 = TestDB()
+
+        db_1.set_table_schema("foo", "foo table schema")
+        db_1.set_top_k("bar", "top_k")
+        self.assertIn("foo", db_2.cache_table_schema.cache.keys())
+        self.assertNotIn("foo", db_2.cache_top_k.cache.keys())
+        self.assertNotIn("foo", db_1.cache_top_k.cache.keys())
+        # add the instances of TestDB must share the cache_top_k, cache_table_schema, cache_sample_rows among processes.
+        self.assertEqual(list(db_1.cache_top_k.order), list(db_2.cache_top_k.order))
+        self.assertEqual(list(db_1.cache_table_schema.order), list(db_2.cache_table_schema.order))
+
 
 if __name__ == "__main__":
     unittest.main()
