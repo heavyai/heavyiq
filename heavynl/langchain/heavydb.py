@@ -112,6 +112,7 @@ class HeavyDB:
             host=config.heavydb_host,
             port=config.heavydb_port,
             dbname=config.heavydb_dbname,
+            protocol=config.heavydb_protocol,
         )
         conn = cls._connect_with_timeout(connect_func, kwargs.pop('timeout', 10))
         return cls(conn, **kwargs)
@@ -124,6 +125,7 @@ class HeavyDB:
             sessionid=session_id,
             host=config.heavydb_host,
             port=config.heavydb_port,
+            protocol=config.heavydb_protocol,
         )
         conn = cls._connect_with_timeout(connect_func, kwargs.pop('timeout', 10))
         return cls(conn, **kwargs)
@@ -143,6 +145,7 @@ class HeavyDB:
             password=password,
             host=config.heavydb_host,
             port=config.heavydb_port,
+            protocol=config.heavydb_protocol,
             dbname=dbname or config.heavydb_dbname,
         )
         return cls(conn, **kwargs)
@@ -172,6 +175,7 @@ class HeavyDB:
             password=config.heavydb_password,
             host=config.heavydb_host,
             port=config.heavydb_port,
+            protocol=config.heavydb_protocol,
             dbname=db_name or config.heavydb_dbname,
         )
         return conn._session
