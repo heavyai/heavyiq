@@ -1,12 +1,11 @@
 from __future__ import annotations
-from functools import lru_cache
 import re
 from threading import Lock
 from typing import Optional, Any, Iterable, TYPE_CHECKING
 
 from heavyai import connect, Connection
 from heavynl.config import get_config
-from heavynl.utils import strip_sql_comments, is_destructive_sql, rate_sql_complexity
+from heavynl.utils import strip_sql_comments, is_destructive_sql, rate_sql_complexity, LRUCache
 
 if TYPE_CHECKING:
     from heavydb._parsers import ColumnDetails
@@ -31,6 +30,10 @@ class PersistantConnection(Connection):
 
 class HeavyDB:
     """A heavydb database connection."""
+
+    top_k_cache = LRUCache[str, str]()
+    sample_rows_cache = LRUCache[str, str]()
+    table_schema_cache = LRUCache[str, str]()
 
     def __init__(
         self,
@@ -165,14 +168,15 @@ class HeavyDB:
         """Information about all usable tables in the database."""
         return self.get_table_info()
 
-    @lru_cache
     def get_table_columns(self, table: str) -> list[ColumnDetails]:
         """Get details about the columns in a table."""
         with self.lock:
             return self._conn.get_table_details(table)
 
-    @lru_cache
     def get_table_schema(self, table: str) -> str:
+        cached_value = self.table_schema_cache.get(table)
+        if cached_value is not None:
+            return cached_value
         """Get the schema of a table."""
         create_command = f"SHOW CREATE TABLE {table};"
         with self.lock:
@@ -183,6 +187,7 @@ class HeavyDB:
         table_schema = re.sub(r"\n", "", table_schema)
         if "WITH (" in table_schema:
             table_schema = table_schema[: table_schema.index("WITH (")]
+        self.table_schema_cache.put(table, table_schema)
         return table_schema
 
     def validate_query(self, query: str) -> list:
@@ -196,7 +201,6 @@ class HeavyDB:
         with self.lock:
             return self._conn._client.sql_validate(self._conn._session, query)
 
-    @lru_cache
     def get_column_top_k(self, table: str, column: str, k: int = 5) -> Optional[list[str]]:
         """Get the top k values for a column."""
         top_k_statement = f"SELECT {column}, COUNT(*) as cnt FROM {table} WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {k};"
@@ -207,8 +211,10 @@ class HeavyDB:
             return top_k_res
         return None
 
-    @lru_cache
     def get_sample_rows(self, table_name: str) -> str:
+        cached_value = self.sample_rows_cache.get(table_name)
+        if cached_value is not None:
+            return cached_value
         # build the select command
         command = f"SELECT * FROM {table_name} LIMIT {self._sample_rows_in_table_info}"
 
@@ -224,10 +230,16 @@ class HeavyDB:
         # save the sample rows in string format
         sample_rows_str = "\n".join([",".join(row) for row in sample_rows])
 
-        return f"{self._sample_rows_in_table_info} rows from {table_name} table:\n{columns_str}\n{sample_rows_str}"
+        res = f"{self._sample_rows_in_table_info} rows from {table_name} table:\n{columns_str}\n{sample_rows_str}"
 
-    @lru_cache
+        self.sample_rows_cache.put(table_name, res)
+
+        return res
+
     def get_top_k(self, table_name: str) -> str:
+        cached_value = self.top_k_cache.get(table_name)
+        if cached_value is not None:
+            return cached_value
         text_columns = [
             c.name
             for c in self.get_table_columns(table_name)
@@ -238,6 +250,7 @@ class HeavyDB:
             top_k_res = self.get_column_top_k(table_name, col)
             if top_k_res:
                 top_k_strings += f"{col}: {', '.join(top_k_res)}\n"
+        self.top_k_cache.put(table_name, top_k_strings)
         return top_k_strings
 
     def get_single_table_info(self, table_name: str, include_samples: bool = True, include_top_k: bool = True) -> str:

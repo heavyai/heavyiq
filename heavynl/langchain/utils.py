@@ -9,11 +9,17 @@ from heavynl.langchain import HeavyDB
 
 is_promptlayer_active = False
 
-config = get_config()
-if config.promptlayer_api_key is not None and config.promptlayer_api_key != "":
-    os.environ["PROMPTLAYER_API_KEY"] = config.promptlayer_api_key
-    promptlayer.api_key = config.promptlayer_api_key
-    is_promptlayer_active = True
+
+def init_promptlayer() -> None:
+    """
+    Initializes the promptlayer API key if it is present in the config.
+    """
+    global is_promptlayer_active
+    config = get_config()
+    if config.promptlayer_api_key is not None and config.promptlayer_api_key != "":
+        os.environ["PROMPTLAYER_API_KEY"] = config.promptlayer_api_key
+        promptlayer.api_key = config.promptlayer_api_key
+        is_promptlayer_active = True
 
 
 def get_token_limit(model_name: str, response_tokens: int = 256) -> int:
@@ -72,6 +78,12 @@ def get_table_info_wrt_token_limit(
     if config.custom_llm_type is None or config.custom_llm_type == "AZURE":
         token_limit = get_token_limit(llm.model_name)  # type: ignore
         token_counter = llm.get_num_tokens
+        table_info_options: list[dict[str, bool]] = [
+            {},
+            {"include_top_k": False},
+            {"include_samples": False},
+            {"include_samples": False, "include_top_k": False},
+        ]
     else:
         from transformers import LlamaTokenizer
 
@@ -82,12 +94,10 @@ def get_table_info_wrt_token_limit(
             """Token counter for the Llama model."""
             return len(tokenizer.tokenize(text))
 
-    table_info_options = [
-        {},
-        {"include_top_k": False},
-        {"include_samples": False},
-        {"include_samples": False, "include_top_k": False},
-    ]
+        table_info_options = [
+            {"include_samples": False},
+            {"include_samples": False, "include_top_k": False},
+        ]
 
     for options in table_info_options:
         table_info = heavydb.get_table_info(table_names=table_names_to_use, **options)

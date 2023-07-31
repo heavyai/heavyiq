@@ -81,8 +81,8 @@ def get_config(file: str = "./config.toml") -> HeavyNLConfig:
     elif app_config.http_port:
         app_config.iq.heavydb_port = app_config.http_port
     if app_config.iq.data is None:
-        if app_config.web and app_config.web.data:
-            app_config.iq.data = app_config.web.data
+        if app_config.data:
+            app_config.iq.data = app_config.data
         else:
             app_config.iq.data = "./storage"
     if not os.path.exists(app_config.iq.data):

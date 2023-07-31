@@ -5,6 +5,7 @@ from flask import Flask, redirect, request, Response
 from flask_cors import CORS
 
 from heavynl.config import get_config, get_heavydb_license_claims
+from heavynl.langchain.utils import init_promptlayer
 from heavynl.logging_utils import _get_access_logger, get_heavynl_logger, init_logs
 
 
@@ -12,6 +13,7 @@ def get_app(config_path: str = "./config.toml") -> Flask:
     print(f"Loading config from:{config_path}")
     config = get_config(config_path)  # loads config using specified path
     init_logs()  # initializes logs using config
+    init_promptlayer()  # initializes promptlayer API key if present in config
 
     app = connexion.FlaskApp(__name__, server_args={"static_folder": "../../public", "static_url_path": "/"})
     CORS(app.app)
