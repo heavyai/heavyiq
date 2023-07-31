@@ -261,6 +261,9 @@ class NLtoSQLChatChain(BaseNltoSQLChain):
             return strip_sql_comments(return_message.content.split("SQLQuery:")[1].strip())
         if "```sql" in return_message.content:
             return strip_sql_comments(return_message.content.split("```sql")[1].strip())
+
+        if ":\n" in return_message.content:
+            return strip_sql_comments(return_message.content.split(":\n")[1].strip())
         return strip_sql_comments(return_message.content)
 
     def build_ai_message(self, return_message: BaseMessage) -> AIMessage:
