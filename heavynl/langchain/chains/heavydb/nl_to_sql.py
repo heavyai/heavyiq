@@ -11,6 +11,7 @@ from langchain.schema import AIMessage, BaseMessage, HumanMessage
 from pydantic import Extra, Field
 
 from heavynl.config import get_config
+from heavynl.logging_utils import get_heavynl_logger
 from heavynl.langchain import HeavyDB
 from heavynl.langchain.utils import get_table_info_wrt_token_limit
 from heavynl.langchain.chains import BaseChain
@@ -132,6 +133,12 @@ class BaseNltoSQLChain(BaseChain):
     input_key: str = "query"  #: :meta private:
     output_key: str = "sql"  #: :meta private:
     max_retries: int = 3
+
+    def __init__(self, *args, **kwargs):
+        logger = get_heavynl_logger()
+        # add langchain_cb_handler handler to the callbacks list by default
+        callbacks = (kwargs.pop("callbacks", []) or []) + [logger.langchain_cb_handler]
+        super().__init__(*args, **kwargs, callbacks=callbacks)
 
     @property
     def input_keys(self) -> list[str]:
