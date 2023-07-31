@@ -1,7 +1,8 @@
 from __future__ import annotations
 import re
 from threading import Lock
-from typing import Optional, Any, Iterable, TYPE_CHECKING
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from typing import Optional, Any, Iterable, TYPE_CHECKING, Callable
 
 from heavyai import connect, Connection
 from heavynl.config import get_config
@@ -85,9 +86,19 @@ class HeavyDB:
             print(f"Error: {e}")
 
     @classmethod
+    def _connect_with_timeout(cls: type[HeavyDB], connect_func: Callable[[], Connection], timeout: float=10) -> Connection:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(connect_func)
+            try:
+                return future.result(timeout)
+            except TimeoutError:
+                raise Exception(f"HeavyDB failed to connect after {timeout} seconds")
+
+    @classmethod
     def from_uri(cls: type[HeavyDB], database_uri: str, **kwargs: Any) -> HeavyDB:
         """Create a database connection from a database URI."""
-        return cls(connect(database_uri), **kwargs)
+        conn = cls._connect_with_timeout(lambda: connect(database_uri), kwargs.pop('timeout', 10))
+        return cls(conn, **kwargs)
 
     @classmethod
     def from_env(cls: type[HeavyDB], **kwargs: Any) -> HeavyDB:
@@ -95,24 +106,26 @@ class HeavyDB:
         config = get_config()
         if not config.heavydb_username or not config.heavydb_password or not config.heavydb_dbname:
             raise ValueError("Please set the config variables heavydb_username, heavydb_password and heavydb_dbname")
-        conn: Connection = connect(
+        connect_func = lambda: connect(
             user=config.heavydb_username,
             password=config.heavydb_password,
             host=config.heavydb_host,
             port=config.heavydb_port,
             dbname=config.heavydb_dbname,
         )
+        conn = cls._connect_with_timeout(connect_func, kwargs.pop('timeout', 10))
         return cls(conn, **kwargs)
 
     @classmethod
     def from_session(cls: type[HeavyDB], session_id: str, **kwargs: Any) -> HeavyDB:
         """Create a database connection from a session id."""
         config = get_config()
-        conn: Connection = connect(
+        connect_func = lambda: connect(
             sessionid=session_id,
             host=config.heavydb_host,
             port=config.heavydb_port,
         )
+        conn = cls._connect_with_timeout(connect_func, kwargs.pop('timeout', 10))
         return cls(conn, **kwargs)
 
     @classmethod
