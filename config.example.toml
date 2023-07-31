@@ -1,6 +1,7 @@
 [iq]
 heavydb_host = "localhost"
 heavydb_port = 6274
+heavydb_protocol = "binary"
 heavydb_dbname = "heavyai"
 heavydb_username = "admin"
 heavydb_password = "HyperInteractive"
@@ -22,9 +23,9 @@ heavyiq_log_level = "INFO" # DEBUG is recommended for development
 # Custom LLM (optional, don't copy to your config if you aren't using a custom LLM solution)
 custom_llm_type = "API" # API or AZURE
 # Custom LLM API
-custom_llm_api_base = "" # base url of API
+custom_llm_api_base = ""             # base url of API
 custom_llm_api_context_window = 2048 # context window limit
 # Custom LLM AZURE
 custom_llm_azure_openai_api_version = "2023-05-15" # API specification version
-custom_llm_azure_openai_api_base = "" # base url of API
-custom_llm_azure_deployment_name = "" # name of deployment
+custom_llm_azure_openai_api_base = ""              # base url of API
+custom_llm_azure_deployment_name = ""              # name of deployment
