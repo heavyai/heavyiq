@@ -16,7 +16,6 @@ promptwatch_api_key = ""
 promptwatch_tracking_project = "<name>_dev" # i.e. "bfturner_dev"
 langchain_project = ""
 langchain_api_key = ""
-langchain_tracing_v2 = "" # set bool value to Enable/disable Tracing 
 
 # Logging, these are defaults no need to copy to your config if not overriding
 access_log_level = "INFO"

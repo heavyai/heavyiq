@@ -31,7 +31,7 @@ def init_telemetrics() -> None:
     global is_langsmith_active
     config = get_config()
     if config.langchain_api_key and config.langchain_project:
-        os.environ["LANGCHAIN_TRACING_V2"] = str(config.langchain_tracing_v2).lower()
+        os.environ["LANGCHAIN_TRACING_V2"] = "true"
         os.environ["LANGCHAIN_API_KEY"] = config.langchain_api_key
         os.environ["LANGCHAIN_PROJECT"] = config.langchain_project
         is_langsmith_active = True

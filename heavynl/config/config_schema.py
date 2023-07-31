@@ -25,7 +25,6 @@ class HeavyNLConfig(OverrideBaseConfig):  # type: ignore
     langchain_endpoint: str = "https://api.smith.langchain.com"
     langchain_api_key: Optional[str] = None
     langchain_project: Optional[str] = None
-    langchain_tracing_v2: bool = False
     # LOGGING
     access_log_level: str = "INFO"
     """Used for the access log of the web server."""
