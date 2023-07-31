@@ -205,6 +205,103 @@ def adjust_identifier_case(table_statements: list[str], query: str) -> str:
     # return {"query": output_query, "tables": used_tables_list}
 
 
+def adjust_alias_case(query: str) -> str:
+    max_num_aliases = 7
+    for alias_idx in range(1, max_num_aliases + 1):
+        table_alias1 = f"AS t{alias_idx}"
+        table_alias2 = f" t{alias_idx}."
+        table_alias3 = f"(t{alias_idx}."
+        upper_table_alias_1 = table_alias1.upper()
+        upper_table_alias_2 = table_alias2.upper()
+        upper_table_alias_3 = table_alias3.upper()
+        query = query.replace(table_alias1, upper_table_alias_1)
+        query = query.replace(table_alias2, upper_table_alias_2)
+        query = query.replace(table_alias3, upper_table_alias_3)
+    return query
+
+
+def add_as_before_table_aliases(query: str) -> str:
+    max_num_aliases = 7
+    for alias_idx in range(1, max_num_aliases + 1):
+        table_alias = f" T{alias_idx} "
+        as_table_alias = f" AS T{alias_idx} "
+        query = query.replace(table_alias, as_table_alias)
+        double_as_table_alias = f" AS AS T{alias_idx} "
+        query = query.replace(double_as_table_alias, as_table_alias)
+    return query
+
+
+def add_spaces_around_parentheses(sql_query):
+    # Add space before parentheses if not present
+    sql_query = re.sub(r"(?<=[^\s])([\(\)])", r" \1", sql_query)
+
+    # Add space after parentheses if not present
+    sql_query = re.sub(r"([\(\)])(?=[^\s])", r"\1 ", sql_query)
+
+    # Remove extra spaces before and after parentheses
+    sql_query = re.sub(r"\s+([\(\)])\s+", r" \1 ", sql_query)
+
+    return sql_query
+
+
+def remove_spaces_around_parentheses(sql_query):
+    sql_query = sql_query.replace("( ", "(")
+    sql_query = sql_query.replace(" )", ")")
+    sql_query = sql_query.replace("COUNT (", "COUNT(")
+    sql_query = sql_query.replace("SUM (", "SUM(")
+    sql_query = sql_query.replace("AVG (", "AVG(")
+    sql_query = sql_query.replace("MIN (", "MIN(")
+    sql_query = sql_query.replace("MAX (", "MAX(")
+    return sql_query
+
+
+def remove_spaces_around_commas(sql_query):
+    sql_query = sql_query.replace(" ,", ",")
+    sql_query = sql_query.replace("  ,", ",")
+    sql_query = sql_query.replace(",   ", ", ")
+    sql_query = sql_query.replace(",  ", ", ")
+    return sql_query
+
+
+def remove_join_aliases(table_statements: list[str], query: str) -> str:
+    column_map = {}
+    table_map = {}
+    for statement in table_statements:
+        parsed = sqlparse.parse(statement)[0]
+
+        # Extract and add the table name to the table map
+        table_name = str(parsed.tokens[4]).split("(")[0]
+        table_map[table_name.lower()] = table_name
+
+        # Extract the column definitions from the statement using a regex
+        # The regex matches any string that does not contain parentheses
+        columns_and_definitions = re.findall(r"\((.*?)\)\s*;", statement)[-1]
+        columns = columns_and_definitions.split(",")
+
+        # Add the columns to the column map
+        for column in columns:
+            column_name = column.split()[0]
+            column_map[column_name.lower()] = column_name
+    lower_query = query.lower()
+    table_alias_map = {}
+    for lower_table_name, table_name in table_map.items():
+        alias_prefix = " " + lower_table_name + " as "
+        alias_prefix_idx = lower_query.find(alias_prefix)
+        if alias_prefix_idx >= 0:
+            alias_suffix_idx = alias_prefix_idx + len(alias_prefix)
+            alias_name = ""
+            while alias_suffix_idx < len(query) and query[alias_suffix_idx].isalnum() or query[alias_suffix_idx] == "_":
+                alias_name += query[alias_suffix_idx]
+                alias_suffix_idx += 1
+            query = query[: alias_prefix_idx + len(table_name) + 1] + query[alias_suffix_idx:]
+            lower_query = query.lower()
+            table_alias_map[alias_name] = table_name
+
+    for alias, table_name in table_alias_map.items():
+        query = query.replace(alias, table_name)
+    return query
+
+
 def getQueriesByDB(queries_file):
     queries_df = pd.read_csv(queries_file)
     queries_df["modified_sql_query"] = queries_df["modified_sql_query"].astype(str)
@@ -593,11 +690,19 @@ def main(argv):
                 try:
                     sql_query = adjust_identifier_case(table_schemas, sql_query)
                     sql_query = normalize_order_by(sql_query)
+                    # sql_query = add_spaces_around_parentheses(sql_query)
+                    sql_query = remove_spaces_around_parentheses(sql_query)
+                    sql_query = remove_spaces_around_commas(sql_query)
+                    sql_query = adjust_alias_case(sql_query)
+                    sql_query = add_as_before_table_aliases(sql_query)
+                    # sql_query = remove_join_aliases(table_schemas, sql_query)
+
                     # query_and_tables = adjust_identifier_case(table_schemas, sql_query)
                     # sql_query = query_and_tables["query"]
                     # filtered_tables = query_and_tables["tables"]
                 except Exception as e:
                     print(f"Exception Query ID: {query_id} DB: {db_id} Query: {sql_query}")
+                    print(e)
                     continue
                 # print(f"Query ID: {query_id} DB: {db_id} Query: {sql_query}")
                 sql_query = sql_query + ";" if sql_query[-1] != ";" else sql_query
