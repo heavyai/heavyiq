@@ -36,7 +36,7 @@ class HeavyNLConfig(OverrideBaseConfig):  # type: ignore
     """ 'API' or 'AZURE' """
     custom_llm_api_base: str = ""
     custom_llm_api_context_window: int = 2048
-    custom_llm_azure_openai_api_version: str = "2023-03-15-preview"
+    custom_llm_azure_openai_api_version: str = "2023-05-15"
     custom_llm_azure_openai_api_base: str = ""
     custom_llm_azure_deployment_name: str = ""
 
