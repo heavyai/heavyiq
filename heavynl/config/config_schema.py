@@ -14,7 +14,7 @@ class HeavyNLConfig(OverrideBaseConfig):  # type: ignore
     heavydb_username: Optional[str] = None
     heavydb_password: Optional[str] = None
     heavydb_host: str = "localhost"
-    heavydb_port: int = 6278
+    heavydb_port: int = 6274
     heavydb_protocol: str = "binary"
     huggingface_embed_model: str = "sentence-transformers/all-mpnet-base-v2"
     metadata_index_dir: str = "db"
@@ -39,6 +39,7 @@ class HeavyNLConfig(OverrideBaseConfig):  # type: ignore
     custom_llm_azure_openai_api_version: str = "2023-03-15-preview"
     custom_llm_azure_openai_api_base: str = ""
     custom_llm_azure_deployment_name: str = ""
+
 
 class AppConfig(OverrideBaseConfig):  # type: ignore
     data: Optional[str] = None
