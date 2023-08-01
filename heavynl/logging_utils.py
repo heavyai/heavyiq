@@ -157,13 +157,18 @@ class HeavyNLLogger(BaseLogger):
         )
         self.info("HeavyNL Logger initialized")
 
-    @property
-    def langchain_cb_handler(self) -> FileCallbackHandler:
+    def langchain_cb_handler(self, to_stdout: bool = True) -> FileCallbackHandler:
         """
         Returns a file callback handler created from the log file.
+
+        Args:
+            to_stdout (bool, optional): whether to log stdout as well. Defaults to True.
+
+        Returns:
+            FileCallbackHandler: callback handler mainly passed as callback for chains.
         """
         rotating_file_handler = next(i for i in self.handlers if isinstance(i, RotatingFileHandler))
-        return FileCallbackHandler(rotating_file_handler.baseFilename)
+        return FileCallbackHandler(rotating_file_handler.baseFilename, to_stdout=to_stdout)
 
 
 class _AccessLogger(BaseLogger):
