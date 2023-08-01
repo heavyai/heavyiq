@@ -6,6 +6,7 @@ from langchain.base_language import BaseLanguageModel
 from langchain.callbacks.manager import CallbackManagerForChainRun
 from pydantic import BaseModel, Extra, Field
 
+from heavynl.langchain.chains import FileCallbackHandlerForChainMixin
 from heavynl.langchain import HeavyDB
 from heavynl.langchain.prompts import LoggedPromptTemplate
 from ..logged_llm import LoggedLLMChain
@@ -30,7 +31,7 @@ ANSWER_PROMPT = LoggedPromptTemplate(
 )
 
 
-class NLtoAnswerChain(Chain, BaseModel):
+class NLtoAnswerChain(FileCallbackHandlerForChainMixin, Chain, BaseModel):
     """
     Chain for translating natural language to an answer.
 
