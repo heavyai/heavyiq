@@ -55,8 +55,8 @@ class TestLRUCache(unittest.TestCase):
         Test shared lru cache sequently, ie. one process modifes the caches after another.
         Always wait for all the child processes to complete before exiting the main process.
         """
-
-        cache = LRUCache(capacity=3)
+        manager = multiprocessing.Manager()
+        cache = LRUCache(capacity=3, manager=manager)
 
         # Create two processes
         process1 = multiprocessing.Process(target=self.process_one, args=(cache,))
@@ -102,8 +102,8 @@ class TestLRUCache(unittest.TestCase):
         Test shared lru cache parallely, ie. two processes tries to modify the cache at the same time.
         In this case, we don't need to explicitly put the lock, manager.Dict (ProxyDict) automatically handles it.
         """
-
-        cache = LRUCache(capacity=3)
+        manager = multiprocessing.Manager()
+        cache = LRUCache(capacity=3, manager=manager)
 
         # Create two processes
         processx = multiprocessing.Process(target=self.process_x, args=(cache,))
@@ -121,10 +121,13 @@ class TestLRUCache(unittest.TestCase):
     def test_should_pass_for_single_class_having_multiple_instances_of_lru_cache(self):
         # create multiple instances of Test db
         # define a sample DB class to test shared caching
+        manager = multiprocessing.Manager()
+
         class TestDB:
-            cache_top_k = LRUCache[str, str](capacity=2)
-            cache_table_schema = LRUCache[str, str](capacity=2)
-            cache_sample_rows = LRUCache[str, str](capacity=2)
+            # a single manager process being shared with all the caches
+            cache_top_k = LRUCache[str, str](capacity=2, manager=manager)
+            cache_table_schema = LRUCache[str, str](capacity=2, manager=manager)
+            cache_sample_rows = LRUCache[str, str](capacity=2, manager=manager)
 
             def set_top_k(self, table_name, top_k):
                 self.cache_top_k.put(table_name, top_k)
