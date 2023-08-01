@@ -11,6 +11,8 @@ from langchain.base_language import BaseLanguageModel
 from pydantic import BaseModel, Extra
 
 from heavynl.config import get_config
+from heavynl.langchain.chains import BaseChain
+
 
 rephrase_question_examples = [
     {
@@ -162,7 +164,7 @@ def get_example_selector() -> MaxMarginalRelevanceExampleSelector:
     return _example_selector
 
 
-class SQLMetadataQuestionTransformerChain(Chain, BaseModel):
+class SQLMetadataQuestionTransformerChain(BaseChain, BaseModel):
     """The HeavyDB Metadata Index performs best when the query input is about database tables and columns.
     This chain rephrases input to be more database-centric.
 
