@@ -13,24 +13,6 @@ from .config_schema import AppConfig, HeavyNLConfig
 
 _config = None
 
-
-def split_url_port(url: str) -> tuple[str, int]:
-    """
-    Parse the given URL and extract hostname and port.
-
-    Args:
-        url (str): The URL to be parsed.
-
-    Returns:
-        tuple: A tuple containing the hostname and port as string and integer respectively.
-    """
-    parsed = urlparse(url)
-    if not parsed.hostname or not parsed.port:
-        raise ValueError(f"Invalid URL contains either no hostname or port: {url}")
-
-    return parsed.hostname, parsed.port
-
-
 def get_heavydb_license_claims(config: HeavyNLConfig) -> TLicenseInfo:
     try:
         socket = TSocket.TSocket(config.heavydb_host, config.heavydb_port)
@@ -74,12 +56,6 @@ def get_config(file: str = "./config.toml") -> HeavyNLConfig:
             raise ValueError("Custom LLM type is set to 'API', but API base URL is not set.")
     else:
         raise ValueError(f"Invalid custom LLM type (valid options are AZURE or API): {app_config.iq.custom_llm_type}")
-    if app_config.web and app_config.web.backend_url:
-        hostname, port = split_url_port(app_config.web.backend_url)
-        app_config.iq.heavydb_host = hostname
-        app_config.iq.heavydb_port = port
-    elif app_config.http_port:
-        app_config.iq.heavydb_port = app_config.http_port
     if app_config.iq.data is None:
         if app_config.data:
             app_config.iq.data = app_config.data

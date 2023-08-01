@@ -15,6 +15,7 @@ class HeavyNLConfig(OverrideBaseConfig):  # type: ignore
     heavydb_password: Optional[str] = None
     heavydb_host: str = "localhost"
     heavydb_port: int = 6278
+    heavydb_protocol: str = "binary"
     huggingface_embed_model: str = "sentence-transformers/all-mpnet-base-v2"
     metadata_index_dir: str = "db"
     table_documents_dir: str = "table_documents"
@@ -22,6 +23,9 @@ class HeavyNLConfig(OverrideBaseConfig):  # type: ignore
     promptlayer_api_key: Optional[str] = None
     promptwatch_api_key: Optional[str] = None
     promptwatch_tracking_project: Optional[str] = None
+    langchain_endpoint: str = "https://api.smith.langchain.com"
+    langchain_api_key: Optional[str] = None
+    langchain_project: Optional[str] = None
     # LOGGING
     access_log_level: str = "INFO"
     """Used for the access log of the web server."""
@@ -36,13 +40,6 @@ class HeavyNLConfig(OverrideBaseConfig):  # type: ignore
     custom_llm_azure_openai_api_base: str = ""
     custom_llm_azure_deployment_name: str = ""
 
-
-class HeavyWebConfig(OverrideBaseConfig):  # type: ignore
-    backend_url: Optional[str] = Field(alias="backend-url", default=None)
-
-
 class AppConfig(OverrideBaseConfig):  # type: ignore
     data: Optional[str] = None
-    http_port: Optional[int] = Field(alias="http-port", default=None)
     iq: HeavyNLConfig
-    web: Optional[HeavyWebConfig] = None

@@ -7,7 +7,9 @@ from langchain.prompts import BasePromptTemplate, BaseChatPromptTemplate
 from heavynl.config import get_config
 from heavynl.langchain import HeavyDB
 
+
 is_promptlayer_active = False
+is_langsmith_active = False
 
 
 def init_promptlayer() -> None:
@@ -20,6 +22,19 @@ def init_promptlayer() -> None:
         os.environ["PROMPTLAYER_API_KEY"] = config.promptlayer_api_key
         promptlayer.api_key = config.promptlayer_api_key
         is_promptlayer_active = True
+
+
+def init_telemetrics() -> None:
+    """
+    Initializes langsmith env vars only if the langchain API key exists on the config.
+    """
+    global is_langsmith_active
+    config = get_config()
+    if config.langchain_api_key and config.langchain_project:
+        os.environ["LANGCHAIN_TRACING_V2"] = "true"
+        os.environ["LANGCHAIN_API_KEY"] = config.langchain_api_key
+        os.environ["LANGCHAIN_PROJECT"] = config.langchain_project
+        is_langsmith_active = True
 
 
 def get_token_limit(model_name: str, response_tokens: int = 256) -> int:
