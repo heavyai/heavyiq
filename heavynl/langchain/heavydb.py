@@ -1,5 +1,6 @@
 from __future__ import annotations
 import re
+import multiprocessing
 from threading import Lock
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from typing import Optional, Any, Iterable, TYPE_CHECKING, Callable
@@ -32,9 +33,11 @@ class PersistantConnection(Connection):
 class HeavyDB:
     """A heavydb database connection."""
 
-    top_k_cache = LRUCache[str, str]()
-    sample_rows_cache = LRUCache[str, str]()
-    table_schema_cache = LRUCache[str, str]()
+    _manager = multiprocessing.Manager()
+    # single manager process being shared with all the caches
+    top_k_cache = LRUCache[str, str](manager=_manager)
+    sample_rows_cache = LRUCache[str, str](manager=_manager)
+    table_schema_cache = LRUCache[str, str](manager=_manager)
 
     def __init__(
         self,

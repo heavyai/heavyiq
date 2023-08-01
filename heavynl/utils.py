@@ -1,5 +1,5 @@
-import multiprocessing
 import re
+from multiprocessing.managers import SyncManager
 from typing import Generic, TypeVar, Optional
 
 
@@ -78,14 +78,17 @@ class LRUCache(Generic[KT, VT]):
     accessed by any process.
     """
 
-    def __init__(self, capacity: int = 100) -> None:
+    def __init__(self, capacity: int = 100, manager: SyncManager | None = None) -> None:
         self.capacity: int = capacity
-        # this should create seperate manager process
-        manager = multiprocessing.Manager()
-        # thread safe/process-safe shared dict which holds the key, value pair
-        self.cache = manager.dict()
-        # shared list which holds the key order, ie. recently used key should be removed and appended to the last
-        self.order = manager.list()
+        if manager:
+            # this should create seperate manager processes if manager isn't passed
+            # thread safe/process-safe shared dict which holds the key, value pair
+            self.cache = manager.dict()
+            # shared list which holds the key order, ie. recently used key should be removed and appended to the last
+            self.order = manager.list()
+        else:
+            self.cache = {}  # type: ignore
+            self.order = []  # type: ignore
 
     def get(self, key: KT) -> Optional[VT]:
         """
