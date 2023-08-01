@@ -14,7 +14,7 @@ from heavynl.config import get_config
 from heavynl.logging_utils import get_heavynl_logger
 from heavynl.langchain import HeavyDB
 from heavynl.langchain.utils import get_table_info_wrt_token_limit
-from heavynl.langchain.chains import BaseChain, FileCallbackHandlerForChainMixin
+from heavynl.langchain.chains import BaseChain
 from heavynl.langchain.exceptions import NLtoSQLException
 from heavynl.langchain.prompts import LoggedChatPromptTemplate, LoggedPromptTemplate
 from heavynl.utils import strip_sql_comments
@@ -109,7 +109,7 @@ NL_TO_SQL_ERROR_PROMPT = LoggedPromptTemplate(
 )
 
 
-class BaseNltoSQLChain(FileCallbackHandlerForChainMixin, BaseChain):
+class BaseNltoSQLChain(BaseChain):
     """
     Chain for converting a natural language question to a SQL query designed to answer the question with its results.
 

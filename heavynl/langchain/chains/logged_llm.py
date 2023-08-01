@@ -9,9 +9,10 @@ from langchain.schema import LLMResult
 
 from heavynl.langchain.prompts import LoggedPromptTemplate
 from heavynl.langchain.utils import is_promptlayer_active
+from heavynl.langchain.chains import FileCallbackHandlerForChainMixin
 
 
-class LoggedLLMChain(LLMChain):
+class LoggedLLMChain(FileCallbackHandlerForChainMixin, LLMChain):
     prompt: LoggedPromptTemplate
 
     def generate(
