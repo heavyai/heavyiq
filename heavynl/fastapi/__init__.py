@@ -29,10 +29,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
 
     app = FastAPI(title="HeavyIQ")
 
-    cors_origins = [
-        "http://localhost",
-        "http://localhost:8000",
-    ]
+    cors_origins = ["http://localhost"]
 
     # add middlewares
     app.add_middleware(
@@ -75,9 +72,10 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         """
         from heavynl.logging_utils import heavynl_logger as logger
 
-        logger.info("Connecting to heavydb...")
-        await run_in_threadpool(get_heavydb_license_claims, config)
-        logger.info("Successfully connected to heavydb...")
+        # TODO: Disabled for now, as no guarantee heavydb is running before heavyiq
+        # logger.info("Connecting to heavydb...")
+        # await run_in_threadpool(get_heavydb_license_claims, config)
+        # logger.info("Successfully connected to heavydb...")
 
     @app.on_event("shutdown")
     async def shutdown():
@@ -92,7 +90,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         if app.openapi_schema:
             return app.openapi_schema
         openapi_schema = get_openapi(
-            title="HeavyAI Endpoints",
+            title="HeavyIQ Endpoints",
             version="0.0.1",
             summary="Endpoints for doing NL operations.",
             description="",
