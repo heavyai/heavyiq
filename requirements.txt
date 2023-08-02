@@ -15,5 +15,6 @@ promptwatch==0.2.7
 pydantic==1.10.11
 sentencepiece==0.1.99
 SQLAlchemy==2.0.19
+types-aiofiles==23.1.0.5
 uvicorn==0.23.2
 transformers==4.31.0

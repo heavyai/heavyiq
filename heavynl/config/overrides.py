@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 class OverrideFileLoader(FileLoader):
     @classmethod
-    def _get_format(cls, file_path: Path, file_format: Optional[FileFormat]) -> FileFormat:
+    def _get_format(cls: type[FileLoader], file_path: Path, file_format: Optional[FileFormat]) -> FileFormat:
         if file_format is not None:
             return file_format
 
@@ -56,14 +56,14 @@ class OverrideConfZMetaclass(type(BaseModel)):  # type: ignore
     """ConfZ Meta Class, inheriting from the pydantic `BaseModel` MetaClass."""
 
     # pylint: disable=no-self-argument,no-member
-    def __call__(cls, config_sources: Optional[ConfigSources] = None, **kwargs):
+    def __call__(self, config_sources: Optional[ConfigSources] = None, **kwargs) -> None:
         """Called every time an instance of any ConfZ object is created. Injects the
         config value population and singleton mechanism."""
         if config_sources is not None:
             config = _load_config(kwargs, config_sources)
             return super().__call__(**config)
 
-        if cls.CONFIG_SOURCES is not None:  # type: ignore
+        if self.CONFIG_SOURCES is not None:  # type: ignore
             # pylint: disable=access-member-before-definition
             # pylint: disable=attribute-defined-outside-init
             if len(kwargs) > 0:
@@ -71,10 +71,10 @@ class OverrideConfZMetaclass(type(BaseModel)):  # type: ignore
                     'Singleton mechanism enabled ("CONFIG_SOURCES" is defined), so '
                     "keyword arguments are not supported"
                 )
-            if cls.confz_instance is None:  # type: ignore
-                config = _load_config(kwargs, cls.CONFIG_SOURCES)  # type: ignore
-                cls.confz_instance = super().__call__(**config)
-            return cls.confz_instance
+            if self.confz_instance is None:  # type: ignore
+                config = _load_config(kwargs, self.CONFIG_SOURCES)  # type: ignore
+                self.confz_instance = super().__call__(**config)
+            return self.confz_instance
 
         return super().__call__(**kwargs)
 
@@ -103,7 +103,7 @@ class OverrideBaseConfig(BaseModel, metaclass=OverrideConfZMetaclass):
         allow_mutation = True  # 2. Allow ConfZ to be mutable
 
     @classmethod
-    def change_config_sources(cls, config_sources: ConfigSources) -> AbstractContextManager:
+    def change_config_sources(cls: type["OverrideBaseConfig"], config_sources: ConfigSources) -> AbstractContextManager:
         """Change the `CONFIG_SOURCES` class variable within a controlled context.
         Within this context, the sources will be different and the singleton reset.
         This can be useful in unit tests to temporarily change a configuration.
@@ -111,4 +111,4 @@ class OverrideBaseConfig(BaseModel, metaclass=OverrideConfZMetaclass):
         :param config_sources: The temporary config sources for within the context.
         :return: Context manager for change of config sources.
         """
-        return SourceChangeManager(cls, config_sources)
+        return SourceChangeManager(cls, config_sources)  # type: ignore

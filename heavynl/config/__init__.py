@@ -13,6 +13,7 @@ from .config_schema import AppConfig, HeavyNLConfig
 
 _config = None
 
+
 def get_heavydb_license_claims(config: HeavyNLConfig) -> TLicenseInfo:
     try:
         socket = TSocket.TSocket(config.heavydb_host, config.heavydb_port)

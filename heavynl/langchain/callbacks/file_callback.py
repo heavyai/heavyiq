@@ -1,6 +1,7 @@
 import asyncio
 import re
-from typing import Any, Literal, Optional, Pattern, TextIO, cast
+from re import Pattern
+from typing import Any, Optional, TextIO, cast
 
 import aiofiles
 from aiofiles.threadpool.text import AsyncTextIOWrapper

@@ -1,8 +1,7 @@
 from __future__ import annotations
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 from fastapi.concurrency import run_in_threadpool
 
-from heavynl.langchain.chains import BaseChain
 from langchain.base_language import BaseLanguageModel
 from langchain.callbacks.manager import AsyncCallbackManagerForChainRun, CallbackManagerForChainRun
 from pydantic import BaseModel, Extra, Field
@@ -84,7 +83,7 @@ class NLtoAnswerChain(BaseChain, BaseModel):
         return "nl_to_answer_chain"
 
     async def _acall(
-        self, inputs: Dict[str, Any], run_manager: AsyncCallbackManagerForChainRun | None = None
+        self, inputs: dict[str, Any], run_manager: AsyncCallbackManagerForChainRun | None = None
     ) -> dict[str, Any]:
         table_names_to_use = inputs.get("tables")
         nl_sql_chain = get_nl_to_sql_chain_by_llm(self.llm)(

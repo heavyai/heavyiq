@@ -68,7 +68,7 @@ class LoggedChatPromptTemplate(BaseLoggedPrompt, ChatPromptTemplate):
 
     @classmethod
     def from_messages(
-        cls,
+        cls: type[LoggedChatPromptTemplate],
         messages: list[BaseMessagePromptTemplate | BaseMessage],
         name: str,
         tags: list[str],

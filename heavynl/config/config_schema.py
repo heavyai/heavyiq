@@ -1,7 +1,5 @@
 from typing import Optional
 
-from pydantic import Field
-
 from .overrides import OverrideBaseConfig
 
 
@@ -39,6 +37,7 @@ class HeavyNLConfig(OverrideBaseConfig):  # type: ignore
     custom_llm_azure_openai_api_version: str = "2023-03-15-preview"
     custom_llm_azure_openai_api_base: str = ""
     custom_llm_azure_deployment_name: str = ""
+
 
 class AppConfig(OverrideBaseConfig):  # type: ignore
     data: Optional[str] = None

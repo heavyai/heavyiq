@@ -2,7 +2,6 @@ from typing import Any, Optional
 
 from langchain.callbacks.manager import CallbackManagerForChainRun
 from langchain.chains import LLMChain
-from langchain.chains.base import Chain
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.prompts import PromptTemplate, FewShotPromptTemplate
 from langchain.prompts.example_selector import MaxMarginalRelevanceExampleSelector

@@ -11,7 +11,6 @@ from langchain.schema import AIMessage, BaseMessage, HumanMessage
 from pydantic import Extra, Field
 
 from heavynl.config import get_config
-from heavynl.logging_utils import get_heavynl_logger
 from heavynl.langchain import HeavyDB
 from heavynl.langchain.utils import get_table_info_wrt_token_limit
 from heavynl.langchain.chains import BaseChain
