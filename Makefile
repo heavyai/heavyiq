@@ -4,4 +4,4 @@ run-flask:
 
 # Run FastAPI application with Uvicorn
 run-fastapi:
-	uvicorn app:fastapp --reload
+	uvicorn fast_app:app --reload
