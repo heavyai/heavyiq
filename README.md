@@ -56,7 +56,7 @@ $ python cli.py --help
 $ python -m unittest discover
 ```
 
-or 
+or
 
 Use `pytest`
 
@@ -77,7 +77,7 @@ cp app.py ./dist/app.py
 ### Run Production Server Process
 
 ```bash
-$ gunicorn -w 4 'heavynl.api:get_app("./path/to/heavy.conf")'
+$ gunicorn -w 4 -k uvicorn.workers.UvicornWorker 'heavynl.api:create_app("./path/to/heavy.conf")' --preload
 ```
 
 Port can be specified in above command with command line flag `-b :8080`

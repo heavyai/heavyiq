@@ -1,5 +1,5 @@
 # flask app entry point
 
-from heavynl.api import get_app
+from heavynl.api import create_app
 
-app = get_app()
+app = create_app()

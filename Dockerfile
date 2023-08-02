@@ -23,4 +23,4 @@ COPY --from=obfuscator /usr/src/app/heavynl/langchain/llama_model/ ./heavynl/lan
 RUN pip install --no-cache-dir --upgrade -r ./requirements.txt
 
 EXPOSE 8000
-CMD ["gunicorn", "-b", ":8000", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--preload", "heavynl.fastapi:create_app()"]
+CMD ["gunicorn", "-b", ":8000", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--preload", "heavynl.api:create_app()"]
