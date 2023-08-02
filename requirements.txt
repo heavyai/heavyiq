@@ -3,8 +3,6 @@ aiofiles==23.1.0
 confz==2.0.0
 connexion[swagger-ui]==2.14.2
 fastapi==0.100.1
-Flask==2.2.4 # cannot upgrade to 2.3.x because of connexion
-Flask-Cors==3.0.10
 gunicorn==21.2.0
 heavyai==1.1.0
 langchain==0.0.249
