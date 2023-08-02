@@ -40,7 +40,7 @@ $ cp config.example.toml config.toml
 8. Run the app:
 
 ```bash
-$ flask run
+$ uvicorn app:app --reload
 ```
 
 You should now be able to access the API Documentation at [http://localhost:5000](http://localhost:5000)!
