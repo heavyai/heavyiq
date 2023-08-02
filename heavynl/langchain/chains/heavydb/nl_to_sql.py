@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any, Optional
 
 from langchain.base_language import BaseLanguageModel
@@ -203,7 +204,7 @@ class NLtoSQLChain(BaseNltoSQLChain):
             "stop": stop_words or [],
         }
         llm_chain = LoggedLLMChain(llm=self.llm, prompt=prompt)
-        sql_cmd = await llm_chain.apredict(**llm_inputs)
+        sql_cmd = await llm_chain.apredict(None, **llm_inputs)
 
         return sql_cmd
 
@@ -270,7 +271,7 @@ class NLtoSQLChain(BaseNltoSQLChain):
             "stop": ["\nSQLResult:"],
         }
         llm_chain = LoggedLLMChain(llm=self.llm, prompt=create_query_prompt)
-        sql_cmd = llm_chain.predict(**llm_inputs)
+        sql_cmd = llm_chain.predict(None, **llm_inputs)
         verified = False
         retries = 0
         while not verified and retries < self.max_retries:
@@ -292,7 +293,7 @@ class NLtoSQLChain(BaseNltoSQLChain):
                     "table_info": table_info,
                     "stop": ["\nNewSQLQuery:"],
                 }
-                sql_cmd = error_recovery_chain.predict(**retry_llm_inputs)
+                sql_cmd = error_recovery_chain.predict(None, **retry_llm_inputs)
                 if sql_cmd.startswith("NewSQLQuery:"):
                     sql_cmd = sql_cmd.replace("NewSQLQuery:", "").strip()
                 retries += 1
@@ -326,7 +327,7 @@ class NLtoSQLChatChain(BaseNltoSQLChain):
 
     llm: BaseChatModel
     """LLM wrapper to use."""
-    prompt_messages: list[BaseMessagePromptTemplate | BaseMessage] = NL_TO_SQL_CHAT_MESSAGES
+    prompt_messages: Sequence[BaseMessagePromptTemplate | BaseMessage] = NL_TO_SQL_CHAT_MESSAGES
     """Prompt to use to translate natural language to SQL."""
     messages_with_comments: bool = True  # helps to keep comments on the messages that we going to stack up
 

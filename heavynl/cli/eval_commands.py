@@ -92,9 +92,9 @@ def run_model_on_questions(
             print(f"=========== Run {i+1} of {n} ===========")
             num_of_questions = len(questions)
             total_num_of_successes = 0
-            total_time = 0
+            total_time = 0.0
             min_time = float("inf")
-            max_time = 0
+            max_time = 0.0
 
             with ThreadPoolExecutor(max_workers=max_threads) as executor:
                 future_results = {

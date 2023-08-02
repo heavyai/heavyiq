@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Sequence
 from typing import Any, Callable
 
 from langchain.prompts import PromptTemplate, ChatPromptTemplate
@@ -69,7 +70,7 @@ class LoggedChatPromptTemplate(BaseLoggedPrompt, ChatPromptTemplate):
     @classmethod
     def from_messages(
         cls: type[LoggedChatPromptTemplate],
-        messages: list[BaseMessagePromptTemplate | BaseMessage],
+        messages: Sequence[BaseMessagePromptTemplate | BaseMessage],
         name: str,
         tags: list[str],
         version: int = 1,
@@ -81,6 +82,6 @@ class LoggedChatPromptTemplate(BaseLoggedPrompt, ChatPromptTemplate):
             tags=tags,
             version=version,
             input_variables=input_variables,
-            messages=messages,
+            messages=list(messages),
             partial_variables=partial_variables,
         )

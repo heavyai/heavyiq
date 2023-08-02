@@ -47,7 +47,7 @@ class RequestContext:
         self.input = input
 
     def success(
-        self, output: dict, cb: Optional[OpenAICallbackHandler] = None, agent_log: Optional[str] = None
+        self, output: dict[Any, Any], cb: Optional[OpenAICallbackHandler] = None, agent_log: Optional[str] = None
     ) -> None:
         self.output = output
         if cb:

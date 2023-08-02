@@ -155,7 +155,7 @@ class AskHeavyDBMetadataIndexChain(FileCallbackHandlerForChainMixin, RetrievalQA
         return result
 
     async def _acall(
-        self, inputs: dict[str, Any], run_manager: Optional[AsyncCallbackManagerForChainRun]
+        self, inputs: dict[str, Any], run_manager: Optional[AsyncCallbackManagerForChainRun] = None
     ) -> dict[str, Any]:
         _run_manager = run_manager or AsyncCallbackManagerForChainRun.get_noop_manager()
         docs = await self._aget_docs(inputs, run_manager=_run_manager)

@@ -56,7 +56,7 @@ class OverrideConfZMetaclass(type(BaseModel)):  # type: ignore
     """ConfZ Meta Class, inheriting from the pydantic `BaseModel` MetaClass."""
 
     # pylint: disable=no-self-argument,no-member
-    def __call__(self, config_sources: Optional[ConfigSources] = None, **kwargs) -> None:
+    def __call__(self, config_sources: Optional[ConfigSources] = None, **kwargs) -> Optional[Any]:
         """Called every time an instance of any ConfZ object is created. Injects the
         config value population and singleton mechanism."""
         if config_sources is not None:

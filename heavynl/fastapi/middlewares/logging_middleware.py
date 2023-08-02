@@ -41,13 +41,13 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         """
         Gets the response body for logging from Response object.
         """
-        resp_body = [section async for section in response.__dict__["body_iterator"]]
-        response.__setattr__("body_iterator", AsyncIteratorWrapper(resp_body))
+        resp_body_sections = [section async for section in response.__dict__["body_iterator"]]
+        response.__setattr__("body_iterator", AsyncIteratorWrapper(resp_body_sections))
 
         try:
-            resp_body = json.loads(resp_body[0].decode())
+            resp_body: str = json.loads(resp_body_sections[0].decode())
         except Exception:
-            resp_body = str(resp_body)
+            resp_body = str(resp_body_sections)
 
         return response, resp_body
 

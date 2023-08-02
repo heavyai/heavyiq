@@ -24,7 +24,7 @@ class _ConvoMessage:
 
     type: str
     prefix: str
-    text_color: TerminalColors
+    text_color: str
     message: str = ""
     is_first_message: bool = False
 
