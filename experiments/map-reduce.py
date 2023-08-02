@@ -13,7 +13,7 @@ from langchain.chat_models import ChatOpenAI
 from langchain.docstore.document import Document
 from langchain.prompts import PromptTemplate
 
-from heavynl.langchain import HeavyDB
+from heavyiq.langchain import HeavyDB
 
 
 def load_map_reduce_chain(

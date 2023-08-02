@@ -13,10 +13,18 @@ Subpackages
 Submodules
 ----------
 
+langchain.chains.base module
+----------------------------
+
+.. automodule:: heavyiq.langchain.chains.base
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 langchain.chains.logged\_llm module
 -----------------------------------
 
-.. automodule:: heavynl.langchain.chains.logged_llm
+.. automodule:: heavyiq.langchain.chains.logged_llm
    :members:
    :undoc-members:
    :show-inheritance:
@@ -24,7 +32,7 @@ langchain.chains.logged\_llm module
 Module contents
 ---------------
 
-.. automodule:: heavynl.langchain.chains
+.. automodule:: heavyiq.langchain.chains
    :members:
    :undoc-members:
    :show-inheritance:

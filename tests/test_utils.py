@@ -1,7 +1,7 @@
 import time
 import unittest
 import multiprocessing
-from heavynl.utils import LRUCache
+from heavyiq.utils import LRUCache
 
 
 class TestLRUCache(unittest.TestCase):

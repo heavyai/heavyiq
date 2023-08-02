@@ -5,7 +5,7 @@ from langchain.chains import OpenAPIEndpointChain
 from langchain.requests import Requests
 from langchain.llms import OpenAI
 
-from heavynl.config import get_config
+from heavyiq.config import get_config
 
 os.environ["OPENAI_API_KEY"] = get_config().openai_api_key
 

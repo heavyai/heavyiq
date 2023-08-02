@@ -1,4 +1,4 @@
-HeavyNL is not limited to using OpenAI for its large language model (LLM). Below are instructions on how to self-host an OpenAI API-compliant server that HeavyNL can communicate with.
+HeavyIQ is not limited to using OpenAI for its large language model (LLM). Below are instructions on how to self-host an OpenAI API-compliant server that HeavyIQ can communicate with.
 
 ## Installation
 
@@ -63,6 +63,6 @@ docker run --rm -it -p 8000:8000 \
 ghcr.io/abetlen/llama-cpp-python:latest
 ```
 
-## Configuring HeavyNL to use this server
+## Configuring HeavyIQ to use this server
 
 **TBD**

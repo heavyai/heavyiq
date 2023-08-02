@@ -7,7 +7,7 @@ Submodules
 langchain.chains.heavydb\_index.ask\_heavydb\_metadata\_index module
 --------------------------------------------------------------------
 
-.. automodule:: heavynl.langchain.chains.heavydb_index.ask_heavydb_metadata_index
+.. automodule:: heavyiq.langchain.chains.heavydb_index.ask_heavydb_metadata_index
    :members:
    :undoc-members:
    :show-inheritance:
@@ -15,7 +15,7 @@ langchain.chains.heavydb\_index.ask\_heavydb\_metadata\_index module
 langchain.chains.heavydb\_index.sql\_metadata\_question\_transformer module
 ---------------------------------------------------------------------------
 
-.. automodule:: heavynl.langchain.chains.heavydb_index.sql_metadata_question_transformer
+.. automodule:: heavyiq.langchain.chains.heavydb_index.sql_metadata_question_transformer
    :members:
    :undoc-members:
    :show-inheritance:
@@ -23,7 +23,7 @@ langchain.chains.heavydb\_index.sql\_metadata\_question\_transformer module
 Module contents
 ---------------
 
-.. automodule:: heavynl.langchain.chains.heavydb_index
+.. automodule:: heavyiq.langchain.chains.heavydb_index
    :members:
    :undoc-members:
    :show-inheritance:

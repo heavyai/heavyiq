@@ -13,7 +13,7 @@ async def mock_log_chain_call_async(chain: Any, chain_input: dict, model_name: s
 
 
 @pytest.mark.parametrize("expected_result", [{"sql": SQL, "answer": ANSWER, "sql_complexity": 3}])
-@patch("heavynl.fastapi.handlers.iq_handler.log_chain_call_async", side_effect=mock_log_chain_call_async)
+@patch("heavyiq.fastapi.handlers.iq_handler.log_chain_call_async", side_effect=mock_log_chain_call_async)
 def test_should_pass_question_endpoint(mock: Callable, expected_result: list[Any]):
     """
     Test query endpoint.

@@ -10,9 +10,9 @@ pip install -r requirements.txt -r requirements-dev.txt
 
 # Create Obfuscated Build
 pyarmor reg pyarmor-regfile-5130.zip
-pyarmor gen ./heavynl
+pyarmor gen ./heavyiq
 cp requirements.txt ./dist/requirements.txt
-cp -r heavynl/langchain/llama_model/ ./dist/heavynl/langchain/llama_model/
+cp -r heavyiq/langchain/llama_model/ ./dist/heavyiq/langchain/llama_model/
 
 # Create version.txt
 mkdir -p dist/public
