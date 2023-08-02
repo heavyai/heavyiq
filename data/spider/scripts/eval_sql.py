@@ -2,8 +2,10 @@ import argparse
 import csv
 import heavyai
 import json
+import pandas as pd
 import re
 import sys
+
 
 def getQueriesByDB(prompts_filename):
     prompts = []
@@ -11,11 +13,11 @@ def getQueriesByDB(prompts_filename):
         prompts = json.load(f)
     queries_by_db = {}
     for prompt in prompts:
-         db_id = prompt["db_id"]
-         if db_id not in queries_by_db:
-             queries_by_db[db_id] = [prompt]
-         else:
-             queries_by_db[db_id].append(prompt)
+        db_id = prompt["db_id"]
+        if db_id not in queries_by_db:
+            queries_by_db[db_id] = [prompt]
+        else:
+            queries_by_db[db_id].append(prompt)
     return queries_by_db
 
 
@@ -32,7 +34,20 @@ def getOptions(argv=None):
 
 def writeQueryResultsCsv(filename, query_results):
     # Specify the fieldnames (headers of the CSV)
-    fieldnames = ["query_id", "db_id", "prompt", "gold_sql_query", "gen_sql_query", "gold_run_success", "gen_run_success", "gold_row_count", "gold_col_count", "gen_row_count", "gen_col_count", "gold_gen_match"]
+    fieldnames = [
+        "query_id",
+        "db_id",
+        "prompt",
+        "gold_sql_query",
+        "gen_sql_query",
+        "gold_run_success",
+        "gen_run_success",
+        "gold_row_count",
+        "gold_col_count",
+        "gen_row_count",
+        "gen_col_count",
+        "gold_gen_match",
+    ]
 
     # Write the dictionaries to a CSV file
     with open(filename, "w", newline="") as csvfile:
@@ -68,38 +83,43 @@ def main(argv):
             query_id = query["query_id"]
             prompt = query["prompt"]
             gold_sql_query = query["gold_sql_query"]
-            gen_sql_query = query["gen_sql_query"]
-            #if not gen_sql_query.lower().startswith("select"):
+            eval_sql_query = query["gen_sql_query"]
+            # if not gen_sql_query.lower().startswith("select"):
             #    match = re.search(r"(SELECT.*FROM.*$)", gen_sql_query, re.DOTALL | re.MULTILINE | re.IGNORECASE)
             #    if match:
             #        gen_sql_query = match.group(1)
-            #if not gen_sql_query.endswith(";"):
+            # if not gen_sql_query.endswith(";"):
             #    gen_sql_query += ";"
             gold_result = None
-            gen_result = None
+            eval_result = None
             gold_run_success = False
-            gen_run_success = False
+            eval_run_success = False
             gold_row_count = None
             gold_col_count = None
-            gen_row_count = None
-            gen_col_count = None
-            gold_gen_match = False
+            eval_row_count = None
+            eval_col_count = None
+            gold_eval_match = False
             try:
-                gold_cur = con.execute(gold_sql_query)
+                gold_df = pd.read_sql(gold_sql_query)
                 gold_run_success = True
-                gold_row_count = gold_cur.rowcount
-                gold_col_count = len(gold_cur.description)
+                num_gold_rows = len(gold_df.axes[0])
+                num_gold_cols = len(gold_df.axes[1])
             except Exception as e:
                 print(f"Error executing gold query {query_id} on database {db_id}: {e}")
             try:
-                gen_cur = con.execute(gen_sql_query)
-                gen_run_success = True
-                gen_row_count = gen_cur.rowcount
-                gen_col_count = len(gen_cur.description)
+                eval_df = con.execute(eval_sql_query)
+                eval_run_success = True
+                num_eval_rows = len(eval_df.axes[0])
+                num_eval_cols = len(eval_df.axes[1])
             except Exception as e:
                 print(f"Error executing generated query {query_id} on database {db_id}: {e}")
                 print(gen_sql_query)
-            if gold_run_success and gen_run_success and gold_row_count == gen_row_count and gold_col_count == gen_col_count: 
+            if (
+                gold_run_success
+                and eval_run_success
+                and num_gold_rows == num_eval_rows
+                and num_gold_cols == num_eval_cols
+            ):
                 gold_gen_match = True
             query_results.append(
                 {
@@ -114,7 +134,7 @@ def main(argv):
                     "gold_col_count": gold_col_count,
                     "gen_row_count": gen_row_count,
                     "gen_col_count": gen_col_count,
-                    "gold_gen_match": gold_gen_match
+                    "gold_gen_match": gold_gen_match,
                 }
             )
             print(query_idx)
