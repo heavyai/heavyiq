@@ -9,6 +9,7 @@ from langchain.callbacks.manager import CallbackManagerForChainRun, AsyncCallbac
 from pydantic import Field
 
 from heavynl.langchain.llms import get_llm
+from heavynl.langchain.chains import FileCallbackHandlerForChainMixin
 from heavynl.langchain.prompts import LoggedPromptTemplate
 from ..logged_llm import LoggedLLMChain
 
@@ -80,7 +81,7 @@ COMBINE_PROMPT = LoggedPromptTemplate(
 )
 
 
-class AskHeavyDBMetadataIndexChain(RetrievalQAWithSourcesChain):
+class AskHeavyDBMetadataIndexChain(FileCallbackHandlerForChainMixin, RetrievalQAWithSourcesChain):
     """
     Takes a question and returns information about the tables that contain the data.
 

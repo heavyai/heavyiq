@@ -1,5 +1,5 @@
-from collections import OrderedDict
 import re
+from multiprocessing.managers import SyncManager
 from typing import Generic, TypeVar, Optional
 
 
@@ -73,20 +73,68 @@ VT = TypeVar("VT")  # Value type
 
 
 class LRUCache(Generic[KT, VT]):
-    def __init__(self, capacity: int = 100) -> None:
-        self.cache: OrderedDict[KT, VT] = OrderedDict()
+    """
+    Implements Singleton/shared caching ie. shared cache which can be
+    accessed by any process.
+    """
+
+    def __init__(self, capacity: int = 100, manager: SyncManager | None = None) -> None:
         self.capacity: int = capacity
+        if manager:
+            # this should create seperate manager processes if manager isn't passed
+            # thread safe/process-safe shared dict which holds the key, value pair
+            self.cache = manager.dict()
+            # shared list which holds the key order, ie. recently used key should be removed and appended to the last
+            self.order = manager.list()
+        else:
+            self.cache = {}  # type: ignore
+            self.order = []  # type: ignore
 
     def get(self, key: KT) -> Optional[VT]:
-        if key not in self.cache:
-            return None
-        else:
-            self.cache.move_to_end(key)  # move key to last to show it was recently used
+        """
+        Returns the value of passed dict key if exists else return None.
+        """
+        if key in self.cache:
+            # Move the key to the end (most recently used) in the order list
+            self.move_to_end(key)
             return self.cache[key]
+        return None
 
     def put(self, key: KT, value: VT) -> None:
+        """
+        Helps to put the given key, value pair on the manager.Dict.
+        """
         if key in self.cache:
-            self.cache.move_to_end(key)  # update the key's position
-        self.cache[key] = value
-        if len(self.cache) > self.capacity:
-            self.cache.popitem(last=False)  # remove the least recently used element
+            # If the key already exists, update its value and move it to the end
+            self.cache[key] = value
+            self.move_to_end(key)
+        else:
+            if len(self.cache) >= self.capacity:
+                # If cache is full, evict the least recently used item
+                self.evict_lru()
+            # Add the new key-value pair
+            self.cache[key] = value
+            # Add the key to the end (most recently used) in the order list
+            self.order.append(key)
+
+    def move_to_end(self, key: KT):
+        """
+        Move the key to the end (most recently used) in the order list.
+
+        Args:
+            key (str): key to be moved.
+        """
+        self.order.remove(key)
+        self.order.append(key)
+
+    def evict_lru(self):
+        """
+        Helps to remove the recently used key from cache and updates the order list accordingly.
+        This just makes space for the new item when threashold limit reached.
+        """
+        # Get the least recently used key from the front of the order list
+        lru_key = self.order[0]
+        # Remove the least recently used key from the cache
+        del self.cache[lru_key]
+        # Remove the least recently used key from the front of the order list
+        self.order.pop(0)

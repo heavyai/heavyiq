@@ -10,6 +10,7 @@ from fastapi import FastAPI
 
 
 from heavynl.config import get_config
+from heavynl.langchain.callbacks import FileCallbackHandler
 
 
 def get_default_formatter() -> logging.Formatter:
@@ -191,6 +192,19 @@ class HeavyNLLogger(BaseLogger):
             name, level=level, log_file_path=log_file_path, filter=HeavyNLFilter(), formatter=get_default_formatter()
         )
         self.info("HeavyNL Logger initialized")
+
+    def langchain_cb_handler(self, to_stdout: bool = True) -> FileCallbackHandler:
+        """
+        Returns a file callback handler created from the log file.
+
+        Args:
+            to_stdout (bool, optional): whether to log stdout as well. Defaults to True.
+
+        Returns:
+            FileCallbackHandler: callback handler mainly passed as callback for chains.
+        """
+        rotating_file_handler = next(i for i in self.handlers if isinstance(i, RotatingFileHandler))
+        return FileCallbackHandler(rotating_file_handler.baseFilename, to_stdout=to_stdout)
 
 
 class _AccessLogger(BaseLogger):

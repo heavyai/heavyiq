@@ -7,6 +7,7 @@ from langchain.base_language import BaseLanguageModel
 from langchain.callbacks.manager import AsyncCallbackManagerForChainRun, CallbackManagerForChainRun
 from pydantic import BaseModel, Extra, Field
 
+from heavynl.langchain.chains import BaseChain
 from heavynl.langchain import HeavyDB
 from heavynl.langchain.prompts import LoggedPromptTemplate
 from ..logged_llm import LoggedLLMChain
@@ -134,7 +135,9 @@ class NLtoAnswerChain(BaseChain, BaseModel):
 
     def _call(self, inputs: dict[str, Any], run_manager: Optional[CallbackManagerForChainRun] = None) -> dict[str, Any]:
         table_names_to_use = inputs.get("tables")
-        nl_sql_chain = get_nl_to_sql_chain_by_llm(self.llm)(llm=self.llm, database=self.database, verbose=self.verbose)
+        nl_sql_chain = get_nl_to_sql_chain_by_llm(self.llm)(
+            llm=self.llm, callbacks=self.callbacks, database=self.database, verbose=self.verbose
+        )
         nl_sql_inputs = {
             nl_sql_chain.input_key: inputs[self.input_key],
             "tables": table_names_to_use,
@@ -156,7 +159,9 @@ class NLtoAnswerChain(BaseChain, BaseModel):
         else:
             if run_manager:
                 run_manager.on_text("\nAnswer:", verbose=self.verbose)
-            llm_chain = LoggedLLMChain(llm=self.llm, prompt=self.prompt, verbose=self.verbose, output_key="answer")
+            llm_chain = LoggedLLMChain(
+                llm=self.llm, prompt=self.prompt, callbacks=self.callbacks, verbose=self.verbose, output_key="answer"
+            )
             llm_inputs = {
                 "input": inputs[self.input_key],
                 "dialect": self.database.dialect,
