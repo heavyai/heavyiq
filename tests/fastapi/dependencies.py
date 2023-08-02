@@ -1,5 +1,5 @@
 from typing import Any
-from heavynl.fastapi.models import QueryRequest
+from heavynl.api.models import QueryRequest
 from heavynl.langchain import HeavyDB
 
 

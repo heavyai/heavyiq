@@ -7,7 +7,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
-from heavynl.fastapi.models import ErrorResponse
+from heavynl.api.models import ErrorResponse
 from heavynl.langchain.exceptions import NLtoSQLException
 from heavynl.logging_utils import get_heavynl_logger
 

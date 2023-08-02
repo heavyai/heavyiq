@@ -1,6 +1,6 @@
 from fastapi import Body
 from fastapi.concurrency import run_in_threadpool
-from heavynl.fastapi.models import QueryRequest, QuestionRequest
+from heavynl.api.models import QueryRequest, QuestionRequest
 from heavynl.langchain import HeavyDB
 
 

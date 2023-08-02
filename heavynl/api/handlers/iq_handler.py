@@ -1,7 +1,7 @@
 from fastapi.concurrency import run_in_threadpool
 from heavynl.config import get_config
 from heavynl.logging_utils import get_heavynl_logger
-from heavynl.fastapi.models import QueryRequest, QueryResponse, QuestionRequest, QuestionResponse
+from heavynl.api.models import QueryRequest, QueryResponse, QuestionRequest, QuestionResponse
 from heavynl.langchain import HeavyDB
 from heavynl.langchain.chains import get_nl_to_sql_chain_by_llm, NLtoAnswerChain
 from heavynl.langchain.llms import get_llm_by_model_name

@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
-from heavynl.fastapi import create_app
-from heavynl.fastapi.dependencies import valid_query_db_session, valid_question_db_session
+from heavynl.api import create_app
+from heavynl.api.dependencies import valid_query_db_session, valid_question_db_session
 
 from .dependencies import override_valid_query_db_session
 

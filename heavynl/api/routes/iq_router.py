@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 from heavynl.langchain import HeavyDB
-from heavynl.fastapi.dependencies import valid_query_db_session, valid_question_db_session
-from heavynl.fastapi.models import QueryRequest, QueryResponse, QuestionResponse, QuestionRequest
-from heavynl.fastapi.handlers import (
+from heavynl.api.dependencies import valid_query_db_session, valid_question_db_session
+from heavynl.api.models import QueryRequest, QueryResponse, QuestionResponse, QuestionRequest
+from heavynl.api.handlers import (
     handle_query_request_async,
     handle_question_request_async,
 )

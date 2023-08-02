@@ -7,7 +7,7 @@ from starlette.types import Message
 from starlette.background import BackgroundTask
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from heavynl.logging_utils import _get_access_logger, get_heavynl_logger, HeavyNLLogger, _AccessLogger
-from heavynl.fastapi.utils import AsyncIteratorWrapper
+from heavynl.api.utils import AsyncIteratorWrapper
 
 
 class LoggingMiddleware(BaseHTTPMiddleware):

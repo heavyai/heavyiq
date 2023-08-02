@@ -7,10 +7,10 @@ from heavydb.exceptions import Error as HeavyDBError
 from starlette.exceptions import HTTPException
 
 from heavynl.config import get_config
-from heavynl.fastapi.handlers import exception_handler as exh
-from heavynl.fastapi.middlewares import AsyncLoggingMiddleware
-from heavynl.fastapi.routes import defaultrouter, iqrouter
-from heavynl.fastapi.models.error import ErrorResponse
+from heavynl.api.handlers import exception_handler as exh
+from heavynl.api.middlewares import AsyncLoggingMiddleware
+from heavynl.api.routes import defaultrouter, iqrouter
+from heavynl.api.models.error import ErrorResponse
 from heavynl.langchain.exceptions import NLtoSQLException
 from heavynl.logging_utils import init_logs
 
