@@ -16,3 +16,4 @@ sentence_transformers==2.2.2
 sphinx==7.1.2
 sphinx-click==4.4.0
 tiktoken==0.4.0
+types-aiofiles==23.1.0.5
