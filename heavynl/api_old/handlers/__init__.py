@@ -1,4 +1,4 @@
-from heavynl.api.utils import handle_errors
+from heavynl.api_old.utils import handle_errors
 from heavynl.config import get_config
 from heavynl.logging_utils import get_heavynl_logger
 from heavynl.langchain import HeavyDB
