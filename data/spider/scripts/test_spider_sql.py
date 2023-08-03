@@ -31,7 +31,12 @@ def getOptions(argv=None):
     parser.add_argument("--fix-queries-gpt", help="Try to fix failed queries with ChatGPT API", action="store_true")
     parser.add_argument("--top-k-str-vals", help="Top K string values", type=int, default=0)
     parser.add_argument("--max-instruction-tokens", help="Max instruction tokens", type=int, default=704)
-    parser.add_argument("--write-prompts", help="Write prompts to file for successful queries", action="store_true")
+    parser.add_argument(
+        "--write-sql-prompts", help="Write SQL prompts to file for successful queries", action="store_true"
+    )
+    parser.add_argument(
+        "--write-english-prompts", help="Write English prompts to file for successful queries", action="store_true"
+    )
     return parser.parse_args(argv)
 
 
@@ -305,12 +310,14 @@ def remove_join_aliases(table_statements: list[str], query: str) -> str:
 def getQueriesByDB(queries_file):
     queries_df = pd.read_csv(queries_file)
     queries_df["modified_sql_query"] = queries_df["modified_sql_query"].astype(str)
+    queries_df["english_explanation"] = queries_df["english_explanation"].astype(str)
     queries_by_db = {}
     for index, row in queries_df.iterrows():
         query_id = row["query_id"]
         db_id = row["db_id"]
         original_sql_query = row["original_sql_query"].strip()
         modified_sql_query = row["modified_sql_query"].strip()
+        english_explanation = row["english_explanation"].strip()
         question = row["question"]
         data_split = row["dataset"]
         if db_id not in queries_by_db:
@@ -321,6 +328,7 @@ def getQueriesByDB(queries_file):
                     "question": question,
                     "original_sql_query": original_sql_query,
                     "modified_sql_query": modified_sql_query,
+                    "english_explanation": english_explanation,
                 }
             ]
         else:
@@ -331,6 +339,7 @@ def getQueriesByDB(queries_file):
                     "question": question,
                     "original_sql_query": original_sql_query,
                     "modified_sql_query": modified_sql_query,
+                    "english_explanation": english_explanation,
                 }
             )
     return queries_by_db
@@ -401,7 +410,7 @@ def extract_tables_from_query(con, query):
     return list(set(tables))  # remove duplicates
 
 
-def write_prompts_to_csv(prompts, output_file):
+def write_sql_prompts_to_csv(prompts, output_file):
     fieldnames = [
         "query_id",
         "db_id",
@@ -428,6 +437,30 @@ def write_prompts_to_csv(prompts, output_file):
             obj["output"],
         )
         for obj in prompts
+    ]
+    with open(output_file, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(fieldnames)
+        writer.writerows(prompts_to_write)
+
+
+def write_english_prompts_to_csv(english_prompts, output_file):
+    fieldnames = [
+        "query_id",
+        "db_id",
+        "data_split",
+        "instruction",
+        "output",
+    ]
+    prompts_to_write = [
+        (
+            obj["query_id"],
+            obj["db_id"],
+            obj["data_split"],
+            obj["instruction"],
+            obj["output"],
+        )
+        for obj in english_prompts
     ]
     with open(output_file, mode="w", newline="") as file:
         writer = csv.writer(file)
@@ -637,6 +670,7 @@ def main(argv):
     fixed_queries = []
     failed_queries = []
     prompts = []
+    english_prompts = []
     con = None
     tokenizer = LlamaTokenizer.from_pretrained("test_model")
     for db_id, queries in queries_by_db.items():
@@ -681,6 +715,7 @@ def main(argv):
                 original_sql_query = query["original_sql_query"]
                 modified_sql_query = query["modified_sql_query"]
                 data_split = query["data_split"]
+                english_explanation = query["english_explanation"]
                 sql_query = modified_sql_query if len(str(modified_sql_query)) > 3 else original_sql_query
                 sql_query = re.sub(" +", " ", sql_query)
                 sql_query = re.sub(" ,", ",", sql_query)
@@ -714,7 +749,7 @@ def main(argv):
                         con.execute(sql_query)
                         print(f"Not in cache: {query_id}")
                     successful_queries += 1
-                    if options.write_prompts:
+                    if options.write_sql_prompts:
                         filtered_tables = extract_tables_from_query(con, sql_query)
                         # print(f"Query ID: {query_id} Tables: {filtered_tables} Query: {sql_query}")
                         sql_query_tokens = tokenizer.tokenize(sql_query)
@@ -755,6 +790,21 @@ def main(argv):
                                 "output_tokens": num_sql_query_tokens,
                             }
                         )
+                    if options.write_english_prompts:
+                        if len(english_explanation) > 4:
+                            cursor = con.execute(sql_query)
+                            results = str(cursor.fetchall())
+                            instruction = f"The user asked the following question:\n{query['question']}\n\nTo answer the question, the following SQL query was generated:\n{sql_query}\n\nThe following results were returned:\n\n{results}\n\nNow explain the results in English, referencing the question and the SQL query as needed."
+                            english_prompts.append(
+                                {
+                                    "db_id": db_id,
+                                    "query_id": query_id,
+                                    "data_split": data_split,
+                                    "instruction": instruction,
+                                    "output": english_explanation,
+                                }
+                            )
+
                 except Exception as e:
                     print(e)
                     query_fixed = False
@@ -786,10 +836,13 @@ def main(argv):
     if options.fix_queries or options.fix_queries_gpt:
         fixes_df = pd.DataFrame(fixed_queries)
         fixes_df.to_csv("fixed_queries.csv", index=False)
-    if options.write_prompts:
+    if options.write_sql_prompts:
         with open("sql_all_prompts.json", "w") as file:
             json.dump(prompts, file, indent=4)
-        write_prompts_to_csv(prompts, "sql_all_prompts.csv")
+        write_sql_prompts_to_csv(prompts, "sql_all_prompts.csv")
+    if options.write_english_prompts:
+        write_english_prompts_to_csv(english_prompts, "sql_english_prompts.csv")
+
     print(f"\n\nTotal successful queries: {total_successful_queries}/{total_queries}")
     print(f"Total successful fixed queries: {len(fixed_queries)}/{total_queries}")
     # print(f"Total successful altered queries: {total_successful_altered_queries}/{total_queries}")
