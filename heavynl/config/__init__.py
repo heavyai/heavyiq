@@ -13,6 +13,7 @@ from .config_schema import AppConfig, HeavyNLConfig
 
 _config = None
 
+
 def get_heavydb_license_claims(config: HeavyNLConfig) -> TLicenseInfo:
     try:
         socket = TSocket.TSocket(config.heavydb_host, config.heavydb_port)
@@ -35,7 +36,7 @@ def get_config(file: str = "./config.toml") -> HeavyNLConfig:
     global _config
     if _config:
         return _config
-    app_config = AppConfig(config_sources=FileSource(file=file))
+    app_config: AppConfig = AppConfig(config_sources=FileSource(file=file))  # type: ignore
     if app_config.iq.custom_llm_type is None or app_config.iq.custom_llm_type == "AZURE":
         if app_config.iq.custom_llm_type == "AZURE" and (
             app_config.iq.custom_llm_azure_deployment_name.strip() == ""

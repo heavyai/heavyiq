@@ -1,16 +1,17 @@
 # All dependencies required to run the REST API in Production
+aiofiles==23.1.0
 confz==2.0.0
 connexion[swagger-ui]==2.14.2
-Flask==2.2.4 # cannot upgrade to 2.3.x because of connexion
-Flask-Cors==3.0.10
+fastapi==0.100.1
 gunicorn==21.2.0
 heavyai==1.1.0
-langchain==0.0.244
-langsmith==0.0.14
+langchain==0.0.249
+langsmith==0.0.16
 openai==0.27.8
-promptlayer==0.1.92
-promptwatch==0.2.5
+promptlayer==0.1.94
+promptwatch==0.2.7
 pydantic==1.10.11
 sentencepiece==0.1.99
-SQLAlchemy==2.0.16
+SQLAlchemy==2.0.19
+uvicorn[standard]==0.23.2
 transformers==4.31.0

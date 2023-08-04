@@ -40,7 +40,7 @@ $ cp config.example.toml config.toml
 8. Run the app:
 
 ```bash
-$ flask run
+$ uvicorn app:app --reload
 ```
 
 You should now be able to access the API Documentation at [http://localhost:5000](http://localhost:5000)!
@@ -56,6 +56,15 @@ $ python cli.py --help
 $ python -m unittest discover
 ```
 
+or
+
+Use `pytest`
+
+```bash
+# runs testcases specific to fastapi
+$ pytest tests/fastapi --disable-warnings
+```
+
 ## Deployment
 
 ### Create Obfuscated Build
@@ -68,7 +77,7 @@ cp app.py ./dist/app.py
 ### Run Production Server Process
 
 ```bash
-$ gunicorn -w 4 'heavynl.api:get_app("./path/to/heavy.conf")'
+$ gunicorn -w 4 -k uvicorn.workers.UvicornWorker 'heavynl.api:create_app("./path/to/heavy.conf")' --preload
 ```
 
 Port can be specified in above command with command line flag `-b :8080`

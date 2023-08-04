@@ -12,7 +12,7 @@ pip install -r requirements.txt -r requirements-dev.txt
 pyarmor reg pyarmor-regfile-5130.zip
 pyarmor gen ./heavynl
 cp requirements.txt ./dist/requirements.txt
-cp heavynl/api/heavyiq-spec.yaml ./dist/heavynl/api/heavyiq-spec.yaml
+cp -r heavynl/langchain/llama_model/ ./dist/heavynl/langchain/llama_model/
 
 # Create version.txt
 mkdir -p dist/public

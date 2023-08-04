@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any, Optional
 
 from langchain.base_language import BaseLanguageModel
-from langchain.callbacks.manager import CallbackManagerForChainRun
+from langchain.callbacks.manager import AsyncCallbackManagerForChainRun, CallbackManagerForChainRun
 from langchain.chat_models.base import BaseChatModel
 from langchain.prompts import HumanMessagePromptTemplate, SystemMessagePromptTemplate
 from langchain.prompts.chat import BaseMessagePromptTemplate
@@ -11,13 +12,13 @@ from langchain.schema import AIMessage, BaseMessage, HumanMessage
 from pydantic import Extra, Field
 
 from heavynl.config import get_config
-from heavynl.logging_utils import get_heavynl_logger
 from heavynl.langchain import HeavyDB
 from heavynl.langchain.utils import get_table_info_wrt_token_limit
 from heavynl.langchain.chains import BaseChain
 from heavynl.langchain.exceptions import NLtoSQLException
 from heavynl.langchain.prompts import LoggedChatPromptTemplate, LoggedPromptTemplate
 from heavynl.utils import strip_sql_comments
+from fastapi.concurrency import run_in_threadpool
 
 from ..logged_llm import LoggedLLMChain
 
@@ -178,6 +179,86 @@ class NLtoSQLChain(BaseNltoSQLChain):
     def _chain_type(self) -> str:
         return "nl_to_sql_chain"
 
+    async def apredict_sql_cmd(
+        self,
+        prompt: LoggedPromptTemplate,
+        table_names_to_use: list[str] | None = None,
+        stop_words: list[str] | None = None,
+    ) -> str:
+        """
+        Async function which predicts the sql command by calling the underlying llm.
+
+        Args:
+            prompt (LoggedPromptTemplate): llm prompt to use
+            table_names_to_use (list[str] | None, optional): target table names to use. Defaults to None.
+            stop_words (list[str] | None, optional): llm stop words. Defaults to None.
+
+        Returns:
+            str: LLM generated sql command/query.
+        """
+        table_info = await run_in_threadpool(
+            get_table_info_wrt_token_limit, self.llm, self.database, prompt, table_names_to_use
+        )
+        llm_inputs = {
+            "table_info": table_info,
+            "stop": stop_words or [],
+        }
+        llm_chain = LoggedLLMChain(llm=self.llm, prompt=prompt)
+        sql_cmd = await llm_chain.apredict(None, **llm_inputs)
+
+        return sql_cmd
+
+    async def _acall(
+        self, inputs: dict[str, Any], run_manager: AsyncCallbackManagerForChainRun | None = None
+    ) -> dict[str, Any]:
+        """
+        Async call.
+        """
+        input_text, table_names_to_use = f"{inputs[self.input_key]} \nSQLQuery:", inputs.get("tables")
+        await self.write_callback_message_async(input_text, run_manager=run_manager)
+        create_query_prompt = self.prompt.partial(input=input_text, dialect=self.database.dialect)
+
+        sql_cmd = await self.apredict_sql_cmd(
+            prompt=create_query_prompt, table_names_to_use=table_names_to_use, stop_words=["\nSQLResult:"]
+        )
+
+        verified, retries = False, 0
+        while not verified and retries < self.max_retries:
+            try:
+                await self.write_callback_message_async(
+                    f"Verifying SQL Query: {sql_cmd}", run_manager=run_manager, color="blue"
+                )
+                await run_in_threadpool(self.database.validate_query, sql_cmd)
+                verified = True
+            except Exception as e:
+                await self.write_callback_message_async(
+                    f"Invalid SQL Query: {e}.", run_manager=run_manager, color="red"
+                )
+                truncated_error = str(e)[0:150] if len(str(e)) > 150 else str(e)
+                error_prompt = self.error_prompt.partial(
+                    input=input_text,
+                    sql_cmd=sql_cmd,
+                    error=f"{truncated_error} \nNewSQLQuery:",
+                    dialect=self.database.dialect,
+                )
+                sql_cmd = await self.apredict_sql_cmd(
+                    prompt=error_prompt, table_names_to_use=table_names_to_use, stop_words=["\nNewSQLQuery:"]
+                )
+                if sql_cmd.startswith("NewSQLQuery:"):
+                    sql_cmd = sql_cmd.replace("NewSQLQuery:", "").strip()
+                retries += 1
+
+        if not verified:
+            await self.write_callback_message_async(
+                f"Failed to verify SQL query after {self.max_retries} retries.", run_manager=run_manager, color="red"
+            )
+            raise NLtoSQLException(f"Failed to verify SQL query after {self.max_retries} retries.")
+
+        await self.write_callback_message_async(sql_cmd, run_manager=run_manager, color="green")
+
+        chain_result: dict[str, Any] = {self.output_key: sql_cmd.strip()}
+        return chain_result
+
     def _call(self, inputs: dict[str, Any], run_manager: Optional[CallbackManagerForChainRun] = None) -> dict[str, Any]:
         input_text = f"{inputs[self.input_key]} \nSQLQuery:"
         self.write_callback_message(input_text, run_manager=run_manager)
@@ -190,7 +271,7 @@ class NLtoSQLChain(BaseNltoSQLChain):
             "stop": ["\nSQLResult:"],
         }
         llm_chain = LoggedLLMChain(llm=self.llm, prompt=create_query_prompt)
-        sql_cmd = llm_chain.predict(**llm_inputs)
+        sql_cmd = llm_chain.predict(None, **llm_inputs)
         verified = False
         retries = 0
         while not verified and retries < self.max_retries:
@@ -212,7 +293,7 @@ class NLtoSQLChain(BaseNltoSQLChain):
                     "table_info": table_info,
                     "stop": ["\nNewSQLQuery:"],
                 }
-                sql_cmd = error_recovery_chain.predict(**retry_llm_inputs)
+                sql_cmd = error_recovery_chain.predict(None, **retry_llm_inputs)
                 if sql_cmd.startswith("NewSQLQuery:"):
                     sql_cmd = sql_cmd.replace("NewSQLQuery:", "").strip()
                 retries += 1
@@ -246,7 +327,7 @@ class NLtoSQLChatChain(BaseNltoSQLChain):
 
     llm: BaseChatModel
     """LLM wrapper to use."""
-    prompt_messages: list[BaseMessagePromptTemplate | BaseMessage] = NL_TO_SQL_CHAT_MESSAGES
+    prompt_messages: Sequence[BaseMessagePromptTemplate | BaseMessage] = NL_TO_SQL_CHAT_MESSAGES
     """Prompt to use to translate natural language to SQL."""
     messages_with_comments: bool = True  # helps to keep comments on the messages that we going to stack up
 
@@ -275,6 +356,66 @@ class NLtoSQLChatChain(BaseNltoSQLChain):
             return AIMessage(content=return_message.content)
         # don't allow comments on messages
         return AIMessage(content=f"SQLQuery: {self.get_sql_query(return_message)}")
+
+    async def _acall(
+        self, inputs: dict[str, Any], run_manager: AsyncCallbackManagerForChainRun | None = None
+    ) -> dict[str, str]:
+        """
+        Async call.
+        """
+        table_names_to_use: list[str] | None = inputs.get("tables")  # type: ignore
+        input_text = inputs[self.input_key]
+        messages_prompt = LoggedChatPromptTemplate.from_messages(
+            messages=self.prompt_messages,
+            name="nl_to_sql_chat_chain",
+            tags=["chain", "nl_to_sql_chat_chain"],
+            input_variables=["table_info"],
+            partial_variables={"dialect": self.database.dialect, "input": input_text},
+            version=1,
+        )
+        table_info = await run_in_threadpool(
+            get_table_info_wrt_token_limit, self.llm, self.database, messages_prompt, table_names_to_use
+        )
+
+        messages_prompt = messages_prompt.format_prompt(table_info=table_info)
+        messages = messages_prompt.to_messages()
+        await self.write_callback_message_async(f"Question: {input_text}\n", run_manager=run_manager, color="yellow")
+        sql_message: BaseMessage = await self.llm.apredict_messages(messages)
+        await self.write_callback_message_async("\n" + sql_message.content, run_manager=run_manager, color="blue")
+
+        sql_valid = False
+        sql_query = ""
+        retries = 1
+
+        while not sql_valid and retries <= self.max_retries:
+            sql_query = self.get_sql_query(sql_message)
+            messages.append(self.build_ai_message(sql_message))
+            try:
+                await run_in_threadpool(self.database.validate_query, sql_query)
+                sql_valid = True
+            except Exception as exc:
+                truncated_exc = str(exc)[0:150] if len(str(exc)) > 150 else str(exc)
+                messages.append(HumanMessage(content=NL_TO_SQL_CHAT_ERROR_TEMPLATE.format(exception=truncated_exc)))
+                await self.write_callback_message_async(
+                    f"\nInvalid SQL,\n{sql_query} \n\nException:\n{exc}\nAttempt {retries}. Retrying ....",
+                    run_manager=run_manager,
+                    color="red",
+                )
+                sql_message = await self.llm.apredict_messages(messages)
+                retries += 1
+
+        if sql_valid:
+            await self.write_callback_message_async("\n\n" + sql_query, run_manager=run_manager, color="green")
+        else:
+            await self.write_callback_message_async(
+                f"\n\nFailed to verify SQL query after {self.max_retries} retries.\n",
+                run_manager=run_manager,
+                color="red",
+            )
+            raise NLtoSQLException(f"Failed to verify SQL query after {self.max_retries} retries.")
+
+        chain_result: dict[str, Any] = {self.output_key: sql_query}
+        return chain_result
 
     def _call(self, inputs: dict[str, Any], run_manager: CallbackManagerForChainRun | None = None) -> dict[str, str]:
         table_names_to_use: list[str] | None = inputs.get("tables")  # type: ignore

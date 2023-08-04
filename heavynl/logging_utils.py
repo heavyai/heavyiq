@@ -7,7 +7,6 @@ import os
 from typing import Any
 import sys
 
-from flask import request
 
 from heavynl.config import get_config
 from heavynl.langchain.callbacks import FileCallbackHandler
@@ -43,7 +42,7 @@ def get_console_handler(formatter: logging.Formatter | None = None, level: str =
     return console_handler
 
 
-# Define a custom filter to extract remote_addr and username from the Flask request object
+# Define a custom filter to extract remote_addr and username from the request object
 class HeavyNLFilter(logging.Filter):
     """
     Filter which attaches extra attributes from request object to the record object.
@@ -51,12 +50,18 @@ class HeavyNLFilter(logging.Filter):
 
     def filter(self, record: Any) -> bool:
         try:
-            record.remote_addr = request.remote_addr or "-"
-            record.username = request.remote_user or "-"
+            request = getattr(record, "request")
+            record.remote_addr = request.client.host
+            record.username = request.headers.get("X-Remote-User") or "-"
         except RuntimeError:
             # accessing through CLI
             record.remote_addr = "-"
             record.username = "CLI"
+        except AttributeError:
+            # request object not been attached to the log record
+            record.remote_addr = "-"
+            record.username = "-"
+
         return True
 
 
@@ -66,18 +71,19 @@ class AppFilter(logging.Filter):
     """
 
     def filter(self, record: logging.LogRecord) -> bool:
-        # Get the response from the Flask context
-        response: Any | None = getattr(request, "response", None)
-        record.remote_addr = request.remote_addr
-        record.username = request.remote_user or "-"
+        # Get the request, response from record
+        request: Any = getattr(record, "request", None)
+        response: Any | None = getattr(record, "response", None)
+
+        record.remote_addr = request.client.host
+        record.username = request.headers.get("X-Remote-User") or "-"
         record.request_method = request.method
-        record.request_uri = request.full_path
-        record.referrer = request.referrer
-        record.user_agent = request.user_agent
-        record.protocol = request.environ.get("SERVER_PROTOCOL", "-")
-        # Include the response in the log record
+        record.request_uri = str(request.url)
+        record.referrer = request.headers.get("Referer")
+        record.user_agent = request.headers.get("User-Agent")
+        record.protocol = request.scope.get("scheme")
         record.status_code = response.status_code if response else "-"
-        record.response_size = response.content_length if response else "-"
+        record.response_size = response.headers["Content-Length"] if response else "-"
 
         return True
 
@@ -173,7 +179,7 @@ class HeavyNLLogger(BaseLogger):
 
 class _AccessLogger(BaseLogger):
     """
-    Flask App logger class specifically used for logging http request calls which
+    FastAPI App logger class specifically used for logging http request calls which
     gets triggered after every api request.
 
     This logger is private and can't be used for general logging.

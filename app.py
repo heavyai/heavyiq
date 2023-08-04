@@ -1,3 +1,5 @@
-from heavynl.api import get_app
+# fastapi app entry point
 
-app = get_app()
+from heavynl.api import create_app
+
+app = create_app()
