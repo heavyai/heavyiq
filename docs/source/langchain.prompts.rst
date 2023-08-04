@@ -7,7 +7,7 @@ Submodules
 langchain.prompts.prompt module
 -------------------------------
 
-.. automodule:: heavynl.langchain.prompts.prompt
+.. automodule:: heavyiq.langchain.prompts.prompt
    :members:
    :undoc-members:
    :show-inheritance:
@@ -15,7 +15,7 @@ langchain.prompts.prompt module
 Module contents
 ---------------
 
-.. automodule:: heavynl.langchain.prompts
+.. automodule:: heavyiq.langchain.prompts
    :members:
    :undoc-members:
    :show-inheritance:

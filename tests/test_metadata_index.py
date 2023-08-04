@@ -1,6 +1,6 @@
 import unittest
 
-from heavynl.langchain.index import get_heavydb_index, HeavyDBMetadataIndex
+from heavyiq.langchain.index import get_heavydb_index, HeavyDBMetadataIndex
 
 
 class TestConversationalAgent(unittest.TestCase):
