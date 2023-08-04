@@ -8,18 +8,28 @@ Subpackages
    :maxdepth: 4
 
    langchain.agents
+   langchain.callbacks
    langchain.chains
    langchain.index
    langchain.logging
+   langchain.memory
    langchain.prompts
 
 Submodules
 ----------
 
+langchain.exceptions module
+---------------------------
+
+.. automodule:: heavyiq.langchain.exceptions
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 langchain.heavydb module
 ------------------------
 
-.. automodule:: heavynl.langchain.heavydb
+.. automodule:: heavyiq.langchain.heavydb
    :members:
    :undoc-members:
    :show-inheritance:
@@ -27,7 +37,7 @@ langchain.heavydb module
 langchain.llms module
 ---------------------
 
-.. automodule:: heavynl.langchain.llms
+.. automodule:: heavyiq.langchain.llms
    :members:
    :undoc-members:
    :show-inheritance:
@@ -35,7 +45,7 @@ langchain.llms module
 langchain.utils module
 ----------------------
 
-.. automodule:: heavynl.langchain.utils
+.. automodule:: heavyiq.langchain.utils
    :members:
    :undoc-members:
    :show-inheritance:
@@ -43,7 +53,7 @@ langchain.utils module
 Module contents
 ---------------
 
-.. automodule:: heavynl.langchain
+.. automodule:: heavyiq.langchain
    :members:
    :undoc-members:
    :show-inheritance:

@@ -3,7 +3,7 @@
 # Copy to dist
 rm -rf dist
 mkdir -p dist
-cp -r heavynl dist/heavynl
+cp -r heavyiq dist/heavyiq
 cp requirements.txt ./dist/requirements.txt
 
 # Create version.txt

@@ -12,7 +12,7 @@ The application also provides a CLI interface for quick interactions with the He
 3. Navigate into the project directory:
 
 ```bash
-$ cd heavynl
+$ cd heavyiq
 ```
 
 4. Create a new virtual environment:
@@ -77,7 +77,7 @@ cp app.py ./dist/app.py
 ### Run Production Server Process
 
 ```bash
-$ gunicorn -w 4 -k uvicorn.workers.UvicornWorker 'heavynl.api:create_app("./path/to/heavy.conf")' --preload
+$ gunicorn -w 4 -k uvicorn.workers.UvicornWorker 'heavyiq.api:create_app("./path/to/heavy.conf")' --preload
 ```
 
 Port can be specified in above command with command line flag `-b :8080`

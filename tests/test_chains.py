@@ -1,9 +1,9 @@
 import unittest
 
-from heavynl.langchain.chains import NLtoSQLChain, NLtoAnswerChain
-from heavynl.langchain.llms import get_llm
-from heavynl.langchain.logging import log_chain_call
-from heavynl.langchain import HeavyDB
+from heavyiq.langchain.chains import NLtoSQLChain, NLtoAnswerChain
+from heavyiq.langchain.llms import get_llm
+from heavyiq.langchain.logging import log_chain_call
+from heavyiq.langchain import HeavyDB
 
 
 class TestChains(unittest.TestCase):

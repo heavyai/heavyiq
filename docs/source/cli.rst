@@ -9,8 +9,10 @@ Command Groups
 
    cli.agent
    cli.chain
+   cli.db
+   cli.eval
    cli.metadata_index
 
-.. click:: heavynl.cli:cli
+.. click:: heavyiq.cli:cli
    :prog: python cli.py
    :nested: full

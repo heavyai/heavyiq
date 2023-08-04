@@ -1,6 +1,6 @@
 from typing import Any
-from heavynl.api.models import QueryRequest
-from heavynl.langchain import HeavyDB
+from heavyiq.api.models import QueryRequest
+from heavyiq.langchain import HeavyDB
 
 
 def override_valid_query_db_session(

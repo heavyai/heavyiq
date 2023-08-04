@@ -1,4 +1,4 @@
 if __name__ == "__main__":
-    from heavynl.cli import cli
+    from heavyiq.cli import cli
 
     cli(obj={})
