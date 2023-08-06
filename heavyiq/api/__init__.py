@@ -7,12 +7,11 @@ from heavydb.exceptions import Error as HeavyDBError
 from starlette.exceptions import HTTPException
 
 from heavyiq.config import get_config
-from heavyiq.api.handlers import exception_handler as exh
 from heavyiq.api.middlewares import AsyncLoggingMiddleware
-from heavyiq.api.routes import defaultrouter, iqrouter
 from heavyiq.api.models.error import ErrorResponse
 from heavyiq.langchain.exceptions import NLtoSQLException
 from heavyiq.logging_utils import init_logs
+from heavyiq.langchain.utils import init_promptlayer, init_telemetrics
 
 
 def create_app(config_path: str = "./config.toml") -> FastAPI:
@@ -23,6 +22,8 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
     """
     get_config(config_path)  # loads config using specified path
     init_logs()  # initializes logs using config
+    init_promptlayer()  # initializes prompt layer
+    init_telemetrics()  # initializes langsmith
 
     app = FastAPI(title="HeavyIQ")
 
@@ -37,6 +38,15 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         allow_headers=["*"],
     )
     app.add_middleware(AsyncLoggingMiddleware)
+
+    # importing the handler functions on top of this module
+    # leads to call __post__init__ method of LoggedPromptTemplate
+    # (Since we created instance for LoggedPromptTemplate class at global scop),
+    # there we check for is_promptlayer_active. This value should always be False.
+    # So we placed the relevant import call here to make sure is_promptlayer_active is accessed
+    # after calling all the init functions.
+    from heavyiq.api.routes import defaultrouter, iqrouter
+    from heavyiq.api.handlers import exception_handler as exh
 
     # add exception handlers
     app.add_exception_handler(AttributeError, exh.attribute_error_handler)
