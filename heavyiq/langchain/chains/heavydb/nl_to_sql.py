@@ -53,7 +53,7 @@ Write a SQL query to answer the following question:
 <|answer|>"""
 CUSTOM_LLM_NL_TO_SQL_PROMPT = LoggedPromptTemplate(
     name="custom_llm_nl_to_sql_chain",
-    tags=["chain", "nl_to_sql_chain"],
+    tags=["chain", "nl_to_sql_chain", "custom_llm_nl_to_sql_chain"],
     input_variables=["input", "table_info"],
     template=CUSTOM_LLM_NL_TO_SQL_TEMPLATE,
     version=1,
@@ -216,7 +216,7 @@ class NLtoSQLChain(BaseNltoSQLChain):
         """
         input_text, table_names_to_use = f"{inputs[self.input_key]} \nSQLQuery:", inputs.get("tables")
         await self.write_callback_message_async(input_text, run_manager=run_manager)
-        create_query_prompt = self.prompt.partial(input=input_text, dialect=self.database.dialect)
+        create_query_prompt = self.prompt.partial(input=input_text)
 
         sql_cmd = await self.apredict_sql_cmd(
             prompt=create_query_prompt, table_names_to_use=table_names_to_use, stop_words=["\nSQLResult:"]
@@ -239,7 +239,6 @@ class NLtoSQLChain(BaseNltoSQLChain):
                     input=input_text,
                     sql_cmd=sql_cmd,
                     error=f"{truncated_error} \nNewSQLQuery:",
-                    dialect=self.database.dialect,
                 )
                 sql_cmd = await self.apredict_sql_cmd(
                     prompt=error_prompt, table_names_to_use=table_names_to_use, stop_words=["\nNewSQLQuery:"]
@@ -370,7 +369,7 @@ class NLtoSQLChatChain(BaseNltoSQLChain):
             name="nl_to_sql_chat_chain",
             tags=["chain", "nl_to_sql_chat_chain"],
             input_variables=["table_info"],
-            partial_variables={"dialect": self.database.dialect, "input": input_text},
+            partial_variables={"input": input_text},
             version=1,
         )
         table_info = await run_in_threadpool(
