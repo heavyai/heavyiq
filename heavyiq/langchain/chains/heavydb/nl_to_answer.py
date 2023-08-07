@@ -9,11 +9,12 @@ from pydantic import BaseModel, Extra, Field
 from heavyiq.langchain.chains import BaseChain
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.prompts import LoggedPromptTemplate
+from heavyiq.config import get_config
 from ..logged_llm import LoggedLLMChain
 
 from .nl_to_sql import get_nl_to_sql_chain_by_llm
 
-ANSWER_TEMPLATE = """Given an input question, first create a syntactically correct {dialect} query to run, then look at the results of the query and return the answer.
+ANSWER_TEMPLATE = """Given an input question, first create a syntactically correct SQL query to run, then look at the results of the query and return the answer.
 Use the following format:
 Question: Question here
 SQLQuery: /* step-by-step thought process */ SQL Query to run
@@ -25,8 +26,28 @@ SQLResult: {sql_result}"""
 ANSWER_PROMPT = LoggedPromptTemplate(
     name="nl_to_answer_chain",
     tags=["chain", "nl_to_answer_chain"],
-    input_variables=["input", "dialect", "sql_cmd", "sql_result"],
+    input_variables=["input", "sql_cmd", "sql_result"],
     template=ANSWER_TEMPLATE,
+    version=1,
+)
+
+CUSTOM_LLM_ANSWER_TEMPLATE = ANSWER_TEMPLATE = """<|english prompt|>
+The user asked the following question:
+{input}
+
+To answer the question, the following SQL query was generated:
+{sql_cmd}
+
+The following results were returned:
+{sql_result}
+
+Now explain the results in English, referencing the question and the SQL query as needed.
+<|english answer|>"""
+CUSTOM_LLM_ANSWER_PROMPT = LoggedPromptTemplate(
+    name="custom_llm_nl_to_answer_chain",
+    tags=["chain", "nl_to_answer_chain", "custom_llm_nl_to_answer_chain"],
+    input_variables=["input", "sql_cmd", "sql_result"],
+    template=CUSTOM_LLM_ANSWER_TEMPLATE,
     version=1,
 )
 
@@ -46,7 +67,7 @@ class NLtoAnswerChain(BaseChain, BaseModel):
     """LLM wrapper to use."""
     database: HeavyDB = Field(exclude=True)
     """HeavyDB Database to connect to."""
-    prompt: LoggedPromptTemplate = ANSWER_PROMPT
+    prompt: LoggedPromptTemplate
     """Prompt to use to translate natural language to SQL."""
     input_key: str = "query"  #: :meta private:
     output_answer_key: str = "answer"  #: :meta private:
@@ -60,6 +81,14 @@ class NLtoAnswerChain(BaseChain, BaseModel):
 
         extra = Extra.forbid
         arbitrary_types_allowed = True
+
+    def __init__(self, *args, **kwargs):
+        config = get_config()
+        if config.custom_llm_type == "API":
+            prompt = CUSTOM_LLM_ANSWER_PROMPT
+        else:
+            prompt = ANSWER_PROMPT
+        super().__init__(*args, prompt=prompt, **kwargs)  # type: ignore
 
     @property
     def input_keys(self) -> list[str]:
@@ -118,7 +147,6 @@ class NLtoAnswerChain(BaseChain, BaseModel):
             )
             llm_inputs = {
                 "input": inputs[self.input_key],
-                "dialect": self.database.dialect,
                 "sql_cmd": sql_cmd,
                 "sql_result": f"{result} \nAnswer:",
                 "stop": ["\nAnswer:"],
@@ -163,7 +191,6 @@ class NLtoAnswerChain(BaseChain, BaseModel):
             )
             llm_inputs = {
                 "input": inputs[self.input_key],
-                "dialect": self.database.dialect,
                 "sql_cmd": sql_cmd,
                 "sql_result": f"{result} \nAnswer:",
                 "stop": ["\nAnswer:"],
