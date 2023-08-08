@@ -1,5 +1,7 @@
 venv/
 
+storage/
+
 *.pyc
 __pycache__/
 
@@ -22,5 +24,4 @@ config.toml
 .chroma/
 
 eval/results/
-*.log*
-flask_session/
+*.log

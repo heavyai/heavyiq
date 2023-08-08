@@ -1,0 +1,72 @@
+Description:
+The "firewall_in_sample" table is designed to store log data from a firewall system. It captures various details related to network traffic, such as timestamps, firewall host, log names, rule numbers, sub-rule numbers, and more. The primary functionality of this table is to provide a record of network traffic and firewall actions for analysis and monitoring purposes. The secondary functionality includes tracking IP addresses, geographical information, and proxy status.
+
+Applications:
+1. Network Security Analysis: The table can be used to analyze network traffic patterns, identify potential security threats, and monitor firewall actions.
+2. Incident Response: The log data can be used to investigate security incidents, track the source and destination of suspicious network traffic, and identify potential vulnerabilities.
+3. Compliance Monitoring: The table can be utilized to ensure compliance with security policies and regulations by monitoring firewall actions and network traffic.
+4. Network Performance Monitoring: The data can be analyzed to identify network bottlenecks, monitor bandwidth usage, and optimize network performance.
+5. Geolocation Analysis: The geographical information stored in the table can be used for geolocation analysis, identifying the origin and destination of network traffic.
+
+Keywords:
+- Firewall log, network traffic, timestamps, firewall host, rule number, sub-rule number, anchor, tracker ID, interface name, log reason, action, message direction, IP protocol version, TOS, ECN, TTL, ID, offset, flags, protocol ID, protocol text, IPv6 class, IPv6 flow label, IPv6 hop limit, header length, source IP, destination IP, source port number, destination port number, data length, ICMP type, TCP flags, TCP sequence number, TCP ACK, TCP window, TCP URG, TCP options, network match, GN ID, access radius, continent code, continent name, country name, city name, regional country name, represented country name, regional country GN ID, represented country GN ID, is an proxy, is satellite provider, postal code, longitude, latitude, IP reference data version, address name, routeable address, broadcast address, reserved address.
+
+Column descriptions for firewall_in_sample table:
+- firewall_in_sample.time_stamp: The timestamp when the log entry was recorded.
+- firewall_in_sample.fire_wall_host: The hostname of the firewall.
+- firewall_in_sample.log_name: The name of the log.
+- firewall_in_sample.rule_number: The number of the firewall rule.
+- firewall_in_sample.sub_rule_number: The number of the sub-rule within the firewall rule.
+- firewall_in_sample.anchor: The anchor associated with the log entry.
+- firewall_in_sample.tracker_id: The ID of the tracker.
+- firewall_in_sample.interface_name: The name of the network interface.
+- firewall_in_sample.log_reason: The reason for the log entry.
+- firewall_in_sample.action: The action taken by the firewall.
+- firewall_in_sample.msg_direction: The direction of the message (inbound or outbound).
+- firewall_in_sample.ip_protocol_version: The IP protocol version.
+- firewall_in_sample.TOS: The Type of Service field in the IP header.
+- firewall_in_sample.ECN: The Explicit Congestion Notification field in the IP header.
+- firewall_in_sample.TTL: The Time to Live field in the IP header.
+- firewall_in_sample.ID: The Identification field in the IP header.
+- firewall_in_sample.offset_v4: The Offset field in the IPv4 header.
+- firewall_in_sample.flags: The flags in the IP header.
+- firewall_in_sample.protocol_id: The ID of the protocol.
+- firewall_in_sample.protocol_text: The text representation of the protocol.
+- firewall_in_sample.v6_class: The class of the IPv6 address.
+- firewall_in_sample.v6_flow_label: The flow label of the IPv6 address.
+- firewall_in_sample.v6_hop_limit: The hop limit of the IPv6 address.
+- firewall_in_sample.hdr_length: The length of the header.
+- firewall_in_sample.source_ip: The source IP address.
+- firewall_in_sample.destination_ip: The destination IP address.
+- firewall_in_sample.source_port_num: The source port number.
+- firewall_in_sample.destination_port_num: The destination port number.
+- firewall_in_sample.data_length: The length of the data.
+- firewall_in_sample.icmp_type: The type of ICMP message.
+- firewall_in_sample.TCP_FLAGS: The TCP flags.
+- firewall_in_sample.tcp_sequence_number: The sequence number of the TCP packet.
+- firewall_in_sample.tcp_ack: The acknowledgement number of the TCP packet.
+- firewall_in_sample.tcp_window: The window size of the TCP packet.
+- firewall_in_sample.tcp_urg: The urgent pointer of the TCP packet.
+- firewall_in_sample.tcp_options: The TCP options.
+- firewall_in_sample.network_mtch: The matched network.
+- firewall_in_sample.gn_id: The ID of the network.
+- firewall_in_sample.acc_rad: The radius of the access.
+- firewall_in_sample.continent_code: The continent code.
+- firewall_in_sample.continent_name: The continent name.
+- firewall_in_sample.country_name: The country name.
+- firewall_in_sample.city_name: The city name.
+- firewall_in_sample.reg_country_name: The registered country name.
+- firewall_in_sample.represent_country_name: The represented country name.
+- firewall_in_sample.reg_cntry_gn_id: The ID of the registered country.
+- firewall_in_sample.represented_cntry_gn_id: The ID of the represented country.
+- firewall_in_sample.is_an_proxy: Indicates if it is an anonymous proxy (0 or 1).
+- firewall_in_sample.is_sat_prvder: Indicates if it is a satellite provider (0 or 1).
+- firewall_in_sample.pstl_code: The postal code.
+- firewall_in_sample.longitude: The longitude of the location.
+- firewall_in_sample.latitude: The latitude of the location.
+- firewall_in_sample.ip_reference_data_version: The version of the IP reference data.
+- firewall_in_sample.address_name: The name of the address.
+- firewall_in_sample.routeable_addr: Indicates if the address is routeable (Y or N).
+- firewall_in_sample.broadcast_addr: Indicates if the address is a broadcast address (U).
+- firewall_in_sample.reserved_addr: Indicates if the address is reserved (N or Y).
+

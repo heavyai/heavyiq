@@ -1,6 +1,5 @@
-from heavynl.api import get_app, socketio
+# fastapi app entry point
 
-app = get_app()
+from heavyiq.api import create_app
 
-if __name__ == "__main__":
-    socketio.run(app)
+app = create_app()

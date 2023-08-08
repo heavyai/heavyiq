@@ -6,11 +6,11 @@ COPY config.toml ./
 COPY pyarmor-regfile-5130.zip ./
 COPY requirements.txt ./
 COPY requirements-dev.txt ./
-COPY heavynl/ ./heavynl/
+COPY heavyiq/ ./heavyiq/
 
 RUN pip install --no-cache-dir pyarmor
 RUN pyarmor reg pyarmor-regfile-5130.zip
-RUN pyarmor gen ./heavynl
+RUN pyarmor gen ./heavyiq
 
 FROM python:3.10 AS runner
 
@@ -19,8 +19,8 @@ WORKDIR /usr/src/app
 COPY --from=obfuscator /usr/src/app/dist/ ./
 COPY --from=obfuscator /usr/src/app/requirements.txt ./requirements.txt
 COPY --from=obfuscator /usr/src/app/config.toml ./config.toml
-COPY --from=obfuscator /usr/src/app/heavynl/api/heavyiq-spec.yaml ./heavynl/api/heavyiq-spec.yaml
+COPY --from=obfuscator /usr/src/app/heavyiq/langchain/llama_model/ ./heavyiq/langchain/llama_model/
 RUN pip install --no-cache-dir --upgrade -r ./requirements.txt
 
 EXPOSE 8000
-CMD ["gunicorn", "-b", ":8000", "-w", "4", "heavynl.api:get_app()"]
+CMD ["gunicorn", "-b", ":8000", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--preload", "heavyiq.api:create_app()"]
