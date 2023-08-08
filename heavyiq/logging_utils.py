@@ -9,7 +9,7 @@ import sys
 
 
 from heavyiq.config import get_config
-from heavyiq.langchain.callbacks import FileCallbackHandler
+from heavyiq.langchain.callbacks import FileCallbackHandler, AsyncFileCallbackHandler
 
 
 def get_default_formatter() -> logging.Formatter:
@@ -175,6 +175,19 @@ class HeavyIQLogger(BaseLogger):
         """
         rotating_file_handler = next(i for i in self.handlers if isinstance(i, RotatingFileHandler))
         return FileCallbackHandler(rotating_file_handler.baseFilename, to_stdout=to_stdout)
+
+    def async_langchain_cb_handler(self, to_stdout: bool = True) -> AsyncFileCallbackHandler:
+        """
+        Returns a file callback handler created from the log file.
+
+        Args:
+            to_stdout (bool, optional): whether to log stdout as well. Defaults to True.
+
+        Returns:
+            FileCallbackHandler: callback handler mainly passed as callback for chains.
+        """
+        rotating_file_handler = next(i for i in self.handlers if isinstance(i, RotatingFileHandler))
+        return AsyncFileCallbackHandler(rotating_file_handler.baseFilename, to_stdout=to_stdout)
 
 
 class _AccessLogger(BaseLogger):

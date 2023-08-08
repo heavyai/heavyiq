@@ -12,7 +12,7 @@ from heavyiq.langchain.prompts import LoggedPromptTemplate
 from heavyiq.config import get_config
 from ..logged_llm import LoggedLLMChain
 
-from .nl_to_sql import get_nl_to_sql_chain_by_llm
+from .nl_to_sql import BaseNltoSQLChain, get_nl_to_sql_chain_by_llm
 
 ANSWER_TEMPLATE = """Given an input question, first create a syntactically correct SQL query to run, then look at the results of the query and return the answer.
 Use the following format:
@@ -64,6 +64,7 @@ class NLtoAnswerChain(BaseChain, BaseModel):
     """
 
     llm: BaseLanguageModel
+    nl_sql_chain: BaseNltoSQLChain
     """LLM wrapper to use."""
     database: HeavyDB = Field(exclude=True)
     """HeavyDB Database to connect to."""
@@ -90,6 +91,13 @@ class NLtoAnswerChain(BaseChain, BaseModel):
             prompt = ANSWER_PROMPT
         super().__init__(*args, prompt=prompt, **kwargs)  # type: ignore
 
+    @classmethod
+    def from_llm(
+        cls: type[NLtoAnswerChain], llm: BaseLanguageModel, database: HeavyDB, verbose: bool = False, **kwargs
+    ) -> NLtoAnswerChain:
+        nl_sql_chain = get_nl_to_sql_chain_by_llm(llm)(llm=llm, database=database, verbose=verbose)
+        return cls(llm=llm, nl_sql_chain=nl_sql_chain, database=database, verbose=verbose, **kwargs)
+
     @property
     def input_keys(self) -> list[str]:
         """Return the singular input key.
@@ -115,19 +123,12 @@ class NLtoAnswerChain(BaseChain, BaseModel):
         self, inputs: dict[str, Any], run_manager: AsyncCallbackManagerForChainRun | None = None
     ) -> dict[str, Any]:
         table_names_to_use = inputs.get("tables")
-        nl_sql_chain = get_nl_to_sql_chain_by_llm(self.llm)(
-            llm=self.llm,
-            database=self.database,
-            callbacks=self.callbacks,
-            verbose=self.verbose,
-            metadata={"name": "Foo"},
-        )
         nl_sql_inputs = {
-            nl_sql_chain.input_key: inputs[self.input_key],
+            self.nl_sql_chain.input_key: inputs[self.input_key],
             "tables": table_names_to_use,
         }
-        nl_sql_results = await nl_sql_chain.acall(nl_sql_inputs)
-        sql_cmd = nl_sql_results[nl_sql_chain.output_key]
+        nl_sql_results = await self.nl_sql_chain.acall(nl_sql_inputs)
+        sql_cmd = nl_sql_results[self.nl_sql_chain.output_key]
         await self.write_callback_message_async(sql_cmd, run_manager=run_manager, color="green")
 
         result = await run_in_threadpool(self.database.run, sql_cmd)
@@ -162,15 +163,12 @@ class NLtoAnswerChain(BaseChain, BaseModel):
 
     def _call(self, inputs: dict[str, Any], run_manager: Optional[CallbackManagerForChainRun] = None) -> dict[str, Any]:
         table_names_to_use = inputs.get("tables")
-        nl_sql_chain = get_nl_to_sql_chain_by_llm(self.llm)(
-            llm=self.llm, callbacks=self.callbacks, database=self.database, verbose=self.verbose
-        )
         nl_sql_inputs = {
-            nl_sql_chain.input_key: inputs[self.input_key],
+            self.nl_sql_chain.input_key: inputs[self.input_key],
             "tables": table_names_to_use,
         }
-        nl_sql_results = nl_sql_chain(nl_sql_inputs)
-        sql_cmd = nl_sql_results[nl_sql_chain.output_key]
+        nl_sql_results = self.nl_sql_chain(nl_sql_inputs)
+        sql_cmd = nl_sql_results[self.nl_sql_chain.output_key]
         if run_manager:
             run_manager.on_text(sql_cmd, color="green", verbose=self.verbose)
         result = self.database.run(sql_cmd)

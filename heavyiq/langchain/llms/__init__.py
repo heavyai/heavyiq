@@ -1,11 +1,57 @@
-from langchain.llms import AzureOpenAI, OpenAI
+from enum import Enum
+
+from langchain.llms import AzureOpenAI
 from langchain.llms.base import BaseLLM
-from langchain.llms.promptlayer_openai import PromptLayerOpenAI
 from langchain.chat_models import PromptLayerChatOpenAI, ChatOpenAI, AzureChatOpenAI
 from langchain.chat_models.base import BaseChatModel
 
 from heavyiq.config import get_config
 from heavyiq.langchain.utils import is_promptlayer_active
+from .overrides import OverrideOpenAI, OverridePromptLayerOpenAI
+
+
+class LLMType(Enum):
+    NL_TO_SQL = "nl_to_sql"
+    SQL_TO_ANSWER = "sql_to_answer"
+
+
+def get_llm_by_type(model_type: LLMType, tags: list[str] = [], **kwargs) -> BaseLLM | BaseChatModel:
+    config = get_config()
+    if config.custom_llm_type == "API":
+        if config.dev:
+            if model_type == LLMType.NL_TO_SQL:
+                return get_custom_llm(LLMType.NL_TO_SQL.value, tags=tags, **config.dev.nl_to_sql.dict(), **kwargs)
+            elif model_type == LLMType.SQL_TO_ANSWER:
+                return get_custom_llm(
+                    LLMType.SQL_TO_ANSWER.value, tags=tags, **config.dev.sql_to_answer.dict(), **kwargs
+                )
+            else:
+                raise ValueError(f"Unknown LLM type: {model_type}")
+        else:
+            return get_llm(tags=tags, **kwargs)
+    else:
+        return get_llm_by_model_name(model=config.openai_gpt_model, tags=tags, **kwargs)
+
+
+def get_custom_llm(name: str, api_base: str, context_window: int, tags: list[str] = [], **kwargs) -> BaseLLM:
+    if is_promptlayer_active:
+        return OverridePromptLayerOpenAI(
+            pl_tags=tags,
+            return_pl_id=True,
+            openai_api_key="not_necessary",
+            openai_api_base=api_base,
+            model=f"CUSTOM_LLM_{name}",
+            context_window=context_window,
+            **kwargs,
+        )
+    else:
+        return OverrideOpenAI(
+            openai_api_key="nothing",
+            openai_api_base=api_base,
+            model=f"CUSTOM_LLM_{name}",
+            context_window=context_window,
+            **kwargs,
+        )
 
 
 def get_llm_by_model_name(model: str, tags: list[str] = [], **kwargs) -> BaseLLM | BaseChatModel:
@@ -26,26 +72,33 @@ def get_llm(tags: list[str] = [], **kwargs) -> BaseLLM:
             openai_api_key=config.openai_api_key,
             openai_api_version=config.custom_llm_azure_openai_api_version,
             deployment_name=config.custom_llm_azure_deployment_name,
-            **kwargs
+            **kwargs,
         )
     elif config.custom_llm_type == "API":
         if is_promptlayer_active:
-            return PromptLayerOpenAI(
+            return OverridePromptLayerOpenAI(
                 pl_tags=tags,
                 return_pl_id=True,
                 openai_api_key="not_necessary",
                 openai_api_base=config.custom_llm_api_base,
+                context_window=config.custom_llm_api_context_window,
                 model="CUSTOM_LLM",
-                **kwargs
+                **kwargs,
             )
         else:
-            return OpenAI(
-                openai_api_key="nothing", openai_api_base=config.custom_llm_api_base, model="CUSTOM_LLM", **kwargs
+            return OverrideOpenAI(
+                openai_api_key="nothing",
+                openai_api_base=config.custom_llm_api_base,
+                model="CUSTOM_LLM",
+                context_window=config.custom_llm_api_context_window,
+                **kwargs,
             )
     if is_promptlayer_active:
-        return PromptLayerOpenAI(pl_tags=tags, return_pl_id=True, openai_api_key=config.openai_api_key, **kwargs)
+        return OverridePromptLayerOpenAI(
+            pl_tags=tags, return_pl_id=True, openai_api_key=config.openai_api_key, **kwargs
+        )
     else:
-        return OpenAI(openai_api_key=config.openai_api_key, **kwargs)
+        return OverrideOpenAI(openai_api_key=config.openai_api_key, **kwargs)
 
 
 def azure_model_to_openai(model: str) -> str:
@@ -65,7 +118,7 @@ def get_chat_llm(tags: list[str], model: str, **kwargs) -> BaseChatModel:
                 deployment_name=config.custom_llm_azure_deployment_name,
                 tiktoken_model_name=azure_model_to_openai(model),
                 model=model,
-                **kwargs
+                **kwargs,
             )
         else:
             raise NotImplementedError("Custom LLMs are not supported for chat models yet.")
