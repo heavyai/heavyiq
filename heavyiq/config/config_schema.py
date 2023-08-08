@@ -3,6 +3,16 @@ from typing import Optional
 from .overrides import OverrideBaseConfig
 
 
+class CustomLLMConfig(OverrideBaseConfig):  # type: ignore
+    api_base: str
+    context_window: int
+
+
+class DevConfig(OverrideBaseConfig):  # type: ignore
+    nl_to_sql: CustomLLMConfig
+    sql_to_answer: CustomLLMConfig
+
+
 class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     port: int = 6275
     data: Optional[str] = None
@@ -37,6 +47,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     custom_llm_azure_openai_api_version: str = "2023-03-15-preview"
     custom_llm_azure_openai_api_base: str = ""
     custom_llm_azure_deployment_name: str = ""
+    dev: Optional[DevConfig] = None
 
 
 class AppConfig(OverrideBaseConfig):  # type: ignore
