@@ -80,7 +80,7 @@ def handle_question_request(request: QuestionRequest) -> QuestionResponse:
     res = log_chain_call(chain, chain_input, "")
     sql = strip_sql_comments(res[chain.output_sql_key])
     sql_complexity = db.complexity(sql)
-    return QuestionResponse(answer=res[chain.output_answer_key], sql=sql, sql_complexity=sql_complexity)
+    return QuestionResponse(answer=res[chain.output_key], sql=sql, sql_complexity=sql_complexity)
 
 
 async def handle_question_request_async(request: QuestionRequest, db: HeavyDB) -> QuestionResponse:
@@ -111,4 +111,4 @@ async def handle_question_request_async(request: QuestionRequest, db: HeavyDB) -
     res = await log_chain_call_async(chain, chain_input, "")
     sql = strip_sql_comments(res[chain.output_sql_key])
     sql_complexity = await run_in_threadpool(db.complexity, sql)
-    return QuestionResponse(answer=res[chain.output_answer_key], sql=sql, sql_complexity=sql_complexity)
+    return QuestionResponse(answer=res[chain.output_key], sql=sql, sql_complexity=sql_complexity)
