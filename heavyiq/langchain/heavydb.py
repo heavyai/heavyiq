@@ -352,6 +352,7 @@ class HeavyDB:
         return str(result[0])
 
     def complexity(self, command: str) -> int:
+        command = strip_sql_comments(command)
         plan = self.explain(command)
         return rate_sql_complexity(plan)
 

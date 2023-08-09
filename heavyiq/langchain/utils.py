@@ -3,6 +3,7 @@ import os
 import promptlayer
 from langchain.base_language import BaseLanguageModel
 from langchain.prompts import BasePromptTemplate, BaseChatPromptTemplate
+from langchain.schema.prompt import PromptValue
 
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
@@ -126,3 +127,14 @@ def get_table_info_wrt_token_limit(
         raise RuntimeError("Couldn't find suitable prompt provided token limit")
 
     return table_info
+
+
+def populate_table_info_wrt_token_limit(
+    prompt: BasePromptTemplate | BaseChatPromptTemplate,
+    llm: BaseLanguageModel,
+    heavydb: HeavyDB,
+    table_names_to_use: list[str] | None,
+) -> PromptValue:
+    table_info = get_table_info_wrt_token_limit(llm, heavydb, prompt, table_names_to_use)
+
+    return prompt.format_prompt(table_info=table_info)

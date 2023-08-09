@@ -1,6 +1,7 @@
 import re
 from typing import Any, Optional
 
+from langchain.chains import LLMChain
 from langchain.chains.qa_with_sources.retrieval import RetrievalQAWithSourcesChain
 from langchain.chains.combine_documents.map_reduce import MapReduceDocumentsChain
 from langchain.chains.combine_documents.stuff import StuffDocumentsChain
@@ -11,7 +12,6 @@ from pydantic import Field
 from heavyiq.langchain.llms import get_llm
 from heavyiq.langchain.chains import FileCallbackHandlerForChainMixin
 from heavyiq.langchain.prompts import LoggedPromptTemplate
-from ..logged_llm import LoggedLLMChain
 
 question_prompt_template = """Use the following description of a SQL table.
 If relevant to the question, return the text verbatim.
@@ -114,8 +114,8 @@ class AskHeavyDBMetadataIndexChain(FileCallbackHandlerForChainMixin, RetrievalQA
         # ChatOpenAI has a hard time formatting proper response
         # Unfortunate because this is more expensive ($0.08 vs $0.008)
         llm = get_llm(["chain", "ask_metadata_index_chain"], temperature=0)
-        llm_question_chain = LoggedLLMChain(llm=llm, prompt=QUESTION_PROMPT)
-        llm_combine_chain = LoggedLLMChain(llm=llm, prompt=COMBINE_PROMPT)
+        llm_question_chain = LLMChain(llm=llm, prompt=QUESTION_PROMPT)
+        llm_combine_chain = LLMChain(llm=llm, prompt=COMBINE_PROMPT)
         combine_results_chain = StuffDocumentsChain(
             llm_chain=llm_combine_chain,
             document_prompt=EXAMPLE_PROMPT,
