@@ -1,12 +1,12 @@
 # All dependencies required to run the REST API in Production
-aiofiles==23.1.0
+aiofiles==23.2.0
 confz==2.0.0
 connexion[swagger-ui]==2.14.2
 fastapi==0.101.0
 gunicorn==21.2.0
 heavyai==1.1.0
-langchain==0.0.255
-langsmith==0.0.19
+langchain==0.0.259
+langsmith==0.0.20
 openai==0.27.8
 promptlayer==0.1.95
 promptwatch==0.2.8
