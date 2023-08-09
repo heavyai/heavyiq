@@ -1,17 +1,20 @@
 from __future__ import annotations
+
 from typing import Any, Optional
-from fastapi.concurrency import run_in_threadpool
 
-from langchain.chains import LLMChain
-from langchain.base_language import BaseLanguageModel
-from langchain.callbacks.manager import AsyncCallbackManagerForChainRun, CallbackManagerForChainRun
-from pydantic import BaseModel, Extra, Field
+from pydantic import Extra
 
+from langchain.schema.language_model import BaseLanguageModel
+from langchain.schema import BasePromptTemplate
+from langchain.prompts.prompt import PromptTemplate
+from langchain.callbacks.manager import (
+    AsyncCallbackManagerForChainRun,
+    CallbackManagerForChainRun,
+)
+
+from heavyiq.config import get_config
 from heavyiq.langchain.chains import BaseChain
 from heavyiq.langchain import HeavyDB
-from heavyiq.langchain.prompts import LoggedPromptTemplate
-from heavyiq.config import get_config
-
 from .nl_to_sql import BaseNLtoSQLChain, get_nl_to_sql_chain_by_llm
 
 ANSWER_TEMPLATE = """Given an input question, first create a syntactically correct SQL query to run, then look at the results of the query and return the answer.
@@ -23,15 +26,9 @@ Answer: Final answer here
 Question: {input}
 SQLQuery: {sql_cmd}
 SQLResult: {sql_result}"""
-ANSWER_PROMPT = LoggedPromptTemplate(
-    name="nl_to_answer_chain",
-    tags=["chain", "nl_to_answer_chain"],
-    input_variables=["input", "sql_cmd", "sql_result"],
-    template=ANSWER_TEMPLATE,
-    version=1,
-)
+ANSWER_PROMPT = PromptTemplate.from_template(ANSWER_TEMPLATE)
 
-CUSTOM_LLM_ANSWER_TEMPLATE = ANSWER_TEMPLATE = """<|english prompt|>
+CUSTOM_LLM_ANSWER_TEMPLATE = """<|english prompt|>
 The user asked the following question:
 {input}
 
@@ -43,16 +40,10 @@ The following results were returned:
 
 Now explain the results in English, referencing the question and the SQL query as needed.
 <|english answer|>"""
-CUSTOM_LLM_ANSWER_PROMPT = LoggedPromptTemplate(
-    name="custom_llm_nl_to_answer_chain",
-    tags=["chain", "nl_to_answer_chain", "custom_llm_nl_to_answer_chain"],
-    input_variables=["input", "sql_cmd", "sql_result"],
-    template=CUSTOM_LLM_ANSWER_TEMPLATE,
-    version=1,
-)
+CUSTOM_LLM_ANSWER_PROMPT = PromptTemplate.from_template(CUSTOM_LLM_ANSWER_TEMPLATE)
 
 
-class NLtoAnswerChain(BaseChain, BaseModel):
+class NLtoAnswerChain(BaseChain):
     """
     Chain for translating natural language to an answer.
 
@@ -63,25 +54,16 @@ class NLtoAnswerChain(BaseChain, BaseModel):
         If you do not restrict the tables you risk exceeding the token limit of the LLM.
     """
 
+    prompt: BasePromptTemplate
+    """Prompt object to use."""
     llm: BaseLanguageModel
     nl_sql_chain: BaseNLtoSQLChain
-    """LLM wrapper to use."""
-    database: HeavyDB = Field(exclude=True)
-    """HeavyDB Database to connect to."""
-    prompt: LoggedPromptTemplate
-    """Prompt to use to translate natural language to SQL."""
+    database: HeavyDB
     input_key: str = "query"  #: :meta private:
-    output_answer_key: str = "answer"  #: :meta private:
+    output_key: str = "answer"  #: :meta private:
     output_sql_key: str = "sql"  #: :meta private:
+    output_sql_complexity_key: str = "sql_complexity"  #: :meta private:
     output_results_key: str = "results"  #: :meta private:
-    return_direct: bool = False
-    """Whether or not to return the result of querying the SQL table directly."""
-
-    class Config:
-        """Configuration for this pydantic object."""
-
-        extra = Extra.forbid
-        arbitrary_types_allowed = True
 
     def __init__(self, *args, **kwargs):
         config = get_config()
@@ -92,113 +74,107 @@ class NLtoAnswerChain(BaseChain, BaseModel):
         super().__init__(*args, prompt=prompt, **kwargs)  # type: ignore
 
     @classmethod
-    def from_llm(
+    def from_same_llm(
         cls: type[NLtoAnswerChain], llm: BaseLanguageModel, database: HeavyDB, verbose: bool = False, **kwargs
     ) -> NLtoAnswerChain:
+        """Create a new NLtoAnswerChain with the same LLM used for the NLtoSQLChain."""
         nl_sql_chain = get_nl_to_sql_chain_by_llm(llm)(llm=llm, database=database, verbose=verbose)
         return cls(llm=llm, nl_sql_chain=nl_sql_chain, database=database, verbose=verbose, **kwargs)
 
+    class Config:
+        """Configuration for this pydantic object."""
+
+        extra = Extra.forbid
+        arbitrary_types_allowed = True
+
     @property
     def input_keys(self) -> list[str]:
-        """Return the singular input key.
+        """Will be whatever keys the prompt expects.
+
         :meta private:
         """
         return [self.input_key]
 
     @property
     def output_keys(self) -> list[str]:
-        """Return the output keys.
+        """Will always return text key.
+
         :meta private:
         """
-        output_keys = [self.output_sql_key, self.output_results_key]
-        if not self.return_direct:
-            output_keys.append(self.output_answer_key)
-        return output_keys
+        return [self.output_key, self.output_results_key, self.output_sql_key, self.output_sql_complexity_key]
+
+    def _call(
+        self,
+        inputs: dict[str, Any],
+        run_manager: Optional[CallbackManagerForChainRun] = None,
+    ) -> dict[str, str]:
+        table_names_to_use = inputs.get("tables")
+        nl_sql_inputs = {
+            self.nl_sql_chain.input_key: inputs[self.input_key],
+            "tables": table_names_to_use,
+        }
+        nl_sql_results = self.nl_sql_chain(nl_sql_inputs, callbacks=run_manager.get_child() if run_manager else None)
+        sql_cmd = nl_sql_results[self.nl_sql_chain.output_key]
+        self.write_callback_message(sql_cmd, run_manager=run_manager, color="green")
+        sql_result = self.database.run(sql_cmd)
+        self.write_callback_message("\nSQLResult: ", run_manager=run_manager, color="yellow")
+        self.write_callback_message(sql_result, run_manager=run_manager, color="yellow")
+
+        gen_answer_prompt = self.prompt.format_prompt(
+            input=inputs[self.input_key],
+            sql_cmd=sql_cmd,
+            sql_result=sql_result,
+        )
+        response = self.llm.generate_prompt(
+            [gen_answer_prompt], callbacks=run_manager.get_child() if run_manager else None
+        )
+        answer = response.generations[0][0].text.strip()
+        self.write_callback_message(f"\nAnswer:\n{answer}", run_manager=run_manager, color="green")
+
+        return {
+            self.output_key: answer,
+            self.output_results_key: sql_result,
+            self.output_sql_key: sql_cmd,
+            self.output_sql_complexity_key: nl_sql_results[self.nl_sql_chain.output_complexity_key],
+        }
+
+    async def _acall(
+        self,
+        inputs: dict[str, Any],
+        run_manager: Optional[AsyncCallbackManagerForChainRun] = None,
+    ) -> dict[str, str]:
+        table_names_to_use = inputs.get("tables")
+        nl_sql_inputs = {
+            self.nl_sql_chain.input_key: inputs[self.input_key],
+            "tables": table_names_to_use,
+        }
+        nl_sql_results = await self.nl_sql_chain.acall(
+            nl_sql_inputs, callbacks=run_manager.get_child() if run_manager else None
+        )
+        sql_cmd = nl_sql_results[self.nl_sql_chain.output_key]
+        await self.write_callback_message_async(sql_cmd, run_manager=run_manager, color="green")
+        sql_result = self.database.run(sql_cmd)
+        await self.write_callback_message_async("\nSQLResult: ", run_manager=run_manager, color="yellow")
+        await self.write_callback_message_async(sql_result, run_manager=run_manager, color="yellow")
+
+        gen_answer_prompt = self.prompt.format_prompt(
+            input=inputs[self.input_key],
+            sql_cmd=sql_cmd,
+            sql_result=sql_result,
+        )
+        response = await self.llm.agenerate_prompt(
+            [gen_answer_prompt], callbacks=run_manager.get_child() if run_manager else None
+        )
+        answer = response.generations[0][0].text.strip()
+        await self.write_callback_message_async(f"\nAnswer:\n{answer}", run_manager=run_manager, color="green")
+
+        return {
+            self.output_key: answer,
+            self.output_results_key: sql_result,
+            self.output_sql_key: sql_cmd,
+            self.output_sql_complexity_key: nl_sql_results[self.nl_sql_chain.output_complexity_key],
+        }
 
     @property
     def _chain_type(self) -> str:
         return "nl_to_answer_chain"
-
-    async def _acall(
-        self, inputs: dict[str, Any], run_manager: AsyncCallbackManagerForChainRun | None = None
-    ) -> dict[str, Any]:
-        table_names_to_use = inputs.get("tables")
-        nl_sql_inputs = {
-            self.nl_sql_chain.input_key: inputs[self.input_key],
-            "tables": table_names_to_use,
-        }
-        nl_sql_results = await self.nl_sql_chain.acall(nl_sql_inputs, callbacks=self.callbacks)
-        sql_cmd = nl_sql_results[self.nl_sql_chain.output_key]
-        await self.write_callback_message_async(sql_cmd, run_manager=run_manager, color="green")
-
-        result = await run_in_threadpool(self.database.run, sql_cmd)
-        if run_manager:
-            await self.write_callback_message_async("\nSQLResult: ", run_manager=run_manager)
-            await self.write_callback_message_async(result, run_manager=run_manager, color="yellow")
-
-        if self.return_direct:
-            return {
-                self.output_sql_key: sql_cmd,
-                self.output_results_key: result,
-            }
-        else:
-            await self.write_callback_message_async("\nAnswer:", run_manager=run_manager)
-            llm_chain = LLMChain(
-                llm=self.llm, prompt=self.prompt, callbacks=self.callbacks, verbose=self.verbose, output_key="answer"
-            )
-            llm_inputs = {
-                "input": inputs[self.input_key],
-                "sql_cmd": sql_cmd,
-                "sql_result": f"{result} \nAnswer:",
-                "stop": ["\nAnswer:"],
-            }
-            final_result = await llm_chain.apredict(**llm_inputs)
-
-            await self.write_callback_message_async(final_result, run_manager=run_manager, color="green")
-            return {
-                self.output_sql_key: sql_cmd,
-                self.output_results_key: result,
-                self.output_answer_key: final_result.strip(),
-            }
-
-    def _call(self, inputs: dict[str, Any], run_manager: Optional[CallbackManagerForChainRun] = None) -> dict[str, Any]:
-        table_names_to_use = inputs.get("tables")
-        nl_sql_inputs = {
-            self.nl_sql_chain.input_key: inputs[self.input_key],
-            "tables": table_names_to_use,
-        }
-        nl_sql_results = self.nl_sql_chain(nl_sql_inputs, callbacks=self.callbacks)
-        sql_cmd = nl_sql_results[self.nl_sql_chain.output_key]
-        if run_manager:
-            run_manager.on_text(sql_cmd, color="green", verbose=self.verbose)
-        result = self.database.run(sql_cmd)
-        if run_manager:
-            run_manager.on_text("\nSQLResult: ", verbose=self.verbose)
-            run_manager.on_text(result, color="yellow", verbose=self.verbose)
-
-        if self.return_direct:
-            return {
-                self.output_sql_key: sql_cmd,
-                self.output_results_key: result,
-            }
-        else:
-            if run_manager:
-                run_manager.on_text("\nAnswer:", verbose=self.verbose)
-            llm_chain = LLMChain(
-                llm=self.llm, prompt=self.prompt, callbacks=self.callbacks, verbose=self.verbose, output_key="answer"
-            )
-            llm_inputs = {
-                "input": inputs[self.input_key],
-                "sql_cmd": sql_cmd,
-                "sql_result": f"{result} \nAnswer:",
-                "stop": ["\nAnswer:"],
-            }
-            final_result = llm_chain.predict(**llm_inputs)
-
-            if run_manager:
-                run_manager.on_text(final_result, color="green", verbose=self.verbose)
-            return {
-                self.output_sql_key: sql_cmd,
-                self.output_results_key: result,
-                self.output_answer_key: final_result.strip(),
-            }
