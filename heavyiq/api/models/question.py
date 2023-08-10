@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -34,7 +32,7 @@ class QuestionResponse(BaseModel):
     answer: str = Field(..., description="Natural language answer")
     sql: str = Field(..., description="A SQL statement")
     sql_complexity: int = Field(..., description="The complexity level of the SQL statement")
-    feedback_id: Optional[str] = Field(
+    feedback_id: str = Field(
         ..., description="A unique identifier for this request that can be used to submit feedback about the response"
     )
 

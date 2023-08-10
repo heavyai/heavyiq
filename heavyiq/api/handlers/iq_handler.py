@@ -34,7 +34,7 @@ def handle_query_request(request: QueryRequest) -> QueryResponse:
     chain = chain_cls(llm=llm, database=db, verbose=True, tags=["rest-api", "query-endpoint"])  # type: ignore
     chain_input = {chain.input_key: question, "tables": tables}
     res = log_chain_call(chain, chain_input, "")
-    feedback_id = str(res["__run"].run_id) if "__run" in res else None
+    feedback_id = str(res["__run"].run_id) if "__run" in res else ""
     return QueryResponse(
         sql=res[chain.output_key], sql_complexity=res[chain.output_complexity_key], feedback_id=feedback_id
     )
@@ -57,7 +57,7 @@ async def handle_query_request_async(request: QueryRequest, db: HeavyDB) -> Quer
     chain = chain_cls(llm=llm, database=db, callbacks=[file_callback_handler], verbose=True, tags=["rest-api", "query-endpoint"])  # type: ignore
     chain_input = {chain.input_key: request.question, "tables": request.tables}
     res = await log_chain_call_async(chain, chain_input, "")
-    feedback_id = str(res["__run"].run_id) if "__run" in res else None
+    feedback_id = str(res["__run"].run_id) if "__run" in res else ""
     return QueryResponse(
         sql=res[chain.output_key], sql_complexity=res[chain.output_complexity_key], feedback_id=feedback_id
     )
@@ -91,7 +91,7 @@ def handle_question_request(request: QuestionRequest) -> QuestionResponse:
     )
     chain_input = {chain.input_key: request.question, "tables": request.tables}
     res = log_chain_call(chain, chain_input, "")
-    feedback_id = str(res["__run"].run_id) if "__run" in res else None
+    feedback_id = str(res["__run"].run_id) if "__run" in res else ""
     return QuestionResponse(
         answer=res[chain.output_key],
         sql=res[chain.output_sql_key],
@@ -131,8 +131,7 @@ async def handle_question_request_async(request: QuestionRequest, db: HeavyDB) -
     )
     chain_input = {chain.input_key: request.question, "tables": request.tables}
     res = await log_chain_call_async(chain, chain_input, "")
-    feedback_id = str(res["__run"].run_id) if "__run" in res else None
-    print(feedback_id)
+    feedback_id = str(res["__run"].run_id) if "__run" in res else ""
     return QuestionResponse(
         answer=res[chain.output_key],
         sql=res[chain.output_sql_key],
@@ -156,7 +155,5 @@ async def handle_submit_feedback_request_async(request: FeedbackRequest) -> Feed
     if not is_langsmith_active:
         raise StarletteHTTPException(status_code=400, detail="Feedback is not enabled in the config.")
     langsmith_client = Client()
-    langsmith_client.create_feedback(
-        request.feedback_id, "user_feedback", score=request.positive, comment=request.comment
-    )
+    langsmith_client.create_feedback(request.feedback_id, "user_feedback", score=request.score, comment=request.comment)
     return FeedbackResponse()

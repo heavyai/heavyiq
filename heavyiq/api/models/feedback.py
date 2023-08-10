@@ -12,7 +12,7 @@ class FeedbackRequest(BaseModel):
         ...,
         description="A unique identifier for a HeavyIQ request that can be used to submit feedback about the response",
     )
-    positive: bool = Field(..., description="Whether the feedback is positive or negative")
+    score: float = Field(..., description="From 0.0 (worst) to 1.0 (best)")
     comment: Optional[str] = Field(..., description="An optional comment about the feedback")
 
     class Config:
@@ -20,7 +20,7 @@ class FeedbackRequest(BaseModel):
             "examples": [
                 {
                     "feedback_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-                    "positive": True,
+                    "score": 1.0,
                     "comment": "(Optional) This produced a geo-spatial join that was very helpful.",
                 }
             ]
