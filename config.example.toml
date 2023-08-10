@@ -12,9 +12,6 @@ table_documents_dir = "table_documents"
 openai_gpt_model = "gpt-3.5-turbo-16k"
 
 # optional, don't copy to your config if you don't have these
-promptlayer_api_key = ""
-promptwatch_api_key = ""
-promptwatch_tracking_project = "<name>_dev" # i.e. "bfturner_dev"
 langsmith_project = ""
 langsmith_api_key = ""
 
