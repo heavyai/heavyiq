@@ -1,15 +1,13 @@
 from collections.abc import Generator, AsyncGenerator
-from contextlib import contextmanager, nullcontext, asynccontextmanager
+from contextlib import contextmanager, asynccontextmanager
 from datetime import datetime
 from typing import Optional, Any
 
 from langchain.agents.agent import AgentExecutor
 from langchain.callbacks import OpenAICallbackHandler, get_openai_callback
 from langchain.chains.base import Chain
-from promptwatch import PromptWatch
 
 from heavyiq import VERSION_TAG
-from heavyiq.config import get_config
 from heavyiq.langchain.utils import is_langsmith_active
 
 # from .database import Session, RequestLog
@@ -167,19 +165,11 @@ def agent_log_request_ctx(
     yield ctx
 
 
-def promptwatch_context() -> PromptWatch | nullcontext:
-    config = get_config()
-    if config.promptwatch_api_key and config.promptlayer_api_key != "":
-        return PromptWatch(api_key=config.promptwatch_api_key, tracking_project=config.promptwatch_tracking_project)
-    else:
-        return nullcontext()
-
-
 def log_chain_call(chain: Chain, input: str | dict, model: str = "", chain_name: Optional[str] = None) -> dict:
     if isinstance(input, str):
         input = {chain.input_keys[0]: input}
     with chain_log_request_ctx(chain_name or chain._chain_type, model, input) as log_ctx:
-        with promptwatch_context(), get_openai_callback() as cb:
+        with get_openai_callback() as cb:
             try:
                 output = chain(input, include_run_info=is_langsmith_active, tags=[VERSION_TAG])
                 log_ctx.success(output, cb)
@@ -195,7 +185,7 @@ async def log_chain_call_async(
     if isinstance(input, str):
         input = {chain.input_keys[0]: input}
     async with chain_log_request_ctx_async(chain_name or chain._chain_type, model, input) as log_ctx:
-        with promptwatch_context(), get_openai_callback() as cb:
+        with get_openai_callback() as cb:
             try:
                 output = await chain.acall(input, include_run_info=is_langsmith_active, tags=[VERSION_TAG])
                 log_ctx.success(output, cb)
@@ -207,7 +197,7 @@ async def log_chain_call_async(
 
 def log_agent_call(agent: AgentExecutor, input: str, model: str = "") -> dict:
     with agent_log_request_ctx("agent", model, {"input": input}) as log_ctx:
-        with promptwatch_context(), get_openai_callback() as cb:
+        with get_openai_callback() as cb:
             try:
                 agent.return_intermediate_steps = True
                 res = agent({"input": input})
