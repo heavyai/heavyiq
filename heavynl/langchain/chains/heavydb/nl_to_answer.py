@@ -1,18 +1,23 @@
 from __future__ import annotations
+
 from typing import Any, Optional
 
-from langchain.chains.base import Chain
-from langchain.base_language import BaseLanguageModel
-from langchain.callbacks.manager import CallbackManagerForChainRun
-from pydantic import BaseModel, Extra, Field
+from pydantic import Extra
 
+from langchain.schema.language_model import BaseLanguageModel
+from langchain.schema import BasePromptTemplate
+from langchain.prompts.prompt import PromptTemplate
+from langchain.callbacks.manager import (
+    AsyncCallbackManagerForChainRun,
+    CallbackManagerForChainRun,
+)
+
+from heavynl.config import get_config
+from heavynl.langchain.chains import BaseChain
 from heavynl.langchain import HeavyDB
-from heavynl.langchain.prompts import LoggedPromptTemplate
-from ..logged_llm import LoggedLLMChain
+from .nl_to_sql import BaseNLtoSQLChain, get_nl_to_sql_chain_by_llm
 
-from .nl_to_sql import get_nl_to_sql_chain_by_llm
-
-ANSWER_TEMPLATE = """Given an input question, first create a syntactically correct {dialect} query to run, then look at the results of the query and return the answer.
+ANSWER_TEMPLATE = """Given an input question, first create a syntactically correct SQL query to run, then look at the results of the query and return the answer.
 Use the following format:
 Question: Question here
 SQLQuery: /* step-by-step thought process */ SQL Query to run
@@ -21,16 +26,24 @@ Answer: Final answer here
 Question: {input}
 SQLQuery: {sql_cmd}
 SQLResult: {sql_result}"""
-ANSWER_PROMPT = LoggedPromptTemplate(
-    name="nl_to_answer_chain",
-    tags=["chain", "nl_to_answer_chain"],
-    input_variables=["input", "dialect", "sql_cmd", "sql_result"],
-    template=ANSWER_TEMPLATE,
-    version=1,
-)
+ANSWER_PROMPT = PromptTemplate.from_template(ANSWER_TEMPLATE)
+
+CUSTOM_LLM_ANSWER_TEMPLATE = """<|english prompt|>
+The user asked the following question:
+{input}
+
+To answer the question, the following SQL query was generated:
+{sql_cmd}
+
+The following results were returned:
+{sql_result}
+
+Now explain the results in English, referencing the question and the SQL query as needed.
+<|english answer|>"""
+CUSTOM_LLM_ANSWER_PROMPT = PromptTemplate.from_template(CUSTOM_LLM_ANSWER_TEMPLATE)
 
 
-class NLtoAnswerChain(Chain, BaseModel):
+class NLtoAnswerChain(BaseChain):
     """
     Chain for translating natural language to an answer.
 
@@ -41,18 +54,32 @@ class NLtoAnswerChain(Chain, BaseModel):
         If you do not restrict the tables you risk exceeding the token limit of the LLM.
     """
 
+    prompt: BasePromptTemplate
+    """Prompt object to use."""
     llm: BaseLanguageModel
-    """LLM wrapper to use."""
-    database: HeavyDB = Field(exclude=True)
-    """HeavyDB Database to connect to."""
-    prompt: LoggedPromptTemplate = ANSWER_PROMPT
-    """Prompt to use to translate natural language to SQL."""
+    nl_sql_chain: BaseNLtoSQLChain
+    database: HeavyDB
     input_key: str = "query"  #: :meta private:
-    output_answer_key: str = "answer"  #: :meta private:
+    output_key: str = "answer"  #: :meta private:
     output_sql_key: str = "sql"  #: :meta private:
+    output_sql_complexity_key: str = "sql_complexity"  #: :meta private:
     output_results_key: str = "results"  #: :meta private:
-    return_direct: bool = False
-    """Whether or not to return the result of querying the SQL table directly."""
+
+    def __init__(self, *args, **kwargs):
+        config = get_config()
+        if config.custom_llm_type == "API":
+            prompt = CUSTOM_LLM_ANSWER_PROMPT
+        else:
+            prompt = ANSWER_PROMPT
+        super().__init__(*args, prompt=prompt, **kwargs)  # type: ignore
+
+    @classmethod
+    def from_same_llm(
+        cls: type[NLtoAnswerChain], llm: BaseLanguageModel, database: HeavyDB, verbose: bool = False, **kwargs
+    ) -> NLtoAnswerChain:
+        """Create a new NLtoAnswerChain with the same LLM used for the NLtoSQLChain."""
+        nl_sql_chain = get_nl_to_sql_chain_by_llm(llm)(llm=llm, database=database, verbose=verbose)
+        return cls(llm=llm, nl_sql_chain=nl_sql_chain, database=database, verbose=verbose, **kwargs)
 
     class Config:
         """Configuration for this pydantic object."""
@@ -62,63 +89,62 @@ class NLtoAnswerChain(Chain, BaseModel):
 
     @property
     def input_keys(self) -> list[str]:
-        """Return the singular input key.
+        """Will be whatever keys the prompt expects.
+
         :meta private:
         """
         return [self.input_key]
 
     @property
     def output_keys(self) -> list[str]:
-        """Return the output keys.
+        """Will always return text key.
+
         :meta private:
         """
-        output_keys = [self.output_sql_key, self.output_results_key]
-        if not self.return_direct:
-            output_keys.append(self.output_answer_key)
-        return output_keys
+        return [self.output_key, self.output_results_key, self.output_sql_key, self.output_sql_complexity_key]
+
+    def _call(
+        self,
+        inputs: dict[str, Any],
+        run_manager: Optional[CallbackManagerForChainRun] = None,
+    ) -> dict[str, str]:
+        table_names_to_use = inputs.get("tables")
+        nl_sql_inputs = {
+            self.nl_sql_chain.input_key: inputs[self.input_key],
+            "tables": table_names_to_use,
+        }
+        nl_sql_results = self.nl_sql_chain(nl_sql_inputs, callbacks=run_manager.get_child() if run_manager else None)
+        sql_cmd = nl_sql_results[self.nl_sql_chain.output_key]
+        self.write_callback_message(sql_cmd, run_manager=run_manager, color="green")
+        sql_result = self.database.run(sql_cmd)
+        self.write_callback_message("\nSQLResult: ", run_manager=run_manager, color="yellow")
+        self.write_callback_message(sql_result, run_manager=run_manager, color="yellow")
+
+        gen_answer_prompt = self.prompt.format_prompt(
+            input=inputs[self.input_key],
+            sql_cmd=sql_cmd,
+            sql_result=sql_result,
+        )
+        response = self.llm.generate_prompt(
+            [gen_answer_prompt], callbacks=run_manager.get_child() if run_manager else None
+        )
+        answer = response.generations[0][0].text.strip()
+        self.write_callback_message(f"\nAnswer:\n{answer}", run_manager=run_manager, color="green")
+
+        return {
+            self.output_key: answer,
+            self.output_results_key: sql_result,
+            self.output_sql_key: sql_cmd,
+            self.output_sql_complexity_key: nl_sql_results[self.nl_sql_chain.output_complexity_key],
+        }
+
+    async def _acall(
+        self,
+        inputs: dict[str, Any],
+        run_manager: Optional[AsyncCallbackManagerForChainRun] = None,
+    ) -> dict[str, str]:
+        raise NotImplementedError("Async not implemented for NLtoAnswerChain")
 
     @property
     def _chain_type(self) -> str:
         return "nl_to_answer_chain"
-
-    def _call(self, inputs: dict[str, Any], run_manager: Optional[CallbackManagerForChainRun] = None) -> dict[str, Any]:
-        table_names_to_use = inputs.get("tables")
-        nl_sql_chain = get_nl_to_sql_chain_by_llm(self.llm)(llm=self.llm, database=self.database, verbose=self.verbose)
-        nl_sql_inputs = {
-            nl_sql_chain.input_key: inputs[self.input_key],
-            "tables": table_names_to_use,
-        }
-        nl_sql_results = nl_sql_chain(nl_sql_inputs)
-        sql_cmd = nl_sql_results[nl_sql_chain.output_key]
-        if run_manager:
-            run_manager.on_text(sql_cmd, color="green", verbose=self.verbose)
-        result = self.database.run(sql_cmd)
-        if run_manager:
-            run_manager.on_text("\nSQLResult: ", verbose=self.verbose)
-            run_manager.on_text(result, color="yellow", verbose=self.verbose)
-
-        if self.return_direct:
-            return {
-                self.output_sql_key: sql_cmd,
-                self.output_results_key: result,
-            }
-        else:
-            if run_manager:
-                run_manager.on_text("\nAnswer:", verbose=self.verbose)
-            llm_chain = LoggedLLMChain(llm=self.llm, prompt=self.prompt, verbose=self.verbose, output_key="answer")
-            llm_inputs = {
-                "input": inputs[self.input_key],
-                "dialect": self.database.dialect,
-                "sql_cmd": sql_cmd,
-                "sql_result": f"{result} \nAnswer:",
-                "stop": ["\nAnswer:"],
-            }
-            final_result = llm_chain.predict(**llm_inputs)
-
-            if run_manager:
-                run_manager.on_text(final_result, color="green", verbose=self.verbose)
-            return {
-                self.output_sql_key: sql_cmd,
-                self.output_results_key: result,
-                self.output_answer_key: final_result.strip(),
-            }

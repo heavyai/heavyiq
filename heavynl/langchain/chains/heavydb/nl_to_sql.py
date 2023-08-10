@@ -2,23 +2,26 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from langchain.base_language import BaseLanguageModel
-from langchain.callbacks.manager import CallbackManagerForChainRun
+from pydantic import Extra
+
 from langchain.chat_models.base import BaseChatModel
+from langchain.schema.language_model import BaseLanguageModel
+from langchain.schema import AIMessage, HumanMessage
 from langchain.prompts import HumanMessagePromptTemplate, SystemMessagePromptTemplate
-from langchain.prompts.chat import BaseMessagePromptTemplate
-from langchain.schema import AIMessage, BaseMessage, HumanMessage
-from pydantic import Extra, Field
+from langchain.prompts.chat import ChatPromptTemplate, BaseChatPromptTemplate
+from langchain.schema import BasePromptTemplate
+from langchain.prompts.prompt import PromptTemplate
+from langchain.callbacks.manager import (
+    AsyncCallbackManagerForChainRun,
+    CallbackManagerForChainRun,
+)
 
 from heavynl.config import get_config
-from heavynl.langchain import HeavyDB
-from heavynl.langchain.utils import get_table_info_wrt_token_limit
+from heavynl.langchain.heavydb import HeavyDB
 from heavynl.langchain.chains import BaseChain
+from heavynl.langchain.utils import populate_table_info_wrt_token_limit
 from heavynl.langchain.exceptions import NLtoSQLException
-from heavynl.langchain.prompts import LoggedChatPromptTemplate, LoggedPromptTemplate
 from heavynl.utils import strip_sql_comments
-
-from ..logged_llm import LoggedLLMChain
 
 NL_TO_SQL_TEMPLATE = """Create a syntactically correct SQL query to answer the input question.
 Only query relevant columns, avoiding SELECT * for any table.
@@ -32,14 +35,9 @@ Question: [QUESTION]
 SQLQuery: /* step-by-step reasoning */ [SINGLE SQL QUERY]
 Only use the tables listed below. Some of the tables may not be relevant.
 {table_info}
-Question: {input}"""
-NL_TO_SQL_PROMPT = LoggedPromptTemplate(
-    name="nl_to_sql_chain",
-    tags=["chain", "nl_to_sql_chain"],
-    input_variables=["input", "table_info"],
-    template=NL_TO_SQL_TEMPLATE,
-    version=1,
-)
+Question: {input}
+SQLQuery:"""
+NL_TO_SQL_PROMPT = PromptTemplate.from_template(NL_TO_SQL_TEMPLATE)
 
 CUSTOM_LLM_NL_TO_SQL_TEMPLATE = """<|prompt|>
 You are a experienced data analyst adept at writing SQL queries to answer user questions.
@@ -49,39 +47,7 @@ You have access to the following relational tables, with schemas below.
 Write a SQL query to answer the following question:
 {input}
 <|answer|>"""
-CUSTOM_LLM_NL_TO_SQL_PROMPT = LoggedPromptTemplate(
-    name="custom_llm_nl_to_sql_chain",
-    tags=["chain", "nl_to_sql_chain"],
-    input_variables=["input", "table_info"],
-    template=CUSTOM_LLM_NL_TO_SQL_TEMPLATE,
-    version=1,
-)
-
-NL_TO_SQL_CHAT_TEMPLATE = """Create a syntactically correct SQL query to answer the input question.
-Only query relevant columns, avoiding SELECT * for any table.
-Only create one query.
-These functions DO NOT EXIST: STRING_AGG, GROUP_CONCAT
-Use only existing column names from the schema description, ensuring they are from the correct table.
-Exclude null values from the results. DO NOT use reserved SQL keywords as aliases.
-DO NOT use double colon cast operators ("::"); instead use the CAST function if needed.
-Explain your thinking step-by-step in a block comment before the query. Provide your response using the format below:
-Question: [QUESTION]
-SQLQuery: /* step-by-step reasoning */ [SINGLE SQL QUERY]
-Only use the tables listed below. Some of the tables may not be relevant.
-
-{table_info}
-"""
-NL_TO_SQL_CHAT_ERROR_TEMPLATE = """
-DO NOT USE "STRING_AGG", "GROUP_CONCAT" functions.
-DO NOT use reserved SQL keywords as aliases.
-Following exception appears after running your previous SQL query.
-
-{exception}
-"""
-NL_TO_SQL_CHAT_MESSAGES = [
-    SystemMessagePromptTemplate.from_template(NL_TO_SQL_CHAT_TEMPLATE),
-    HumanMessagePromptTemplate.from_template("{input}"),
-]
+CUSTOM_LLM_NL_TO_SQL_PROMPT = PromptTemplate.from_template(CUSTOM_LLM_NL_TO_SQL_TEMPLATE)
 
 NL_TO_SQL_ERROR_TEMPLATE = """Correct the given SQL query:
 If a function signature does not exist, do not use it. Reformulate the query to not use that function signature.
@@ -97,18 +63,41 @@ Only use the tables listed below.
 {table_info}
 Question: {input}
 SQLQuery: {sql_cmd}
-Errors: {error}
+Error: {error}
+NewSQLQuery:
 """
-NL_TO_SQL_ERROR_PROMPT = LoggedPromptTemplate(
-    name="nl_to_sql_chain_error",
-    tags=["chain", "nl_to_sql_chain", "nl_to_sql_chain_error"],
-    input_variables=["input", "table_info", "sql_cmd", "error"],
-    template=NL_TO_SQL_ERROR_TEMPLATE,
-    version=1,
-)
+NL_TO_SQL_ERROR_PROMPT = PromptTemplate.from_template(NL_TO_SQL_ERROR_TEMPLATE)
+
+NL_TO_SQL_CHAT_TEMPLATE = """Create a syntactically correct SQL query to answer the input question.
+Only query relevant columns, avoiding SELECT * for any table.
+Only create one query.
+These functions DO NOT EXIST: STRING_AGG, GROUP_CONCAT
+Use only existing column names from the schema description, ensuring they are from the correct table.
+Exclude null values from the results. DO NOT use reserved SQL keywords as aliases.
+DO NOT use double colon cast operators ("::"); instead use the CAST function if needed.
+Explain your thinking step-by-step in a block comment before the query. Provide your response using the format below:
+Question: [QUESTION]
+SQLQuery: /* step-by-step reasoning */ [SINGLE SQL QUERY]
+Only use the tables listed below. Some of the tables may not be relevant.
+
+{table_info}
+"""
+NL_TO_SQL_CHAT_MESSAGES = [
+    SystemMessagePromptTemplate.from_template(NL_TO_SQL_CHAT_TEMPLATE),
+    HumanMessagePromptTemplate.from_template("{input}"),
+]
+NL_TO_SQL_CHAT_PROMPT = ChatPromptTemplate.from_messages(NL_TO_SQL_CHAT_MESSAGES)
+
+NL_TO_SQL_CHAT_ERROR_TEMPLATE = """
+DO NOT USE "STRING_AGG", "GROUP_CONCAT" functions.
+DO NOT use reserved SQL keywords as aliases.
+Following exception appears after running your previous SQL query.
+
+{exception}
+"""
 
 
-class BaseNltoSQLChain(BaseChain):
+class BaseNLtoSQLChain(BaseChain):
     """
     Chain for converting a natural language question to a SQL query designed to answer the question with its results.
 
@@ -119,19 +108,18 @@ class BaseNltoSQLChain(BaseChain):
         If you do not restrict the tables you risk exceeding the token limit of the LLM.
     """
 
+    llm: BaseLanguageModel | BaseChatModel
+    database: HeavyDB
+    input_key: str = "query"  #: :meta private:
+    output_key: str = "sql"  #: :meta private:
+    output_complexity_key: str = "sql_complexity"  #: :meta private:
+    max_retries: int = 3
+
     class Config:
         """Configuration for this pydantic object."""
 
         extra = Extra.forbid
         arbitrary_types_allowed = True
-
-    llm: BaseLanguageModel | BaseChatModel
-    """LLM wrapper to use."""
-    database: HeavyDB = Field(exclude=True)
-    """HeavyDB Database to connect to."""
-    input_key: str = "query"  #: :meta private:
-    output_key: str = "sql"  #: :meta private:
-    max_retries: int = 3
 
     @property
     def input_keys(self) -> list[str]:
@@ -148,7 +136,7 @@ class BaseNltoSQLChain(BaseChain):
         return [self.output_key]
 
 
-class NLtoSQLChain(BaseNltoSQLChain):
+class NLtoSQLChain(BaseNLtoSQLChain):
     """
     Chain for converting a natural language question to a SQL query designed to answer the question with its results.
 
@@ -160,10 +148,9 @@ class NLtoSQLChain(BaseNltoSQLChain):
     """
 
     llm: BaseLanguageModel
-    prompt: LoggedPromptTemplate
-    """Prompt to use to translate natural language to SQL."""
-    error_prompt: LoggedPromptTemplate = NL_TO_SQL_ERROR_PROMPT
-    """Prompt to use to fix SQL errors."""
+    prompt: BasePromptTemplate
+    error_prompt: BasePromptTemplate = NL_TO_SQL_ERROR_PROMPT
+    """Prompt object to use."""
 
     def __init__(self, *args, **kwargs):
         config = get_config()
@@ -173,48 +160,52 @@ class NLtoSQLChain(BaseNltoSQLChain):
             prompt = NL_TO_SQL_PROMPT
         super().__init__(*args, prompt=prompt, **kwargs)  # type: ignore
 
-    @property
-    def _chain_type(self) -> str:
-        return "nl_to_sql_chain"
+    def _call(
+        self,
+        inputs: dict[str, Any],
+        run_manager: Optional[CallbackManagerForChainRun] = None,
+    ) -> dict[str, str]:
+        self.write_callback_message(inputs[self.input_key], run_manager=run_manager)
 
-    def _call(self, inputs: dict[str, Any], run_manager: Optional[CallbackManagerForChainRun] = None) -> dict[str, Any]:
-        input_text = f"{inputs[self.input_key]} \nSQLQuery:"
-        self.write_callback_message(input_text, run_manager=run_manager)
         # If not present, then defaults to None which is all tables available to HeavyDB wrapper instance
         table_names_to_use = inputs.get("tables")
-        create_query_prompt = self.prompt.partial(input=input_text)
-        table_info = get_table_info_wrt_token_limit(self.llm, self.database, create_query_prompt, table_names_to_use)
-        llm_inputs = {
-            "table_info": table_info,
-            "stop": ["\nSQLResult:"],
-        }
-        llm_chain = LoggedLLMChain(llm=self.llm, prompt=create_query_prompt)
-        sql_cmd = llm_chain.predict(**llm_inputs)
+
+        partial_gen_sql_prompt = self.prompt.partial(input=inputs[self.input_key])
+        gen_sql_prompt = populate_table_info_wrt_token_limit(
+            partial_gen_sql_prompt, self.llm, self.database, table_names_to_use
+        )
+
+        response = self.llm.generate_prompt(
+            [gen_sql_prompt], callbacks=run_manager.get_child() if run_manager else None
+        )
+        sql_cmd = response.generations[0][0].text.strip()
         verified = False
         retries = 0
-        while not verified and retries < self.max_retries:
+
+        while not verified:
             try:
                 self.write_callback_message(f"Verifying SQL Query: {sql_cmd}", run_manager=run_manager, color="blue")
                 self.database.validate_query(sql_cmd)
                 verified = True
             except Exception as e:
+                retries += 1
+                if retries > self.max_retries:
+                    break
                 self.write_callback_message(f"Invalid SQL Query: {e}.", run_manager=run_manager, color="red")
                 truncated_error = str(e)[0:150] if len(str(e)) > 150 else str(e)
-                error_prompt = self.error_prompt.partial(
-                    input=input_text,
+                partial_error_prompt = self.error_prompt.partial(
+                    input=inputs[self.input_key],
                     sql_cmd=sql_cmd,
-                    error=f"{truncated_error} \nNewSQLQuery:",
+                    error=truncated_error,
                 )
-                table_info = get_table_info_wrt_token_limit(self.llm, self.database, error_prompt, table_names_to_use)
-                error_recovery_chain = LoggedLLMChain(llm=self.llm, prompt=error_prompt)
-                retry_llm_inputs = {
-                    "table_info": table_info,
-                    "stop": ["\nNewSQLQuery:"],
-                }
-                sql_cmd = error_recovery_chain.predict(**retry_llm_inputs)
-                if sql_cmd.startswith("NewSQLQuery:"):
-                    sql_cmd = sql_cmd.replace("NewSQLQuery:", "").strip()
-                retries += 1
+                correct_error_prompt = populate_table_info_wrt_token_limit(
+                    partial_error_prompt, self.llm, self.database, table_names_to_use
+                )
+                response = self.llm.generate_prompt(
+                    [correct_error_prompt], callbacks=run_manager.get_child() if run_manager else None
+                )
+                sql_cmd = response.generations[0][0].text.strip()
+
         if not verified:
             self.write_callback_message(
                 f"Failed to verify SQL query after {self.max_retries} retries.", run_manager=run_manager, color="red"
@@ -225,110 +216,104 @@ class NLtoSQLChain(BaseNltoSQLChain):
 
         self.write_callback_message(sql_cmd, run_manager=run_manager, color="green")
 
-        chain_result: dict[str, Any] = {self.output_key: sql_cmd.strip()}
-        return chain_result
+        sql_complexity = self.database.complexity(sql_cmd)
 
+        return {self.output_key: strip_sql_comments(sql_cmd), self.output_complexity_key: str(sql_complexity)}
 
-class NLtoSQLChatChain(BaseNltoSQLChain):
-    """
-    Chain for converting a natural language question to a SQL query designed to answer the question with its results.
-
-    This Chain corrects invalid SQL by maintaining a history of it's previous attempts
-    to create a valid SQL within the max_retries limit.
-
-    Note: You MUST restrict the tables that are used by either:
-        1. Passing in a list of table names to use in the `tables` input key.
-        2. Setting the `database` attribute to a HeavyDB object with the `include_tables` or `ignore_tables` attribute set.
-
-        If you do not restrict the tables you risk exceeding the token limit of the LLM.
-    """
-
-    llm: BaseChatModel
-    """LLM wrapper to use."""
-    prompt_messages: list[BaseMessagePromptTemplate | BaseMessage] = NL_TO_SQL_CHAT_MESSAGES
-    """Prompt to use to translate natural language to SQL."""
-    messages_with_comments: bool = True  # helps to keep comments on the messages that we going to stack up
+    async def _acall(
+        self,
+        inputs: dict[str, Any],
+        run_manager: Optional[AsyncCallbackManagerForChainRun] = None,
+    ) -> dict[str, str]:
+        raise NotImplementedError("Async version of NLtoSQLChain is not implemented.")
 
     @property
     def _chain_type(self) -> str:
-        return "nl_to_sql_chat_chain"
+        return "nl_to_sql_chain"
 
-    def get_sql_query(self, return_message: BaseMessage) -> str:
+
+class NLtoSQLChatChain(BaseNLtoSQLChain):
+    llm: BaseChatModel
+    prompt: BaseChatPromptTemplate = NL_TO_SQL_CHAT_PROMPT
+    error_prompt: BasePromptTemplate = NL_TO_SQL_ERROR_PROMPT
+
+    def get_sql_query(self, message: str) -> str:
         """
         Helps to parse out SQL query from the llm response message.
         """
-        if "SQLQuery:" in return_message.content:
-            return strip_sql_comments(return_message.content.split("SQLQuery:")[1].strip())
-        if "```sql" in return_message.content:
-            return strip_sql_comments(return_message.content.split("```sql")[1].strip())
-        return strip_sql_comments(return_message.content)
+        if "SQLQuery:" in message:
+            return message.split("SQLQuery:")[1].strip()
+        if "```sql" in message:
+            return message.split("```sql")[1].strip()
 
-    def build_ai_message(self, return_message: BaseMessage) -> AIMessage:
-        """
-        Helps to build AI Message from the llm returned response message.
-        """
-        if self.messages_with_comments:
-            return AIMessage(content=return_message.content)
-        # don't allow comments on messages
-        return AIMessage(content=f"SQLQuery: {self.get_sql_query(return_message)}")
+        if ":\n" in message:
+            return message.split(":\n")[1].strip()
+        return strip_sql_comments(message)
 
-    def _call(self, inputs: dict[str, Any], run_manager: CallbackManagerForChainRun | None = None) -> dict[str, str]:
-        table_names_to_use: list[str] | None = inputs.get("tables")  # type: ignore
-        input_text = inputs[self.input_key]
-        messages_prompt = LoggedChatPromptTemplate.from_messages(
-            messages=self.prompt_messages,
-            name="nl_to_sql_chat_chain",
-            tags=["chain", "nl_to_sql_chat_chain"],
-            input_variables=["table_info"],
-            partial_variables={"input": input_text},
-            version=1,
+    def _call(
+        self,
+        inputs: dict[str, Any],
+        run_manager: Optional[CallbackManagerForChainRun] = None,
+    ) -> dict[str, str]:
+        self.write_callback_message(inputs[self.input_key], run_manager=run_manager)
+
+        # If not present, then defaults to None which is all tables available to HeavyDB wrapper instance
+        table_names_to_use = inputs.get("tables")
+
+        partial_gen_sql_prompt = self.prompt.partial(input=inputs[self.input_key])
+        gen_sql_prompt = populate_table_info_wrt_token_limit(
+            partial_gen_sql_prompt, self.llm, self.database, table_names_to_use
         )
-        table_info = get_table_info_wrt_token_limit(self.llm, self.database, messages_prompt, table_names_to_use)
 
-        messages_prompt = messages_prompt.format_prompt(table_info=table_info)
-        messages = messages_prompt.to_messages()
-        self.write_callback_message(f"Question: {input_text}\n", run_manager=run_manager, color="yellow")
-        sql_message: BaseMessage = self.llm(messages)
-        self.write_callback_message("\n" + sql_message.content, run_manager=run_manager, color="blue")
+        messages = gen_sql_prompt.to_messages()
+        response = self.llm.generate([messages], callbacks=run_manager.get_child() if run_manager else None)
+        sql_cmd = self.get_sql_query(response.generations[0][0].text)
+        verified = False
+        retries = 0
 
-        sql_valid = False
-        sql_query = ""
-        retries = 1
-
-        while not sql_valid and retries <= self.max_retries:
-            sql_query = self.get_sql_query(sql_message)
-            messages.append(self.build_ai_message(sql_message))
+        while not verified:
             try:
-                self.database.validate_query(sql_query)
-                sql_valid = True
-            except Exception as exc:
-                truncated_exc = str(exc)[0:150] if len(str(exc)) > 150 else str(exc)
-                messages.append(HumanMessage(content=NL_TO_SQL_CHAT_ERROR_TEMPLATE.format(exception=truncated_exc)))
-                self.write_callback_message(
-                    f"\nInvalid SQL,\n{sql_query} \n\nException:\n{exc}\nAttempt {retries}. Retrying ....",
-                    run_manager=run_manager,
-                    color="red",
-                )
-                sql_message = self.llm(messages)
+                messages.append(AIMessage(content=sql_cmd))
+                self.write_callback_message(f"Verifying SQL Query: {sql_cmd}", run_manager=run_manager, color="blue")
+                self.database.validate_query(sql_cmd)
+                verified = True
+            except Exception as e:
                 retries += 1
+                if retries > self.max_retries:
+                    break
+                self.write_callback_message(f"Invalid SQL Query: {e}.", run_manager=run_manager, color="red")
+                truncated_error = str(e)[0:150] if len(str(e)) > 150 else str(e)
+                messages.append(HumanMessage(content=NL_TO_SQL_CHAT_ERROR_TEMPLATE.format(exception=truncated_error)))
+                response = self.llm.generate([messages], callbacks=run_manager.get_child() if run_manager else None)
+                sql_cmd = self.get_sql_query(response.generations[0][0].text)
 
-        if sql_valid:
-            self.write_callback_message("\n\n" + sql_query, run_manager=run_manager, color="green")
-        else:
+        if not verified:
             self.write_callback_message(
-                f"\n\nFailed to verify SQL query after {self.max_retries} retries.\n",
-                run_manager=run_manager,
-                color="red",
+                f"Failed to verify SQL query after {self.max_retries} retries.", run_manager=run_manager, color="red"
             )
             raise NLtoSQLException(
                 f"Language model failed to generate a valid SQL query after {self.max_retries} tries."
             )
 
-        chain_result: dict[str, Any] = {self.output_key: sql_query}
-        return chain_result
+        self.write_callback_message(sql_cmd, run_manager=run_manager, color="green")
+
+        sql_complexity = self.database.complexity(sql_cmd)
+
+        return {self.output_key: strip_sql_comments(sql_cmd), self.output_complexity_key: str(sql_complexity)}
+
+    async def _acall(
+        self,
+        inputs: dict[str, Any],
+        run_manager: Optional[AsyncCallbackManagerForChainRun] = None,
+    ) -> dict[str, str]:
+        raise NotImplementedError("Async version of NLtoSQLChatChain is not implemented.")
+
+    @property
+    def _chain_type(self) -> str:
+        return "nl_to_sql_chat_chain"
 
 
-def get_nl_to_sql_chain_by_llm(llm: BaseLanguageModel) -> type[BaseNltoSQLChain]:
+def get_nl_to_sql_chain_by_llm(llm: BaseLanguageModel) -> type[BaseNLtoSQLChain]:
     """
     Gets the appropriate nt_to_sql chain class based upon the llm passed.
     """
