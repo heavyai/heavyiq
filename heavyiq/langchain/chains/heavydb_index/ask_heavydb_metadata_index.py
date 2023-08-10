@@ -113,7 +113,7 @@ class AskHeavyDBMetadataIndexChain(FileCallbackHandlerForChainMixin, RetrievalQA
     ) -> "AskHeavyDBMetadataIndexChain":
         # ChatOpenAI has a hard time formatting proper response
         # Unfortunate because this is more expensive ($0.08 vs $0.008)
-        llm = get_llm(["chain", "ask_metadata_index_chain"], temperature=0)
+        llm = get_llm(temperature=0)
         llm_question_chain = LLMChain(llm=llm, prompt=QUESTION_PROMPT)
         llm_combine_chain = LLMChain(llm=llm, prompt=COMBINE_PROMPT)
         combine_results_chain = StuffDocumentsChain(
