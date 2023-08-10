@@ -1,12 +1,19 @@
-from fastapi.concurrency import run_in_threadpool
+from langsmith import Client
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from heavyiq.logging_utils import get_heavyiq_logger
-from heavyiq.api.models import QueryRequest, QueryResponse, QuestionRequest, QuestionResponse
+from heavyiq.api.models import (
+    QueryRequest,
+    QueryResponse,
+    QuestionRequest,
+    QuestionResponse,
+    FeedbackRequest,
+    FeedbackResponse,
+)
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.chains import get_nl_to_sql_chain_by_llm, NLtoAnswerChain
 from heavyiq.langchain.llms import get_llm_by_type, LLMType
 from heavyiq.langchain.logging import log_chain_call, log_chain_call_async
-from heavyiq.utils import strip_sql_comments
 
 
 def handle_query_request(request: QueryRequest) -> QueryResponse:
@@ -27,9 +34,10 @@ def handle_query_request(request: QueryRequest) -> QueryResponse:
     chain = chain_cls(llm=llm, database=db, verbose=True, tags=["rest-api", "query-endpoint"])  # type: ignore
     chain_input = {chain.input_key: question, "tables": tables}
     res = log_chain_call(chain, chain_input, "")
-    sql = strip_sql_comments(res[chain.output_key])
-    sql_complexity = db.complexity(sql)
-    return QueryResponse(sql=sql, sql_complexity=sql_complexity)
+    feedback_id = str(res["__run"].run_id) if "__run" in res else None
+    return QueryResponse(
+        sql=res[chain.output_key], sql_complexity=res[chain.output_complexity_key], feedback_id=feedback_id
+    )
 
 
 async def handle_query_request_async(request: QueryRequest, db: HeavyDB) -> QueryResponse:
@@ -49,9 +57,10 @@ async def handle_query_request_async(request: QueryRequest, db: HeavyDB) -> Quer
     chain = chain_cls(llm=llm, database=db, callbacks=[file_callback_handler], verbose=True, tags=["rest-api", "query-endpoint"])  # type: ignore
     chain_input = {chain.input_key: request.question, "tables": request.tables}
     res = await log_chain_call_async(chain, chain_input, "")
-    sql = strip_sql_comments(res[chain.output_key])
-    sql_complexity = await run_in_threadpool(db.complexity, sql)
-    return QueryResponse(sql=sql, sql_complexity=sql_complexity)
+    feedback_id = str(res["__run"].run_id) if "__run" in res else None
+    return QueryResponse(
+        sql=res[chain.output_key], sql_complexity=res[chain.output_complexity_key], feedback_id=feedback_id
+    )
 
 
 def handle_question_request(request: QuestionRequest) -> QuestionResponse:
@@ -82,9 +91,13 @@ def handle_question_request(request: QuestionRequest) -> QuestionResponse:
     )
     chain_input = {chain.input_key: request.question, "tables": request.tables}
     res = log_chain_call(chain, chain_input, "")
-    sql = strip_sql_comments(res[chain.output_sql_key])
-    sql_complexity = db.complexity(sql)
-    return QuestionResponse(answer=res[chain.output_key], sql=sql, sql_complexity=sql_complexity)
+    feedback_id = str(res["__run"].run_id) if "__run" in res else None
+    return QuestionResponse(
+        answer=res[chain.output_key],
+        sql=res[chain.output_sql_key],
+        sql_complexity=res[chain.output_sql_complexity_key],
+        feedback_id=feedback_id,
+    )
 
 
 async def handle_question_request_async(request: QuestionRequest, db: HeavyDB) -> QuestionResponse:
@@ -118,6 +131,32 @@ async def handle_question_request_async(request: QuestionRequest, db: HeavyDB) -
     )
     chain_input = {chain.input_key: request.question, "tables": request.tables}
     res = await log_chain_call_async(chain, chain_input, "")
-    sql = strip_sql_comments(res[chain.output_sql_key])
-    sql_complexity = await run_in_threadpool(db.complexity, sql)
-    return QuestionResponse(answer=res[chain.output_key], sql=sql, sql_complexity=sql_complexity)
+    feedback_id = str(res["__run"].run_id) if "__run" in res else None
+    print(feedback_id)
+    return QuestionResponse(
+        answer=res[chain.output_key],
+        sql=res[chain.output_sql_key],
+        sql_complexity=res[chain.output_sql_complexity_key],
+        feedback_id=feedback_id,
+    )
+
+
+async def handle_submit_feedback_request_async(request: FeedbackRequest) -> FeedbackResponse:
+    """
+    Handles /submit-feedback request.
+
+    Args:
+        request (FeedbackRequest): request payload
+
+    Returns:
+        FeedbackResponse: response content
+    """
+    from heavyiq.langchain.utils import is_langsmith_active
+
+    if not is_langsmith_active:
+        raise StarletteHTTPException(status_code=400, detail="Feedback is not enabled in the config.")
+    langsmith_client = Client()
+    langsmith_client.create_feedback(
+        request.feedback_id, "user_feedback", score=request.positive, comment=request.comment
+    )
+    return FeedbackResponse()

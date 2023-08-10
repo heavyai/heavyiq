@@ -1,10 +1,18 @@
 from fastapi import APIRouter, Depends
 from heavyiq.langchain import HeavyDB
 from heavyiq.api.dependencies import valid_query_db_session, valid_question_db_session
-from heavyiq.api.models import QueryRequest, QueryResponse, QuestionResponse, QuestionRequest
+from heavyiq.api.models import (
+    QueryRequest,
+    QueryResponse,
+    QuestionResponse,
+    QuestionRequest,
+    FeedbackRequest,
+    FeedbackResponse,
+)
 from heavyiq.api.handlers import (
     handle_query_request_async,
     handle_question_request_async,
+    handle_submit_feedback_request_async,
 )
 
 iqrouter = APIRouter()
@@ -36,3 +44,8 @@ async def question(values: tuple[QuestionRequest, HeavyDB] = Depends(valid_quest
     :param QuestionRequest request: Request Body
     """
     return await handle_question_request_async(*values)
+
+
+@iqrouter.post("/submit-feedback", response_model=FeedbackResponse)
+async def submit_feedback(value: FeedbackRequest) -> FeedbackResponse:
+    return await handle_submit_feedback_request_async(value)
