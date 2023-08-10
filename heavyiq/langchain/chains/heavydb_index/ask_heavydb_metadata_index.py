@@ -2,6 +2,7 @@ import re
 from typing import Any, Optional
 
 from langchain.chains import LLMChain
+from langchain.prompts import PromptTemplate
 from langchain.chains.qa_with_sources.retrieval import RetrievalQAWithSourcesChain
 from langchain.chains.combine_documents.map_reduce import MapReduceDocumentsChain
 from langchain.chains.combine_documents.stuff import StuffDocumentsChain
@@ -11,7 +12,6 @@ from pydantic import Field
 
 from heavyiq.langchain.llms import get_llm
 from heavyiq.langchain.chains import FileCallbackHandlerForChainMixin
-from heavyiq.langchain.prompts import LoggedPromptTemplate
 
 question_prompt_template = """Use the following description of a SQL table.
 If relevant to the question, return the text verbatim.
@@ -20,20 +20,14 @@ If relevant to the question, return the text verbatim.
 
 Question: {question}
 Relevant text, if any:"""
-QUESTION_PROMPT = LoggedPromptTemplate(
-    name="ask_heavydb_metadata_index_chain_question",
-    tags=["chain", "ask_heavydb_metadata_index_chain", "ask_heavydb_metadata_index_chain_question"],
+QUESTION_PROMPT = PromptTemplate(
     template=question_prompt_template,
     input_variables=["context", "question"],
-    version=1,
 )
 
-EXAMPLE_PROMPT = LoggedPromptTemplate(
-    name="ask_heavydb_metadata_index_chain_example",
-    tags=["chain", "ask_heavydb_metadata_index_chain", "ask_heavydb_metadata_index_chain_example"],
+EXAMPLE_PROMPT = PromptTemplate(
     template="Content: {page_content}\nTable: {source}",
     input_variables=["page_content", "source"],
-    version=1,
 )
 
 SQLSchemaQuestionChainNoResultsAnswer = "None relevant."
@@ -72,9 +66,7 @@ QUESTION: {question}
 {summaries}
 =========
 FINAL ANSWER:"""
-COMBINE_PROMPT = LoggedPromptTemplate(
-    name="ask_heavydb_metadata_index_chain_combine",
-    tags=["chain", "ask_heavydb_metadata_index_chain", "ask_heavydb_metadata_index_chain_combine"],
+COMBINE_PROMPT = PromptTemplate(
     template=combine_prompt_template,
     input_variables=["summaries", "question"],
     partial_variables={"no_results_answer": SQLSchemaQuestionChainNoResultsAnswer},
