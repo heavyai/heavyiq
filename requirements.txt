@@ -8,8 +8,6 @@ heavyai==1.1.0
 langchain==0.0.261
 langsmith==0.0.20
 openai==0.27.8
-promptlayer==0.1.96
-promptwatch==0.2.8
 pydantic==1.10.11
 sentencepiece==0.1.99
 SQLAlchemy==2.0.19

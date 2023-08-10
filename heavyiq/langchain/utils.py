@@ -1,6 +1,5 @@
 import os
 
-import promptlayer
 from langchain.base_language import BaseLanguageModel
 from langchain.prompts import BasePromptTemplate, BaseChatPromptTemplate
 from langchain.schema.prompt import PromptValue
@@ -9,20 +8,7 @@ from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
 
 
-is_promptlayer_active = False
 is_langsmith_active = False
-
-
-def init_promptlayer() -> None:
-    """
-    Initializes the promptlayer API key if it is present in the config.
-    """
-    global is_promptlayer_active
-    config = get_config()
-    if config.promptlayer_api_key is not None and config.promptlayer_api_key != "":
-        os.environ["PROMPTLAYER_API_KEY"] = config.promptlayer_api_key
-        promptlayer.api_key = config.promptlayer_api_key
-        is_promptlayer_active = True
 
 
 def init_telemetrics() -> None:
