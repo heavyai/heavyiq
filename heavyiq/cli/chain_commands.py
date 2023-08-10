@@ -33,8 +33,8 @@ def nl_to_sql(ctx: click.Context, question: str, model: str, tables: str, verbos
     """Call the NL to SQL Chain"""
 
     heavydb = HeavyDB.from_env(include_tables=[t.strip() for t in tables.split(",")])
-    llm = get_llm_by_model_name(model, ["cli", "chain", "nl_to_sql_chain"], temperature=temperature, client=None)
-    chain = get_nl_to_sql_chain_by_llm(llm)(database=heavydb, llm=llm, verbose=verbose)  # type: ignore
+    llm = get_llm_by_model_name(model, temperature=temperature, client=None)
+    chain = get_nl_to_sql_chain_by_llm(llm)(database=heavydb, llm=llm, verbose=verbose, tags=["cli"])  # type: ignore
     click.echo(log_chain_call(chain, question, ""))
 
 
@@ -52,8 +52,8 @@ def nl_to_sql(ctx: click.Context, question: str, model: str, tables: str, verbos
 def nl_to_answer(ctx: click.Context, question: str, model: str, tables: str, verbose: bool, temperature: float) -> None:
     """Call the NL to Answer Chain"""
     heavydb = HeavyDB.from_env(include_tables=[t.strip() for t in tables.split(",")])
-    llm = get_llm_by_model_name(model, ["cli", "chain", "nl_to_answer_chain"], temperature=temperature, client=None)
-    chain = NLtoAnswerChain.from_same_llm(llm=llm, database=heavydb, verbose=verbose)
+    llm = get_llm_by_model_name(model, temperature=temperature, client=None)
+    chain = NLtoAnswerChain.from_same_llm(llm=llm, database=heavydb, verbose=verbose, tags=["cli"])
     click.echo(log_chain_call(chain, question, model))
 
 
@@ -68,10 +68,8 @@ def nl_to_answer(ctx: click.Context, question: str, model: str, tables: str, ver
 @click.pass_context
 def question_rephraser(ctx: click.Context, question: str, model: str, temperature: float) -> None:
     """Rephrase a question to be about SQL metadata"""
-    llm = get_llm_by_model_name(
-        model, ["cli", "chain", "sql_metadata_question_transformer_chain"], temperature=temperature, client=None
-    )
-    chain = SQLMetadataQuestionTransformerChain(llm=llm)
+    llm = get_llm_by_model_name(model, temperature=temperature, client=None)
+    chain = SQLMetadataQuestionTransformerChain(llm=llm, tags=["cli"])
     click.echo(log_chain_call(chain, question, ""))
 
 
