@@ -14,25 +14,23 @@ class LLMType(Enum):
     SQL_TO_ANSWER = "sql_to_answer"
 
 
-def get_llm_by_type(model_type: LLMType, tags: list[str] = [], **kwargs) -> BaseLLM | BaseChatModel:
+def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
     config = get_config()
     if config.custom_llm_type == "API":
         if config.dev:
             if model_type == LLMType.NL_TO_SQL:
-                return get_custom_llm(LLMType.NL_TO_SQL.value, tags=tags, **config.dev.nl_to_sql.dict(), **kwargs)
+                return get_custom_llm(LLMType.NL_TO_SQL.value, **config.dev.nl_to_sql.dict(), **kwargs)
             elif model_type == LLMType.SQL_TO_ANSWER:
-                return get_custom_llm(
-                    LLMType.SQL_TO_ANSWER.value, tags=tags, **config.dev.sql_to_answer.dict(), **kwargs
-                )
+                return get_custom_llm(LLMType.SQL_TO_ANSWER.value, **config.dev.sql_to_answer.dict(), **kwargs)
             else:
                 raise ValueError(f"Unknown LLM type: {model_type}")
         else:
-            return get_llm(tags=tags, **kwargs)
+            return get_llm(**kwargs)
     else:
-        return get_llm_by_model_name(model=config.openai_gpt_model, tags=tags, **kwargs)
+        return get_llm_by_model_name(model=config.openai_gpt_model, **kwargs)
 
 
-def get_custom_llm(name: str, api_base: str, context_window: int, tags: list[str] = [], **kwargs) -> BaseLLM:
+def get_custom_llm(name: str, api_base: str, context_window: int, **kwargs) -> BaseLLM:
     return OverrideOpenAI(
         openai_api_key="nothing",
         openai_api_base=api_base,
@@ -42,17 +40,17 @@ def get_custom_llm(name: str, api_base: str, context_window: int, tags: list[str
     )
 
 
-def get_llm_by_model_name(model: str, tags: list[str] = [], **kwargs) -> BaseLLM | BaseChatModel:
+def get_llm_by_model_name(model: str, **kwargs) -> BaseLLM | BaseChatModel:
     config = get_config()
     if config.custom_llm_type == "API":
-        return get_llm(tags=tags, **kwargs)
+        return get_llm(**kwargs)
     if model.startswith("gpt-3.5") or model.startswith("gpt-4") or model.startswith("gpt-35"):
-        return get_chat_llm(tags=tags, model=model, **kwargs)
+        return get_chat_llm(model=model, **kwargs)
     else:
-        return get_llm(tags=tags, model=model, **kwargs)
+        return get_llm(model=model, **kwargs)
 
 
-def get_llm(tags: list[str] = [], **kwargs) -> BaseLLM:
+def get_llm(**kwargs) -> BaseLLM:
     config = get_config()
     if config.custom_llm_type == "AZURE":
         return AzureOpenAI(
@@ -79,7 +77,7 @@ def azure_model_to_openai(model: str) -> str:
     return model
 
 
-def get_chat_llm(tags: list[str], model: str, **kwargs) -> BaseChatModel:
+def get_chat_llm(model: str, **kwargs) -> BaseChatModel:
     config = get_config()
     if config.custom_llm_type is not None:
         if config.custom_llm_type == "AZURE":
