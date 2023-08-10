@@ -9,6 +9,7 @@ from langchain.chains.base import Chain
 from promptwatch import PromptWatch
 
 from heavyiq.config import get_config
+from heavyiq.langchain.utils import is_langsmith_active
 
 # from .database import Session, RequestLog
 from .enums import LangChainType
@@ -179,7 +180,7 @@ def log_chain_call(chain: Chain, input: str | dict, model: str = "", chain_name:
     with chain_log_request_ctx(chain_name or chain._chain_type, model, input) as log_ctx:
         with promptwatch_context(), get_openai_callback() as cb:
             try:
-                output = chain(input)
+                output = chain(input, include_run_info=is_langsmith_active)
                 log_ctx.success(output, cb)
                 return output
             except Exception as e:
@@ -195,7 +196,7 @@ async def log_chain_call_async(
     async with chain_log_request_ctx_async(chain_name or chain._chain_type, model, input) as log_ctx:
         with promptwatch_context(), get_openai_callback() as cb:
             try:
-                output = await chain.acall(input)
+                output = await chain.acall(input, include_run_info=is_langsmith_active)
                 log_ctx.success(output, cb)
                 return output
             except Exception as e:
