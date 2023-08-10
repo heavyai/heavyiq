@@ -32,8 +32,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     promptwatch_api_key: Optional[str] = None
     promptwatch_tracking_project: Optional[str] = None
     langchain_endpoint: str = "https://api.smith.langchain.com"
-    langchain_api_key: Optional[str] = None
-    langchain_project: Optional[str] = None
+    langsmith_api_key: Optional[str] = None
+    langsmith_project: Optional[str] = None
     # LOGGING
     access_log_level: str = "INFO"
     """Used for the access log of the web server."""
