@@ -1,11 +1,9 @@
 from langchain.llms import AzureOpenAI, OpenAI
 from langchain.llms.base import BaseLLM
-from langchain.llms.promptlayer_openai import PromptLayerOpenAI
-from langchain.chat_models import PromptLayerChatOpenAI, ChatOpenAI, AzureChatOpenAI
+from langchain.chat_models import ChatOpenAI, AzureChatOpenAI
 from langchain.chat_models.base import BaseChatModel
 
 from heavynl.config import get_config
-from heavynl.langchain.utils import is_promptlayer_active
 
 
 def get_llm_by_model_name(model: str, tags: list[str] = [], **kwargs) -> BaseLLM | BaseChatModel:
@@ -29,23 +27,10 @@ def get_llm(tags: list[str] = [], **kwargs) -> BaseLLM:
             **kwargs
         )
     elif config.custom_llm_type == "API":
-        if is_promptlayer_active:
-            return PromptLayerOpenAI(
-                pl_tags=tags,
-                return_pl_id=True,
-                openai_api_key="not_necessary",
-                openai_api_base=config.custom_llm_api_base,
-                model="CUSTOM_LLM",
-                **kwargs
-            )
-        else:
-            return OpenAI(
-                openai_api_key="nothing", openai_api_base=config.custom_llm_api_base, model="CUSTOM_LLM", **kwargs
-            )
-    if is_promptlayer_active:
-        return PromptLayerOpenAI(pl_tags=tags, return_pl_id=True, openai_api_key=config.openai_api_key, **kwargs)
-    else:
-        return OpenAI(openai_api_key=config.openai_api_key, **kwargs)
+        return OpenAI(
+            openai_api_key="nothing", openai_api_base=config.custom_llm_api_base, model="CUSTOM_LLM", **kwargs
+        )
+    return OpenAI(openai_api_key=config.openai_api_key, **kwargs)
 
 
 def azure_model_to_openai(model: str) -> str:
@@ -69,9 +54,4 @@ def get_chat_llm(tags: list[str], model: str, **kwargs) -> BaseChatModel:
             )
         else:
             raise NotImplementedError("Custom LLMs are not supported for chat models yet.")
-    if is_promptlayer_active:
-        return PromptLayerChatOpenAI(
-            model=model, pl_tags=tags, return_pl_id=True, openai_api_key=config.openai_api_key, **kwargs
-        )
-    else:
-        return ChatOpenAI(model=model, openai_api_key=config.openai_api_key, **kwargs)
+    return ChatOpenAI(model=model, openai_api_key=config.openai_api_key, **kwargs)

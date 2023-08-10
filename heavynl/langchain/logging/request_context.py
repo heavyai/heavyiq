@@ -1,14 +1,14 @@
 from collections.abc import Generator
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager
 from datetime import datetime
 from typing import Optional, Any
 
 from langchain.agents.agent import AgentExecutor
 from langchain.callbacks import OpenAICallbackHandler, get_openai_callback
 from langchain.chains.base import Chain
-from promptwatch import PromptWatch
 
-from heavynl.config import get_config
+from heavynl import VERSION_TAG
+from heavynl.langchain.utils import is_langsmith_active
 
 # from .database import Session, RequestLog
 from .enums import LangChainType
@@ -151,21 +151,13 @@ def agent_log_request_ctx(
     yield ctx
 
 
-def promptwatch_context():
-    config = get_config()
-    if config.promptwatch_api_key and config.promptlayer_api_key != "":
-        return PromptWatch(api_key=config.promptwatch_api_key, tracking_project=config.promptwatch_tracking_project)
-    else:
-        return nullcontext()
-
-
 def log_chain_call(chain: Chain, input: str | dict, model: str = "", chain_name: Optional[str] = None) -> dict:
     if isinstance(input, str):
         input = {chain.input_keys[0]: input}
     with chain_log_request_ctx(chain_name or chain._chain_type, model, input) as log_ctx:
-        with promptwatch_context(), get_openai_callback() as cb:
+        with get_openai_callback() as cb:
             try:
-                output = chain(input)
+                output = chain(input, include_run_info=is_langsmith_active, tags=[VERSION_TAG])
                 log_ctx.success(output, cb)
                 return output
             except Exception as e:
@@ -175,7 +167,7 @@ def log_chain_call(chain: Chain, input: str | dict, model: str = "", chain_name:
 
 def log_agent_call(agent: AgentExecutor, input: str, model: str = "") -> dict:
     with agent_log_request_ctx("agent", model, {"input": input}) as log_ctx:
-        with promptwatch_context(), get_openai_callback() as cb:
+        with get_openai_callback() as cb:
             try:
                 agent.return_intermediate_steps = True
                 res = agent({"input": input})

@@ -1,16 +1,16 @@
 import re
 from typing import Any, Optional
 
+from langchain.chains import LLMChain
 from langchain.chains.qa_with_sources.retrieval import RetrievalQAWithSourcesChain
 from langchain.chains.combine_documents.map_reduce import MapReduceDocumentsChain
 from langchain.chains.combine_documents.stuff import StuffDocumentsChain
 from langchain.schema import BaseRetriever
 from langchain.callbacks.manager import CallbackManagerForChainRun, AsyncCallbackManagerForChainRun
+from langchain.prompts import PromptTemplate
 from pydantic import Field
 
 from heavynl.langchain.llms import get_llm
-from heavynl.langchain.prompts import LoggedPromptTemplate
-from ..logged_llm import LoggedLLMChain
 
 question_prompt_template = """Use the following description of a SQL table.
 If relevant to the question, return the text verbatim.
@@ -19,20 +19,14 @@ If relevant to the question, return the text verbatim.
 
 Question: {question}
 Relevant text, if any:"""
-QUESTION_PROMPT = LoggedPromptTemplate(
-    name="ask_heavydb_metadata_index_chain_question",
-    tags=["chain", "ask_heavydb_metadata_index_chain", "ask_heavydb_metadata_index_chain_question"],
+QUESTION_PROMPT = PromptTemplate(
     template=question_prompt_template,
     input_variables=["context", "question"],
-    version=1,
 )
 
-EXAMPLE_PROMPT = LoggedPromptTemplate(
-    name="ask_heavydb_metadata_index_chain_example",
-    tags=["chain", "ask_heavydb_metadata_index_chain", "ask_heavydb_metadata_index_chain_example"],
+EXAMPLE_PROMPT = PromptTemplate(
     template="Content: {page_content}\nTable: {source}",
     input_variables=["page_content", "source"],
-    version=1,
 )
 
 SQLSchemaQuestionChainNoResultsAnswer = "None relevant."
@@ -71,9 +65,7 @@ QUESTION: {question}
 {summaries}
 =========
 FINAL ANSWER:"""
-COMBINE_PROMPT = LoggedPromptTemplate(
-    name="ask_heavydb_metadata_index_chain_combine",
-    tags=["chain", "ask_heavydb_metadata_index_chain", "ask_heavydb_metadata_index_chain_combine"],
+COMBINE_PROMPT = PromptTemplate(
     template=combine_prompt_template,
     input_variables=["summaries", "question"],
     partial_variables={"no_results_answer": SQLSchemaQuestionChainNoResultsAnswer},
@@ -113,8 +105,8 @@ class AskHeavyDBMetadataIndexChain(RetrievalQAWithSourcesChain):
         # ChatOpenAI has a hard time formatting proper response
         # Unfortunate because this is more expensive ($0.08 vs $0.008)
         llm = get_llm(["chain", "ask_metadata_index_chain"], temperature=0)
-        llm_question_chain = LoggedLLMChain(llm=llm, prompt=QUESTION_PROMPT)
-        llm_combine_chain = LoggedLLMChain(llm=llm, prompt=COMBINE_PROMPT)
+        llm_question_chain = LLMChain(llm=llm, prompt=QUESTION_PROMPT)
+        llm_combine_chain = LLMChain(llm=llm, prompt=COMBINE_PROMPT)
         combine_results_chain = StuffDocumentsChain(
             llm_chain=llm_combine_chain,
             document_prompt=EXAMPLE_PROMPT,
@@ -154,7 +146,7 @@ class AskHeavyDBMetadataIndexChain(RetrievalQAWithSourcesChain):
         return result
 
     async def _acall(
-        self, inputs: dict[str, Any], run_manager: Optional[AsyncCallbackManagerForChainRun]
+        self, inputs: dict[str, Any], run_manager: Optional[AsyncCallbackManagerForChainRun] = None
     ) -> dict[str, Any]:
         _run_manager = run_manager or AsyncCallbackManagerForChainRun.get_noop_manager()
         docs = await self._aget_docs(inputs, run_manager=_run_manager)

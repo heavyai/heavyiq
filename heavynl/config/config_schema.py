@@ -1,7 +1,5 @@
 from typing import Optional
 
-from pydantic import Field
-
 from .overrides import OverrideBaseConfig
 
 
@@ -20,9 +18,9 @@ class HeavyNLConfig(OverrideBaseConfig):  # type: ignore
     metadata_index_dir: str = "db"
     table_documents_dir: str = "table_documents"
     # TELEMETRICS
-    promptlayer_api_key: Optional[str] = None
-    promptwatch_api_key: Optional[str] = None
-    promptwatch_tracking_project: Optional[str] = None
+    langchain_endpoint: str = "https://api.smith.langchain.com"
+    langsmith_api_key: Optional[str] = None
+    langsmith_project: Optional[str] = None
     # LOGGING
     access_log_level: str = "INFO"
     """Used for the access log of the web server."""

@@ -1,5 +1,4 @@
 from uuid import uuid4
-from contextlib import nullcontext
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
 import time
@@ -7,7 +6,6 @@ import time
 import click
 from langchain.callbacks import get_openai_callback
 from langchain.base_language import BaseLanguageModel
-from promptwatch import PromptWatch
 
 from heavynl.langchain import HeavyDB
 from heavynl.langchain.chains import get_nl_to_sql_chain_by_llm
@@ -20,14 +18,6 @@ from heavynl.utils import strip_sql_comments
 def eval():
     """Evaluate models."""
     pass
-
-
-def promptwatch_context(project: str, tenant: str) -> PromptWatch | nullcontext:
-    config = get_config()
-    if config.promptwatch_api_key and config.promptlayer_api_key != "":
-        return PromptWatch(api_key=config.promptwatch_api_key, tracking_project=project, tracking_tenant=tenant)
-    else:
-        return nullcontext()
 
 
 @eval.command()
@@ -53,7 +43,7 @@ def run_model_on_questions(
         if is_multi_table.upper() == "TRUE":
             tables.append(secondary_table)
         chain = get_nl_to_sql_chain_by_llm(llm)(database=heavydb, llm=llm, verbose=verbose)  # type: ignore
-        with promptwatch_context("nl_to_sql_eval", str(eval_id)), get_openai_callback() as cb:
+        with get_openai_callback() as cb:
             try:
                 res = chain({"query": question, "tables": tables})
                 sql = strip_sql_comments(res["sql"]).replace("\n", " ")
