@@ -157,9 +157,20 @@ class HeavyIQLogger(BaseLogger):
     By default all the logs produced by this logger gets stored inside "heavyiq.log" file.
     """
 
-    def __init__(self, name: str = "heavyiq", log_file_path: str | None = None, level: str | None = None):
+    def __init__(
+        self,
+        name: str = "heavyiq",
+        log_file_path: str | None = None,
+        level: str | None = None,
+        enable_console_logging: bool = True,
+    ):
         super().__init__(
-            name, level=level, log_file_path=log_file_path, filter=HeavyIQFilter(), formatter=get_default_formatter()
+            name,
+            level=level,
+            log_file_path=log_file_path,
+            filter=HeavyIQFilter(),
+            formatter=get_default_formatter(),
+            enable_console_logging=enable_console_logging,
         )
         self.info("HeavyIQ Logger initialized")
 
@@ -213,9 +224,20 @@ class _AccessLogger(BaseLogger):
     By default all the logs produced by this logger gets stored inside "access.log" file.
     """
 
-    def __init__(self, name: str = "app", log_file_path: str | None = None, level: str | None = None):
+    def __init__(
+        self,
+        name: str = "app",
+        log_file_path: str | None = None,
+        level: str | None = None,
+        enable_console_logging: bool = True,
+    ):
         super().__init__(
-            name, level=level, log_file_path=log_file_path, filter=AppFilter(), formatter=get_app_log_formatter()
+            name,
+            level=level,
+            log_file_path=log_file_path,
+            filter=AppFilter(),
+            formatter=get_app_log_formatter(),
+            enable_console_logging=enable_console_logging,
         )
 
 
@@ -256,7 +278,9 @@ def init_logs():
         os.makedirs(log_dir, exist_ok=True)
 
         _access_logger = _AccessLogger(
-            log_file_path=os.path.join(log_dir, access_log_name), level=LOG_CONFIG.access_log_level
+            log_file_path=os.path.join(log_dir, access_log_name),
+            level=LOG_CONFIG.access_log_level,
+            enable_console_logging=LOG_CONFIG.log_to_stdout,
         )
 
         access_symlink = os.path.join(log_dir, "heavyiq.ACCESS")
@@ -281,7 +305,9 @@ def init_logs():
         os.makedirs(log_dir, exist_ok=True)
 
         heavyiq_logger = HeavyIQLogger(
-            log_file_path=os.path.join(log_dir, app_log_name), level=LOG_CONFIG.heavyiq_log_level
+            log_file_path=os.path.join(log_dir, app_log_name),
+            level=LOG_CONFIG.heavyiq_log_level,
+            enable_console_logging=LOG_CONFIG.log_to_stdout,
         )
 
         app_symlink = os.path.join(log_dir, "heavyiq.ALL")

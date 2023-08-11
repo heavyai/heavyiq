@@ -18,6 +18,7 @@ langsmith_api_key = ""
 # Logging, these are defaults no need to copy to your config if not overriding
 access_log_level = "INFO"
 heavyiq_log_level = "INFO" # DEBUG is recommended for development
+log_to_stdout = false      # true is recommended for development
 
 # Custom LLM (optional, don't copy to your config if you aren't using a custom LLM solution)
 custom_llm_type = "API" # API or AZURE

@@ -9,6 +9,7 @@ from langchain.chains.base import Chain
 
 from heavyiq import VERSION_TAG
 from heavyiq.langchain.utils import is_langsmith_active
+from heavyiq.config import get_config
 
 # from .database import Session, RequestLog
 from .enums import LangChainType
@@ -60,11 +61,13 @@ class RequestContext:
         self.total_tokens = cb.total_tokens
         self.successful_requests = cb.successful_requests
         self.total_cost = cb.total_cost
-        print(f"Prompt Tokens: {cb.prompt_tokens}")
-        print(f"Completion Tokens: {cb.completion_tokens}")
-        print(f"Total Tokens: {cb.total_tokens}")
-        print(f"Successful Requests: {cb.successful_requests}")
-        print(f"Total Cost (USD): ${cb.total_cost}")
+        config = get_config()
+        if config.log_to_stdout:
+            print(f"Prompt Tokens: {cb.prompt_tokens}")
+            print(f"Completion Tokens: {cb.completion_tokens}")
+            print(f"Total Tokens: {cb.total_tokens}")
+            print(f"Successful Requests: {cb.successful_requests}")
+            print(f"Total Cost (USD): ${cb.total_cost}")
 
     def error(self, error: str, cb: Optional[OpenAICallbackHandler] = None, agent_log: Optional[str] = None) -> None:
         self.error_msg = error

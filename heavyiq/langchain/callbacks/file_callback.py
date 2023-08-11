@@ -49,9 +49,9 @@ class AsyncFileCallbackHandler(AsyncCallbackHandler):
         if self.to_stdout:
             bolded_text = get_bolded_text(text) if bold else text
             text_to_print = get_colored_text(bolded_text, color) if color else bolded_text
-            print(text_to_print, end=end)
+            print(f"\n{text_to_print}", end=end)
 
-        await self.append_to_file(f"{text}{end}")
+        await self.append_to_file(f"\n{text}{end}")
 
     def __del__(self) -> None:
         """Destructor to cleanup when done."""
@@ -134,7 +134,7 @@ class FileCallbackHandler(BaseFileCallbackHandler):
         """Print out that we are entering a chain."""
         class_name = serialized.get("name", serialized.get("id", ["<unknown>"])[-1])
         print_text(
-            f"\n\n> Entering new {class_name} chain...", end="\n", file=self.file, bold=True, to_stdout=self.to_stdout
+            f"\n> Entering new {class_name} chain...", end="\n", file=self.file, bold=True, to_stdout=self.to_stdout
         )
 
     def on_chain_end(self, outputs: dict[str, Any], **kwargs: Any) -> None:
@@ -165,14 +165,14 @@ class FileCallbackHandler(BaseFileCallbackHandler):
         # remove color codes exists in prompt after formatting text
         if "Prompt after formatting:" in text:
             print_text(
-                self.REMOVE_COLOR_CHARS_RGX.sub("", text),
+                f"\n{self.REMOVE_COLOR_CHARS_RGX.sub('', text)}",
                 color=color or self.color,
                 end=end,
                 file=self.file,
                 to_stdout=self.to_stdout,
             )
         else:
-            print_text(text, color=color or self.color, end=end, file=self.file, to_stdout=self.to_stdout)
+            print_text(f"\n{text}", color=color or self.color, end=end, file=self.file, to_stdout=self.to_stdout)
 
     def on_agent_finish(self, finish: AgentFinish, color: Optional[str] = None, **kwargs: Any) -> None:
         """Run on agent end."""
