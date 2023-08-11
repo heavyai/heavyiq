@@ -7,12 +7,10 @@ from langchain.memory.chat_message_histories.in_memory import ChatMessageHistory
 from langchain.agents import AgentExecutor, AgentOutputParser, BaseMultiActionAgent, BaseSingleActionAgent
 from langchain.agents.conversational_chat.base import ConversationalChatAgent
 from langchain.agents.conversational_chat.prompt import PREFIX, SUFFIX
-from langchain.callbacks.base import BaseCallbackManager
-from langchain.callbacks.manager import Callbacks
+from langchain.callbacks.base import Callbacks, BaseCallbackManager
 from langchain.chat_models.base import BaseChatModel
 from langchain.memory import CombinedMemory, ConversationBufferMemory
-from langchain.memory.chat_memory import BaseChatMemory
-from langchain.prompts.base import BasePromptTemplate
+from langchain.schema.prompt_template import BasePromptTemplate
 from langchain.prompts.chat import (
     ChatPromptTemplate,
     HumanMessagePromptTemplate,
@@ -156,7 +154,7 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
         """
         Gets the instance of heavyiq buffer memory.
         """
-        return next(i for i in self.memory.memories if isinstance(i, HeavyIQQueryBufferWindowMemory))
+        return next(i for i in self.memory.memories if isinstance(i, HeavyIQQueryBufferWindowMemory))  # type: ignore
 
     def _save_to_sql_memory(self, response: dict[str, Any]) -> Optional[str]:
         """
@@ -181,6 +179,20 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
         saved_query = self._save_to_sql_memory(response=response)
         if saved_query:
             logger.debug(f"Saved the last success query, \n{saved_query}")
+        return response["output"]
+
+    async def arun(
+        self,
+        question: str,
+        callbacks: Callbacks = None,
+        tags: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        inputs = {"input": question}
+        kwargs = {**kwargs, **inputs}
+        response = await self.acall(kwargs, callbacks=callbacks, tags=tags, metadata=metadata)
+        self._save_to_sql_memory(response=response)
         return response["output"]
 
     @classmethod
@@ -291,4 +303,33 @@ def create_conversational_agent(
         chat_history=chat_history,
         sql_history=sql_history,
         callbacks=[ConvoAgentCallbackHandler()],
+    )
+
+
+async def create_conversational_agent_async(
+    heavydb: Optional[HeavyDB] = None,
+    chat_llm: Optional[BaseChatModel] = None,
+    chat_history: Optional[ChatMessageHistory] = None,
+    sql_history: Optional[ChatMessageHistory] = None,
+    verbose: bool = False,
+) -> AgentExecutor:
+    chat_llm = chat_llm or get_chat_llm(
+        ["agent", "conversational_sql_agent"], temperature=0, model=get_config().openai_gpt_model
+    )
+    heavydb = heavydb or await HeavyDB.from_env_async()
+    toolkit = HeavyDBToolkit(db=heavydb)
+    tools = toolkit.get_tools()
+    chat_history = chat_history or ChatMessageHistory()
+    return SaveSuccessQueryAgentExecutor.initialize(
+        agent_kwargs=dict(
+            llm=chat_llm,
+            system_message=SYSTEM_MESSAGE,
+            human_message=HUMAN_MESSAGE,
+            output_parser=CustomOutputParser(),
+        ),
+        tools=tools,
+        last_k=1,
+        verbose=verbose,
+        chat_history=chat_history,
+        sql_history=sql_history,
     )

@@ -1,6 +1,6 @@
+import React from "react";
 import Header from "../components/Header";
 import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
-import { useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { socket } from "../socket";
 
@@ -22,7 +22,6 @@ const messageType = {
 const HomePage = () => {
   const inputRef = useRef();
   const chatWrapperRef = useRef();
-  const navigate = useNavigate();
 
   // enabled on question request and disabled once the answer arrives
   const [onRequest, setOnRequest] = useState(false);

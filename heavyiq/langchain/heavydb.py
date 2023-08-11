@@ -1,10 +1,11 @@
 from __future__ import annotations
 import re
+import asyncio
 import multiprocessing
 from threading import Lock
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from typing import Optional, Any, Iterable, TYPE_CHECKING, Callable
-
+from fastapi.concurrency import run_in_threadpool
 from heavyai import connect, Connection
 from heavyiq.config import get_config
 from heavyiq.utils import strip_sql_comments, is_destructive_sql, rate_sql_complexity, LRUCache
@@ -123,6 +124,35 @@ class HeavyDB:
             )
 
         conn = cls._connect_with_timeout(connect_func, kwargs.pop("timeout", 10))
+        return cls(conn, **kwargs)
+
+    @classmethod
+    async def _connect_with_timeout_async(
+        cls: type[HeavyDB], connect_func: Callable[[], Any], timeout: float = 10
+    ) -> Connection:
+        try:
+            return await asyncio.wait_for(connect_func(), timeout=timeout)
+        except TimeoutError:
+            raise Exception(f"HeavyDB failed to connect after {timeout} seconds")
+
+    @classmethod
+    async def from_env_async(cls: type[HeavyDB], **kwargs: Any) -> HeavyDB:
+        config = get_config()
+        if not config.heavydb_username or not config.heavydb_password or not config.heavydb_dbname:
+            raise ValueError("Please set the config variables heavydb_username, heavydb_password and heavydb_dbname")
+
+        async def connect_func() -> Any:
+            return await run_in_threadpool(
+                connect,
+                user=config.heavydb_username,
+                password=config.heavydb_password,
+                host=config.heavydb_host,
+                port=config.heavydb_port,
+                dbname=config.heavydb_dbname,
+                protocol=config.heavydb_protocol,
+            )
+
+        conn = await cls._connect_with_timeout_async(connect_func, kwargs.pop("timeout", 10))
         return cls(conn, **kwargs)
 
     @classmethod
