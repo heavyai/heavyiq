@@ -1,7 +1,9 @@
 import asyncio
+import logging
 import re
 from re import Pattern
 from typing import Any, Optional, TextIO, cast
+from logging import LogRecord
 
 import aiofiles
 from aiofiles.threadpool.text import AsyncTextIOWrapper
@@ -12,7 +14,7 @@ from langchain.schema.agent import AgentAction, AgentFinish
 
 
 class AsyncFileCallbackHandler(AsyncCallbackHandler):
-    """Async Callback Handler that writes to a file."""
+    """Async Callback Handler that write logs to a file."""
 
     def __init__(self, filename: str, mode: str = "a", color: Optional[str] = None, to_stdout: bool = True) -> None:
         """
@@ -69,7 +71,7 @@ class AsyncFileCallbackHandler(AsyncCallbackHandler):
 
     async def on_agent_action(self, action: AgentAction, color: Optional[str] = None, **kwargs: Any) -> Any:
         """Run on agent action."""
-        await self.print_text_async(action.log, color=color or self.color)
+        await self.print_text_async(action.log, color=color or self.color, end="\n")
 
     async def on_tool_end(
         self,
@@ -88,11 +90,45 @@ class AsyncFileCallbackHandler(AsyncCallbackHandler):
 
     async def on_text(self, text: str, color: Optional[str] = None, end: str = "", **kwargs: Any) -> None:
         """Run when agent ends."""
-        await self.print_text_async(text, color=color or self.color, end=end)
+        await self.print_text_async(text, color=color or self.color, end="\n")
 
     async def on_agent_finish(self, finish: AgentFinish, color: Optional[str] = None, **kwargs: Any) -> None:
         """Run on agent end."""
         await self.print_text_async(finish.log, color=color or self.color, end="\n")
+
+
+class AsyncLogFileCallbackHandler(AsyncFileCallbackHandler):
+    """
+    Same as AsyncFileCallbackHandler but it formats the text as per the log format before logging.
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        from heavyiq.logging_utils import get_heavyiq_logger
+
+        super().__init__(*args, **kwargs)
+        self._logger = get_heavyiq_logger()
+
+    def _text_to_log(self, text: str) -> str:
+        fn, lno, func, sinfo = self._logger.findCaller(stack_info=False, stacklevel=1)
+        log_record = self._logger.makeRecord(
+            self._logger.name, logging.INFO, fn, lno, text, (), None, func=func, extra=None, sinfo=sinfo
+        )
+        # diable some record attributes
+        log_record.remote_addr = "-"
+        log_record.username = "-"
+        return self._logger.log_formatter.format(log_record)
+
+    async def print_text_async(self, text: str, end: str = "", color: Optional[str] = None, bold: bool = False):
+        """
+        Optional write to stdout and log the text to file.
+        """
+        text = self._text_to_log(text)
+        if self.to_stdout:
+            bolded_text = get_bolded_text(text) if bold else text
+            text_to_print = get_colored_text(bolded_text, color) if color else bolded_text
+            print(text_to_print, end=end)
+
+        await self.append_to_file(f"{text}{end}")
 
 
 def print_text(

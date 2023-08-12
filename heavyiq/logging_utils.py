@@ -9,7 +9,7 @@ import sys
 
 
 from heavyiq.config import get_config
-from heavyiq.langchain.callbacks import FileCallbackHandler, AsyncFileCallbackHandler
+from heavyiq.langchain.callbacks import FileCallbackHandler, AsyncLogFileCallbackHandler
 
 
 def get_default_formatter() -> logging.Formatter:
@@ -128,12 +128,15 @@ class BaseLogger(logging.Logger):
         level = level or "DEBUG"
         super().__init__(name, level)
         formatter = formatter or get_default_formatter()
+        self.log_formatter = formatter
+        self.log_file_path = ""
         if enable_console_logging:
             console_handler = get_console_handler(formatter=formatter, level=level)
             self.addHandler(console_handler)
         if log_file_path:
             file_handler = get_rotating_file_handler(log_file_path, formatter=formatter, level=level)
             self.addHandler(file_handler)
+            self.log_file_path = log_file_path
         if filter:
             self.addFilter(filter)
 
@@ -184,10 +187,9 @@ class HeavyIQLogger(BaseLogger):
         Returns:
             FileCallbackHandler: callback handler mainly passed as callback for chains.
         """
-        rotating_file_handler = next(i for i in self.handlers if isinstance(i, RotatingFileHandler))
-        return FileCallbackHandler(rotating_file_handler.baseFilename, to_stdout=to_stdout)
+        return FileCallbackHandler(self.log_file_path, to_stdout=to_stdout)
 
-    def async_langchain_cb_handler(self, to_stdout: bool = True) -> AsyncFileCallbackHandler:
+    def async_langchain_cb_handler(self, to_stdout: bool = True) -> AsyncLogFileCallbackHandler:
         """
         Returns a file callback handler created from the log file.
 
@@ -197,8 +199,7 @@ class HeavyIQLogger(BaseLogger):
         Returns:
             FileCallbackHandler: callback handler mainly passed as callback for chains.
         """
-        rotating_file_handler = next(i for i in self.handlers if isinstance(i, RotatingFileHandler))
-        return AsyncFileCallbackHandler(rotating_file_handler.baseFilename, to_stdout=to_stdout)
+        return AsyncLogFileCallbackHandler(self.log_file_path, to_stdout=to_stdout)
 
 
 class _AccessLogger(BaseLogger):
