@@ -1,6 +1,7 @@
 from langchain.chains.base import Chain
 from langchain.callbacks.manager import CallbackManagerForChainRun, AsyncCallbackManagerForChainRun
 from heavyiq.logging_utils import get_heavyiq_logger
+from heavyiq.config import get_config
 
 
 class FileCallbackHandlerForChainMixin:
@@ -10,8 +11,11 @@ class FileCallbackHandlerForChainMixin:
 
     def __init__(self, *args, **kwargs):
         logger = get_heavyiq_logger()
+        config = get_config()
         # add langchain_cb_handler handler if callbacks are not specified
-        kwargs["callbacks"] = kwargs.get("callbacks", None) or [logger.langchain_cb_handler(to_stdout=False)]
+        kwargs["callbacks"] = kwargs.get("callbacks", None) or [
+            logger.langchain_cb_handler(to_stdout=config.log_to_stdout)
+        ]
         super().__init__(*args, **kwargs)  # type: ignore
 
 

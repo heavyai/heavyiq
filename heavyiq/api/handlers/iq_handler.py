@@ -14,6 +14,7 @@ from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.chains import get_nl_to_sql_chain_by_llm, NLtoAnswerChain
 from heavyiq.langchain.llms import get_llm_by_type, LLMType
 from heavyiq.langchain.logging import log_chain_call, log_chain_call_async
+from heavyiq.config import get_config
 
 
 def handle_query_request(request: QueryRequest) -> QueryResponse:
@@ -31,7 +32,7 @@ def handle_query_request(request: QueryRequest) -> QueryResponse:
     question = request.question
     llm = get_llm_by_type(LLMType.NL_TO_SQL, temperature=0.0)
     chain_cls = get_nl_to_sql_chain_by_llm(llm=llm)
-    chain = chain_cls(llm=llm, database=db, verbose=True, tags=["rest-api", "query-endpoint"])  # type: ignore
+    chain = chain_cls(llm=llm, database=db, tags=["rest-api", "query-endpoint"])  # type: ignore
     chain_input = {chain.input_key: question, "tables": tables}
     res = log_chain_call(chain, chain_input, "")
     feedback_id = str(res["__run"].run_id) if "__run" in res else ""
@@ -50,11 +51,12 @@ async def handle_query_request_async(request: QueryRequest, db: HeavyDB) -> Quer
     Returns:
         QueryResponse: response content
     """
+    config = get_config()
     logger = get_heavyiq_logger()
     llm = get_llm_by_type(LLMType.NL_TO_SQL, temperature=0.0)
     chain_cls = get_nl_to_sql_chain_by_llm(llm=llm)
-    file_callback_handler = logger.async_langchain_cb_handler(to_stdout=False)
-    chain = chain_cls(llm=llm, database=db, callbacks=[file_callback_handler], verbose=True, tags=["rest-api", "query-endpoint"])  # type: ignore
+    file_callback_handler = logger.async_langchain_cb_handler(to_stdout=config.log_to_stdout)
+    chain = chain_cls(llm=llm, database=db, callbacks=[file_callback_handler], tags=["rest-api", "query-endpoint"])  # type: ignore
     chain_input = {chain.input_key: request.question, "tables": request.tables}
     res = await log_chain_call_async(chain, chain_input, "")
     feedback_id = str(res["__run"].run_id) if "__run" in res else ""
@@ -79,14 +81,13 @@ def handle_question_request(request: QuestionRequest) -> QuestionResponse:
     logger.info("Table(s): %s", ", ".join(request.tables))
     nl_sql_llm = get_llm_by_type(LLMType.NL_TO_SQL, temperature=0.0)
     nl_sql_chain = get_nl_to_sql_chain_by_llm(llm=nl_sql_llm)(
-        llm=nl_sql_llm, database=db, verbose=True, tags=["rest-api", "question-endpoint"]
+        llm=nl_sql_llm, database=db, tags=["rest-api", "question-endpoint"]
     )
     llm = get_llm_by_type(LLMType.SQL_TO_ANSWER, temperature=0.0)
     chain = NLtoAnswerChain(
         llm=llm,
         nl_sql_chain=nl_sql_chain,
         database=db,
-        verbose=True,
         tags=["rest-api", "question-endpoint"],
     )
     chain_input = {chain.input_key: request.question, "tables": request.tables}
@@ -110,14 +111,14 @@ async def handle_question_request_async(request: QuestionRequest, db: HeavyDB) -
     Returns:
         QuestionResponse: response content
     """
+    config = get_config()
     logger = get_heavyiq_logger()
-    file_callback_handler = logger.async_langchain_cb_handler(to_stdout=False)
+    file_callback_handler = logger.async_langchain_cb_handler(to_stdout=config.log_to_stdout)
     nl_sql_llm = get_llm_by_type(LLMType.NL_TO_SQL, temperature=0.0)
     nl_sql_chain = get_nl_to_sql_chain_by_llm(llm=nl_sql_llm)(
         llm=nl_sql_llm,
         database=db,
         callbacks=[file_callback_handler],
-        verbose=True,
         tags=["rest-api", "question-endpoint"],
     )
     llm = get_llm_by_type(LLMType.SQL_TO_ANSWER, temperature=0.0)
@@ -126,7 +127,6 @@ async def handle_question_request_async(request: QuestionRequest, db: HeavyDB) -
         nl_sql_chain=nl_sql_chain,
         database=db,
         callbacks=[file_callback_handler],
-        verbose=True,
         tags=["rest-api", "question-endpoint"],
     )
     chain_input = {chain.input_key: request.question, "tables": request.tables}
