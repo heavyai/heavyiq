@@ -31,7 +31,9 @@ def one_time(
 ) -> None:
     """Call SQL Agent with a question"""
 
-    chat_llm = get_chat_llm(["cli", "agent", "one_time_sql_agent"], model=model, temperature=temperature, client=None)
+    chat_llm = get_chat_llm(
+        tags=["cli", "agent", "one_time_sql_agent"], model=model, temperature=temperature, client=None
+    )
     sql_agent = create_sql_agent(chat_llm=chat_llm)
     log_agent_call(sql_agent, question, model)
 
@@ -54,7 +56,7 @@ def conversational(
     """Begin a conversation with an Agent with access to HeavyDB"""
 
     chat_llm = get_chat_llm(
-        ["cli", "agent", "conversational_sql_agent"], model=model, temperature=temperature, client=None
+        tags=["cli", "agent", "conversational_sql_agent"], model=model, temperature=temperature, client=None
     )
     sql_agent = create_conversational_agent(chat_llm=chat_llm, verbose=verbose)
     # start a loop that asks for input and then calls the agent, break the loop on EXIT

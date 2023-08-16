@@ -22,15 +22,15 @@ class RequestContext:
         self.model = model
         self.input = input
         self.start_time = datetime.now()
-        self.output = None
-        self.prompt_tokens = None
-        self.completion_tokens = None
-        self.total_tokens = None
-        self.successful_requests = None
-        self.total_cost = None
+        self.output: dict[Any, Any] | None = None
+        self.prompt_tokens: int | None = None
+        self.completion_tokens: int | None = None
+        self.total_tokens: int | None = None
+        self.successful_requests: int | None = None
+        self.total_cost: float | None = None
         self.output = None
         self.agent_log = None
-        self.error_msg = None
+        self.error_msg: str | None = None
 
     async def __aenter__(self) -> "RequestContext":
         return self
