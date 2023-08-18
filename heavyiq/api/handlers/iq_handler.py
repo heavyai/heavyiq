@@ -1,20 +1,25 @@
+import re
+from typing import Any
+
 from langsmith import Client
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from heavyiq.logging_utils import get_heavyiq_logger
 from heavyiq.api.models import (
+    FeedbackRequest,
+    FeedbackResponse,
+    GenerateTableMetadataRequest,
     QueryRequest,
     QueryResponse,
     QuestionRequest,
     QuestionResponse,
-    FeedbackRequest,
-    FeedbackResponse,
 )
-from heavyiq.langchain import HeavyDB
-from heavyiq.langchain.chains import get_nl_to_sql_chain_by_llm, NLtoAnswerChain
-from heavyiq.langchain.llms import get_llm_by_type, LLMType
-from heavyiq.langchain.logging import log_chain_call, log_chain_call_async
 from heavyiq.config import get_config
+from heavyiq.langchain import HeavyDB
+from heavyiq.langchain.chains import NLtoAnswerChain, get_nl_to_sql_chain_by_llm
+from heavyiq.langchain.index.generate_table_documents import async_create_table_metadata
+from heavyiq.langchain.llms import LLMType, get_llm_by_type
+from heavyiq.langchain.logging import log_chain_call, log_chain_call_async
+from heavyiq.logging_utils import get_heavyiq_logger
 
 
 def handle_query_request(request: QueryRequest) -> QueryResponse:
@@ -157,3 +162,13 @@ async def handle_submit_feedback_request_async(request: FeedbackRequest) -> Feed
     langsmith_client = Client()
     langsmith_client.create_feedback(request.feedback_id, "user_feedback", score=request.score, comment=request.comment)
     return FeedbackResponse()
+
+
+async def handle_generate_table_metadata_async(request: GenerateTableMetadataRequest, db: HeavyDB) -> dict[Any, Any]:
+    """
+    Handles /generate-table-metadata request.
+    """
+    table_metadata = await async_create_table_metadata(db, request.table_name)
+    summary, column_description = re.split(r"(?m)\s*Column descriptions for.*", table_metadata)
+    column_description_mapping = dict(re.findall(r"(?m)^\s*-\s*(?:\w+\.)?(\w+):\s*(.+)", column_description))
+    return {"table_name": request.table_name, "summary": summary, "columns": column_description_mapping}
