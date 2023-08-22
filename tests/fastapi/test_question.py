@@ -1,6 +1,6 @@
 import pytest
 from typing import Any, Callable
-from .base import client
+from .base import client, RunId
 from unittest.mock import patch
 
 SQL = "SELECT COUNT(*) AS num_states, STATE_NAME FROM usa_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;"
@@ -8,12 +8,14 @@ ANSWER = "4 states start with the letter A; Alaska, Arizona, Arkansas, and Alaba
 
 
 # Mock the log_chain_call_async function to return "foo"
-async def mock_log_chain_call_async(chain: Any, chain_input: dict, model_name: str) -> dict[str, str]:
-    return {"sql": SQL, "answer": ANSWER}
+async def mock_log_chain_call_async(chain: Any, chain_input: dict, model_name: str) -> dict[str, str | int | RunId]:
+    return {"sql": SQL, "answer": ANSWER, "sql_complexity": 3, "__run": RunId("acf2132")}
 
 
-@pytest.mark.parametrize("expected_result", [{"sql": SQL, "answer": ANSWER, "sql_complexity": 3}])
-@patch("heavyiq.fastapi.handlers.iq_handler.log_chain_call_async", side_effect=mock_log_chain_call_async)
+@pytest.mark.parametrize(
+    "expected_result", [{"sql": SQL, "answer": ANSWER, "sql_complexity": 3, "feedback_id": "acf2132"}]
+)
+@patch("heavyiq.api.handlers.iq_handler.log_chain_call_async", side_effect=mock_log_chain_call_async)
 def test_should_pass_question_endpoint(mock: Callable, expected_result: list[Any]):
     """
     Test query endpoint.
