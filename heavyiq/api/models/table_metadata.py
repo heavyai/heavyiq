@@ -37,7 +37,7 @@ class GenerateTableMetadataResponse(BaseModel):
             "examples": [
                 {
                     "table_name": "us_pois_safegraph",
-                    "description": 'The "us_pois_safegraph" table is designed to store information about points of interest (POIs) in the United States.',
+                    "summary": 'The "us_pois_safegraph" table is designed to store information about points of interest (POIs) in the United States.',
                     "columns": {
                         "safegraph_place_id": "A unique identifier for each place in the dataset.",
                         "parent_safegraph_place_id": "The safegraph_place_id of the parent place, if applicable.",
