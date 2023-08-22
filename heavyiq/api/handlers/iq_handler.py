@@ -1,20 +1,22 @@
 from langsmith import Client
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from heavyiq.logging_utils import get_heavyiq_logger
 from heavyiq.api.models import (
+    FeedbackRequest,
+    FeedbackResponse,
+    GenerateTableMetadataRequest,
+    GenerateTableMetadataResponse,
     QueryRequest,
     QueryResponse,
     QuestionRequest,
     QuestionResponse,
-    FeedbackRequest,
-    FeedbackResponse,
 )
-from heavyiq.langchain import HeavyDB
-from heavyiq.langchain.chains import get_nl_to_sql_chain_by_llm, NLtoAnswerChain
-from heavyiq.langchain.llms import get_llm_by_type, LLMType
-from heavyiq.langchain.logging import log_chain_call, log_chain_call_async
 from heavyiq.config import get_config
+from heavyiq.langchain import HeavyDB
+from heavyiq.langchain.chains import NLtoAnswerChain, GenerateTableMetadataChain, get_nl_to_sql_chain_by_llm
+from heavyiq.langchain.llms import LLMType, get_llm_by_type
+from heavyiq.langchain.logging import log_chain_call, log_chain_call_async
+from heavyiq.logging_utils import get_heavyiq_logger
 
 
 def handle_query_request(request: QueryRequest) -> QueryResponse:
@@ -157,3 +159,21 @@ async def handle_submit_feedback_request_async(request: FeedbackRequest) -> Feed
     langsmith_client = Client()
     langsmith_client.create_feedback(request.feedback_id, "user_feedback", score=request.score, comment=request.comment)
     return FeedbackResponse()
+
+
+async def handle_generate_table_metadata_async(
+    request: GenerateTableMetadataRequest, db: HeavyDB
+) -> GenerateTableMetadataResponse:
+    """
+    Handles /generate-table-metadata request.
+    """
+    llm = get_llm_by_type(LLMType.SQL_TO_ANSWER, temperature=0.0)
+    chain = GenerateTableMetadataChain(llm=llm, database=db, tags=["rest-api", "generate-table-metadata-endpoint"])
+    res = await log_chain_call_async(chain, request.table_name, "")
+    feedback_id = str(res["__run"].run_id) if "__run" in res else ""
+    return GenerateTableMetadataResponse(
+        table_name=request.table_name,
+        summary=res[chain.output_summary_key],
+        columns=res[chain.output_columns_key],
+        feedback_id=feedback_id,
+    )

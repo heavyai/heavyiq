@@ -1,6 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-import os
 
 from langchain.docstore.document import Document
 from langchain.schema import HumanMessage, SystemMessage
@@ -46,7 +45,8 @@ def get_table_summary_document(heavydb: HeavyDB, table: str) -> Document:
 
 
 column_description_prompt = """Provided a table schema, sample rows, and common column values, please return an unnumbered list of each column with comments describing the column's purpose.
-Do not return sample rows or common values. Do not explain any clauses.
+Do not return sample rows or common values. Do not explain any clauses. Do not include the column names which do not exists in the table schema.
+Try to provide description for all the columns exsists on the table schema.
 
 Example:
 - table_name.column_name: Description of the column."""
