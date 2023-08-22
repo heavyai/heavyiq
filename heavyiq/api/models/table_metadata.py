@@ -26,15 +26,18 @@ class GenerateTableMetadataResponse(BaseModel):
     """
 
     table_name: str = Field(..., description="Name of the table for which metadata gets generated")
-    summary: str = Field(..., description="summary of the table as a whole")
+    summary: str = Field(..., description="description of the table as a whole")
     columns: dict[str, str] = Field(..., description="Description of each column.")
+    feedback_id: str = Field(
+        ..., description="A unique identifier for this request that can be used to submit feedback about the response"
+    )
 
     class Config:
         schema_extra = {
             "examples": [
                 {
                     "table_name": "us_pois_safegraph",
-                    "summary": 'Description:\nThe "us_pois_safegraph" table is designed to store information about points of interest (POIs) in the United States.',
+                    "description": 'The "us_pois_safegraph" table is designed to store information about points of interest (POIs) in the United States.',
                     "columns": {
                         "safegraph_place_id": "A unique identifier for each place in the dataset.",
                         "parent_safegraph_place_id": "The safegraph_place_id of the parent place, if applicable.",

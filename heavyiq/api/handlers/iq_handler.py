@@ -1,6 +1,3 @@
-import re
-from typing import Any
-
 from langsmith import Client
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -8,6 +5,7 @@ from heavyiq.api.models import (
     FeedbackRequest,
     FeedbackResponse,
     GenerateTableMetadataRequest,
+    GenerateTableMetadataResponse,
     QueryRequest,
     QueryResponse,
     QuestionRequest,
@@ -15,8 +13,7 @@ from heavyiq.api.models import (
 )
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
-from heavyiq.langchain.chains import NLtoAnswerChain, get_nl_to_sql_chain_by_llm
-from heavyiq.langchain.index.generate_table_documents import async_create_table_metadata
+from heavyiq.langchain.chains import NLtoAnswerChain, GenerateTableMetadataChain, get_nl_to_sql_chain_by_llm
 from heavyiq.langchain.llms import LLMType, get_llm_by_type
 from heavyiq.langchain.logging import log_chain_call, log_chain_call_async
 from heavyiq.logging_utils import get_heavyiq_logger
@@ -164,11 +161,19 @@ async def handle_submit_feedback_request_async(request: FeedbackRequest) -> Feed
     return FeedbackResponse()
 
 
-async def handle_generate_table_metadata_async(request: GenerateTableMetadataRequest, db: HeavyDB) -> dict[Any, Any]:
+async def handle_generate_table_metadata_async(
+    request: GenerateTableMetadataRequest, db: HeavyDB
+) -> GenerateTableMetadataResponse:
     """
     Handles /generate-table-metadata request.
     """
-    table_metadata = await async_create_table_metadata(db, request.table_name)
-    summary, column_description = re.split(r"(?m)\s*Column descriptions for.*", table_metadata)
-    column_description_mapping = dict(re.findall(r"(?m)^\s*-\s*(?:\w+\.)?(\w+):\s*(.+)", column_description))
-    return {"table_name": request.table_name, "summary": summary, "columns": column_description_mapping}
+    llm = get_llm_by_type(LLMType.SQL_TO_ANSWER, temperature=0.0)
+    chain = GenerateTableMetadataChain(llm=llm, database=db, tags=["rest-api", "generate-table-metadata-endpoint"])
+    res = await log_chain_call_async(chain, request.table_name, "")
+    feedback_id = str(res["__run"].run_id) if "__run" in res else ""
+    return GenerateTableMetadataResponse(
+        table_name=request.table_name,
+        summary=res[chain.output_summary_key],
+        columns=res[chain.output_columns_key],
+        feedback_id=feedback_id,
+    )
