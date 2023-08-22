@@ -2,7 +2,7 @@ import os
 from urllib.parse import urlparse
 
 from confz import FileSource
-from heavydb.thrift.Heavy import Client
+from heavydb.thrift.Heavy import Client  # type: ignore
 from heavydb.thrift.ttypes import TLicenseInfo
 from thrift.protocol import TBinaryProtocol
 from thrift.transport import TSocket, TTransport
@@ -11,7 +11,7 @@ import openai
 
 from .config_schema import AppConfig, HeavyIQConfig
 
-_config = None
+_config: HeavyIQConfig | None = None
 
 
 def get_heavydb_license_claims(config: HeavyIQConfig) -> TLicenseInfo:

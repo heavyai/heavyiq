@@ -1,17 +1,19 @@
 import uuid
 
 from sqlalchemy import create_engine, Column, String, Integer, DateTime, Enum, Float, JSON
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from .enums import LangChainType
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    pass
 
 
 class RequestLog(Base):
     __tablename__ = "call_log"
 
     id = Column(String, default=lambda: uuid.uuid4().hex, primary_key=True, unique=True, nullable=False)
-    langchain_type = Column(Enum(LangChainType), nullable=False)
+    langchain_type = Column(Enum(LangChainType), nullable=False)  # type: ignore
     langchain_name = Column(String, nullable=False)
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)

@@ -115,7 +115,7 @@ class AskHeavyDBMetadataIndexChain(FileCallbackHandlerForChainMixin, RetrievalQA
         )
         combine_document_chain = MapReduceDocumentsChain(
             llm_chain=llm_question_chain,
-            combine_document_chain=combine_results_chain,
+            combine_document_chain=combine_results_chain,  # type: ignore
             document_variable_name="context",
         )
         return cls(

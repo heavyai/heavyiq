@@ -242,9 +242,9 @@ class _AccessLogger(BaseLogger):
         )
 
 
-_access_logger = None
-heavyiq_logger = None
-default_logger = None
+_access_logger: _AccessLogger | None = None
+heavyiq_logger: HeavyIQLogger | None = None
+default_logger: HeavyIQLogger | None = None
 
 
 def get_log_name(lvl: str) -> str:
