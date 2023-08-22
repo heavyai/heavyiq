@@ -83,7 +83,9 @@ class AppFilter(logging.Filter):
         record.user_agent = request.headers.get("User-Agent")
         record.protocol = request.scope.get("scheme")
         record.status_code = response.status_code if response else "-"
-        record.response_size = response.headers["Content-Length"] if response else "-"
+        record.response_size = (
+            response.headers["Content-Length"] if response and "Content-Length" in response.headers else "-"
+        )
 
         return True
 

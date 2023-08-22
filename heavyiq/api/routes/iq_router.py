@@ -1,5 +1,7 @@
-from typing import Any
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+
 from heavyiq.langchain import HeavyDB
 from heavyiq.api.dependencies import (
     valid_query_db_session,
@@ -21,6 +23,7 @@ from heavyiq.api.handlers import (
     handle_question_request_async,
     handle_submit_feedback_request_async,
     handle_generate_table_metadata_async,
+    streaming_test,
 )
 
 iqrouter = APIRouter()
@@ -62,10 +65,23 @@ async def submit_feedback(value: FeedbackRequest) -> FeedbackResponse:
 @iqrouter.post("/generate-table-metadata", response_model=GenerateTableMetadataResponse)
 async def generate_table_metadata(
     values: tuple[GenerateTableMetadataRequest, HeavyDB] = Depends(validate_db_session_for_table_metadata)
-) -> dict[Any, Any]:
+) -> GenerateTableMetadataResponse:
     """
     Endpoint which is reponsible for generating table metadata.
     """
     # Don't forget FastAPI converts Response Pydantic Object to Dict then to an instance of ResponseModel then to Dict then to JSON.
     # That's why a direct dict was returned instead of pydantic model.
     return await handle_generate_table_metadata_async(*values)
+
+
+class TestRequest(BaseModel):
+    message: str
+
+
+@iqrouter.post("/streaming-test", response_class=Response)
+def streaming_test_endpoint(value: TestRequest) -> StreamingResponse:
+    response = StreamingResponse(streaming_test(value.message), media_type="text/event-stream")
+    response.headers["Content-Type"] = "text/event-stream"
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["Connection"] = "keep-alive"
+    return response
