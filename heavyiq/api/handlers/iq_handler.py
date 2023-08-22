@@ -86,7 +86,7 @@ def handle_question_request(request: QuestionRequest) -> QuestionResponse:
     logger.info("Table(s): %s", ", ".join(request.tables))
     nl_sql_llm = get_llm_by_type(LLMType.NL_TO_SQL, temperature=0.0)
     nl_sql_chain = get_nl_to_sql_chain_by_llm(llm=nl_sql_llm)(
-        llm=nl_sql_llm, database=db, tags=["rest-api", "question-endpoint"]
+        llm=nl_sql_llm, database=db, tags=["rest-api", "question-endpoint"]  # type: ignore
     )
     llm = get_llm_by_type(LLMType.SQL_TO_ANSWER, temperature=0.0)
     chain = NLtoAnswerChain(

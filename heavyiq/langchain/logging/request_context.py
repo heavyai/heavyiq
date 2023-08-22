@@ -8,7 +8,6 @@ from langchain.callbacks import OpenAICallbackHandler, get_openai_callback
 from langchain.chains.base import Chain
 
 from heavyiq import VERSION_TAG
-from heavyiq.langchain.utils import is_langsmith_active
 from heavyiq.config import get_config
 
 # from .database import Session, RequestLog
@@ -22,15 +21,15 @@ class RequestContext:
         self.model = model
         self.input = input
         self.start_time = datetime.now()
-        self.output = None
-        self.prompt_tokens = None
-        self.completion_tokens = None
-        self.total_tokens = None
-        self.successful_requests = None
-        self.total_cost = None
+        self.output: dict[Any, Any] | None = None
+        self.prompt_tokens: int | None = None
+        self.completion_tokens: int | None = None
+        self.total_tokens: int | None = None
+        self.successful_requests: int | None = None
+        self.total_cost: float | None = None
         self.output = None
         self.agent_log = None
-        self.error_msg = None
+        self.error_msg: str | None = None
 
     async def __aenter__(self) -> "RequestContext":
         return self
@@ -169,6 +168,8 @@ def agent_log_request_ctx(
 
 
 def log_chain_call(chain: Chain, input: str | dict, model: str = "", chain_name: Optional[str] = None) -> dict:
+    from heavyiq.langchain.utils import is_langsmith_active
+
     if isinstance(input, str):
         input = {chain.input_keys[0]: input}
     with chain_log_request_ctx(chain_name or chain._chain_type, model, input) as log_ctx:
@@ -185,6 +186,8 @@ def log_chain_call(chain: Chain, input: str | dict, model: str = "", chain_name:
 async def log_chain_call_async(
     chain: Chain, input: str | dict, model: str = "", chain_name: Optional[str] = None
 ) -> dict:
+    from heavyiq.langchain.utils import is_langsmith_active
+
     if isinstance(input, str):
         input = {chain.input_keys[0]: input}
     async with chain_log_request_ctx_async(chain_name or chain._chain_type, model, input) as log_ctx:

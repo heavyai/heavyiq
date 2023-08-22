@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
-from heavydb.exceptions import Error as HeavyDBError
+from heavydb.exceptions import Error as HeavyDBError  # type: ignore
 from starlette.exceptions import HTTPException
 
 from heavyiq.config import get_config
@@ -110,6 +110,6 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         return app.openapi_schema
 
     # custom openapi
-    app.openapi = custom_openapi
+    app.openapi = custom_openapi  # type: ignore
 
     return app

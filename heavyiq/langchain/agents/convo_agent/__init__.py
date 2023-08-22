@@ -6,16 +6,18 @@ from collections.abc import Sequence
 from langchain.agents import AgentExecutor, AgentOutputParser, BaseMultiActionAgent, BaseSingleActionAgent
 from langchain.agents.conversational_chat.base import ConversationalChatAgent
 from langchain.agents.conversational_chat.prompt import PREFIX, SUFFIX
-from langchain.callbacks.base import BaseCallbackManager
-from langchain.callbacks.manager import Callbacks
+from langchain.callbacks.base import BaseCallbackManager, Callbacks
 from langchain.chat_models.base import BaseChatModel
 from langchain.memory import CombinedMemory, ConversationBufferMemory
-from langchain.prompts.base import BasePromptTemplate
+from langchain.schema.prompt_template import BasePromptTemplate
+from langchain.schema.messages import BaseMessage
 from langchain.prompts.chat import (
     ChatPromptTemplate,
     HumanMessagePromptTemplate,
     MessagesPlaceholder,
     SystemMessagePromptTemplate,
+    BaseMessagePromptTemplate,
+    BaseChatPromptTemplate,
 )
 from langchain.schema import AgentAction, AgentFinish, BaseOutputParser
 from langchain.tools import BaseTool
@@ -130,7 +132,7 @@ class CustomConversationalChatAgent(ConversationalChatAgent):
         if input_variables is None:
             input_variables = ["input", "chat_history", "agent_scratchpad", "last_run_sql"]
         message_without_input, input_message = re.split(r"\b(?=USER'S INPUT)", final_prompt)
-        messages = [
+        messages: list[BaseMessagePromptTemplate | BaseChatPromptTemplate | BaseMessage] = [
             SystemMessagePromptTemplate.from_template(system_message),
             HumanMessagePromptTemplate.from_template(message_without_input),
             SystemMessagePromptTemplate.from_template("Chat History:\n------------------\n"),
@@ -148,6 +150,8 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
     An agent executor which stores n success queries on a special HeavyIQQueryBufferWindowMemory memory.
     This memory got retained and will be used upon every run.
     """
+
+    memory: CombinedMemory
 
     @property
     def _heavyiq_buffer_memory(self) -> HeavyIQQueryBufferWindowMemory:
@@ -170,12 +174,19 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
                 return True
         return False
 
-    def run(self, question: str, callbacks: Callbacks = None, tags: list[str] | None = None, **kwargs: Any) -> str:
+    def run(
+        self,
+        *args: Any,
+        callbacks: Callbacks = None,
+        tags: Optional[list[str]] = None,
+        metadata: Optional[dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> str:
         """
         Custom run method for storing successful query returned from intermediate steps.
         """
-        inputs = {"input": question}
-        response = self.__call__(inputs=inputs, callbacks=callbacks, tags=tags, **kwargs)
+        inputs = {"input": args[0]}
+        response = self.__call__(inputs=inputs, callbacks=callbacks, tags=tags, metadata=metadata, **kwargs)
         status = self._save_to_sql_memory(response=response)
         if status:
             logger.debug("Saved the last success query")
@@ -259,7 +270,7 @@ def create_conversational_agent(
     - AgentExecutor: An AgentExecutor instance configured with the conversational agent and the set
     of tools for interacting with the database."""
     chat_llm = chat_llm or get_chat_llm(
-        ["agent", "conversational_sql_agent"], temperature=0, model=get_config().openai_gpt_model
+        tags=["agent", "conversational_sql_agent"], temperature=0, model=get_config().openai_gpt_model
     )
     heavydb = heavydb or HeavyDB.from_env()
     toolkit = HeavyDBToolkit(db=heavydb)

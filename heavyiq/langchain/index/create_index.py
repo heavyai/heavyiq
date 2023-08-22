@@ -4,6 +4,7 @@ from chromadb.api import Where
 from langchain.vectorstores import Chroma
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.indexes import VectorstoreIndexCreator
+from langchain.vectorstores.base import VectorStore
 
 from heavyiq.config import get_config
 from .generate_table_documents import generate_table_documents
@@ -23,11 +24,12 @@ def update_tables_in_index(index_creator: VectorstoreIndexCreator, vectorstore: 
     if len(docs) != len(tables_to_update):
         raise ValueError("Not all provided tables have documents. Aborting.")
     print("Deleting existing table documents from index...")
+    where: Where | None = None
     if len(tables_to_update) == 1:
-        where: Where = {"source": tables_to_update[0]}
+        where = {"source": tables_to_update[0]}
         vectorstore._collection.delete(where=where)
     else:
-        where: Where = {"$or": [{"source": table_name} for table_name in tables_to_update]}
+        where = {"$or": [{"source": table_name} for table_name in tables_to_update]}
         vectorstore._collection.delete(where=where)
     print("Splitting documents...")
     sub_docs = index_creator.text_splitter.split_documents(docs)
@@ -60,6 +62,7 @@ def create_index_if_nonexistent() -> HeavyDBMetadataIndex:
     index_creator = get_vectorstore_index_creator(metadata_index_dir)
 
     persist_path = Path(metadata_index_dir)
+    vectorstore: VectorStore
     if persist_path.exists():
         print("Index already exists. Returning existing index.")
         vectorstore = Chroma(embedding_function=index_creator.embedding, persist_directory=metadata_index_dir)
