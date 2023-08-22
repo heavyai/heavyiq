@@ -1,8 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from fastapi.concurrency import run_in_threadpool
-import os
-import asyncio
 
 from langchain.docstore.document import Document
 from langchain.schema import HumanMessage, SystemMessage
@@ -23,25 +20,6 @@ Upon completion, evaluate the coherence, accuracy, and relevance of the generate
 maximizing its value and usefulness for search and retrieval tasks."""
 
 CONFIG = get_config()
-
-
-async def async_get_table_summary(table: str, table_info: str) -> str:
-    """
-    Asks llm to generate table summary by passing only the table information.
-
-    Args:
-        table_info (str): table info we got from the heavydb.
-
-    Returns:
-        str: table summary
-    """
-    llm = get_chat_llm(tags=["metadata_index", "table_summary"], model=CONFIG.openai_gpt_model, temperature=0.2)
-    messages = [
-        SystemMessage(content=table_summary_prompt),
-        HumanMessage(content=table_info),
-    ]
-    resp = await llm._call_async(messages)
-    return resp.content
 
 
 def get_table_summary_document(heavydb: HeavyDB, table: str) -> Document:
@@ -74,28 +52,6 @@ Example:
 - table_name.column_name: Description of the column."""
 
 
-async def async_get_table_column_description(table: str, table_info: str) -> str:
-    """
-    Generates a document string containing the description of each column in a specified table.
-
-    Args:
-        table_info (str): Table information fetched from HeavyDB instance.
-
-    Returns:
-        str: Returns description about each table column.
-    """
-    llm = get_chat_llm(
-        tags=["metadata_index", "table_columns_description"], model=CONFIG.openai_gpt_model, temperature=0.2
-    )
-    messages = [
-        SystemMessage(content=column_description_prompt),
-        HumanMessage(content=table_info),
-    ]
-    # async version of call, which also does the job of caching llm result
-    resp = await llm._call_async(messages)
-    return f"Column descriptions for {table} table:\n{resp.content}"
-
-
 def get_table_column_description_document(heavydb: HeavyDB, table: str) -> Document:
     """
     Generates a document containing the description of each column in a specified table.
@@ -118,23 +74,6 @@ def get_table_column_description_document(heavydb: HeavyDB, table: str) -> Docum
     resp = llm(messages)
     page_content = f"Column descriptions for {table} table:\n{resp.content}"
     return Document(page_content=page_content, metadata={"source": table})
-
-
-async def async_create_table_metadata(heavydb: HeavyDB, table: str) -> str:
-    """
-    Create table metadata asynchronously.
-    Using the table info got from the heavydb instance, this function uses
-    llm to generate table summary and description about each table column.
-
-    Args:
-        heavydb (HeavyDB): HeavyDB instance.
-        table (str): table name to get info for.
-    """
-
-    table_info = await run_in_threadpool(heavydb.get_table_info, [table])
-    tasks = [async_get_table_summary(table, table_info), async_get_table_column_description(table, table_info)]
-    summary, column_desciption = await asyncio.gather(*tasks)
-    return f"{summary}\n\n{column_desciption}"
 
 
 def create_and_write_table_document(heavydb: HeavyDB, table: str) -> None:

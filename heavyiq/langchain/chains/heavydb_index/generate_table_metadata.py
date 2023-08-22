@@ -5,6 +5,7 @@ from typing import Any, Optional, TYPE_CHECKING
 
 from pydantic import Extra
 
+from fastapi.concurrency import run_in_threadpool
 from langchain.chat_models.base import BaseChatModel
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
 from langchain.schema.language_model import BaseLanguageModel
@@ -130,15 +131,15 @@ class GenerateTableMetadataChain(BaseChain):
         table_name = inputs[self.input_key]
         await self.write_callback_message_async(f"Generating table metadata prompt for {table_name}")
 
-        columns = self.database.get_table_columns(table_name)
+        columns = await run_in_threadpool(self.database.get_table_columns, table_name)
         output_parser = self.create_output_parser(columns)
         gen_metadata_partial_prompt = self.prompt.partial(format_instructions=output_parser.get_format_instructions())
-        gen_metadata_prompt = populate_table_info_wrt_token_limit(
-            gen_metadata_partial_prompt, self.llm, self.database, [table_name]
+        gen_metadata_prompt = await run_in_threadpool(
+            populate_table_info_wrt_token_limit, gen_metadata_partial_prompt, self.llm, self.database, [table_name]
         )
 
         await self.write_callback_message_async("Calling LLM")
-        response = self.llm.generate_prompt(
+        response = await self.llm.agenerate_prompt(
             [gen_metadata_prompt], callbacks=run_manager.get_child() if run_manager else None
         )
         try:

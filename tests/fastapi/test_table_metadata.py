@@ -1,24 +1,21 @@
 import pytest
 from typing import Any, Callable
-from .base import client
+from .base import client, RunId
 from unittest.mock import patch
-from heavyiq.langchain.heavydb import HeavyDB
 
 
-# async_create_table_metadata mock
-async def mock_async_create_table_metadata(db: HeavyDB, table_name: str) -> str:
-    """
-    Mock function.
-    """
-    table_summary = """Description:\nThe "us_pois_safegraph" table is designed to store information about points of interest (POIs) in the United States."""
-    column_description = """
-        Column descriptions for us_pois_safegraph table:
-            - us_pois_safegraph.safegraph_place_id: A unique identifier for each place in the dataset.
-            - us_pois_safegraph.parent_safegraph_place_id: The safegraph_place_id of the parent place, if applicable.
-            - us_pois_safegraph.location_name: The name of the location.
-            - us_pois_safegraph.brands: The name of the brand associated with the location.
-    """
-    return f"{table_summary}\n{column_description}"
+# Mock the log_chain_call_async function
+async def mock_log_chain_call_async(chain: Any, chain_input: dict, model_name: str) -> dict[str, str | dict | RunId]:
+    return {
+        "summary": 'Description:\nThe "us_pois_safegraph" table is designed to store information about points of interest (POIs) in the United States.',
+        "columns": {
+            "safegraph_place_id": "A unique identifier for each place in the dataset.",
+            "parent_safegraph_place_id": "The safegraph_place_id of the parent place, if applicable.",
+            "location_name": "The name of the location.",
+            "brands": "The name of the brand associated with the location.",
+        },
+        "__run": RunId("acf2132"),
+    }
 
 
 @pytest.mark.parametrize(
@@ -33,10 +30,11 @@ async def mock_async_create_table_metadata(db: HeavyDB, table_name: str) -> str:
                 "location_name": "The name of the location.",
                 "brands": "The name of the brand associated with the location.",
             },
+            "feedback_id": "acf2132",
         },
     ],
 )
-@patch("heavyiq.api.handlers.iq_handler.async_create_table_metadata", side_effect=mock_async_create_table_metadata)
+@patch("heavyiq.api.handlers.iq_handler.log_chain_call_async", side_effect=mock_log_chain_call_async)
 def test_should_pass_for_generate_table_metadata_endpoint(mock: Callable, expected_result: dict[str, Any]):
     """
     Test /generate-table-metadata endpoint.
