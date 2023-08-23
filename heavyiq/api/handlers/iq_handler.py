@@ -1,3 +1,4 @@
+from typing import Any
 from langsmith import Client
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -5,15 +6,20 @@ from heavyiq.api.models import (
     FeedbackRequest,
     FeedbackResponse,
     GenerateTableMetadataRequest,
-    GenerateTableMetadataResponse,
     QueryRequest,
     QueryResponse,
     QuestionRequest,
     QuestionResponse,
+    CustomExpressionRequest,
 )
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
-from heavyiq.langchain.chains import NLtoAnswerChain, GenerateTableMetadataChain, get_nl_to_sql_chain_by_llm
+from heavyiq.langchain.chains import (
+    NLtoAnswerChain,
+    GenerateTableMetadataChain,
+    GenerateCustomExpressionChain,
+    get_nl_to_sql_chain_by_llm,
+)
 from heavyiq.langchain.llms import LLMType, get_llm_by_type
 from heavyiq.langchain.logging import log_chain_call, log_chain_call_async
 from heavyiq.logging_utils import get_heavyiq_logger
@@ -161,9 +167,7 @@ async def handle_submit_feedback_request_async(request: FeedbackRequest) -> Feed
     return FeedbackResponse()
 
 
-async def handle_generate_table_metadata_async(
-    request: GenerateTableMetadataRequest, db: HeavyDB
-) -> GenerateTableMetadataResponse:
+async def handle_generate_table_metadata_async(request: GenerateTableMetadataRequest, db: HeavyDB) -> dict[Any, Any]:
     """
     Handles /generate-table-metadata request.
     """
@@ -171,9 +175,30 @@ async def handle_generate_table_metadata_async(
     chain = GenerateTableMetadataChain(llm=llm, database=db, tags=["rest-api", "generate-table-metadata-endpoint"])
     res = await log_chain_call_async(chain, request.table_name, "")
     feedback_id = str(res["__run"].run_id) if "__run" in res else ""
-    return GenerateTableMetadataResponse(
+    return {
+        "table_name": request.table_name,
+        "summary": res[chain.output_summary_key],
+        "columns": res[chain.output_columns_key],
+        "feedback_id": feedback_id,
+    }
+
+
+async def handle_generate_custom_expression_async(request: CustomExpressionRequest, db: HeavyDB) -> dict[Any, Any]:
+    """
+    Handles /generate-custom-expression request.
+    """
+    llm = get_llm_by_type(LLMType.SQL_TO_ANSWER, temperature=0.0)
+    chain = GenerateCustomExpressionChain(
+        llm=llm,
+        database=db,
+        tags=["rest-api", "generate-custom-expression-endpoint"],
         table_name=request.table_name,
-        summary=res[chain.output_summary_key],
-        columns=res[chain.output_columns_key],
-        feedback_id=feedback_id,
+        join_info=request.join_info,
+        expression_type=request.type,
     )
+    res = await log_chain_call_async(chain, request.question, "")
+    feedback_id = str(res["__run"].run_id) if "__run" in res else ""
+    return {
+        "expression": res[chain.output_key],
+        "feedback_id": feedback_id,
+    }

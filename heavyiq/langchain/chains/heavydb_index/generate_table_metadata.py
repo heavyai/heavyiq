@@ -97,7 +97,7 @@ class GenerateTableMetadataChain(BaseChain):
         run_manager: Optional[CallbackManagerForChainRun] = None,
     ) -> dict[str, str]:
         table_name = inputs[self.input_key]
-        self.write_callback_message(f"Generating table metadata prompt for {table_name}")
+        self.write_callback_message(f"Generating table metadata prompt for {table_name}", run_manager)
 
         columns = self.database.get_table_columns(table_name)
         output_parser = self.create_output_parser(columns)
@@ -106,15 +106,15 @@ class GenerateTableMetadataChain(BaseChain):
             gen_metadata_partial_prompt, self.llm, self.database, [table_name]
         )
 
-        self.write_callback_message("Calling LLM")
+        self.write_callback_message("Calling LLM", run_manager)
         response = self.llm.generate_prompt(
             [gen_metadata_prompt], callbacks=run_manager.get_child() if run_manager else None
         )
         try:
-            self.write_callback_message("Parsing LLM response")
+            self.write_callback_message("Parsing LLM response", run_manager)
             parsed_response = output_parser.parse(self.clean_llm_response(response))
         except Exception as e:
-            self.write_callback_message(f"Error parsing LLM response: {e}", color="red")
+            self.write_callback_message(f"Error parsing LLM response: {e}", run_manager, color="red")
             raise GenerateTableMetadataException("Language model returned unparseable response. Please try again.")
 
         output = {self.output_summary_key: parsed_response["description"], self.output_columns_key: {}}
@@ -129,7 +129,7 @@ class GenerateTableMetadataChain(BaseChain):
         run_manager: Optional[AsyncCallbackManagerForChainRun] = None,
     ) -> dict[str, str]:
         table_name = inputs[self.input_key]
-        await self.write_callback_message_async(f"Generating table metadata prompt for {table_name}")
+        await self.write_callback_message_async(f"Generating table metadata prompt for {table_name}", run_manager)
 
         columns = await run_in_threadpool(self.database.get_table_columns, table_name)
         output_parser = self.create_output_parser(columns)
@@ -138,15 +138,15 @@ class GenerateTableMetadataChain(BaseChain):
             populate_table_info_wrt_token_limit, gen_metadata_partial_prompt, self.llm, self.database, [table_name]
         )
 
-        await self.write_callback_message_async("Calling LLM")
+        await self.write_callback_message_async("Calling LLM", run_manager)
         response = await self.llm.agenerate_prompt(
             [gen_metadata_prompt], callbacks=run_manager.get_child() if run_manager else None
         )
         try:
-            await self.write_callback_message_async("Parsing LLM response")
+            await self.write_callback_message_async("Parsing LLM response", run_manager)
             parsed_response = output_parser.parse(self.clean_llm_response(response))
         except Exception as e:
-            await self.write_callback_message_async(f"Error parsing LLM response: {e}", color="red")
+            await self.write_callback_message_async(f"Error parsing LLM response: {e}", run_manager, color="red")
             raise GenerateTableMetadataException("Language model returned unparseable response. Please try again.")
 
         output = {self.output_summary_key: parsed_response["description"], self.output_columns_key: {}}
