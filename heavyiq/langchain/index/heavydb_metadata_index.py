@@ -94,7 +94,7 @@ class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
         Returns:
             Rephrased question.
         """
-        llm = get_llm(["chain", "sql_metadata_question_transformer_chain"], temperature=0)
+        llm = get_llm(temperature=0)
         chain = SQLMetadataQuestionTransformerChain(llm=llm)
         return log_chain_call(chain, {chain.input_key: question}, "")[chain.output_key]
 

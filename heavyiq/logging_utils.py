@@ -9,7 +9,7 @@ import sys
 
 
 from heavyiq.config import get_config
-from heavyiq.langchain.callbacks import FileCallbackHandler
+from heavyiq.langchain.callbacks import FileCallbackHandler, AsyncLogFileCallbackHandler
 
 
 def get_default_formatter() -> logging.Formatter:
@@ -128,12 +128,15 @@ class BaseLogger(logging.Logger):
         level = level or "DEBUG"
         super().__init__(name, level)
         formatter = formatter or get_default_formatter()
+        self.log_formatter = formatter
+        self.log_file_path = ""
         if enable_console_logging:
             console_handler = get_console_handler(formatter=formatter, level=level)
             self.addHandler(console_handler)
         if log_file_path:
             file_handler = get_rotating_file_handler(log_file_path, formatter=formatter, level=level)
             self.addHandler(file_handler)
+            self.log_file_path = log_file_path
         if filter:
             self.addFilter(filter)
 
@@ -157,9 +160,20 @@ class HeavyIQLogger(BaseLogger):
     By default all the logs produced by this logger gets stored inside "heavyiq.log" file.
     """
 
-    def __init__(self, name: str = "heavyiq", log_file_path: str | None = None, level: str | None = None):
+    def __init__(
+        self,
+        name: str = "heavyiq",
+        log_file_path: str | None = None,
+        level: str | None = None,
+        enable_console_logging: bool = True,
+    ):
         super().__init__(
-            name, level=level, log_file_path=log_file_path, filter=HeavyIQFilter(), formatter=get_default_formatter()
+            name,
+            level=level,
+            log_file_path=log_file_path,
+            filter=HeavyIQFilter(),
+            formatter=get_default_formatter(),
+            enable_console_logging=enable_console_logging,
         )
         self.info("HeavyIQ Logger initialized")
 
@@ -173,8 +187,19 @@ class HeavyIQLogger(BaseLogger):
         Returns:
             FileCallbackHandler: callback handler mainly passed as callback for chains.
         """
-        rotating_file_handler = next(i for i in self.handlers if isinstance(i, RotatingFileHandler))
-        return FileCallbackHandler(rotating_file_handler.baseFilename, to_stdout=to_stdout)
+        return FileCallbackHandler(self.log_file_path, to_stdout=to_stdout)
+
+    def async_langchain_cb_handler(self, to_stdout: bool = True) -> AsyncLogFileCallbackHandler:
+        """
+        Returns a file callback handler created from the log file.
+
+        Args:
+            to_stdout (bool, optional): whether to log stdout as well. Defaults to True.
+
+        Returns:
+            FileCallbackHandler: callback handler mainly passed as callback for chains.
+        """
+        return AsyncLogFileCallbackHandler(self.log_file_path, to_stdout=to_stdout)
 
 
 class _AccessLogger(BaseLogger):
@@ -200,15 +225,26 @@ class _AccessLogger(BaseLogger):
     By default all the logs produced by this logger gets stored inside "access.log" file.
     """
 
-    def __init__(self, name: str = "app", log_file_path: str | None = None, level: str | None = None):
+    def __init__(
+        self,
+        name: str = "app",
+        log_file_path: str | None = None,
+        level: str | None = None,
+        enable_console_logging: bool = True,
+    ):
         super().__init__(
-            name, level=level, log_file_path=log_file_path, filter=AppFilter(), formatter=get_app_log_formatter()
+            name,
+            level=level,
+            log_file_path=log_file_path,
+            filter=AppFilter(),
+            formatter=get_app_log_formatter(),
+            enable_console_logging=enable_console_logging,
         )
 
 
-_access_logger = None
-heavyiq_logger = None
-default_logger = None
+_access_logger: _AccessLogger | None = None
+heavyiq_logger: HeavyIQLogger | None = None
+default_logger: HeavyIQLogger | None = None
 
 
 def get_log_name(lvl: str) -> str:
@@ -243,7 +279,9 @@ def init_logs():
         os.makedirs(log_dir, exist_ok=True)
 
         _access_logger = _AccessLogger(
-            log_file_path=os.path.join(log_dir, access_log_name), level=LOG_CONFIG.access_log_level
+            log_file_path=os.path.join(log_dir, access_log_name),
+            level=LOG_CONFIG.access_log_level,
+            enable_console_logging=LOG_CONFIG.log_to_stdout,
         )
 
         access_symlink = os.path.join(log_dir, "heavyiq.ACCESS")
@@ -268,7 +306,9 @@ def init_logs():
         os.makedirs(log_dir, exist_ok=True)
 
         heavyiq_logger = HeavyIQLogger(
-            log_file_path=os.path.join(log_dir, app_log_name), level=LOG_CONFIG.heavyiq_log_level
+            log_file_path=os.path.join(log_dir, app_log_name),
+            level=LOG_CONFIG.heavyiq_log_level,
+            enable_console_logging=LOG_CONFIG.log_to_stdout,
         )
 
         app_symlink = os.path.join(log_dir, "heavyiq.ALL")

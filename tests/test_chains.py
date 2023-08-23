@@ -9,7 +9,7 @@ from heavyiq.langchain import HeavyDB
 class TestChains(unittest.TestCase):
     def test_nl_to_sql(self):
         heavydb = HeavyDB.from_env(include_tables=["usa_states"])
-        llm = get_llm(["unit_test", "chain", "nl_to_sql_chain"], temperature=0.0, client=None)
+        llm = get_llm(temperature=0.0, client=None)
         chain = NLtoSQLChain(database=heavydb, llm=llm)
         res = log_chain_call(chain, "How many states begin with the letter A? What are they?", "")
         self.assertEqual("query" in res, True)
@@ -17,8 +17,8 @@ class TestChains(unittest.TestCase):
 
     def test_nl_to_answer(self):
         heavydb = HeavyDB.from_env(include_tables=["usa_states"])
-        llm = get_llm(["unit_test", "chain", "nl_to_sql_chain"], temperature=0.0, client=None)
-        chain = NLtoAnswerChain(database=heavydb, llm=llm)
+        llm = get_llm(temperature=0.0, client=None)
+        chain = NLtoAnswerChain.from_same_llm(llm=llm, database=heavydb)
         res = log_chain_call(chain, "How many states begin with the letter A? What are they?", "")
         self.assertEqual("query" in res, True)
         self.assertEqual("sql" in res, True)

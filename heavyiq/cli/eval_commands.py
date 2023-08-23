@@ -1,5 +1,4 @@
 from uuid import uuid4
-from contextlib import nullcontext
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
 import time
@@ -7,11 +6,9 @@ import time
 import click
 from langchain.callbacks import get_openai_callback
 from langchain.base_language import BaseLanguageModel
-from promptwatch import PromptWatch
 
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.chains import get_nl_to_sql_chain_by_llm
-from heavyiq.config import get_config
 from heavyiq.langchain.llms import get_llm_by_model_name
 from heavyiq.utils import strip_sql_comments
 
@@ -20,14 +17,6 @@ from heavyiq.utils import strip_sql_comments
 def eval():
     """Evaluate models."""
     pass
-
-
-def promptwatch_context(project: str, tenant: str) -> PromptWatch | nullcontext:
-    config = get_config()
-    if config.promptwatch_api_key and config.promptlayer_api_key != "":
-        return PromptWatch(api_key=config.promptwatch_api_key, tracking_project=project, tracking_tenant=tenant)
-    else:
-        return nullcontext()
 
 
 @eval.command()
@@ -46,14 +35,16 @@ def run_model_on_questions(
 ) -> None:
     """Call the NL to SQL Chain on each question in eval_questions.tsv. Provides tables to LLM"""
 
-    def process_question(heavydb: HeavyDB, llm: BaseLanguageModel, index: int, question: str) -> tuple[int, float]:
+    def process_question(
+        eval_str: str, heavydb: HeavyDB, llm: BaseLanguageModel, index: int, question: str
+    ) -> tuple[int, float]:
         start_time = time.time()
         primary_table, is_multi_table, secondary_table, question, reference_sql = question.split("\t")
         tables = [primary_table]
         if is_multi_table.upper() == "TRUE":
             tables.append(secondary_table)
-        chain = get_nl_to_sql_chain_by_llm(llm)(database=heavydb, llm=llm, verbose=verbose)  # type: ignore
-        with promptwatch_context("nl_to_sql_eval", str(eval_id)), get_openai_callback() as cb:
+        chain = get_nl_to_sql_chain_by_llm(llm)(database=heavydb, llm=llm, verbose=verbose, tags=[eval_str, "cli"])  # type: ignore
+        with get_openai_callback() as cb:
             try:
                 res = chain({"query": question, "tables": tables})
                 sql = strip_sql_comments(res["sql"]).replace("\n", " ")
@@ -79,10 +70,8 @@ def run_model_on_questions(
         )
 
     heavydb = HeavyDB.from_env()
-    runner_llm = get_llm_by_model_name(
-        model, [eval_str, "cli", "chain", "nl_to_sql_chain"], temperature=temperature, client=None
-    )
-    process_func = partial(process_question, heavydb, runner_llm)
+    runner_llm = get_llm_by_model_name(model, temperature=temperature, client=None)
+    process_func = partial(process_question, eval_str, heavydb, runner_llm)
 
     with open("./eval/questions.tsv") as f:
         f.readline()  # skip the header

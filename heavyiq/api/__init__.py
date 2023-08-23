@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
-from heavydb.exceptions import Error as HeavyDBError
+from heavydb.exceptions import Error as HeavyDBError  # type: ignore
 from starlette.exceptions import HTTPException
 from fastapi_socketio import SocketManager
 
@@ -12,8 +12,10 @@ from heavyiq.api.middlewares import AsyncLoggingMiddleware
 from heavyiq.api.models.error import ErrorResponse
 from heavyiq.langchain.exceptions import NLtoSQLException
 from heavyiq.logging_utils import init_logs
-from heavyiq.langchain.utils import init_promptlayer, init_telemetrics
 from heavyiq.api.handlers.socket_handler import register_socket_events
+from heavyiq.langchain.utils import init_telemetrics
+from heavyiq.api.routes import defaultrouter, iqrouter
+from heavyiq.api.handlers import exception_handler as exh
 
 
 def create_app(config_path: str = "./config.toml", socket_io: bool = True) -> FastAPI:
@@ -24,7 +26,6 @@ def create_app(config_path: str = "./config.toml", socket_io: bool = True) -> Fa
     """
     get_config(config_path)  # loads config using specified path
     init_logs()  # initializes logs using config
-    init_promptlayer()  # initializes prompt layer
     init_telemetrics()  # initializes langsmith
 
     app = FastAPI(title="HeavyIQ")
@@ -40,15 +41,6 @@ def create_app(config_path: str = "./config.toml", socket_io: bool = True) -> Fa
         allow_headers=["*"],
     )
     app.add_middleware(AsyncLoggingMiddleware)
-
-    # importing the handler functions on top of this module
-    # leads to call __post__init__ method of LoggedPromptTemplate
-    # (Since we created instance for LoggedPromptTemplate class at global scop),
-    # there we check for is_promptlayer_active. This value should always be False.
-    # So we placed the relevant import call here to make sure is_promptlayer_active is accessed
-    # after calling all the init functions.
-    from heavyiq.api.routes import defaultrouter, iqrouter
-    from heavyiq.api.handlers import exception_handler as exh
 
     # add exception handlers
     app.add_exception_handler(AttributeError, exh.attribute_error_handler)
@@ -93,7 +85,7 @@ def create_app(config_path: str = "./config.toml", socket_io: bool = True) -> Fa
         """
         from heavyiq.logging_utils import heavyiq_logger as logger
 
-        logger.info("Shutting down FastAPI app.")
+        logger.info("Shutting down FastAPI app.")  # type: ignore
 
     def custom_openapi() -> dict[str, Any]:
         if app.openapi_schema:
@@ -120,7 +112,7 @@ def create_app(config_path: str = "./config.toml", socket_io: bool = True) -> Fa
         return app.openapi_schema
 
     # custom openapi
-    app.openapi = custom_openapi
+    app.openapi = custom_openapi  # type: ignore
 
     if socket_io:
         socket_manager = SocketManager(app=app, mount_location="", cors_allowed_origins=cors_origins)

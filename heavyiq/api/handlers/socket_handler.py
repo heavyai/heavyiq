@@ -1,7 +1,9 @@
 import asyncio
 from typing import Any
 from fastapi_socketio import SocketManager
-from langchain.callbacks.streaming_aiter_final_only import AsyncFinalIteratorCallbackHandler
+from langchain.callbacks.streaming_aiter import AsyncIteratorCallbackHandler
+
+# from langchain.callbacks.streaming_aiter_final_only import AsyncFinalIteratorCallbackHandler
 from langchain.memory.chat_message_histories.in_memory import ChatMessageHistory
 from heavyiq.langchain.agents.convo_agent import create_conversational_agent_async
 from heavyiq.langchain.llms import get_chat_llm
@@ -32,10 +34,10 @@ def register_socket_events(socket_manager: SocketManager):
         retrieved_chat_history = ChatMessageHistory(messages=await message_history_manager.get_chat_history())
         retrieved_sql_history = ChatMessageHistory(messages=await message_history_manager.get_sql_history())
 
-        stream_handler = AsyncFinalIteratorCallbackHandler()
-        # await socket_manager.emit("answer", {"data": f"Ecohing... {data['question']}"}, room=sid)
+        # stream_handler = AsyncFinalIteratorCallbackHandler()
+        stream_handler = AsyncIteratorCallbackHandler()
         chat_llm = get_chat_llm(
-            ["agent", "conversational_sql_agent"],
+            tags=["agent", "conversational_sql_agent"],
             temperature=0,
             streaming=True,
             model=get_config().openai_gpt_model,

@@ -1,10 +1,26 @@
+from typing import Any
 from fastapi import APIRouter, Depends
 from heavyiq.langchain import HeavyDB
-from heavyiq.api.dependencies import valid_query_db_session, valid_question_db_session
-from heavyiq.api.models import QueryRequest, QueryResponse, QuestionResponse, QuestionRequest
+from heavyiq.api.dependencies import (
+    valid_query_db_session,
+    valid_question_db_session,
+    validate_db_session_for_table_metadata,
+)
+from heavyiq.api.models import (
+    QueryRequest,
+    QueryResponse,
+    QuestionResponse,
+    QuestionRequest,
+    FeedbackRequest,
+    FeedbackResponse,
+    GenerateTableMetadataRequest,
+    GenerateTableMetadataResponse,
+)
 from heavyiq.api.handlers import (
     handle_query_request_async,
     handle_question_request_async,
+    handle_submit_feedback_request_async,
+    handle_generate_table_metadata_async,
 )
 
 iqrouter = APIRouter()
@@ -36,3 +52,20 @@ async def question(values: tuple[QuestionRequest, HeavyDB] = Depends(valid_quest
     :param QuestionRequest request: Request Body
     """
     return await handle_question_request_async(*values)
+
+
+@iqrouter.post("/submit-feedback", response_model=FeedbackResponse)
+async def submit_feedback(value: FeedbackRequest) -> FeedbackResponse:
+    return await handle_submit_feedback_request_async(value)
+
+
+@iqrouter.post("/generate-table-metadata", response_model=GenerateTableMetadataResponse)
+async def generate_table_metadata(
+    values: tuple[GenerateTableMetadataRequest, HeavyDB] = Depends(validate_db_session_for_table_metadata)
+) -> dict[Any, Any]:
+    """
+    Endpoint which is reponsible for generating table metadata.
+    """
+    # Don't forget FastAPI converts Response Pydantic Object to Dict then to an instance of ResponseModel then to Dict then to JSON.
+    # That's why a direct dict was returned instead of pydantic model.
+    return await handle_generate_table_metadata_async(*values)

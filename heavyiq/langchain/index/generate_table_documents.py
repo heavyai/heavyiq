@@ -1,6 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-import os
 
 from langchain.docstore.document import Document
 from langchain.schema import HumanMessage, SystemMessage
@@ -35,7 +34,7 @@ def get_table_summary_document(heavydb: HeavyDB, table: str) -> Document:
         Document: A Document object containing the table summary and metadata.
     """
     table_info = heavydb.get_table_info([table])
-    llm = get_chat_llm(["metadata_index", "table_summary"], model=CONFIG.openai_gpt_model, temperature=0.2)
+    llm = get_chat_llm(model=CONFIG.openai_gpt_model, tags=["metadata_index", "table_summary"], temperature=0.2)
     messages = [
         SystemMessage(content=table_summary_prompt),
         HumanMessage(content=table_info),
@@ -46,7 +45,8 @@ def get_table_summary_document(heavydb: HeavyDB, table: str) -> Document:
 
 
 column_description_prompt = """Provided a table schema, sample rows, and common column values, please return an unnumbered list of each column with comments describing the column's purpose.
-Do not return sample rows or common values. Do not explain any clauses.
+Do not return sample rows or common values. Do not explain any clauses. Do not include the column names which do not exists in the table schema.
+Try to provide description for all the columns exsists on the table schema.
 
 Example:
 - table_name.column_name: Description of the column."""
@@ -64,7 +64,9 @@ def get_table_column_description_document(heavydb: HeavyDB, table: str) -> Docum
         Document: A Document object containing the column descriptions and metadata.
     """
     table_info = heavydb.get_table_info([table])
-    llm = get_chat_llm(["metadata_index", "table_columns_description"], model=CONFIG.openai_gpt_model, temperature=0.2)
+    llm = get_chat_llm(
+        model=CONFIG.openai_gpt_model, tags=["metadata_index", "table_columns_description"], temperature=0.2
+    )
     messages = [
         SystemMessage(content=column_description_prompt),
         HumanMessage(content=table_info),
