@@ -11,12 +11,22 @@ import {
   FormControl,
   OutlinedInput,
   CircularProgress,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
 } from "@mui/material";
+import CheckIcon from "@mui/icons-material/Check";
+import ClearIcon from "@mui/icons-material/Clear";
+import InfoIcon from '@mui/icons-material/Info';
 import Answer from "../components/Answer";
+import Steps from "../components/Steps";
+// import Steps from "../components/Steps";
 
 const messageType = {
   answer: "answer",
   question: "question",
+  steps: "steps",
 };
 
 const HomePage = () => {
@@ -39,6 +49,21 @@ const HomePage = () => {
   const [showStreamingAnswer, setShowStreamingAnswer] = useState(false);
   // used to store intermediate tokens
   const [content, setContent] = useState(""); // tokens
+  // intermediate step items
+  const [stepItems, setStepItems] = useState([
+    // {
+    //   thought:
+    //     'Running SQL query... "SELECT STATE_NAME, (HISPANIC * 100.0 / POPULATION) AS percentage_hispanic FROM usa_states ORDER BY percentage_hispanic DESC LIMIT "5"',
+    //   observation:
+    //     "[('New Mexico', 44.9), ('California', 35.3), ('Texas', 33.4), ('Arizona', 26.9), ('Nevada', 23.9)]",
+    // },
+    // {
+    //   thought: "You?",
+    //   observation: "Error! Dont know what you mean."
+    // }
+  ]);
+  // final thought
+  const [finalThought, setFinalThought] = useState("");
 
   const onEnterPress = (e) => {
     if (e.keyCode === 13) {
@@ -56,6 +81,24 @@ const HomePage = () => {
       });
     }, 200);
   }, []);
+
+  const addItemToSteps = (newItem) => {
+    setStepItems((prevItems) => [...prevItems, newItem]);
+  };
+
+  // const addStepMessage = () => {
+  //   if(stepItems.length > 0) {
+  //     setMessages((prevMessages) => [
+  //       ...prevMessages,
+  //       {
+  //         type: messageType.steps,
+  //         content: stepItems,
+  //       },
+  //     ]);
+  //     // reset stepItems
+  //     setStepItems([]);
+  //   }
+  // }
 
   useEffect(() => {
     // Event handler for receiving messages and appending
@@ -82,6 +125,17 @@ const HomePage = () => {
       setOnRequest(false);
     };
 
+    const handleIntermediateStep = (data) => {
+      addItemToSteps({
+        thought: data["thought"],
+        observation: data["observation"],
+      });
+    };
+
+    const handleFinalThought = (data) => {
+      setFinalThought(data);
+    }
+
     socket.on("answer", handleAnswer);
 
     // Event for receiving session id
@@ -93,6 +147,10 @@ const HomePage = () => {
 
     socket.on("endToken", handleEndToken);
 
+    socket.on("intermediateStep", handleIntermediateStep);
+
+    socket.on("finalThought", handleFinalThought);
+
     // Cleanup function to disconnect when component unmounts
     return () => {
       socket.off("answer", handleAnswer);
@@ -100,11 +158,25 @@ const HomePage = () => {
       socket.off("startToken", handleStartToken);
       socket.off("newToken", handleNewToken);
       socket.off("endToken", handleEndToken);
+      socket.off("intermediateStep", handleIntermediateStep);
+      socket.off("finalThought", handleFinalThought);
     };
   }, []);
 
   useEffect(() => {
     if (answer && typingComplete) {
+      if(stepItems.length > 0) {
+        setMessages((prevMessages) => [
+          ...prevMessages,
+          {
+            type: messageType.steps,
+            content: stepItems,
+            finalThought: finalThought
+          },
+        ]);
+        setStepItems([]);
+        setFinalThought("");
+      }
       setMessages((prevMessages) => [
         ...prevMessages,
         {
@@ -116,7 +188,7 @@ const HomePage = () => {
       setTypingComplete(false);
       setContent("");
     }
-  }, [answer, typingComplete]);
+  }, [answer, typingComplete, stepItems, finalThought]);
 
   useEffect(() => {
     socket.connect();
@@ -211,18 +283,96 @@ const HomePage = () => {
           }}
         >
           {messages.map((item, index) => (
-            <Box key={index} padding={1}>
+            item.type === messageType.steps ? 
+              <Steps key={index} stepItems={item.content} finalThought={item.finalThought}></Steps>
+            :
+            (<Box key={index} padding={1}>
               <Box
                 sx={{
                   padding: 2,
-                  bgcolor: item.type === messageType.answer && "#2f2f2f",
+                  bgcolor:
+                    item.type === messageType.answer
+                      ? "#2f2f2f"
+                      : item.type === messageType.question
+                      ? "#c956d1"
+                      : "",
                   borderRadius: 3,
                 }}
               >
                 {item.content}
               </Box>
-            </Box>
+            </Box>)
           ))}
+          {stepItems && (
+            <div>
+              <Box height="auto">
+                <List
+                  sx={{
+                    listStyleType: "disc",
+                    listStylePosition: "inside",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 0,
+                    // pl: 2
+                  }}
+                >
+                  {stepItems.map((item, index) => (
+                    <React.Fragment key={`step-item-${index}`}>
+                      <ListItem sx={{ color: "yellow", display: "flex" }}>
+                        <ListItemIcon sx={{ color: "green" }}>
+                          <CheckIcon />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={"Thought: " + item.thought}
+                          primaryTypographyProps={{
+                            sx: { fontSize: 13, fontWeight: "bold" },
+                          }}
+                        />
+                      </ListItem>
+                      <ListItem
+                        sx={{
+                          color: item.observation.startsWith("Error")
+                            ? "red"
+                            : "green",
+                          display: "flex",
+                        }}
+                      >
+                        {item.observation.startsWith("Error") ? (
+                          <ListItemIcon sx={{ color: "red" }}>
+                            <ClearIcon />
+                          </ListItemIcon>
+                        ) : (
+                          <ListItemIcon sx={{ color: "green" }}>
+                            <CheckIcon />
+                          </ListItemIcon>
+                        )}
+
+                        <ListItemText
+                          primary={"Observation: " + item.observation}
+                          primaryTypographyProps={{
+                            sx: { fontSize: 13, fontWeight: "bold" },
+                          }}
+                        />
+                      </ListItem>
+                    </React.Fragment>
+                  ))}
+                  {finalThought && (
+                    <ListItem sx={{ color: "pink", display: "flex" }}>
+                      <ListItemIcon sx={{ color: "pink" }}>
+                        <InfoIcon />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={"Final Thought: " + finalThought}
+                        primaryTypographyProps={{
+                          sx: { fontSize: 14, fontWeight: "bold" },
+                        }}
+                      />
+                    </ListItem>
+                  )}
+                </List>
+              </Box>
+            </div>
+          )}
           {showStreamingAnswer && (
             <Answer
               streamingInput={content}

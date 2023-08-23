@@ -1,14 +1,13 @@
 import asyncio
 from typing import Any
 from fastapi_socketio import SocketManager
-from langchain.callbacks.streaming_aiter import AsyncIteratorCallbackHandler
 
-# from langchain.callbacks.streaming_aiter_final_only import AsyncFinalIteratorCallbackHandler
+from langchain.callbacks.streaming_aiter_final_only import AsyncFinalIteratorCallbackHandler
 from langchain.memory.chat_message_histories.in_memory import ChatMessageHistory
 from heavyiq.langchain.agents.convo_agent import create_conversational_agent_async
 from heavyiq.langchain.llms import get_chat_llm
 from heavyiq.config import get_config
-from heavyiq.api.utils import wrap_done, MessageHistoryManager
+from heavyiq.api.utils import MessageHistoryManager, wrap_done_iter
 
 
 def register_socket_events(socket_manager: SocketManager):
@@ -34,8 +33,7 @@ def register_socket_events(socket_manager: SocketManager):
         retrieved_chat_history = ChatMessageHistory(messages=await message_history_manager.get_chat_history())
         retrieved_sql_history = ChatMessageHistory(messages=await message_history_manager.get_sql_history())
 
-        # stream_handler = AsyncFinalIteratorCallbackHandler()
-        stream_handler = AsyncIteratorCallbackHandler()
+        stream_handler = AsyncFinalIteratorCallbackHandler()
         chat_llm = get_chat_llm(
             tags=["agent", "conversational_sql_agent"],
             temperature=0,
@@ -51,7 +49,9 @@ def register_socket_events(socket_manager: SocketManager):
         )
         # Begin a task that runs in the background.
         task = asyncio.create_task(
-            wrap_done(sql_agent.arun(question), stream_handler.done),
+            wrap_done_iter(
+                sql_agent.iter(question, async_=True), stream_handler.done, socket_manager=socket_manager, sid=sid
+            ),
         )
         # tell the FE that the token sending is in progress
         await socket_manager.emit("startToken", {})

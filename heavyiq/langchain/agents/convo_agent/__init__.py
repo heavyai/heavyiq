@@ -80,6 +80,34 @@ Use this if you want to respond directly to the human. Markdown code snippet for
 }}}}
 ```"""
 
+CHAT_FORMAT_INSTRUCTIONS = """RESPONSE FORMAT INSTRUCTIONS
+----------------------------
+
+When responding to me please, please output a response in one of two formats:
+
+**Option 1:**
+Use this if you want the human to use a tool.
+Markdown code snippet formatted in the following schema:
+
+```json
+{{{{
+    "thought": string \\ your initial thought
+    "action": string \\ The action to take. Must be one of {tool_names}
+    "action_input": string \\ The input to the action
+}}}}
+```
+
+**Option #2:**
+Use this if you want to respond directly to the human. Markdown code snippet formatted in the following schema:
+
+```json
+{{{{
+    "thought": string \\ your final thought
+    "action": "Final Answer",
+    "action_input": string \\ You should put what you want to return to human
+}}}}
+```"""
+
 
 class CustomOutputParser(AgentOutputParser):
     def get_format_instructions(self) -> str:
@@ -103,6 +131,39 @@ class CustomOutputParser(AgentOutputParser):
             action, action_input = response["action"], response["action_input"]
             if action == "Final Answer":
                 return AgentFinish({"output": action_input}, text)
+            else:
+                return AgentAction(action, action_input, text)
+        except Exception:
+            # bot forgot to speak json, just output the response as a final answer
+            return AgentFinish({"output": text.strip()}, text)
+
+
+class ChatOutputParser(AgentOutputParser):
+    """
+    Output Parser specifically used for chat agents.
+    """
+
+    def get_format_instructions(self) -> str:
+        return CHAT_FORMAT_INSTRUCTIONS
+
+    def parse(self, text: str) -> AgentAction | AgentFinish:
+        try:
+            cleaned_output = text.strip()
+            if "```json" in cleaned_output:
+                _, cleaned_output = cleaned_output.split("```json")
+            if "```" in cleaned_output:
+                cleaned_output, _ = cleaned_output.split("```")
+            if cleaned_output.startswith("```json"):
+                cleaned_output = cleaned_output[len("```json") :]
+            if cleaned_output.startswith("```"):
+                cleaned_output = cleaned_output[len("```") :]
+            if cleaned_output.endswith("```"):
+                cleaned_output = cleaned_output[: -len("```")]
+            cleaned_output = cleaned_output.strip()
+            response = json.loads(cleaned_output)
+            action, action_input, thought = response["action"], response["action_input"], response.get("thought")
+            if action == "Final Answer":
+                return AgentFinish({"output": action_input, "thought": thought}, text)
             else:
                 return AgentAction(action, action_input, text)
         except Exception:
@@ -174,6 +235,19 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
                 heavyiq_buffer_memory.save_context(inputs, outputs, manual_save=True)
                 return agent_action.tool_input
         return None
+
+    def save_to_sql_memory(self, question: str, query: str) -> None:
+        """
+        Helps to save successfull sql query into heavyiq buffer memory.
+
+        Args:
+            question (str): NL question asked by user.
+            query (str): Query derived by run_sql_query tool.
+        """
+        heavyiq_buffer_memory = self._heavyiq_buffer_memory
+        inputs = {heavyiq_buffer_memory.input_key: question}
+        outputs = {heavyiq_buffer_memory.output_key: query}
+        heavyiq_buffer_memory.save_context(inputs, outputs, manual_save=True)
 
     def run(
         self,
@@ -307,7 +381,7 @@ def create_conversational_agent(
             llm=chat_llm,
             system_message=SYSTEM_MESSAGE,
             human_message=HUMAN_MESSAGE,
-            output_parser=CustomOutputParser(),
+            output_parser=ChatOutputParser(),
         ),
         tools=tools,
         last_k=1,
@@ -337,7 +411,7 @@ async def create_conversational_agent_async(
             llm=chat_llm,
             system_message=SYSTEM_MESSAGE,
             human_message=HUMAN_MESSAGE,
-            output_parser=CustomOutputParser(),
+            output_parser=ChatOutputParser(),
         ),
         tools=tools,
         last_k=1,

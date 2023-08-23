@@ -3,6 +3,7 @@ import json
 from collections.abc import Awaitable
 from typing import Any, Iterable, Iterator
 from fastapi_socketio import SocketManager
+from langchain.agents.agent_iterator import AgentExecutorIterator
 from langchain.schema import messages_from_dict, HumanMessage, AIMessage, BaseMessage
 
 
@@ -33,6 +34,59 @@ async def wrap_done(fn: Awaitable, event: asyncio.Event) -> Any:
     """Wrap an awaitable with a event to signal when it's done or an exception is raised."""
     try:
         return await fn
+    except Exception as e:
+        print(f"Caught exception: {e}")
+        raise e
+    finally:
+        # Signal the event/aiter to stop.
+        event.set()
+
+
+async def wrap_done_iter(
+    iter: AgentExecutorIterator,
+    event: asyncio.Event,
+    socket_manager: SocketManager | None = None,
+    sid: str | None = None,
+) -> Any:
+    """Wrap an awaitable with a event to signal when it's done or an exception is raised."""
+    try:
+        last_run_sql_query = ""
+        async for step in iter:
+            if output := step.get("intermediate_step"):
+                action, value = output[0]
+                tool_dict = {}
+                log = json.loads(action.log) if action.log else {}
+                thought = log.get("thought", "")
+                action_info = action.tool
+                tool_dict["action_input"] = action.tool_input
+                tool_dict["observation"] = value
+                if action.tool == "query_for_relevant_tables":
+                    action_info = "Checking wether if there's any HeavyDB table contain relevant information..."
+                    # only the first line of observation is enough
+                    tool_dict["observation"] = value.split(".")[0] + "."
+                elif action.tool == "retrieve_table_schemas":
+                    action_info = f'Retrieving schema, sample rows for the given table "{action.tool_input}"...'
+                elif action.tool == "run_sql_query":
+                    action_info = f'Running SQL query...\n"{action.tool_input}"'
+                    last_run_sql_query = action.tool_input
+                tool_dict["thought"] = thought
+                tool_dict["action"] = action_info
+                if socket_manager and sid:
+                    await socket_manager.emit("intermediateStep", tool_dict, to=sid)
+
+        final_output = ""
+        if final_outputs := iter.final_outputs:
+            final_output = final_outputs["output"]
+            if thought := final_outputs.get("thought"):
+                if socket_manager and sid:
+                    await socket_manager.emit("finalThought", thought, to=sid)
+
+        if final_output and last_run_sql_query:
+            # save last run sql into memory
+            iter.agent_executor.save_to_sql_memory(iter.inputs["input"], last_run_sql_query)  # type: ignore
+
+        return final_output
+
     except Exception as e:
         print(f"Caught exception: {e}")
         raise e
@@ -72,7 +126,7 @@ class MessageHistoryManager:
         messages: list[str] = []
         if key_info:
             # key already exists, so load it as json
-            messages: list[str] = json.loads(key_info)
+            messages = json.loads(key_info)
         messages.extend([question.content, answer.content])
         # alter session info with the new values for the passed key
         session_info[key] = json.dumps(messages)
