@@ -67,7 +67,7 @@ class NLtoAnswerChain(BaseChain):
 
     def __init__(self, *args, **kwargs):
         config = get_config()
-        if config.custom_llm_type == "API":
+        if config.custom_llm_type == "API" or config.custom_llm_type == "API_VLLM":
             prompt = CUSTOM_LLM_ANSWER_PROMPT
         else:
             prompt = ANSWER_PROMPT

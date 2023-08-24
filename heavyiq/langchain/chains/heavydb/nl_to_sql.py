@@ -155,7 +155,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
 
     def __init__(self, *args, **kwargs):
         config = get_config()
-        if config.custom_llm_type == "API":
+        if config.custom_llm_type == "API" or config.custom_llm_type == "API_VLLM":
             prompt = CUSTOM_LLM_NL_TO_SQL_PROMPT
         else:
             prompt = NL_TO_SQL_PROMPT
