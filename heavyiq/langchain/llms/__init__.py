@@ -6,7 +6,7 @@ from langchain.chat_models import ChatOpenAI, AzureChatOpenAI
 from langchain.chat_models.base import BaseChatModel
 
 from heavyiq.config import get_config
-from .overrides import OverrideOpenAI
+from .overrides import OverrideOpenAI, OverrideVLLMOpenAI
 
 
 class LLMType(Enum):
@@ -16,7 +16,7 @@ class LLMType(Enum):
 
 def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
     config = get_config()
-    if config.custom_llm_type == "API":
+    if config.custom_llm_type == "API" or config.custom_llm_type == "API_VLLM":
         if config.dev:
             if model_type == LLMType.NL_TO_SQL:
                 return get_custom_llm(LLMType.NL_TO_SQL.value, **config.dev.nl_to_sql.dict(), **kwargs)
@@ -31,11 +31,27 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
 
 
 def get_custom_llm(name: str, api_base: str, context_window: int, **kwargs) -> BaseLLM:
-    return OverrideOpenAI(
+    config = get_config()
+    if config.custom_llm_type == "API":
+        return OverrideOpenAI(
+            openai_api_key="nothing",
+            openai_api_base=api_base,
+            model=f"CUSTOM_LLM_{name}",
+            context_window=context_window,
+            **kwargs,
+        )
+    # API_VLLM
+    vllm_kwargs = (
+        {}
+        if config.custom_llm_api_vllm_beam_width < 2
+        else {"use_beam_search": True, "best_of": config.custom_llm_api_vllm_beam_width}
+    )
+    return OverrideVLLMOpenAI(
         openai_api_key="nothing",
-        openai_api_base=api_base,
-        model=f"CUSTOM_LLM_{name}",
-        context_window=context_window,
+        openai_api_base=config.custom_llm_api_base,
+        model_name=config.custom_llm_api_vllm_model_name,
+        model_kwargs=vllm_kwargs,
+        context_window=config.custom_llm_api_context_window,
         **kwargs,
     )
 
@@ -65,6 +81,20 @@ def get_llm(**kwargs) -> BaseLLM:
             openai_api_key="nothing",
             openai_api_base=config.custom_llm_api_base,
             model="CUSTOM_LLM",
+            context_window=config.custom_llm_api_context_window,
+            **kwargs,
+        )
+    elif config.custom_llm_type == "API_VLLM":
+        vllm_kwargs = (
+            {}
+            if config.custom_llm_api_vllm_beam_width < 2
+            else {"use_beam_search": True, "best_of": config.custom_llm_api_vllm_beam_width}
+        )
+        return OverrideVLLMOpenAI(
+            openai_api_key="nothing",
+            openai_api_base=config.custom_llm_api_base,
+            model_name=config.custom_llm_api_vllm_model_name,
+            model_kwargs=vllm_kwargs,
             context_window=config.custom_llm_api_context_window,
             **kwargs,
         )
