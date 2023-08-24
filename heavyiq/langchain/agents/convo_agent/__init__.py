@@ -9,7 +9,7 @@ from langchain.agents.conversational_chat.base import ConversationalChatAgent
 from langchain.agents.conversational_chat.prompt import PREFIX, SUFFIX
 from langchain.callbacks.base import BaseCallbackManager, Callbacks
 from langchain.chat_models.base import BaseChatModel
-from langchain.memory import CombinedMemory, ConversationBufferMemory
+from langchain.memory import CombinedMemory, ConversationBufferWindowMemory
 from langchain.schema.prompt_template import BasePromptTemplate
 from langchain.schema.messages import BaseMessage
 from langchain.prompts.chat import (
@@ -102,8 +102,8 @@ Use this if you want to respond directly to the human. Markdown code snippet for
 
 ```json
 {{{{
-    "thought": string \\ your final thought
-    "action": "Final Answer",
+    "thought": string \\ your final thoughts
+    "action": "Final Answer"
     "action_input": string \\ You should put what you want to return to human
 }}}}
 ```"""
@@ -165,7 +165,7 @@ class ChatOutputParser(AgentOutputParser):
             if action == "Final Answer":
                 return AgentFinish({"output": action_input, "thought": thought}, text)
             else:
-                return AgentAction(action, action_input, text)
+                return AgentAction(action, action_input, cleaned_output)
         except Exception:
             # bot forgot to speak json, just output the response as a final answer
             return AgentFinish({"output": text.strip()}, text)
@@ -196,6 +196,10 @@ class CustomConversationalChatAgent(ConversationalChatAgent):
         message_without_input, input_message = re.split(r"\b(?=USER'S INPUT)", final_prompt)
         messages: list[BaseMessagePromptTemplate | BaseChatPromptTemplate | BaseMessage] = [
             SystemMessagePromptTemplate.from_template(system_message),
+            # instruct Assistant to pick recently used table for consideration.
+            SystemMessagePromptTemplate.from_template(
+                """\nIf you're unsure about the table to use, consider referencing any recently used tables from the chat history to help determine the appropriate table for the SQL query.\n"""
+            ),
             HumanMessagePromptTemplate.from_template(message_without_input),
             SystemMessagePromptTemplate.from_template("Chat History:\n------------------\n"),
             MessagesPlaceholder(variable_name="chat_history"),
@@ -296,7 +300,7 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
         relevant default values has to be used. Why because, we need the executor to
         return intermediate_steps for catching the right query and also the memory should
         be an instance of CombinedMemory
-            1. ConversationBufferMemory used for storing chat history.
+            1. ConversationBufferWindowMemory used for storing chat history (recent 10 messages, k=10).
             2. HeavyIQQueryBufferWindowMemory used for storing n successful queries.
 
         Args:
@@ -305,13 +309,14 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
         kwargs.pop("memory", None)
         kwargs.pop("return_intermediate_steps", None)
         chat_history, sql_history = kwargs.pop("chat_history", None), kwargs.pop("sql_history", None)
-        convo_memory = ConversationBufferMemory(
+        convo_memory = ConversationBufferWindowMemory(
             chat_memory=chat_history or ChatMessageHistory(),
             memory_key="chat_history",
             return_messages=True,
             ai_prefix="Assistant",
             input_key="input",
             output_key="output",
+            k=10,
         )
         latest_run_sql_memory = HeavyIQQueryBufferWindowMemory(
             chat_memory=sql_history or ChatMessageHistory(),

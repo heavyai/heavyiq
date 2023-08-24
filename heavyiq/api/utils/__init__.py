@@ -4,7 +4,7 @@ from collections.abc import Awaitable
 from typing import Any, Iterable, Iterator
 from fastapi_socketio import SocketManager
 from langchain.agents.agent_iterator import AgentExecutorIterator
-from langchain.schema import messages_from_dict, HumanMessage, AIMessage, BaseMessage
+from langchain.schema import messages_from_dict, HumanMessage, AIMessage, BaseMessage, AgentAction
 
 
 class AsyncIteratorWrapper:
@@ -42,6 +42,20 @@ async def wrap_done(fn: Awaitable, event: asyncio.Event) -> Any:
         event.set()
 
 
+def get_thought_from_action(action: AgentAction) -> str:
+    """
+    Function to get thought message from AgentAction.log
+    """
+    thought = ""
+    try:
+        log = json.loads(action.log)
+        thought = log.get("thought", "")
+    except json.JSONDecodeError:
+        pass
+
+    return thought
+
+
 async def wrap_done_iter(
     iter: AgentExecutorIterator,
     event: asyncio.Event,
@@ -55,8 +69,7 @@ async def wrap_done_iter(
             if output := step.get("intermediate_step"):
                 action, value = output[0]
                 tool_dict = {}
-                log = json.loads(action.log) if action.log else {}
-                thought = log.get("thought", "")
+                thought = get_thought_from_action(action)
                 action_info = action.tool
                 tool_dict["action_input"] = action.tool_input
                 tool_dict["observation"] = value
@@ -77,9 +90,11 @@ async def wrap_done_iter(
         final_output = ""
         if final_outputs := iter.final_outputs:
             final_output = final_outputs["output"]
-            if thought := final_outputs.get("thought"):
-                if socket_manager and sid:
-                    await socket_manager.emit("finalThought", thought, to=sid)
+            # show final_thought only if atleast one tool have been used.
+            if iter.intermediate_steps:
+                if thought := final_outputs.get("thought"):
+                    if socket_manager and sid:
+                        await socket_manager.emit("finalThought", thought, to=sid)
 
         if final_output and last_run_sql_query:
             # save last run sql into memory
