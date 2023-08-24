@@ -41,13 +41,15 @@ def get_custom_llm(name: str, api_base: str, context_window: int, **kwargs) -> B
             **kwargs,
         )
     # API_VLLM
+    model_kwargs = {}
     if config.custom_llm_api_vllm_beam_width >= 2:
-        kwargs["use_beam_search"] = True
+        model_kwargs["use_beam_search"] = True
         kwargs["best_of"] = config.custom_llm_api_vllm_beam_width
     return OverrideVLLMOpenAI(
         openai_api_key="nothing",
         openai_api_base=config.custom_llm_api_base,
         model_name=config.custom_llm_api_vllm_model_name,
+        model_kwargs=model_kwargs,
         context_window=config.custom_llm_api_context_window,
         **kwargs,
     )
@@ -82,13 +84,15 @@ def get_llm(**kwargs) -> BaseLLM:
             **kwargs,
         )
     elif config.custom_llm_type == "API_VLLM":
+        model_kwargs = {}
         if config.custom_llm_api_vllm_beam_width >= 2:
-            kwargs["use_beam_search"] = True
+            model_kwargs["use_beam_search"] = True
             kwargs["best_of"] = config.custom_llm_api_vllm_beam_width
         return OverrideVLLMOpenAI(
             openai_api_key="nothing",
             openai_api_base=config.custom_llm_api_base,
             model_name=config.custom_llm_api_vllm_model_name,
+            model_kwargs=model_kwargs,
             context_window=config.custom_llm_api_context_window,
             **kwargs,
         )
