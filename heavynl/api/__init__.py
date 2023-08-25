@@ -9,7 +9,22 @@ from heavynl.langchain.utils import init_telemetrics
 from heavynl.logging_utils import _get_access_logger, get_heavynl_logger, init_logs
 
 
+def stripped_down_api() -> Flask:
+    app = connexion.FlaskApp(__name__, server_args={"static_folder": "../../public", "static_url_path": "/"})
+    CORS(app.app)
+    return app.app  # type: ignore
+
+
 def get_app(config_path: str = "./config.toml") -> Flask:
+    try:
+        with open(config_path, "r") as f:
+            if "[iq]" not in f.read():
+                print("No HeavyIQ configuration options detected; service disabled.")
+                return stripped_down_api()
+    except Exception:
+        print("Provided config path is not valid; service disabled.")
+        return stripped_down_api()
+
     print(f"Loading config from:{config_path}")
     get_config(config_path)  # loads config using specified path
     init_logs()  # initializes logs using config
