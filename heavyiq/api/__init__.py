@@ -22,6 +22,12 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
 
     :return FastAPI: instance of fastapi with custom openapi scehma.
     """
+    with open(config_path, "r") as f:
+        if "[iq]" not in f.read():
+            print("No HeavyIQ configuration options detected; service disabled.")
+            app = FastAPI(title="HeavyIQ")
+            app.include_router(defaultrouter)
+            return app
     get_config(config_path)  # loads config using specified path
     init_logs()  # initializes logs using config
     init_telemetrics()  # initializes langsmith
