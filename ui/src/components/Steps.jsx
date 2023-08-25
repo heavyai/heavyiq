@@ -1,25 +1,47 @@
-import React from "react";
-import { Box, List, ListItem, ListItemText, ListItemIcon } from "@mui/material";
+import React, { useState } from "react";
+import {
+  Box,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  IconButton,
+} from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
 import ClearIcon from "@mui/icons-material/Clear";
-import InfoIcon from '@mui/icons-material/Info';
+import InfoIcon from "@mui/icons-material/Info";
+import { ExpandMore, ExpandLess } from "@mui/icons-material";
 
 const Steps = ({ stepItems, finalThought }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  const toggleExpand = () => {
+    setExpanded(!expanded);
+  };
+
   return (
-    <div>
-      <Box height="auto">
+    <div style={{ display: "flex", flexDirection: "row" }}>
+      <div style={{ paddingTop: 15 }}>
+        <IconButton onClick={toggleExpand}>
+          {expanded ? <ExpandLess /> : <ExpandMore />}
+        </IconButton>
+      </div>
+      <Box>
         <List
           sx={{
             listStyleType: "disc",
             listStylePosition: "inside",
             display: "flex",
             flexDirection: "column",
-            gap: 0,
+            overflow: "hidden",
+            transition: "display 0.3s ease",
           }}
         >
           {stepItems.map((item, index) => (
             <React.Fragment key={`step-item-${index}`}>
-              <ListItem sx={{ color: "yellow", display: "flex" }}>
+              <ListItem
+                sx={{ color: "yellow", display: expanded ? "flex" : "none" }}
+              >
                 <ListItemIcon sx={{ color: "green" }}>
                   <CheckIcon />
                 </ListItemIcon>
@@ -33,7 +55,7 @@ const Steps = ({ stepItems, finalThought }) => {
               <ListItem
                 sx={{
                   color: item.observation.startsWith("Error") ? "red" : "green",
-                  display: "flex",
+                  display: expanded ? "flex" : "none",
                 }}
               >
                 {item.observation.startsWith("Error") ? (
