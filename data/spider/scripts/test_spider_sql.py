@@ -37,6 +37,9 @@ def getOptions(argv=None):
     parser.add_argument(
         "--write-english-prompts", help="Write English prompts to file for successful queries", action="store_true"
     )
+    parser.add_argument(
+        "--write-question-prompts", help="Write question prompts to file for successful queries", action="store_true"
+    )
     return parser.parse_args(argv)
 
 
@@ -379,7 +382,7 @@ def get_top_k_vals_str(table_name, top_k_vals):
     # return "\n".join(top_k_vals_strs)
 
 
-def generate_instruction(table_schemas, top_k_str_vals, user_question):
+def generate_instruction(table_schemas, top_k_str_vals, user_question=None):
     # print(top_k_str_vals)
     top_k_str_vals_str = ""
     if len(top_k_str_vals) > 0:
@@ -387,14 +390,23 @@ def generate_instruction(table_schemas, top_k_str_vals, user_question):
         for table_top_k_str_vals in top_k_str_vals:
             top_k_str_vals_str += "\n".join(table_top_k_str_vals)
             top_k_str_vals_str += "\n"
-    instruction = """You are a experienced data analyst adept at writing SQL queries to answer user questions.\n
-You have access to the following relational tables, with schemas below.\n
-{table_schemas}\n\n{top_k_str_vals_str}
-Write a SQL query to answer the following question:\n
-{user_question}\n""".format(
-        table_schemas="\n\n".join(table_schemas), top_k_str_vals_str=top_k_str_vals_str, user_question=user_question
-    )
-    return instruction
+    if user_question is not None:
+        instruction = """You are a experienced data analyst adept at writing SQL queries to answer user questions.\n
+    You have access to the following relational tables, with schemas below.\n
+    {table_schemas}\n\n{top_k_str_vals_str}
+    Write a SQL query to answer the following question:\n
+    {user_question}\n""".format(
+            table_schemas="\n\n".join(table_schemas), top_k_str_vals_str=top_k_str_vals_str, user_question=user_question
+        )
+        return instruction
+    else:
+        instruction = """You are a experienced data analyst adept at asking compelling questions of your data.\n
+    You have access to the following relational tables, with schemas below.\n
+    {table_schemas}\n\n{top_k_str_vals_str}
+    Write a compelling question to ask of the above data:\n""".format(
+            table_schemas="\n\n".join(table_schemas), top_k_str_vals_str=top_k_str_vals_str
+        )
+        return instruction
 
 
 def extract_tables_from_query(con, query):
@@ -461,6 +473,30 @@ def write_english_prompts_to_csv(english_prompts, output_file):
             obj["output"],
         )
         for obj in english_prompts
+    ]
+    with open(output_file, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(fieldnames)
+        writer.writerows(prompts_to_write)
+
+
+def write_question_prompts_to_csv(question_prompts, output_file):
+    fieldnames = [
+        "query_id",
+        "db_id",
+        "data_split",
+        "instruction",
+        "output",
+    ]
+    prompts_to_write = [
+        (
+            obj["query_id"],
+            obj["db_id"],
+            obj["data_split"],
+            obj["instruction"],
+            obj["output"],
+        )
+        for obj in question_prompts
     ]
     with open(output_file, mode="w", newline="") as file:
         writer = csv.writer(file)
@@ -615,7 +651,6 @@ def fix_failed_query_gpt(con, query_id, failed_query, error):
     while sql_try_count <= max_sql_try_count and not sql_success:
         sql_completion = None
         model = base_model if sql_try_count == 1 else power_model
-        print(sql_try_count)
         try:
             sql_completion = openai.ChatCompletion.create(
                 model=model,
@@ -671,10 +706,10 @@ def main(argv):
     failed_queries = []
     prompts = []
     english_prompts = []
+    question_prompts = []
     con = None
     tokenizer = LlamaTokenizer.from_pretrained("test_model")
     for db_id, queries in queries_by_db.items():
-        print(db_id)
         try:
             if db_num < options.start_db:
                 db_num += 1
@@ -747,7 +782,6 @@ def main(argv):
                 try:
                     if sql_query not in db_query_cache:
                         con.execute(sql_query)
-                        print(f"Not in cache: {query_id}")
                     successful_queries += 1
                     if options.write_sql_prompts:
                         filtered_tables = extract_tables_from_query(con, sql_query)
@@ -804,9 +838,32 @@ def main(argv):
                                     "output": english_explanation,
                                 }
                             )
+                    if options.write_question_prompts:
+                        filtered_tables = extract_tables_from_query(con, sql_query)
+                        filtered_table_schemas = []
+                        for db_table in filtered_tables:
+                            filtered_table_schemas.append(table_schemas_map[db_table.lower()])
+                        filtered_top_k_str_vals = []
+                        if options.top_k_str_vals > 0:
+                            for db_table in filtered_tables:
+                                filtered_top_k_str_vals.append(top_k_str_vals_map[db_table])
+                        instruction = generate_instruction(filtered_table_schemas, filtered_top_k_str_vals)
+                        instruction_tokens = tokenizer.tokenize(instruction)
+                        num_instruction_tokens = len(instruction_tokens)
+                        if num_instruction_tokens > options.max_instruction_tokens:
+                            instruction = generate_instruction(filtered_table_schemas, [])
+                        question_prompts.append(
+                            {
+                                "db_id": db_id,
+                                "query_id": query_id,
+                                "data_split": data_split,
+                                "instruction": instruction,
+                                "output": query["question"],
+                            }
+                        )
 
                 except Exception as e:
-                    print(e)
+                    print(f"Exception: {query_id}")
                     query_fixed = False
                     if options.fix_queries:
                         fixed_query = fix_failed_query_unquoted_keyword(con, query_id, sql_query, e)
@@ -842,6 +899,8 @@ def main(argv):
         write_sql_prompts_to_csv(prompts, "sql_all_prompts.csv")
     if options.write_english_prompts:
         write_english_prompts_to_csv(english_prompts, "sql_english_prompts.csv")
+    if options.write_question_prompts:
+        write_question_prompts_to_csv(question_prompts, "sql_question_prompts.csv")
 
     print(f"\n\nTotal successful queries: {total_successful_queries}/{total_queries}")
     print(f"Total successful fixed queries: {len(fixed_queries)}/{total_queries}")
