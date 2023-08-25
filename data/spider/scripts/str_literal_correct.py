@@ -4,6 +4,7 @@ import heavyai
 import pandas as pd
 import re
 import sys
+from typing import Dict, Tuple
 
 
 def getOptions(argv=None):
@@ -15,6 +16,52 @@ def getOptions(argv=None):
     parser.add_argument("-d", "--db", help="HeavyDB DB", default="heavyai")
     parser.add_argument("-q", "--query", help="SQL query", default=None)
     return parser.parse_args(argv)
+
+
+def get_query_plan(con, query):
+    explain_calcite_query = f"EXPLAIN CALCITE DETAILED {query}"
+    res = con.execute(explain_calcite_query)
+    query_plan = list(res)[0][0]
+    return query_plan
+
+
+def extract_column_mappings(query_plan: str) -> Dict[str, Tuple[str, str, str]]:
+    result = {}
+    # Use a regex pattern to capture (database, table, column) and literal values in LogicalFilter
+    # pattern = r"\[\$([0-9]+)->(db:[\w]+),tableName:([\w]+),colName:([\w]+)\]\], \=.*'([^']+)')"
+    # pattern = r"\[\$([0-9]+)->(db:[\w]+),tableName:([\w]+),colName:([\w]+)\], \=.*'([^']+)'\)"
+    pattern = r"\[\$([0-9]+)->db:([\w]+),tableName:([\w]+),colName:([\w]+)\]"
+
+    matches = re.findall(pattern, query_plan)
+
+    # for _, db, table, column, literal in matches:
+    for id, db, table, column in matches:
+        col_id = (db, table, column)
+        result[id] = col_id
+
+    return result
+
+
+def extract_str_literal_ops(query_plan):
+    result = {}
+    pattern1 = r"(LIKE|PG_ILIKE|>=|<=|<>|=)\(\$(\d+), '([\w ]+)'"
+    pattern2 = r"(LIKE|PG_ILIKE|>=|<=|<>|=)\('([\w+ ]+)', \$(\d+)\)"
+
+    matches1 = re.findall(pattern1, query_plan)
+    matches2 = re.findall(pattern2, query_plan)
+    for op, id, literal in matches1:
+        result[id] = (op, literal)
+    for op, literal, id in matches2:
+        result[id] = (op, literal)
+    return result
+
+
+def join_str_literals_with_col_mapping(str_literal_ops, col_mapping):
+    result = []
+    for id, (op, literal) in str_literal_ops.items():
+        db, table, column = col_mapping[id]
+        result.append({"operator": op, "literal": literal, "database": db, "table": table, "column": column})
+    return result
 
 
 def matchLiteral(con, literal, exact_match_threshold):
@@ -49,7 +96,10 @@ def matchLiteral(con, literal, exact_match_threshold):
             return altered_literal
     elif total_count == 0:
         lower_literal = literal["literal"].lower()
-        similarity_query = f"SELECT LOWER({literal['column']}), COUNT(*), JAROWINKLER_SIMILARITY(LOWER({literal['column']}), '{lower_literal}') FROM {literal['database']}.{literal['table']} WHERE JAROWINKLER_SIMILARITY(LOWER({literal['column']}), '{lower_literal}') >= 80 GROUP BY LOWER({literal['column']}) ORDER BY JAROWINKLER_SIMILARITY(LOWER({literal['column']}), '{lower_literal}') DESC NULLS LAST LIMIT 1;"
+        # similarity_query = f"SELECT LOWER({literal['column']}), COUNT(*), JAROWINKLER_SIMILARITY(LOWER({literal['column']}), '{lower_literal}') FROM {literal['database']}.{literal['table']} WHERE JAROWINKLER_SIMILARITY(LOWER({literal['column']}), '{lower_literal}') >= 80 GROUP BY LOWER({literal['column']}) ORDER BY JAROWINKLER_SIMILARITY(LOWER({literal['column']}), '{lower_literal}') DESC NULLS LAST LIMIT 1;"
+        similarity_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS n FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) FROM distinct_values WHERE LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) < 5 ORDER BY LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) ASC LIMIT 1;"
+        # LOWER({literal['column']}), COUNT(*), JAROWINKLER_SIMILARITY(LOWER({literal['column']}), '{lower_literal}') FROM {literal['database']}.{literal['table']} WHERE JAROWINKLER_SIMILARITY(LOWER({literal['column']}), '{lower_literal}') >= 80 GROUP BY LOWER({literal['column']}) ORDER BY JAROWINKLER_SIMILARITY(LOWER({literal['column']}), '{lower_literal}') DESC NULLS LAST LIMIT 1;"
+        print(similarity_query)
         similarity_df = pd.read_sql(similarity_query, con)
         num_similarity_rows = len(similarity_df.axes[0])
         print(similarity_df)
@@ -64,65 +114,36 @@ def matchLiteral(con, literal, exact_match_threshold):
     return altered_literal
 
 
-def getLiterals(con, query):
-    literals = []
-    explain_calcite_query = f"EXPLAIN CALCITE {query}"
-    print(explain_calcite_query)
-    res = con.execute(explain_calcite_query)
-    query_plan = list(res)[0][0]
-    # Extract lines that have literals
-    literal_lines = re.findall(
-        r"(LogicalFilter\(condition=\[)(LIKE|ILIKE|>=|<=|<>|=)(.*?'([^']+).*?{\[\$.*?\]})", query_plan
-    )
-
-    # r"(LogicalFilter\(condition=\[)(LIKE|ILIKE|>=|<=|<>|=)(.*?'\w+'.*?{\[\$.*?\]})", query_plan
-    literal_results = []
-    for line in literal_lines:
-        # Extract the operator
-        operator = line[1]
-
-        # Extract the literal
-        # literal = re.search(r"'(\w+)'", line[2]).group(1)
-        literal = re.search(r"'([^']+)'", line[2]).group(1)
-
-        mappings = re.search(r"{\[\$(\d+)->db:(\w+),tableName:(\w+),colName:(\w+)\]}", line[2]).groups()
-
-        literal_result = {
-            "operator": operator,
-            "literal": f"{literal}",
-            "database": mappings[1],
-            "table": mappings[2],
-            "column": mappings[3],
-        }
-
-        literal_results.append(literal_result)
-
-    return literal_results
-
-
 def main(argv):
     options = getOptions(argv)
     con = heavyai.connect(user=options.user, password=options.password, host=options.host, dbname=options.db)
-    literals = getLiterals(con, options.query)
-    print(literals)
+    query_plan = get_query_plan(con, options.query)
+    print(query_plan)
+    col_mapping = extract_column_mappings(query_plan)
+    print(col_mapping)
+    str_literal_ops = extract_str_literal_ops(query_plan)
+    print(str_literal_ops)
+    str_literal_ops_with_col_mapping = join_str_literals_with_col_mapping(str_literal_ops, col_mapping)
+    print(str_literal_ops_with_col_mapping)
     exact_match_threshold = 0.999999
     altered_query = copy.deepcopy(options.query)
-    for literal in literals:
-        altered_literal = matchLiteral(con, literal, exact_match_threshold)
-        if altered_literal != literal:
-            if altered_literal["operator"] != literal["operator"]:
+    for str_literal_op in str_literal_ops_with_col_mapping:
+        print(str_literal_op)
+        altered_str_literal_op = matchLiteral(con, str_literal_op, exact_match_threshold)
+        if altered_str_literal_op != str_literal_op:
+            if altered_str_literal_op["operator"] != str_literal_op["operator"]:
                 altered_query = altered_query.replace(
-                    f"{literal['column']} {literal['operator']} '{literal['literal']}'",
-                    f"{literal['column']} {altered_literal['operator']} '{literal['literal']}'",
+                    f"{str_literal_op['column']} {str_literal_op['operator']} '{str_literal_op['literal']}'",
+                    f"{str_literal_op['column']} {altered_str_literal_op['operator']} '{altered_str_literal_op['literal']}'",
                 )
-                print(f"Operator changed from {literal['operator']} to {altered_literal['operator']}")
+                print(f"Operator changed from {str_literal_op['operator']} to {altered_str_literal_op['operator']}")
 
-            if altered_literal["literal"] != literal["literal"]:
+            if altered_str_literal_op["literal"] != str_literal_op["literal"]:
                 altered_query = altered_query.replace(
-                    f"{literal['column']} {altered_literal['operator']} '{literal['literal']}'",
-                    f"{literal['column']} {altered_literal['operator']} '{altered_literal['literal']}'",
+                    f"{str_literal_op['column']} {altered_str_literal_op['operator']} '{str_literal_op['literal']}'",
+                    f"{str_literal_op['column']} {altered_str_literal_op['operator']} '{altered_str_literal_op['literal']}'",
                 )
-                print(f"Literal changed from {literal['literal']} to {altered_literal['literal']}")
+                print(f"Literal changed from {str_literal_op['literal']} to {altered_str_literal_op['literal']}")
     print(altered_query)
     final_df = pd.read_sql(altered_query, con)
     print(final_df)
