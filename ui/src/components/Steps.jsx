@@ -37,10 +37,10 @@ const Steps = ({ stepItems, finalThought }) => {
             transition: "display 0.3s ease",
           }}
         >
-          {stepItems.map((item, index) => (
+          {expanded && stepItems.map((item, index) => (
             <React.Fragment key={`step-item-${index}`}>
               <ListItem
-                sx={{ color: "yellow", display: expanded ? "flex" : "none" }}
+                sx={{ color: "yellow", display: "flex" }}
               >
                 <ListItemIcon sx={{ color: "green" }}>
                   <CheckIcon />
@@ -55,7 +55,7 @@ const Steps = ({ stepItems, finalThought }) => {
               <ListItem
                 sx={{
                   color: item.observation.startsWith("Error") ? "red" : "green",
-                  display: expanded ? "flex" : "none",
+                  display: "flex",
                 }}
               >
                 {item.observation.startsWith("Error") ? (
