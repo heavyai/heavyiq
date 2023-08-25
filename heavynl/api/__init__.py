@@ -10,6 +10,13 @@ from heavynl.logging_utils import _get_access_logger, get_heavynl_logger, init_l
 
 
 def get_app(config_path: str = "./config.toml") -> Flask:
+    with open(config_path, "r") as f:
+        if "[iq]" not in f.read():
+            print("No HeavyIQ configuration options detected; service disabled.")
+            app = connexion.FlaskApp(__name__, server_args={"static_folder": "../../public", "static_url_path": "/"})
+            CORS(app.app)
+            return app.app  # type: ignore
+
     print(f"Loading config from:{config_path}")
     get_config(config_path)  # loads config using specified path
     init_logs()  # initializes logs using config
