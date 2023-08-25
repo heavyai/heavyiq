@@ -5,8 +5,8 @@ const URL = process.env.NODE_ENV === 'production' ? undefined : process.env.REAC
 
 export const socket = io(URL, {autoConnect: false,
     reconnection: true,
-    reconnectionAttempts: 3, // Adjust as needed
-    reconnectionDelay: 1000,
+    reconnectionAttempts: 10, // Adjust as needed
+    reconnectionDelay: 2000,
     transports: ["websocket"],
 }
 );

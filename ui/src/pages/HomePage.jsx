@@ -3,6 +3,7 @@ import Header from "../components/Header";
 import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
 import { useEffect, useRef, useState } from "react";
 import { socket } from "../socket";
+import ColoredCircleIcon from "../components/CircleIcon";
 
 import {
   Stack,
@@ -18,15 +19,20 @@ import {
 } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
 import ClearIcon from "@mui/icons-material/Clear";
-import InfoIcon from '@mui/icons-material/Info';
+import InfoIcon from "@mui/icons-material/Info";
 import Answer from "../components/Answer";
 import Steps from "../components/Steps";
-// import Steps from "../components/Steps";
 
 const messageType = {
   answer: "answer",
   question: "question",
   steps: "steps",
+};
+
+const socketStatusType = {
+  connected: "Connected",
+  disconnected: "Disconnected",
+  connecting: "Connecting",
 };
 
 const HomePage = () => {
@@ -64,6 +70,10 @@ const HomePage = () => {
   ]);
   // final thought
   const [finalThought, setFinalThought] = useState("");
+  // socket status
+  const [socketStatus, setSocketStatus] = useState(
+    socketStatusType.disconnected
+  );
 
   const onEnterPress = (e) => {
     if (e.keyCode === 13) {
@@ -85,20 +95,6 @@ const HomePage = () => {
   const addItemToSteps = (newItem) => {
     setStepItems((prevItems) => [...prevItems, newItem]);
   };
-
-  // const addStepMessage = () => {
-  //   if(stepItems.length > 0) {
-  //     setMessages((prevMessages) => [
-  //       ...prevMessages,
-  //       {
-  //         type: messageType.steps,
-  //         content: stepItems,
-  //       },
-  //     ]);
-  //     // reset stepItems
-  //     setStepItems([]);
-  //   }
-  // }
 
   useEffect(() => {
     // Event handler for receiving messages and appending
@@ -134,7 +130,7 @@ const HomePage = () => {
 
     const handleFinalThought = (data) => {
       setFinalThought(data);
-    }
+    };
 
     socket.on("answer", handleAnswer);
 
@@ -151,6 +147,31 @@ const HomePage = () => {
 
     socket.on("finalThought", handleFinalThought);
 
+    socket.on("connect", () => {
+      setSocketStatus(socketStatusType.connected);
+      console.log("Connected to socket server");
+    });
+
+    socket.on("disconnect", () => {
+      setSocketStatus(socketStatusType.disconnected);
+      console.log("Disconnected from socket server");
+    });
+
+    socket.io.on("reconnect_attempt", (attempt) => {
+      setSocketStatus(socketStatusType.connecting);
+      console.log("Reconnecting to socket server...");
+    });
+
+    socket.on('connect_error', (error) => {
+      setSocketStatus(socketStatusType.disconnected);
+      console.log('Connection error:', error);
+    });
+  
+    socket.on('connect_timeout', (timeout) => {
+      setSocketStatus(socketStatusType.disconnected);
+      console.log('Connection timeout:', timeout);
+    });
+
     // Cleanup function to disconnect when component unmounts
     return () => {
       socket.off("answer", handleAnswer);
@@ -165,13 +186,13 @@ const HomePage = () => {
 
   useEffect(() => {
     if (answer && typingComplete) {
-      if(stepItems.length > 0) {
+      if (stepItems.length > 0) {
         setMessages((prevMessages) => [
           ...prevMessages,
           {
             type: messageType.steps,
             content: stepItems,
-            finalThought: finalThought
+            finalThought: finalThought,
           },
         ]);
         setStepItems([]);
@@ -282,27 +303,32 @@ const HomePage = () => {
             width: "100%",
           }}
         >
-          {messages.map((item, index) => (
-            item.type === messageType.steps ? 
-              <Steps key={index} stepItems={item.content} finalThought={item.finalThought}></Steps>
-            :
-            (<Box key={index} padding={1}>
-              <Box
-                sx={{
-                  padding: 2,
-                  bgcolor:
-                    item.type === messageType.answer
-                      ? "#2f2f2f"
-                      : item.type === messageType.question
-                      ? "#c956d1"
-                      : "",
-                  borderRadius: 3,
-                }}
-              >
-                {item.content}
+          {messages.map((item, index) =>
+            item.type === messageType.steps ? (
+              <Steps
+                key={index}
+                stepItems={item.content}
+                finalThought={item.finalThought}
+              ></Steps>
+            ) : (
+              <Box key={index} padding={1}>
+                <Box
+                  sx={{
+                    padding: 2,
+                    bgcolor:
+                      item.type === messageType.answer
+                        ? "#2f2f2f"
+                        : item.type === messageType.question
+                        ? "#c956d1"
+                        : "",
+                    borderRadius: 3,
+                  }}
+                >
+                  {item.content}
+                </Box>
               </Box>
-            </Box>)
-          ))}
+            )
+          )}
           {stepItems && (
             <div>
               <Box height="auto">
@@ -389,11 +415,25 @@ const HomePage = () => {
         borderTop="1px solid #2c2c2c"
         bgcolor="#000"
         zIndex={3}
+        direction="row"
         sx={{
           position: "sticky",
           bottom: 0,
         }}
       >
+        <Box display="flex" alignItems="center">
+          <ColoredCircleIcon
+            color={
+              socketStatus === socketStatusType.connected
+                ? "success"
+                : socketStatus === socketStatusType.connecting
+                ? "warning"
+                : "error"
+            }
+            fontSize="small"
+          />
+          <Box marginLeft={1}>{socketStatus}</Box>
+        </Box>
         <Box padding={2} width="100%" maxWidth="md">
           <FormControl fullWidth variant="outlined">
             <OutlinedInput
