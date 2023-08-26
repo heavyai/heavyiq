@@ -3,18 +3,22 @@ import logging
 import re
 from re import Pattern
 from typing import Any, Optional, TextIO, cast
-from logging import LogRecord
 
 import aiofiles
 from aiofiles.threadpool.text import AsyncTextIOWrapper
 from langchain.callbacks import FileCallbackHandler as BaseFileCallbackHandler
 from langchain.callbacks.base import AsyncCallbackHandler
 from langchain.input import get_bolded_text, get_colored_text
+
+from dataclasses import asdict
 from langchain.schema.agent import AgentAction, AgentFinish
+from langchain.schema.output import LLMResult
 
 
 class AsyncFileCallbackHandler(AsyncCallbackHandler):
-    """Async Callback Handler that write logs to a file."""
+    """
+    Async Callback Handler that write logs to a file.
+    """
 
     def __init__(self, filename: str, mode: str = "a", color: Optional[str] = None, to_stdout: bool = True) -> None:
         """
@@ -34,7 +38,7 @@ class AsyncFileCallbackHandler(AsyncCallbackHandler):
 
     async def _open_file(self):
         if not self.file:
-            self.file = cast(AsyncTextIOWrapper, await aiofiles.open(self.file_path, mode=self.mode))
+            self.file = cast(AsyncTextIOWrapper, await aiofiles.open(self.file_path, mode=self.mode))  # type: ignore
 
     async def append_to_file(self, text: str):
         await self._open_file()
@@ -44,7 +48,9 @@ class AsyncFileCallbackHandler(AsyncCallbackHandler):
         await self.file.write(text)
         await self.file.flush()
 
-    async def print_text_async(self, text: str, end: str = "", color: Optional[str] = None, bold: bool = False):
+    async def print_text_async(
+        self, text: str, end: str = "\n", color: Optional[str] = None, bold: bool = False, log_level: int = 0
+    ) -> None:
         """
         Optional write to stdout and log the text to file.
         """
@@ -60,18 +66,49 @@ class AsyncFileCallbackHandler(AsyncCallbackHandler):
         if self.file and not self.file.closed:
             asyncio.ensure_future(self.file.close())
 
+    async def on_llm_start(self, serialized: dict[str, Any], prompts: list[str], **kwargs: Any) -> Any:
+        """Run when LLM starts running."""
+        await self.print_text_async(f"on_llm_start, {serialized}")
+
+    async def on_llm_error(self, error: Exception | KeyboardInterrupt, **kwargs: Any) -> Any:
+        """Run when LLM errors."""
+        await self.print_text_async(f"on_llm_error, {error}", log_level=logging.ERROR)
+
+    async def on_llm_end(self, response: LLMResult, **kwargs: Any) -> Any:
+        """Run when LLM ends running."""
+        await self.print_text_async("on_llm_end, LLM finished running")
+
     async def on_chain_start(self, serialized: dict[str, Any], inputs: dict[str, Any], **kwargs: Any) -> None:
         """Print out that we are entering a chain."""
         class_name = serialized.get("name", serialized.get("id", ["<unknown>"])[-1])
-        await self.print_text_async(f"\n\n> Entering new {class_name} chain...", end="\n", bold=True)
+        await self.print_text_async(f"\n\n> Entering new {class_name} chain...", bold=True, log_level=logging.DEBUG)
+
+    async def on_chain_error(self, error: Exception | KeyboardInterrupt, **kwargs: Any) -> Any:
+        """Run when chain errors."""
+        await self.print_text_async(f"on_chain_error, {error}", log_level=logging.ERROR)
 
     async def on_chain_end(self, outputs: dict[str, Any], **kwargs: Any) -> None:
         """Print out that we finished a chain."""
-        await self.print_text_async("\n> Finished chain.", end="\n", bold=True)
+        await self.print_text_async("\n> Finished chain.", bold=True, log_level=logging.DEBUG)
 
-    async def on_agent_action(self, action: AgentAction, color: Optional[str] = None, **kwargs: Any) -> Any:
-        """Run on agent action."""
-        await self.print_text_async(action.log, color=color or self.color, end="\n")
+    async def on_tool_start(
+        self,
+        serialized: dict[str, Any],
+        input_str: str,
+        **kwargs: Any,
+    ) -> None:
+        """Run when tool starts running."""
+        await self.print_text_async(
+            f"on_tool_start, name: {serialized['name']}, input_str: {input_str}", log_level=logging.INFO
+        )
+
+    async def on_tool_error(
+        self,
+        error: Exception | KeyboardInterrupt,
+        **kwargs: Any,
+    ) -> None:
+        """Run when tool errors."""
+        await self.print_text_async(f"on_tool_error, {error}", log_level=logging.ERROR)
 
     async def on_tool_end(
         self,
@@ -82,19 +119,21 @@ class AsyncFileCallbackHandler(AsyncCallbackHandler):
         **kwargs: Any,
     ) -> None:
         """If not the final action, print out observation."""
-        if observation_prefix is not None:
-            await self.print_text_async(f"\n{observation_prefix}")
-        await self.print_text_async(output, color=color or self.color)
-        if llm_prefix is not None:
-            await self.print_text_async(f"\n{llm_prefix}")
+        await self.print_text_async(
+            f"on_tool_end, {observation_prefix or 'output'}: {output}",
+            color=color or self.color,
+            log_level=logging.INFO,
+        )
 
-    async def on_text(self, text: str, color: Optional[str] = None, end: str = "", **kwargs: Any) -> None:
-        """Run when agent ends."""
-        await self.print_text_async(text, color=color or self.color, end="\n")
+    async def on_agent_action(self, action: AgentAction, color: Optional[str] = None, **kwargs: Any) -> Any:
+        """Run on agent action."""
+        await self.print_text_async(
+            f"on_agent_action, {asdict(action)}", color=color or self.color, log_level=logging.INFO
+        )
 
     async def on_agent_finish(self, finish: AgentFinish, color: Optional[str] = None, **kwargs: Any) -> None:
         """Run on agent end."""
-        await self.print_text_async(finish.log, color=color or self.color, end="\n")
+        await self.print_text_async(f"on_agent_finish, {finish.log}", color=color or self.color, log_level=logging.INFO)
 
 
 class AsyncLogFileCallbackHandler(AsyncFileCallbackHandler):
@@ -108,21 +147,31 @@ class AsyncLogFileCallbackHandler(AsyncFileCallbackHandler):
         super().__init__(*args, **kwargs)
         self._logger = get_heavyiq_logger()
 
-    def _text_to_log(self, text: str) -> str:
+    def _text_to_log(self, text: str, log_level: int) -> str:
         fn, lno, func, sinfo = self._logger.findCaller(stack_info=False, stacklevel=1)
         log_record = self._logger.makeRecord(
-            self._logger.name, logging.INFO, fn, lno, text, (), None, func=func, extra=None, sinfo=sinfo
+            self._logger.name, log_level, fn, lno, text, (), None, func=func, extra=None, sinfo=sinfo
         )
         # diable some record attributes
         log_record.remote_addr = "-"
         log_record.username = "-"
         return self._logger.log_formatter.format(log_record)
 
-    async def print_text_async(self, text: str, end: str = "", color: Optional[str] = None, bold: bool = False):
+    async def print_text_async(
+        self,
+        text: str,
+        end: str = "\n",
+        color: Optional[str] = None,
+        bold: bool = False,
+        log_level: int = logging.DEBUG,
+    ) -> None:
         """
         Optional write to stdout and log the text to file.
         """
-        text = self._text_to_log(text)
+        # don't print if the logger is not enabled for printing particular log levels
+        if not self._logger.isEnabledFor(log_level):
+            return
+        text = self._text_to_log(text, log_level)
         if self.to_stdout:
             bolded_text = get_bolded_text(text) if bold else text
             text_to_print = get_colored_text(bolded_text, color) if color else bolded_text

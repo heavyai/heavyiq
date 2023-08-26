@@ -1,13 +1,15 @@
 import asyncio
 from typing import Any
-from fastapi_socketio import SocketManager
 
+from fastapi_socketio import SocketManager
 from langchain.callbacks.streaming_aiter_final_only import AsyncFinalIteratorCallbackHandler
 from langchain.memory.chat_message_histories.in_memory import ChatMessageHistory
+
+from heavyiq.api.utils import MessageHistoryManager, wrap_done_iter
+from heavyiq.config import get_config
 from heavyiq.langchain.agents.convo_agent import create_conversational_agent_async
 from heavyiq.langchain.llms import get_chat_llm
-from heavyiq.config import get_config
-from heavyiq.api.utils import MessageHistoryManager, wrap_done_iter
+from heavyiq.logging_utils import get_heavyiq_logger
 
 
 def register_socket_events(socket_manager: SocketManager):
@@ -28,6 +30,9 @@ def register_socket_events(socket_manager: SocketManager):
             message (dict[str, str]): input dict which contains question.
         """
         question = message["question"]
+        # define file logger
+        logger = get_heavyiq_logger()
+        file_callback_handler = logger.async_langchain_cb_handler(to_stdout=False)
         message_history_manager = MessageHistoryManager(socket_manager=socket_manager, sid=sid)
         # retrieve chat/sql history from current session
         retrieved_chat_history = ChatMessageHistory(messages=await message_history_manager.get_chat_history())
@@ -50,7 +55,10 @@ def register_socket_events(socket_manager: SocketManager):
         # Begin a task that runs in the background.
         task = asyncio.create_task(
             wrap_done_iter(
-                sql_agent.iter(question, async_=True), stream_handler.done, socket_manager=socket_manager, sid=sid
+                sql_agent.iter(question, callbacks=[file_callback_handler], async_=True),
+                stream_handler.done,
+                socket_manager=socket_manager,
+                sid=sid,
             ),
         )
         # tell the FE that the token sending is in progress
