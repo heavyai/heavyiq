@@ -58,8 +58,6 @@ def get_config(file: str = "./config.toml") -> HeavyIQConfig:
     elif app_config.iq.custom_llm_type == "API_VLLM":
         if app_config.iq.custom_llm_api_base.strip() == "":
             raise ValueError("Custom LLM type is set to 'API_VLLM', but API base URL is not set.")
-        if app_config.iq.custom_llm_api_vllm_model_name is None:
-            raise ValueError("Custom LLM type is set to 'API_VLLM', but API VLLM model name is not set.")
     else:
         raise ValueError(
             f"Invalid custom LLM type (valid options are AZURE or API or API_VLLM): {app_config.iq.custom_llm_type}"
