@@ -2,7 +2,8 @@ import click
 
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.logging import log_chain_call
-from heavyiq.langchain.index.heavydb import SearchType, get_heavydb_index
+from heavyiq.langchain.index.heavydb import get_heavydb_index
+from heavyiq.langchain.index.utils import SearchType
 from heavyiq.langchain.chains import (
     NLtoAnswerChain,
     SQLMetadataQuestionTransformerChain,

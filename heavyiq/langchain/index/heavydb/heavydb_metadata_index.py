@@ -1,11 +1,7 @@
-from enum import Enum
 from typing import Optional
 
 from chromadb.api import Where
-from langchain.vectorstores import Chroma
-from langchain.indexes.vectorstore import VectorStoreIndexWrapper
 from langchain.schema import Document, BaseRetriever
-from langchain.text_splitter import TextSplitter
 
 from heavyiq.langchain.chains import (
     SQLMetadataQuestionTransformerChain,
@@ -14,17 +10,10 @@ from heavyiq.langchain.chains import (
 from heavyiq.langchain.llms import get_llm
 from heavyiq.langchain.logging import log_chain_call
 from .utils import read_table_documents, apply_retriever_filter
+from ..utils import HeavyIQIndexWrapper, SearchType
 
 
-class SearchType(Enum):
-    SIMILARITY = "similarity"
-    MMR = "mmr"
-
-
-class HeavyDBMetadataIndex(VectorStoreIndexWrapper):
-    text_splitter: TextSplitter
-    vectorstore: Chroma
-
+class HeavyDBMetadataIndex(HeavyIQIndexWrapper):
     def simple_search_for_table_docs(
         self, search_string: str, allowable_tables: Optional[list[str]] = None, **kwargs
     ) -> list[Document]:
