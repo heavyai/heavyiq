@@ -18,12 +18,27 @@ from heavyiq.api.routes import defaultrouter, iqrouter
 from heavyiq.api.handlers import exception_handler as exh
 
 
+def stripped_down_api() -> FastAPI:
+    app = FastAPI(title="HeavyIQ")
+    app.include_router(defaultrouter)
+    return app
+
+
 def create_app(config_path: str = "./config.toml", socket_io: bool = True) -> FastAPI:
     """
     create and return a FastAPI instance.
 
     :return FastAPI: instance of fastapi with custom openapi scehma.
     """
+    try:
+        with open(config_path, "r") as f:
+            if "[iq]" not in f.read():
+                print("No HeavyIQ configuration options detected; service disabled.")
+                return stripped_down_api()
+    except Exception:
+        print("Provided config path is not valid; service disabled.")
+        return stripped_down_api()
+
     get_config(config_path)  # loads config using specified path
     init_logs()  # initializes logs using config
     init_telemetrics()  # initializes langsmith

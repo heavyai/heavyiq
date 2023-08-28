@@ -154,7 +154,11 @@ class AsyncSocketCallbackHandler(AsyncCallbackHandler):
 
     async def on_tool_end(self, output: str, **kwargs: Any) -> None:
         """If not the final action, print out observation."""
-        status = EventStatus.error.value if output.startswith("Exception") else EventStatus.success.value
+        status = (
+            EventStatus.error.value
+            if output.startswith("Error") or output.startswith("Exception")
+            else EventStatus.success.value
+        )
         event = SocketEventInfo(
             status=status,
             event=SocketIOEvent.TOOL_END.value,
