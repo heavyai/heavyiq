@@ -80,17 +80,6 @@ const HomePage = () => {
     }
   };
 
-  useEffect(() => {
-    setTimeout(() => {
-      chatWrapperRef.current.addEventListener("DOMNodeInserted", (e) => {
-        e.currentTarget.scroll({
-          top: e.currentTarget.scrollHeight,
-          behavior: "smooth",
-        });
-      });
-    }, 200);
-  }, []);
-
   const addItemToSteps = (newItem) => {
     setStepItems((prevItems) => [...prevItems, newItem]);
   };

@@ -7,7 +7,7 @@ import {
 import { ExpandMore, ExpandLess } from "@mui/icons-material";
 import {FinalThoughtStep, IntermediateStep, EventStep} from "./Step";
 
-const Steps = ({ stepItems, finalThought }) => {
+const Steps = React.memo(({ stepItems, finalThought }) => {
   const [expanded, setExpanded] = useState(false);
 
   const toggleExpand = () => {
@@ -53,6 +53,6 @@ const Steps = ({ stepItems, finalThought }) => {
       </Box>
     </div>
   );
-};
+});
 
 export default Steps;
