@@ -40,14 +40,14 @@ Question: {input}
 SQLQuery:"""
 NL_TO_SQL_PROMPT = PromptTemplate.from_template(NL_TO_SQL_TEMPLATE)
 
-CUSTOM_LLM_NL_TO_SQL_TEMPLATE = """<|prompt|>
+CUSTOM_LLM_NL_TO_SQL_TEMPLATE = """<|sql prompt|>
 You are a experienced data analyst adept at writing SQL queries to answer user questions.
 
 You have access to the following relational tables, with schemas below.
 {table_info}
 Write a SQL query to answer the following question:
 {input}
-<|answer|>"""
+<|sql answer|>"""
 CUSTOM_LLM_NL_TO_SQL_PROMPT = PromptTemplate.from_template(CUSTOM_LLM_NL_TO_SQL_TEMPLATE)
 
 NL_TO_SQL_ERROR_TEMPLATE = """Correct the given SQL query:
