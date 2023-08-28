@@ -25,13 +25,13 @@ def get_vllm_model_name(api_base: str) -> str:
 
 
 @lru_cache
-def get_vllm_model_kwargs(model_type: LLMType) -> dict[str, Any]:
+def get_vllm_model_kwargs(model_type: LLMType, **kwargs) -> tuple[dict[str, Any], dict[str, Any]]:
     config = get_config()
     model_kwargs: dict[str, Any] = {}
     if config.custom_llm_api_vllm_beam_width >= 2 and model_type == LLMType.NL_TO_SQL:
         model_kwargs["use_beam_search"] = True
-        model_kwargs["best_of"] = config.custom_llm_api_vllm_beam_width
-    return model_kwargs
+        kwargs["best_of"] = config.custom_llm_api_vllm_beam_width
+    return kwargs, model_kwargs
 
 
 def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
@@ -57,7 +57,7 @@ def get_custom_llm(model_type: LLMType, api_base: str, context_window: int, **kw
             context_window=context_window,
             **kwargs,
         )
-    model_kwargs = get_vllm_model_kwargs(model_type)
+    kwargs, model_kwargs = get_vllm_model_kwargs(model_type, **kwargs)
     model_name = get_vllm_model_name(api_base)
     return OverrideVLLMOpenAI(
         openai_api_key="nothing",
@@ -97,7 +97,7 @@ def get_llm(model_type: LLMType, **kwargs) -> BaseLLM:
             **kwargs,
         )
     elif config.custom_llm_type == "API_VLLM":
-        model_kwargs = get_vllm_model_kwargs(model_type)
+        kwargs, model_kwargs = get_vllm_model_kwargs(model_type, **kwargs)
         model_name = get_vllm_model_name(config.custom_llm_api_base)
         return OverrideVLLMOpenAI(
             openai_api_key="nothing",
