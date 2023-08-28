@@ -4,6 +4,7 @@ import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
 import { useEffect, useRef, useState } from "react";
 import { socket } from "../socket";
 import ColoredCircleIcon from "../components/CircleIcon";
+import {FinalThoughtStep, IntermediateStep, EventStep} from "../components/Step";
 
 import {
   Stack,
@@ -12,14 +13,8 @@ import {
   FormControl,
   OutlinedInput,
   CircularProgress,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
+  List
 } from "@mui/material";
-import CheckIcon from "@mui/icons-material/Check";
-import ClearIcon from "@mui/icons-material/Clear";
-import InfoIcon from "@mui/icons-material/Info";
 import Answer from "../components/Answer";
 import Steps from "../components/Steps";
 
@@ -66,6 +61,10 @@ const HomePage = () => {
     // {
     //   thought: "You?",
     //   observation: "Error! Dont know what you mean."
+    // }
+    // or
+    // {
+    // "text": "LLM Started!"
     // }
   ]);
   // final thought
@@ -122,14 +121,23 @@ const HomePage = () => {
     };
 
     const handleIntermediateStep = (data) => {
-      addItemToSteps({
-        thought: data["thought"],
-        observation: data["observation"],
-      });
+      // we don't need to handle intermediate step since
+      // socket callback returns the necessary data
+      // addItemToSteps({
+      //   thought: data["thought"],
+      //   observation: data["observation"],
+      // });
     };
 
     const handleFinalThought = (data) => {
       setFinalThought(data);
+    };
+
+    const handleCallbackEvent = ({ text, status, data }) => {
+      addItemToSteps({
+        text: text,
+        status: status
+      });
     };
 
     socket.on("answer", handleAnswer);
@@ -142,6 +150,21 @@ const HomePage = () => {
     socket.on("newToken", handleNewToken);
 
     socket.on("endToken", handleEndToken);
+
+    socket.on("intermediateStep", handleIntermediateStep);
+
+    // calback events
+    socket.on("llm_start", handleCallbackEvent);
+    socket.on("llm_error", handleCallbackEvent);
+    socket.on("llm_end", handleCallbackEvent);
+    socket.on("chain_start", handleCallbackEvent);
+    socket.on("chain_error", handleCallbackEvent);
+    socket.on("chain_end", handleCallbackEvent);
+    socket.on("tool_start", handleCallbackEvent);
+    socket.on("tool_error", handleCallbackEvent);
+    socket.on("tool_end", handleCallbackEvent);
+    socket.on("agent_action", handleCallbackEvent);
+    socket.on("agent_finish", handleCallbackEvent);
 
     socket.on("intermediateStep", handleIntermediateStep);
 
@@ -162,14 +185,14 @@ const HomePage = () => {
       console.log("Reconnecting to socket server...");
     });
 
-    socket.on('connect_error', (error) => {
+    socket.on("connect_error", (error) => {
       setSocketStatus(socketStatusType.disconnected);
-      console.log('Connection error:', error);
+      console.log("Connection error:", error);
     });
-  
-    socket.on('connect_timeout', (timeout) => {
+
+    socket.on("connect_timeout", (timeout) => {
       setSocketStatus(socketStatusType.disconnected);
-      console.log('Connection timeout:', timeout);
+      console.log("Connection timeout:", timeout);
     });
 
     // Cleanup function to disconnect when component unmounts
@@ -181,6 +204,17 @@ const HomePage = () => {
       socket.off("endToken", handleEndToken);
       socket.off("intermediateStep", handleIntermediateStep);
       socket.off("finalThought", handleFinalThought);
+      socket.off("llm_start", handleCallbackEvent);
+      socket.off("llm_error", handleCallbackEvent);
+      socket.off("llm_end", handleCallbackEvent);
+      socket.off("chain_start", handleCallbackEvent);
+      socket.off("chain_error", handleCallbackEvent);
+      socket.off("chain_end", handleCallbackEvent);
+      socket.off("tool_start", handleCallbackEvent);
+      socket.off("tool_error", handleCallbackEvent);
+      socket.off("tool_end", handleCallbackEvent);
+      socket.off("agent_action", handleCallbackEvent);
+      socket.off("agent_finish", handleCallbackEvent);
     };
   }, []);
 
@@ -342,58 +376,18 @@ const HomePage = () => {
                     // pl: 2
                   }}
                 >
-                  {stepItems.map((item, index) => (
-                    <React.Fragment key={`step-item-${index}`}>
-                      <ListItem sx={{ color: "yellow", display: "flex" }}>
-                        <ListItemIcon sx={{ color: "green" }}>
-                          <CheckIcon />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={"Thought: " + item.thought}
-                          primaryTypographyProps={{
-                            sx: { fontSize: 13, fontWeight: "bold" },
-                          }}
-                        />
-                      </ListItem>
-                      <ListItem
-                        sx={{
-                          color: item.observation.startsWith("Error")
-                            ? "red"
-                            : "green",
-                          display: "flex",
-                        }}
-                      >
-                        {item.observation.startsWith("Error") ? (
-                          <ListItemIcon sx={{ color: "red" }}>
-                            <ClearIcon />
-                          </ListItemIcon>
-                        ) : (
-                          <ListItemIcon sx={{ color: "green" }}>
-                            <CheckIcon />
-                          </ListItemIcon>
-                        )}
-
-                        <ListItemText
-                          primary={"Observation: " + item.observation}
-                          primaryTypographyProps={{
-                            sx: { fontSize: 13, fontWeight: "bold" },
-                          }}
-                        />
-                      </ListItem>
-                    </React.Fragment>
-                  ))}
+                  {stepItems.map((item, index) =>
+                    "thought" in item ? (
+                      <React.Fragment key={`step-item-${index}`}>
+                        <IntermediateStep text={"Thought: " + item.thought}></IntermediateStep>
+                        <IntermediateStep text={"Observation: " + item.observation}></IntermediateStep>
+                      </React.Fragment>
+                    ) : (
+                      <EventStep key={`step-item-${index}`} text={item.text} status={item.status}></EventStep>
+                    )
+                  )}
                   {finalThought && (
-                    <ListItem sx={{ color: "pink", display: "flex" }}>
-                      <ListItemIcon sx={{ color: "pink" }}>
-                        <InfoIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={"Final Thought: " + finalThought}
-                        primaryTypographyProps={{
-                          sx: { fontSize: 14, fontWeight: "bold" },
-                        }}
-                      />
-                    </ListItem>
+                    <FinalThoughtStep text={finalThought}></FinalThoughtStep>
                   )}
                 </List>
               </Box>

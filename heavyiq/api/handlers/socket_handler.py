@@ -8,6 +8,7 @@ from langchain.memory.chat_message_histories.in_memory import ChatMessageHistory
 from heavyiq.api.utils import MessageHistoryManager, wrap_done_iter
 from heavyiq.config import get_config
 from heavyiq.langchain.agents.convo_agent import create_conversational_agent_async
+from heavyiq.langchain.callbacks import AsyncSocketCallbackHandler
 from heavyiq.langchain.llms import get_chat_llm
 from heavyiq.logging_utils import get_heavyiq_logger
 
@@ -33,6 +34,7 @@ def register_socket_events(socket_manager: SocketManager):
         # define file logger
         logger = get_heavyiq_logger()
         file_callback_handler = logger.async_langchain_cb_handler(to_stdout=False)
+        socket_callback_handler = AsyncSocketCallbackHandler(socket_manager=socket_manager, sid=sid)
         message_history_manager = MessageHistoryManager(socket_manager=socket_manager, sid=sid)
         # retrieve chat/sql history from current session
         retrieved_chat_history = ChatMessageHistory(messages=await message_history_manager.get_chat_history())
@@ -55,7 +57,7 @@ def register_socket_events(socket_manager: SocketManager):
         # Begin a task that runs in the background.
         task = asyncio.create_task(
             wrap_done_iter(
-                sql_agent.iter(question, callbacks=[file_callback_handler], async_=True),
+                sql_agent.iter(question, callbacks=[file_callback_handler, socket_callback_handler], async_=True),
                 stream_handler.done,
                 socket_manager=socket_manager,
                 sid=sid,

@@ -62,7 +62,7 @@ async def submit_feedback(value: FeedbackRequest) -> FeedbackResponse:
 @iqrouter.post("/generate-table-metadata", response_model=GenerateTableMetadataResponse)
 async def generate_table_metadata(
     values: tuple[GenerateTableMetadataRequest, HeavyDB] = Depends(validate_db_session_for_table_metadata)
-) -> dict[Any, Any]:
+) -> GenerateTableMetadataResponse:
     """
     Endpoint which is reponsible for generating table metadata.
     """

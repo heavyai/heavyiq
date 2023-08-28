@@ -2,15 +2,10 @@ import React, { useState } from "react";
 import {
   Box,
   List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  IconButton,
+  IconButton
 } from "@mui/material";
-import CheckIcon from "@mui/icons-material/Check";
-import ClearIcon from "@mui/icons-material/Clear";
-import InfoIcon from "@mui/icons-material/Info";
 import { ExpandMore, ExpandLess } from "@mui/icons-material";
+import {FinalThoughtStep, IntermediateStep, EventStep} from "./Step";
 
 const Steps = ({ stepItems, finalThought }) => {
   const [expanded, setExpanded] = useState(false);
@@ -37,58 +32,22 @@ const Steps = ({ stepItems, finalThought }) => {
             transition: "display 0.3s ease",
           }}
         >
-          {expanded && stepItems.map((item, index) => (
-            <React.Fragment key={`step-item-${index}`}>
-              <ListItem
-                sx={{ color: "yellow", display: "flex" }}
-              >
-                <ListItemIcon sx={{ color: "green" }}>
-                  <CheckIcon />
-                </ListItemIcon>
-                <ListItemText
-                  primary={"Thought: " + item.thought}
-                  primaryTypographyProps={{
-                    sx: { fontSize: 13, fontWeight: "bold" },
-                  }}
-                />
-              </ListItem>
-              <ListItem
-                sx={{
-                  color: item.observation.startsWith("Error") ? "red" : "green",
-                  display: "flex",
-                }}
-              >
-                {item.observation.startsWith("Error") ? (
-                  <ListItemIcon sx={{ color: "red" }}>
-                    <ClearIcon />
-                  </ListItemIcon>
-                ) : (
-                  <ListItemIcon sx={{ color: "green" }}>
-                    <CheckIcon />
-                  </ListItemIcon>
-                )}
-
-                <ListItemText
-                  primary={"Observation: " + item.observation}
-                  primaryTypographyProps={{
-                    sx: { fontSize: 13, fontWeight: "bold" },
-                  }}
-                />
-              </ListItem>
-            </React.Fragment>
-          ))}
+          {expanded &&
+            stepItems.map((item, index) =>
+              "thought" in item ? (
+                <React.Fragment key={`step-item-${index}`}>
+                  <IntermediateStep text={"Thought: " + item.thought}></IntermediateStep>
+                  <IntermediateStep text={"Observation: " + item.observation}></IntermediateStep>
+                </React.Fragment>
+              ) : (
+                <EventStep key={`step-item-${index}`} text={item.text} status={item.status}></EventStep>
+              )
+            )}
           {finalThought && (
-            <ListItem sx={{ color: "pink", display: "flex" }}>
-              <ListItemIcon sx={{ color: "pink" }}>
-                <InfoIcon />
-              </ListItemIcon>
-              <ListItemText
-                primary={"Final Thought: " + finalThought}
-                primaryTypographyProps={{
-                  sx: { fontSize: 14, fontWeight: "bold" },
-                }}
-              />
-            </ListItem>
+            <FinalThoughtStep text={finalThought}></FinalThoughtStep>
+          )}
+          {!expanded && !finalThought && stepItems.length > 0 && (
+            <EventStep text={stepItems[stepItems.length-1].text} status={stepItems[stepItems.length-1].status}></EventStep>
           )}
         </List>
       </Box>

@@ -62,7 +62,11 @@ async def wrap_done_iter(
     socket_manager: SocketManager | None = None,
     sid: str | None = None,
 ) -> Any:
-    """Wrap an awaitable with a event to signal when it's done or an exception is raised."""
+    """
+    Wrap an awaitable with a event to signal when it's done or an exception is raised.
+    After comleting each step or Agent Action, this function is supposed to emit
+    Thought, Action Input, Action Output data via SocketIO connection.
+    """
     try:
         last_run_sql_query = ""
         async for step in iter:
