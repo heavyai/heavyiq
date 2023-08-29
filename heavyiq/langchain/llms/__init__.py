@@ -18,6 +18,11 @@ class LLMType(Enum):
     SQL_TO_ANSWER = "sql_to_answer"
 
 
+def is_using_custom_trained_llm() -> bool:
+    config = get_config()
+    return config.custom_llm_type in ["API", "API_VLLM"]
+
+
 def get_vllm_model_name(api_base: str) -> str:
     response = requests.get(f"{api_base}/models")
     response.raise_for_status()

@@ -12,9 +12,9 @@ from langchain.callbacks.manager import (
     CallbackManagerForChainRun,
 )
 
-from heavyiq.config import get_config
 from heavyiq.langchain.chains import BaseChain
 from heavyiq.langchain import HeavyDB
+from heavyiq.langchain.llms import is_using_custom_trained_llm
 from .nl_to_sql import BaseNLtoSQLChain, get_nl_to_sql_chain_by_llm
 
 ANSWER_TEMPLATE = """Given an input question, first create a syntactically correct SQL query to run, then look at the results of the query and return the answer.
@@ -66,8 +66,7 @@ class NLtoAnswerChain(BaseChain):
     output_results_key: str = "results"  #: :meta private:
 
     def __init__(self, *args, **kwargs):
-        config = get_config()
-        if config.custom_llm_type == "API" or config.custom_llm_type == "API_VLLM":
+        if is_using_custom_trained_llm():
             prompt = CUSTOM_LLM_ANSWER_PROMPT
         else:
             prompt = ANSWER_PROMPT

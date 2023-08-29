@@ -17,7 +17,7 @@ from langchain.callbacks.manager import (
     CallbackManagerForChainRun,
 )
 
-from heavyiq.config import get_config
+from heavyiq.langchain.llms import is_using_custom_trained_llm
 from heavyiq.langchain.heavydb import HeavyDB
 from heavyiq.langchain.chains import BaseChain
 from heavyiq.langchain.utils import populate_table_info_wrt_token_limit
@@ -154,8 +154,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
     """Prompt object to use."""
 
     def __init__(self, *args, **kwargs):
-        config = get_config()
-        if config.custom_llm_type == "API" or config.custom_llm_type == "API_VLLM":
+        if is_using_custom_trained_llm():
             prompt = CUSTOM_LLM_NL_TO_SQL_PROMPT
         else:
             prompt = NL_TO_SQL_PROMPT
