@@ -39,8 +39,9 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     log_to_stdout: bool = False
     # CUSTOM LLM
     custom_llm_type: Optional[str] = None
-    """ 'API' or 'AZURE' """
+    """ 'API' or 'API_VLLM' or 'AZURE' """
     custom_llm_api_base: str = ""
+    custom_llm_api_vllm_beam_width: int = 1
     custom_llm_api_context_window: int = 2048
     custom_llm_azure_openai_api_version: str = "2023-03-15-preview"
     custom_llm_azure_openai_api_base: str = ""
