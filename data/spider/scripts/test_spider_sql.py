@@ -9,6 +9,7 @@ import re
 import sqlparse
 import sys
 from transformers import LlamaTokenizer
+from typing import Dict, List, Tuple
 
 from collections.abc import Iterable
 
@@ -39,6 +40,9 @@ def getOptions(argv=None):
     )
     parser.add_argument(
         "--write-question-prompts", help="Write question prompts to file for successful queries", action="store_true"
+    )
+    parser.add_argument(
+        "--add-columns-to-question-prompts", help="Add column specifications to question prompts", action="store_true"
     )
     return parser.parse_args(argv)
 
@@ -385,7 +389,7 @@ def get_top_k_vals_str(table_name, top_k_vals):
 def generate_instruction(table_schemas, top_k_str_vals, user_question=None):
     # print(top_k_str_vals)
     top_k_str_vals_str = ""
-    if len(top_k_str_vals) > 0:
+    if top_k_str_vals is not None and len(top_k_str_vals) > 0:
         top_k_str_vals_str = "Sample values for TEXT columns (comma-separated):\n"
         for table_top_k_str_vals in top_k_str_vals:
             top_k_str_vals_str += "\n".join(table_top_k_str_vals)
@@ -393,6 +397,33 @@ def generate_instruction(table_schemas, top_k_str_vals, user_question=None):
     if user_question is not None:
         instruction = """You are a experienced data analyst adept at writing SQL queries to answer user questions.\nYou have access to the following relational tables, with schemas below.\n{table_schemas}\n\n{top_k_str_vals_str}\n\nWrite a SQL query to answer the following question:\n\n{user_question}\n""".format(
             table_schemas="\n\n".join(table_schemas), top_k_str_vals_str=top_k_str_vals_str, user_question=user_question
+        )
+        return instruction
+    else:
+        instruction = """You are a experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n\n{table_schemas}\n\n{top_k_str_vals_str}\n\nWrite a compelling question to ask of the above data:\n""".format(
+            table_schemas="\n\n".join(table_schemas), top_k_str_vals_str=top_k_str_vals_str
+        )
+        return instruction
+
+
+def generate_question(table_schemas, top_k_str_vals, unique_columns=None):
+    top_k_str_vals_str = ""
+    if top_k_str_vals is not None and len(top_k_str_vals) > 0:
+        top_k_str_vals_str = "Sample values for TEXT columns (comma-separated):\n"
+        for table_top_k_str_vals in top_k_str_vals:
+            top_k_str_vals_str += "\n".join(table_top_k_str_vals)
+            top_k_str_vals_str += "\n"
+    if unique_columns is not None:
+        unique_columns_str = ""
+        if len(unique_columns) > 0:
+            for unique_column in unique_columns:
+                unique_columns_str += unique_column[1] + "." + unique_column[2] + "\n"
+        else:
+            unique_columns_str += "COUNT(*)\n"
+        instruction = """You are a experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n\n{table_schemas}\n\n{top_k_str_vals_str}\n\nUse the following columns to generate the question a compelling question of the data:\n\n{unique_columns_str}\n""".format(
+            table_schemas="\n\n".join(table_schemas),
+            top_k_str_vals_str=top_k_str_vals_str,
+            unique_columns_str=unique_columns_str,
         )
         return instruction
     else:
@@ -684,6 +715,35 @@ def load_query_cache(cache_file):
     return query_cache_by_db
 
 
+def get_query_plan(con, query):
+    explain_calcite_query = f"EXPLAIN CALCITE DETAILED {query}"
+    res = con.execute(explain_calcite_query)
+    query_plan = list(res)[0][0]
+    return query_plan
+
+
+def extract_column_mappings(query_plan: str) -> Dict[str, Tuple[str, str, str]]:
+    result = {}
+    # Use a regex pattern to capture (database, table, column) and literal values in LogicalFilter
+    # pattern = r"\[\$([0-9]+)->(db:[\w]+),tableName:([\w]+),colName:([\w]+)\]\], \=.*'([^']+)')"
+    # pattern = r"\[\$([0-9]+)->(db:[\w]+),tableName:([\w]+),colName:([\w]+)\], \=.*'([^']+)'\)"
+    pattern = r"\[\$([0-9]+)->db:([\w]+),tableName:([\w]+),colName:([\w]+)\]"
+
+    matches = re.findall(pattern, query_plan)
+
+    # for _, db, table, column, literal in matches:
+    for id, db, table, column in matches:
+        col_id = (db, table, column)
+        result[id] = col_id
+
+    return result
+
+
+def get_unique_columns(col_mappings: Dict[str, Tuple[str, str, str]]) -> List[Tuple[str, str, str]]:
+    unique_cols = set(col_mappings.values())
+    return sorted(list(unique_cols))
+
+
 def main(argv):
     options = getOptions(argv)
     openai.api_key = options.openai_api_key
@@ -700,6 +760,7 @@ def main(argv):
     prompts = []
     english_prompts = []
     question_prompts = []
+    question_prompts_with_cols = []
     con = None
     tokenizer = LlamaTokenizer.from_pretrained("test_model")
     for db_id, queries in queries_by_db.items():
@@ -840,11 +901,17 @@ def main(argv):
                         if options.top_k_str_vals > 0:
                             for db_table in filtered_tables:
                                 filtered_top_k_str_vals.append(top_k_str_vals_map[db_table])
-                        instruction = generate_instruction(filtered_table_schemas, filtered_top_k_str_vals)
+                        unique_columns = None
+                        if options.add_columns_to_question_prompts:
+                            query_plan = get_query_plan(con, sql_query)
+                            col_mapping = extract_column_mappings(query_plan)
+                            unique_columns = get_unique_columns(col_mapping)
+                        instruction = generate_question(filtered_table_schemas, filtered_top_k_str_vals, unique_columns)
                         instruction_tokens = tokenizer.tokenize(instruction)
                         num_instruction_tokens = len(instruction_tokens)
                         if num_instruction_tokens > options.max_instruction_tokens:
-                            instruction = generate_instruction(filtered_table_schemas, [])
+                            print(f"Instruction too long: {num_instruction_tokens}")
+                            instruction = generate_question(filtered_table_schemas, None, unique_columns)
                         question_prompts.append(
                             {
                                 "db_id": db_id,
