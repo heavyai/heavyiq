@@ -216,7 +216,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
             )
 
         self.write_callback_message(sql_cmd, run_manager=run_manager, color="green")
-        if not get_config().disable_str_literal_correction:
+        if get_config().enable_str_literal_correction:
             self.write_callback_message(
                 "Attempting to correct string literals in SQL query.", run_manager=run_manager, color="blue"
             )
@@ -291,7 +291,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
 
         await self.write_callback_message_async(sql_cmd, run_manager=run_manager, color="green")
 
-        if not get_config().disable_str_literal_correction:
+        if get_config().enable_str_literal_correction:
             await self.write_callback_message_async(
                 "Attempting to correct string literals in SQL query.", run_manager=run_manager, color="blue"
             )
@@ -374,7 +374,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
 
         self.write_callback_message(sql_cmd, run_manager=run_manager, color="green")
 
-        if not get_config().disable_str_literal_correction:
+        if get_config().enable_str_literal_correction:
             self.write_callback_message(
                 "Attempting to correct string literals in SQL query.", run_manager=run_manager, color="blue"
             )
@@ -438,7 +438,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
 
         await self.write_callback_message_async(sql_cmd, run_manager=run_manager, color="green")
 
-        if not get_config().disable_str_literal_correction:
+        if get_config().enable_str_literal_correction:
             await self.write_callback_message_async(
                 "Attempting to correct string literals in SQL query.", run_manager=run_manager, color="blue"
             )

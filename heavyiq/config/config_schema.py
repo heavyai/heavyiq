@@ -27,7 +27,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     huggingface_embed_model: str = "sentence-transformers/all-mpnet-base-v2"
     metadata_index_dir: str = "db"
     table_documents_dir: str = "table_documents"
-    disable_str_literal_correction: bool = False
+    enable_str_literal_correction: bool = False
     # TELEMETRICS
     langchain_endpoint: str = "https://api.smith.langchain.com"
     langsmith_api_key: Optional[str] = None

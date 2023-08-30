@@ -506,7 +506,7 @@ class HeavyDB:
 
     def correct_string_literals(self, query: str, exact_match_threshold: float = 0.999999) -> str:
         config = get_config()
-        if config.disable_str_literal_correction:
+        if not config.enable_str_literal_correction:
             return query
         from heavyiq.logging_utils import get_heavyiq_logger
 
