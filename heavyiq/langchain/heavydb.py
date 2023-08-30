@@ -1,9 +1,11 @@
 from __future__ import annotations
 import re
 import multiprocessing
+from multiprocessing.managers import SyncManager
 from threading import Lock
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
-from typing import Optional, Any, Iterable, TYPE_CHECKING, Callable
+from typing import Optional, Any, Iterable, TYPE_CHECKING, Callable, TypedDict
+from copy import deepcopy
 
 from heavyai import connect, Connection
 from heavyiq.config import get_config
@@ -30,14 +32,25 @@ class PersistantConnection(Connection):
         self._rbc = None
 
 
+class StringLiteralOp(TypedDict):
+    """
+    A type representation for string literal operations.
+    """
+
+    operator: str
+    literal: str
+    database: str
+    table: str
+    column: str
+
+
 class HeavyDB:
     """A heavydb database connection."""
 
-    _manager = multiprocessing.Manager()
-    # single manager process being shared with all the caches
-    top_k_cache = LRUCache[str, str](manager=_manager)
-    sample_rows_cache = LRUCache[str, str](manager=_manager)
-    table_schema_cache = LRUCache[str, str](manager=_manager)
+    _manager: Optional[SyncManager] = None
+    _top_k_cache: Optional[LRUCache[str, str]] = None
+    _sample_rows_cache: Optional[LRUCache[str, str]] = None
+    _table_schema_cache: Optional[LRUCache[str, str]] = None
 
     def __init__(
         self,
@@ -87,6 +100,42 @@ class HeavyDB:
             self._conn.close()
         except Exception as e:
             print(f"Error: {e}")
+
+    @classmethod
+    def get_manager(cls) -> SyncManager:
+        if cls._manager is None:
+            cls._manager = multiprocessing.Manager()
+        return cls._manager
+
+    @classmethod
+    def get_top_k_cache(cls) -> LRUCache[str, str]:
+        if cls._top_k_cache is None:
+            cls._top_k_cache = LRUCache[str, str](manager=cls.get_manager())
+        return cls._top_k_cache
+
+    @classmethod
+    def get_sample_rows_cache(cls) -> LRUCache[str, str]:
+        if cls._sample_rows_cache is None:
+            cls._sample_rows_cache = LRUCache[str, str](manager=cls.get_manager())
+        return cls._sample_rows_cache
+
+    @classmethod
+    def get_table_schema_cache(cls) -> LRUCache[str, str]:
+        if cls._table_schema_cache is None:
+            cls._table_schema_cache = LRUCache[str, str](manager=cls.get_manager())
+        return cls._table_schema_cache
+
+    @property
+    def top_k_cache(self) -> LRUCache[str, str]:
+        return self.get_top_k_cache()
+
+    @property
+    def sample_rows_cache(self) -> LRUCache[str, str]:
+        return self.get_sample_rows_cache()
+
+    @property
+    def table_schema_cache(self) -> LRUCache[str, str]:
+        return self.get_table_schema_cache()
 
     @classmethod
     def _connect_with_timeout(
@@ -342,18 +391,162 @@ class HeavyDB:
             raise ValueError("Fetch parameter must be either 'one' or 'all'")
         return str(result)
 
-    def explain(self, command: str) -> str:
-        command = strip_sql_comments(command)
-        if is_destructive_sql(command):
+    def get_query_plan(self, query: str) -> str:
+        query = strip_sql_comments(query)
+        if is_destructive_sql(query):
             raise ValueError("Destructive SQL is not allowed")
         with self.lock:
-            cursor = self._conn.execute(f"EXPLAIN plan {command}")
+            cursor = self._conn.execute(f"EXPLAIN plan {query}")
         result: tuple[str] = cursor.fetchone()  # type: ignore
         return str(result[0])
 
+    def get_detailed_query_plan(self, query: str) -> str:
+        query = strip_sql_comments(query)
+        if is_destructive_sql(query):
+            raise ValueError("Destructive SQL is not allowed")
+        with self.lock:
+            cursor = self._conn.execute(f"EXPLAIN CALCITE DETAILED {query}")
+        query_plan: tuple[str] = cursor.fetchone()  # type: ignore
+        return str(query_plan[0])
+
+    def extract_column_mappings(self, detailed_query_plan: str) -> dict[str, tuple[str, str, str]]:
+        result = {}
+        # Use a regex pattern to capture (database, table, column) and literal values in LogicalFilter
+        pattern = r"\[\$([0-9]+)->db:([\w]+),tableName:([\w]+),colName:([\w]+)\]"
+        matches = re.findall(pattern, detailed_query_plan)
+        for id, db, table, column in matches:
+            col_id = (db, table, column)
+            result[id] = col_id
+
+        return result
+
+    def extract_string_literal_ops(self, detailed_query_plan: str) -> dict[str, tuple[str, str]]:
+        result = {}
+        pattern1 = r"(LIKE|PG_ILIKE|>=|<=|<>|=)\(\$(\d+), '([\w ]+)'"
+        pattern2 = r"(LIKE|PG_ILIKE|>=|<=|<>|=)\('([\w+ ]+)', \$(\d+)\)"
+
+        matches1 = re.findall(pattern1, detailed_query_plan)
+        matches2 = re.findall(pattern2, detailed_query_plan)
+        for op, id, literal in matches1:
+            result[id] = (op, literal)
+        for op, literal, id in matches2:
+            result[id] = (op, literal)
+        return result
+
+    def get_string_literal_ops(self, query: str) -> list[StringLiteralOp]:
+        detailed_query_plan = self.get_detailed_query_plan(query)
+        col_mapping = self.extract_column_mappings(detailed_query_plan)
+        str_literal_ops = self.extract_string_literal_ops(detailed_query_plan)
+        result: list[StringLiteralOp] = []
+        for id, (op, literal) in str_literal_ops.items():
+            db, table, column = col_mapping[id]
+            result.append({"operator": op, "literal": literal, "database": db, "table": table, "column": column})
+        return result
+
+    def correct_string_literal(self, literal: StringLiteralOp, exact_match_threshold: float) -> StringLiteralOp:
+        """
+        Tries to correct a given string literal by searching for close matches in a database.
+
+        Parameters
+        ----------
+        literal : StringLiteralOp
+            A dictionary representing the string literal to be corrected.
+            Expected keys are 'column', 'database', 'table', 'literal', and 'operator'.
+
+        exact_match_threshold : float
+            A threshold value between 0 and 1 that determines how strict the exact match ratio should be
+            before deciding to change the literal or operator. If the exact match ratio is below this
+            threshold, the operator might be changed to "ILIKE" or "NOT ILIKE".
+        """
+
+        case_match_query = f"SELECT {literal['column']}, COUNT(*) FROM {literal['database']}.{literal['table']} WHERE {literal['column']} ILIKE '{literal['literal']}' GROUP BY {literal['column']} ORDER BY COUNT(*) DESC;"
+        with self.lock:
+            cursor = self._conn.execute(case_match_query)
+        case_match_rows = cursor.fetchall()
+
+        num_case_match_rows = len(case_match_rows)
+        exact_match_count = 0
+        total_count = 0
+        altered_literal = deepcopy(literal)
+
+        for row in case_match_rows:
+            if row[0] == literal["literal"]:
+                exact_match_count += row[1]  # type: ignore
+            total_count += row[1]  # type: ignore
+
+        if total_count > 0 and literal["operator"] != "ILIKE":
+            if exact_match_count == 0 and num_case_match_rows == 1:
+                altered_literal["literal"] = str(case_match_rows[0][0])
+                return literal
+            elif exact_match_count / total_count < exact_match_threshold:
+                if literal["operator"] == "<>":
+                    altered_literal["operator"] = "NOT ILIKE"
+                else:
+                    altered_literal["operator"] = "ILIKE"
+                return altered_literal
+        elif total_count == 0:
+            lower_literal = literal["literal"].lower()
+            similarity_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS n FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) FROM distinct_values WHERE LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) < 5 ORDER BY LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) ASC LIMIT 1;"
+
+            with self.lock:
+                cursor = self._conn.execute(similarity_query)
+            similarity_rows = cursor.fetchall()
+
+            num_similarity_rows = len(similarity_rows)
+
+            if num_similarity_rows > 0:
+                altered_literal["literal"] = str(similarity_rows[0][0])
+                if literal["operator"] == "<>":
+                    altered_literal["operator"] = "NOT ILIKE"
+                else:
+                    altered_literal["operator"] = "ILIKE"
+            return altered_literal
+
+        return altered_literal
+
+    def correct_string_literals(self, query: str, exact_match_threshold: float = 0.999999) -> str:
+        config = get_config()
+        if not config.enable_str_literal_correction:
+            return query
+        from heavyiq.logging_utils import get_heavyiq_logger
+
+        logger = get_heavyiq_logger()
+        logger.info(f"Correcting string literals in query: {query}")
+        altered_query = deepcopy(query)
+        try:
+            str_literal_ops_list = self.get_string_literal_ops(query)
+            if len(str_literal_ops_list) == 0:
+                logger.info("No string literals found in query")
+                return query
+            for str_literal_op in str_literal_ops_list:
+                altered_str_literal_op = self.correct_string_literal(str_literal_op, exact_match_threshold)
+                if altered_str_literal_op != str_literal_op:
+                    if altered_str_literal_op["operator"] != str_literal_op["operator"]:
+                        altered_query = altered_query.replace(
+                            f"{str_literal_op['column']} {str_literal_op['operator']} '{str_literal_op['literal']}'",
+                            f"{str_literal_op['column']} {altered_str_literal_op['operator']} '{altered_str_literal_op['literal']}'",
+                        )
+                        logger.info(
+                            f"Operator changed from {str_literal_op['operator']} to {altered_str_literal_op['operator']}"
+                        )
+                    if altered_str_literal_op["literal"] != str_literal_op["literal"]:
+                        altered_query = altered_query.replace(
+                            f"{str_literal_op['column']} {altered_str_literal_op['operator']} '{str_literal_op['literal']}'",
+                            f"{str_literal_op['column']} {altered_str_literal_op['operator']} '{altered_str_literal_op['literal']}'",
+                        )
+                        logger.info(
+                            f"Literal changed from {str_literal_op['literal']} to {altered_str_literal_op['literal']}"
+                        )
+        except Exception as e:
+            logger.info(f"Error: {e}")
+            return query
+
+        logger.info(f"Altered query: {altered_query}")
+        return altered_query
+
     def complexity(self, command: str) -> int:
         command = strip_sql_comments(command)
-        plan = self.explain(command)
+        plan = self.get_query_plan(command)
         return rate_sql_complexity(plan)
 
     def get_table_info_no_throw(self, table_names: Optional[list[str]] = None) -> str:

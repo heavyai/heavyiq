@@ -120,7 +120,7 @@ def run_complexity_rater(ctx: click.Context) -> None:
         for line in questions:
             primary_table, is_multi_table, secondary_table, question, reference_sql = line.split("\t")
             print(f"Reference SQL: {reference_sql}\n")
-            plan = heavydb.explain(reference_sql)
+            plan = heavydb.get_query_plan(reference_sql)
             print(f"Plan: {plan}\n")
             print(f"Complexity: {rate_sql_complexity(plan)}\n")
             print("====================================")
