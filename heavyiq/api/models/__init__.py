@@ -3,3 +3,4 @@ from .query import QueryRequest, QueryResponse
 from .question import QuestionRequest, QuestionResponse
 from .error import ErrorResponse
 from .table_metadata import GenerateTableMetadataRequest, GenerateTableMetadataResponse
+from .custom_expression import CustomExpressionRequest, CustomExpressionResponse
