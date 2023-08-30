@@ -422,8 +422,8 @@ class HeavyDB:
 
     def extract_string_literal_ops(self, detailed_query_plan: str) -> dict[str, tuple[str, str]]:
         result = {}
-        pattern1 = r"(LIKE|PG_ILIKE|>=|<=|<>|=)\(\$(\d+), '([\w ]+)'"
-        pattern2 = r"(LIKE|PG_ILIKE|>=|<=|<>|=)\('([\w+ ]+)', \$(\d+)\)"
+        pattern1 = r"(LIKE|PG_ILIKE|>=|<=|<>|=)\(\$(\d+), '([\w\- ]+)'"
+        pattern2 = r"(LIKE|PG_ILIKE|>=|<=|<>|=)\('([\w\- ]+)', \$(\d+)\)"
 
         matches1 = re.findall(pattern1, detailed_query_plan)
         matches2 = re.findall(pattern2, detailed_query_plan)
