@@ -42,7 +42,7 @@ def get_vllm_model_kwargs(model_type: LLMType, **kwargs) -> tuple[dict[str, Any]
 def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
     config = get_config()
     if config.custom_llm_type in ["API", "API_VLLM"]:
-        if config.dev:
+        if config.dev is not None:
             dev_attr = getattr(config.dev, model_type.value, None)
             if dev_attr:
                 return get_custom_llm(model_type, **dev_attr.dict(), **kwargs)

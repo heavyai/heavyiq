@@ -15,12 +15,15 @@ from heavyiq.api.models import (
     FeedbackResponse,
     GenerateTableMetadataRequest,
     GenerateTableMetadataResponse,
+    AskHeavyAIDocsRequest,
+    AskHeavyAIDocsResponse,
 )
 from heavyiq.api.handlers import (
     handle_query_request_async,
     handle_question_request_async,
     handle_submit_feedback_request_async,
     handle_generate_table_metadata_async,
+    handle_ask_heavyai_docs_async,
 )
 
 iqrouter = APIRouter()
@@ -69,3 +72,8 @@ async def generate_table_metadata(
     # Don't forget FastAPI converts Response Pydantic Object to Dict then to an instance of ResponseModel then to Dict then to JSON.
     # That's why a direct dict was returned instead of pydantic model.
     return await handle_generate_table_metadata_async(*values)
+
+
+@iqrouter.post("/ask-heavyai-docs", response_model=AskHeavyAIDocsResponse)
+async def ask_heavyai_docs(value: AskHeavyAIDocsRequest) -> AskHeavyAIDocsResponse:
+    return await handle_ask_heavyai_docs_async(value)
