@@ -63,6 +63,9 @@ class HeavyDB:
         if include_tables and ignore_tables:
             raise ValueError("Cannot specify both include_tables and ignore_tables")
 
+        from heavyiq.logging_utils import get_heavyiq_logger
+
+        self.logger = get_heavyiq_logger()
         self._conn = conn
         self.lock = Lock()
 
@@ -247,12 +250,17 @@ class HeavyDB:
 
     def get_table_columns(self, table: str) -> list[ColumnDetails]:
         """Get details about the columns in a table."""
+        self.logger.debug(f"Getting columns for table {table}")
         with self.lock:
-            return self._conn.get_table_details(table)
+            table_details = self._conn.get_table_details(table)
+            self.logger.debug(f"Got columns for table {table}")
+            return table_details
 
     def get_table_schema(self, table: str) -> str:
+        self.logger.debug(f"Getting schema for table {table}")
         cached_value = self.table_schema_cache.get(table)
         if cached_value is not None:
+            self.logger.debug(f"Got schema for table {table} from cache")
             return cached_value
         """Get the schema of a table."""
         create_command = f"SHOW CREATE TABLE {table};"
@@ -265,6 +273,7 @@ class HeavyDB:
         if "WITH (" in table_schema:
             table_schema = table_schema[: table_schema.index("WITH (")]
         self.table_schema_cache.put(table, table_schema)
+        self.logger.debug(f"Got schema for table {table}")
         return table_schema
 
     def validate_query(self, query: str) -> list:
@@ -280,17 +289,21 @@ class HeavyDB:
 
     def get_column_top_k(self, table: str, column: str, k: int = 5) -> Optional[list[str]]:
         """Get the top k values for a column."""
+        self.logger.debug(f"Getting top k values for column {column} in table {table}")
         top_k_statement = f"SELECT {column}, COUNT(*) as cnt FROM {table} WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {k};"
         with self.lock:
             cursor = self._conn.execute(top_k_statement)
         top_k_res: list[str] = [str(v[0]) for v in cursor.fetchall()]
+        self.logger.debug(f"Got top k values for column {column} in table {table}")
         if not any([v for v in top_k_res if v.startswith("MULTIPOLYGON")]):
             return top_k_res
         return None
 
     def get_sample_rows(self, table_name: str) -> str:
+        self.logger.debug(f"Getting sample rows for table {table_name}")
         cached_value = self.sample_rows_cache.get(table_name)
         if cached_value is not None:
+            self.logger.debug(f"Got sample rows for table {table_name} from cache")
             return cached_value
         # build the select command
         command = f"SELECT * FROM {table_name} LIMIT {self._sample_rows_in_table_info}"
@@ -310,12 +323,14 @@ class HeavyDB:
         res = f"{self._sample_rows_in_table_info} rows from {table_name} table:\n{columns_str}\n{sample_rows_str}"
 
         self.sample_rows_cache.put(table_name, res)
-
+        self.logger.debug(f"Got sample rows for table {table_name}")
         return res
 
     def get_top_k(self, table_name: str) -> str:
+        self.logger.debug(f"Getting top k values for table {table_name}")
         cached_value = self.top_k_cache.get(table_name)
         if cached_value is not None:
+            self.logger.debug(f"Got top k values for table {table_name} from cache")
             return cached_value
         text_columns = [
             c.name
@@ -328,6 +343,7 @@ class HeavyDB:
             if top_k_res:
                 top_k_strings += f"{col}: {', '.join(top_k_res)}\n"
         self.top_k_cache.put(table_name, top_k_strings)
+        self.logger.debug(f"Got top k values for table {table_name}")
         return top_k_strings
 
     def get_single_table_info(self, table_name: str, include_samples: bool = True, include_top_k: bool = True) -> str:
@@ -410,6 +426,7 @@ class HeavyDB:
         return str(query_plan[0])
 
     def extract_column_mappings(self, detailed_query_plan: str) -> dict[str, tuple[str, str, str]]:
+        self.logger.debug(f"Extracting column mappings from query plan: {detailed_query_plan}")
         result = {}
         # Use a regex pattern to capture (database, table, column) and literal values in LogicalFilter
         pattern = r"\[\$([0-9]+)->db:([\w]+),tableName:([\w]+),colName:([\w]+)\]"
@@ -418,9 +435,11 @@ class HeavyDB:
             col_id = (db, table, column)
             result[id] = col_id
 
+        self.logger.debug("Finished extracting column mappings")
         return result
 
     def extract_string_literal_ops(self, detailed_query_plan: str) -> dict[str, tuple[str, str]]:
+        self.logger.debug(f"Extracting string literal operations from query plan: {detailed_query_plan}")
         result = {}
         pattern1 = r"(LIKE|PG_ILIKE|>=|<=|<>|=)\(\$(\d+), '([\w\- ]+)'"
         pattern2 = r"(LIKE|PG_ILIKE|>=|<=|<>|=)\('([\w\- ]+)', \$(\d+)\)"
@@ -431,6 +450,8 @@ class HeavyDB:
             result[id] = (op, literal)
         for op, literal, id in matches2:
             result[id] = (op, literal)
+
+        self.logger.debug("Finished extracting string literal operations")
         return result
 
     def get_string_literal_ops(self, query: str) -> list[StringLiteralOp]:
@@ -458,7 +479,7 @@ class HeavyDB:
             before deciding to change the literal or operator. If the exact match ratio is below this
             threshold, the operator might be changed to "ILIKE" or "NOT ILIKE".
         """
-
+        self.logger.debug(f"Correcting string literal: {literal['column']} : {literal['literal']}")
         case_match_query = f"SELECT {literal['column']}, COUNT(*) FROM {literal['database']}.{literal['table']} WHERE {literal['column']} ILIKE '{literal['literal']}' GROUP BY {literal['column']} ORDER BY COUNT(*) DESC;"
         with self.lock:
             cursor = self._conn.execute(case_match_query)
@@ -508,15 +529,13 @@ class HeavyDB:
         config = get_config()
         if not config.enable_str_literal_correction:
             return query
-        from heavyiq.logging_utils import get_heavyiq_logger
 
-        logger = get_heavyiq_logger()
-        logger.info(f"Correcting string literals in query: {query}")
+        self.logger.debug(f"Correcting string literals in query: {query}")
         altered_query = deepcopy(query)
         try:
             str_literal_ops_list = self.get_string_literal_ops(query)
             if len(str_literal_ops_list) == 0:
-                logger.info("No string literals found in query")
+                self.logger.debug("No string literals found in query")
                 return query
             for str_literal_op in str_literal_ops_list:
                 altered_str_literal_op = self.correct_string_literal(str_literal_op, exact_match_threshold)
@@ -526,7 +545,7 @@ class HeavyDB:
                             f"{str_literal_op['column']} {str_literal_op['operator']} '{str_literal_op['literal']}'",
                             f"{str_literal_op['column']} {altered_str_literal_op['operator']} '{altered_str_literal_op['literal']}'",
                         )
-                        logger.info(
+                        self.logger.debug(
                             f"Operator changed from {str_literal_op['operator']} to {altered_str_literal_op['operator']}"
                         )
                     if altered_str_literal_op["literal"] != str_literal_op["literal"]:
@@ -534,14 +553,14 @@ class HeavyDB:
                             f"{str_literal_op['column']} {altered_str_literal_op['operator']} '{str_literal_op['literal']}'",
                             f"{str_literal_op['column']} {altered_str_literal_op['operator']} '{altered_str_literal_op['literal']}'",
                         )
-                        logger.info(
+                        self.logger.debug(
                             f"Literal changed from {str_literal_op['literal']} to {altered_str_literal_op['literal']}"
                         )
         except Exception as e:
-            logger.info(f"Error: {e}")
+            self.logger.info(f"Error correcting string literals: {e}")
             return query
 
-        logger.info(f"Altered query: {altered_query}")
+        self.logger.debug(f"Altered query: {altered_query}")
         return altered_query
 
     def complexity(self, command: str) -> int:
