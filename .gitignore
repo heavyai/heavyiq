@@ -18,6 +18,7 @@ build/
 .DS_STORE
 
 db/
+heavyai_docs/
 langchain_call_log.db
 
 config.toml
