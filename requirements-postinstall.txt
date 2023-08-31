@@ -1,0 +1,2 @@
+# some packages have a dependency conflict and must be installed afterward to avoid errors
+chromadb==0.4.8 # requires fastapi<0.100.0
