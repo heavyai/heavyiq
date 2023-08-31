@@ -16,7 +16,7 @@ const Steps = React.memo(({ stepItems, finalThought }) => {
 
   return (
     <div style={{ display: "flex", flexDirection: "row" }}>
-      <div style={{ paddingTop: 15 }}>
+      <div style={{ paddingTop: 5 }}>
         <IconButton onClick={toggleExpand}>
           {expanded ? <ExpandLess /> : <ExpandMore />}
         </IconButton>

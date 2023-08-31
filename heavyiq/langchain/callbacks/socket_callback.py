@@ -96,7 +96,7 @@ class AsyncSocketCallbackHandler(AsyncCallbackHandler):
         event = SocketEventInfo(
             event=SocketIOEvent.LLM_END.value,
             status=EventStatus.info.value,
-            text=f"LLM Finished! Result: {response.llm_output}",
+            text="LLM Finished!",
             data={},
         )
         await self.send(event)

@@ -65,7 +65,7 @@ const HomePage = () => {
     // or
     // {
     // "text": "LLM Started!"
-    // }
+    // },
   ]);
   // final thought
   const [finalThought, setFinalThought] = useState("");
@@ -143,9 +143,9 @@ const HomePage = () => {
     socket.on("intermediateStep", handleIntermediateStep);
 
     // calback events
-    socket.on("llm_start", handleCallbackEvent);
+    // socket.on("llm_start", handleCallbackEvent);
     socket.on("llm_error", handleCallbackEvent);
-    socket.on("llm_end", handleCallbackEvent);
+    // socket.on("llm_end", handleCallbackEvent);
     socket.on("chain_start", handleCallbackEvent);
     socket.on("chain_error", handleCallbackEvent);
     socket.on("chain_end", handleCallbackEvent);
@@ -193,9 +193,9 @@ const HomePage = () => {
       socket.off("endToken", handleEndToken);
       socket.off("intermediateStep", handleIntermediateStep);
       socket.off("finalThought", handleFinalThought);
-      socket.off("llm_start", handleCallbackEvent);
+      // socket.off("llm_start", handleCallbackEvent);
       socket.off("llm_error", handleCallbackEvent);
-      socket.off("llm_end", handleCallbackEvent);
+      // socket.off("llm_end", handleCallbackEvent);
       socket.off("chain_start", handleCallbackEvent);
       socket.off("chain_error", handleCallbackEvent);
       socket.off("chain_end", handleCallbackEvent);
@@ -296,7 +296,7 @@ const HomePage = () => {
               transform: "translate(-50%, -50%)",
             }}
           >
-            Heavy AI Assistant
+            HeavyIQ AI Assistant
           </Typography>
         </Box>
       </Header>

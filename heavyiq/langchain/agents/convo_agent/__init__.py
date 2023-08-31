@@ -198,7 +198,10 @@ class CustomConversationalChatAgent(ConversationalChatAgent):
             SystemMessagePromptTemplate.from_template(system_message),
             # instruct Assistant to pick recently used table for consideration.
             SystemMessagePromptTemplate.from_template(
-                """\nIf you're unsure about the table to use, consider referencing any recently used tables from the chat history to help determine the appropriate table for the SQL query.\n"""
+                """\nIf you're unsure about the table to use, consider referencing any recently used tables from the chat history to help determine the appropriate table for the SQL query.\n\
+                    To retrieve the last executed SQL query, you have to pick it from the prompt's SQL history section.
+                    User can use a shortcut command `!history` which tells the Agent to pick the last executed SQL query. 
+                    """
             ),
             HumanMessagePromptTemplate.from_template(message_without_input),
             SystemMessagePromptTemplate.from_template("Chat History:\n------------------\n"),
@@ -218,6 +221,7 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
     """
 
     memory: CombinedMemory
+    max_iterations: Optional[int] = 10
 
     @property
     def _heavyiq_buffer_memory(self) -> HeavyIQQueryBufferWindowMemory:

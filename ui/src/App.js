@@ -11,7 +11,10 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 
 function App() {
   const theme = createTheme({
-    palette: { mode: "dark" }
+    palette: { mode: "dark" },
+    typography: {
+      fontFamily: 'Poppins, sans-serif', // Specify Poppins as the font family
+    },
   });
 
   return (
