@@ -130,7 +130,12 @@ class AsyncLoggingMiddleware(LoggingMiddleware):
             logs.extend(
                 [
                     Log(type=heavyiq_logger, level="debug", message="Request Path: %s", values=[request.url.path]),
-                    Log(type=heavyiq_logger, level="debug", message="Request Body: %s", values=[await request.json()]),
+                    Log(
+                        type=heavyiq_logger,
+                        level="debug",
+                        message="Request Body: %s",
+                        values=[await request.json() if request.method != "GET" else ""],
+                    ),
                 ]
             )
 
