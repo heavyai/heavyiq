@@ -26,6 +26,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     heavydb_protocol: str = "binary"
     huggingface_embed_model: str = "sentence-transformers/all-mpnet-base-v2"
     metadata_index_dir: str = "db"
+    docs_index_dir: str = "heavyai_docs"
     table_documents_dir: str = "table_documents"
     enable_str_literal_correction: bool = False
     # TELEMETRICS

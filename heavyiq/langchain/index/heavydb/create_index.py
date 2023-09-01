@@ -2,22 +2,19 @@ from pathlib import Path
 
 from chromadb.api import Where
 from langchain.vectorstores import Chroma
-from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.indexes import VectorstoreIndexCreator
 from langchain.vectorstores.base import VectorStore
 
 from heavyiq.config import get_config
+from ..utils import get_vectorstore_index_creator
 from .generate_table_documents import generate_table_documents
 from .heavydb_metadata_index import HeavyDBMetadataIndex
 from .utils import read_table_documents
 
-config = get_config()
-huggingface_model_name = config.huggingface_embed_model
-metadata_index_dir = config.metadata_index_dir
-table_documents_dir = config.table_documents_dir
-
 
 def update_tables_in_index(index_creator: VectorstoreIndexCreator, vectorstore: Chroma, tables_to_update: list[str]):
+    config = get_config()
+    huggingface_model_name = config.huggingface_embed_model
     print("New table summaries will replace existing summaries in the index (if any).")
     print("Reading new table documents...")
     docs = list(read_table_documents(include=tables_to_update))
@@ -38,18 +35,6 @@ def update_tables_in_index(index_creator: VectorstoreIndexCreator, vectorstore: 
     print("Done")
 
 
-def get_vectorstore_index_creator(persist_directory: str) -> VectorstoreIndexCreator:
-    """
-    Get a VectorstoreIndexCreator instance.
-    :param persist_directory: Path to the directory where the vector store index should be persisted.
-    :return: A VectorstoreIndexCreator instance.
-    """
-    return VectorstoreIndexCreator(
-        vectorstore_kwargs={"persist_directory": persist_directory},
-        embedding=HuggingFaceEmbeddings(model_name=huggingface_model_name),
-    )
-
-
 def create_index_if_nonexistent() -> HeavyDBMetadataIndex:
     """
     Create a new vector store index if it does not exist, otherwise return the existing index.
@@ -57,6 +42,9 @@ def create_index_if_nonexistent() -> HeavyDBMetadataIndex:
     :param persist_directory: Path to the directory where the vector store index should be persisted.
     :return: A HeavyDBMetadataIndex instance containing the vector store index.
     """
+    config = get_config()
+    huggingface_model_name = config.huggingface_embed_model
+    metadata_index_dir = config.metadata_index_dir
     tables_with_new_summaries = generate_table_documents()
 
     index_creator = get_vectorstore_index_creator(metadata_index_dir)
@@ -64,12 +52,12 @@ def create_index_if_nonexistent() -> HeavyDBMetadataIndex:
     persist_path = Path(metadata_index_dir)
     vectorstore: VectorStore
     if persist_path.exists():
-        print("Index already exists. Returning existing index.")
+        print("HeavyDB Index already exists. Returning existing index.")
         vectorstore = Chroma(embedding_function=index_creator.embedding, persist_directory=metadata_index_dir)
         if len(tables_with_new_summaries) > 0:
             update_tables_in_index(index_creator, vectorstore, tables_with_new_summaries)
     else:
-        print("Index does not exist. Creating new index.")
+        print("HeavyDB Index does not exist. Creating new index.")
         print("Reading table documents...")
         docs = read_table_documents()
 
