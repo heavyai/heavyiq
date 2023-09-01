@@ -7,13 +7,11 @@ python3.10 -m venv venv
 
 # Install Requirements
 pip install -r requirements.txt -r requirements-dev.txt
-pip install -r requirements-postinstall.txt
 
 # Create Obfuscated Build
 pyarmor reg pyarmor-regfile-5130.zip
 pyarmor gen ./heavyiq
 cp requirements.txt ./dist/requirements.txt
-cp requirements-postinstall.txt ./dist/requirements-postinstall.txt
 cp -r heavyiq/langchain/llama_model/ ./dist/heavyiq/langchain/llama_model/
 
 # Create version.txt

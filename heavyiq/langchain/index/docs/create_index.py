@@ -9,8 +9,12 @@ from .heavyai_docs_index import HeavyAIDocsIndex
 from .utils import get_latest_heavyai_docs
 from ..utils import get_vectorstore_index_creator
 
+heavyai_docs_index = None
 
 def create_heavyai_docs_index() -> HeavyAIDocsIndex:
+    global heavyai_docs_index
+    if heavyai_docs_index is not None:
+        return heavyai_docs_index
     config = get_config()
     docs_index_dir = config.docs_index_dir
 
@@ -28,4 +32,5 @@ def create_heavyai_docs_index() -> HeavyAIDocsIndex:
             documents, index_creator.embedding, **index_creator.vectorstore_kwargs
         )
 
-    return HeavyAIDocsIndex(vectorstore=vectorstore, text_splitter=index_creator.text_splitter)  # type: ignore
+    heavyai_docs_index = HeavyAIDocsIndex(vectorstore=vectorstore, text_splitter=index_creator.text_splitter)  # type: ignore
+    return heavyai_docs_index

@@ -25,7 +25,7 @@ $ . venv/bin/activate
 5. Install the requirements:
 
 ```bash
-$ sh scripts/install_dev.sh
+$ pip install -r requirements.txt -r requirements-dev.txt
 # it may be necessary to `export HNSWLIB_NO_NATIVE=1` to install chromadb on Mac
 ```
 

@@ -5,7 +5,6 @@ rm -rf dist
 mkdir -p dist
 cp -r heavyiq dist/heavyiq
 cp requirements.txt ./dist/requirements.txt
-cp requirements-postinstall.txt ./dist/requirements-postinstall.txt
 
 # Create version.txt
 mkdir -p dist/public
