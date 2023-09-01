@@ -18,9 +18,11 @@ WORKDIR /usr/src/app
 
 COPY --from=obfuscator /usr/src/app/dist/ ./
 COPY --from=obfuscator /usr/src/app/requirements.txt ./requirements.txt
+COPY --from=obfuscator /usr/src/app/requirements-postinstall.txt ./requirements-postinstall.txt
 COPY --from=obfuscator /usr/src/app/config.toml ./config.toml
 COPY --from=obfuscator /usr/src/app/heavyiq/langchain/llama_model/ ./heavyiq/langchain/llama_model/
 RUN pip install --no-cache-dir --upgrade -r ./requirements.txt
+RUN pip install --no-cache-dir --upgrade -r ./requirements-postinstall.txt
 
 EXPOSE 8000
 CMD ["gunicorn", "-b", ":8000", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--preload", "heavyiq.api:create_app()"]
