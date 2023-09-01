@@ -39,6 +39,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     heavyiq_log_level: str = "INFO"
     """Used for the log of the application code."""
     log_to_stdout: bool = False
+    enable_debug_endpoints: bool = False
     # CUSTOM LLM
     custom_llm_type: Optional[str] = None
     """ 'API' or 'API_VLLM' or 'AZURE' """
