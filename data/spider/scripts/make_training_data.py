@@ -33,9 +33,11 @@ def load_queries(
     load_sql = f"COPY heavyiq_text_to_sql_v{version}_{max_token_length}_tokens FROM '{queries_path}' WITH (header='t', array_marker='[]');"
     add_prompt_col_sql = f"ALTER TABLE heavyiq_text_to_sql_v{version}_{max_token_length}_tokens ADD COLUMN prompt TEXT;"
     add_answer_col_sql = f"ALTER TABLE heavyiq_text_to_sql_v{version}_{max_token_length}_tokens ADD COLUMN answer TEXT;"
-    update_prompt_col_sql = f"UPDATE heavyiq_text_to_sql_v{version}_{max_token_length}_tokens SET prompt = instruction;"
+    update_prompt_col_sql = (
+        f"UPDATE heavyiq_text_to_sql_v{version}_{max_token_length}_tokens SET prompt = targeted_instruction;"
+    )
     if query_instruction_prompt and query_output_prompt is not None:
-        update_prompt_col_sql = f"UPDATE heavyiq_text_to_sql_v{version}_{max_token_length}_tokens SET prompt = '{query_instruction_prompt}\n' || instruction || '\n{query_output_prompt}\n';"
+        update_prompt_col_sql = f"UPDATE heavyiq_text_to_sql_v{version}_{max_token_length}_tokens SET prompt = '{query_instruction_prompt}\n' || targeted_instruction || '\n{query_output_prompt}\n';"
     update_answer_col_sql = f"UPDATE heavyiq_text_to_sql_v{version}_{max_token_length}_tokens SET answer = output;"
     export_train_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_text_to_sql_v{version}_{max_token_length}_tokens WHERE data_split <> 'dev' AND num_targeted_instruction_tokens <= {max_token_length}) TO '{output_dir}/heavyiq_text_to_sql_v{version}_{max_token_length}_tokens_train.csv' WITH (header='t');"
     export_eval_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_text_to_sql_v{version}_{max_token_length}_tokens WHERE data_split = 'dev' AND num_targeted_instruction_tokens <= {max_token_length}) TO '{output_dir}/heavyiq_text_to_sql_v{version}_{max_token_length}_tokens_eval.csv' WITH (header='t');"
@@ -79,18 +81,20 @@ def create_combo_dataset(con, version, instruction_table, sql_table, nl_answers_
     assert only_sql_in_eval, "only_sql_in_eval must be True"
 
     drop_table_sql = f"DROP TABLE IF EXISTS heavyiq_combo_v{version}"
-    create_table_sql = f"CREATE TABLE heavyiq_combo_v{version} (id INT, data_split TEXT, prompt TEXT, answer TEXT);"
-    load_sql_sql = f"INSERT INTO heavyiq_combo_v{version} SELECT query_id, CASE WHEN data_split <> 'dev' THEN 'train' ELSE 'eval' END, prompt, answer FROM {sql_table};"
-    load_answers_sql = f"INSERT INTO heavyiq_combo_v{version} SELECT query_id + 1000000, 'train', prompt, answer FROM {nl_answers_table};"
-    load_dolly_sql = f"INSERT INTO heavyiq_combo_v{version} SELECT id + 2000000, 'train', prompt, answer FROM {instruction_table} WHERE length(prompt) < 1760 AND length(answer) < 640;"
-    export_train_sql = f"COPY (SELECT id, prompt, answer FROM heavyiq_combo_v{version} WHERE data_split = 'train') TO '{output_dir}/heavyiq_combo_v{version}_train.csv' WITH (header='t');"
-    export_eval_sql = f"COPY (SELECT id, prompt, answer FROM heavyiq_combo_v{version} WHERE data_split = 'eval') TO '{output_dir}/heavyiq_combo_v{version}_eval.csv' WITH (header='t');"
+    create_table_sql = (
+        f"CREATE TABLE heavyiq_combo_v{version} (id INT, db_id TEXT, data_split TEXT, prompt TEXT, answer TEXT);"
+    )
+    load_dolly_sql = f"INSERT INTO heavyiq_combo_v{version} SELECT id + 2000000, 'INVALID', 'train', prompt, answer FROM {instruction_table} WHERE length(prompt) < 1760 AND length(answer) < 640;"
+    load_sql_sql = f"INSERT INTO heavyiq_combo_v{version} SELECT query_id, db_id, CASE WHEN data_split <> 'dev' THEN 'train' ELSE 'eval' END, prompt, answer FROM {sql_table};"
+    load_answers_sql = f"INSERT INTO heavyiq_combo_v{version} SELECT query_id + 1000000, db_id, 'train', prompt, answer FROM {nl_answers_table};"
+    export_train_sql = f"COPY (SELECT id, db_id, prompt, answer FROM heavyiq_combo_v{version} WHERE data_split = 'train') TO '{output_dir}/heavyiq_combo_v{version}_train.csv' WITH (header='t');"
+    export_eval_sql = f"COPY (SELECT id, db_id, prompt, answer FROM heavyiq_combo_v{version} WHERE data_split = 'eval') TO '{output_dir}/heavyiq_combo_v{version}_eval.csv' WITH (header='t');"
 
     con.execute(drop_table_sql)
     con.execute(create_table_sql)
+    con.execute(load_dolly_sql)
     con.execute(load_sql_sql)
     con.execute(load_answers_sql)
-    con.execute(load_dolly_sql)
     con.execute(export_train_sql)
     con.execute(export_eval_sql)
 
