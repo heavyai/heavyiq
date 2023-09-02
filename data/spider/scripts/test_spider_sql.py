@@ -29,6 +29,7 @@ def getOptions(argv=None):
     parser.add_argument(
         "--fix-queries", help="Try to fix failed queries with automatically applied corrections", action="store_true"
     )
+    parser.add_argument("--filter-null-groups", help="Add filters to remove null groups", action="store_true")
     parser.add_argument("--fix-queries-gpt", help="Try to fix failed queries with ChatGPT API", action="store_true")
     parser.add_argument("--top-k-str-vals", help="Top K string values", type=int, default=0)
     parser.add_argument("--max-instruction-tokens", help="Max instruction tokens", type=int, default=704)
@@ -700,6 +701,41 @@ def fix_failed_query_gpt(con, query_id, failed_query, error):
         return sql
 
 
+def add_not_null_filters(sql_query):
+    # Check if the query contains a GROUP BY clause
+    # Look for SQL keywords following GROUP BY, so the regular expression will stop at them
+    group_by_match = re.search(
+        r"GROUP BY\s+([\w_,\s]+)(?=\s+ORDER BY|\s+HAVING|\s+LIMIT|\s+OFFSET|\s+;|$)", sql_query, re.IGNORECASE
+    )
+    if not group_by_match:
+        return sql_query
+
+    # Extract columns in GROUP BY clause
+    group_by_columns = group_by_match.group(1).split(",")
+    group_by_columns = [col.strip() for col in group_by_columns]
+
+    # Check if the query contains a WHERE clause
+    where_match = re.search(
+        r"WHERE\s+(.+?)(?=\s+GROUP BY|\s+ORDER BY|\s+HAVING|\s+LIMIT|\s+OFFSET|\s+;|$)", sql_query, re.IGNORECASE
+    )
+
+    if where_match:
+        where_clause = where_match.group(1)
+        new_where_clause = where_clause
+        for column in group_by_columns:
+            # Append filters only if they are not already there
+            if f"{column} IS NOT NULL" not in where_clause:
+                new_where_clause = f"{new_where_clause} AND {column} IS NOT NULL"
+        # Replace old WHERE clause with the new one
+        sql_query = sql_query.replace(where_clause, new_where_clause)
+    else:
+        # Add a WHERE clause if it does not exist
+        where_clause = " AND ".join([f"{column} IS NOT NULL" for column in group_by_columns])
+        sql_query = re.sub(r"(FROM\s+\w+)", r"\1 WHERE " + where_clause, sql_query, flags=re.IGNORECASE)
+
+    return sql_query
+
+
 def load_query_cache(cache_file):
     queries = []
     with open(cache_file, "r") as f:
@@ -763,6 +799,9 @@ def main(argv):
     question_prompts_with_cols = []
     con = None
     tokenizer = LlamaTokenizer.from_pretrained("test_model")
+    num_null_rewrite_successes = 0
+    num_null_rewrite_fails = 0
+    null_rewrite_fail_ids = []
     for db_id, queries in queries_by_db.items():
         try:
             if db_num < options.start_db:
@@ -819,6 +858,19 @@ def main(argv):
                     sql_query = remove_spaces_around_commas(sql_query)
                     sql_query = adjust_alias_case(sql_query)
                     sql_query = add_as_before_table_aliases(sql_query)
+                    if options.filter_null_groups:
+                        old_sql_query = copy.deepcopy(sql_query)
+                        sql_query = add_not_null_filters(sql_query)
+                        if sql_query != old_sql_query:
+                            try:
+                                con.execute(sql_query)
+                                print(f"Rewrite SUCCESS: {query_id}")
+                                num_null_rewrite_successes += 1
+                            except Exception as e:
+                                print(f"Rewrite FAIL: {query_id}")
+                                num_null_rewrite_fails += 1
+                                null_rewrite_fail_ids.append(query_id)
+                                sql_query = old_sql_query
                     # sql_query = remove_join_aliases(table_schemas, sql_query)
 
                     # query_and_tables = adjust_identifier_case(table_schemas, sql_query)
@@ -923,7 +975,7 @@ def main(argv):
                         )
 
                 except Exception as e:
-                    print(f"Exception: {query_id}")
+                    print(f"Exception Query ID: {query_id} DB: {db_id} Query: {sql_query}")
                     query_fixed = False
                     if options.fix_queries:
                         fixed_query = fix_failed_query_unquoted_keyword(con, query_id, sql_query, e)
@@ -962,8 +1014,10 @@ def main(argv):
     if options.write_question_prompts:
         write_question_prompts_to_csv(question_prompts, "sql_question_prompts.csv")
 
+    print(f"\n\nTotal NULL Rewrite SUCCESSES: {num_null_rewrite_successes}, FAILS: {num_null_rewrite_fails}")
     print(f"\n\nTotal successful queries: {total_successful_queries}/{total_queries}")
     print(f"Total successful fixed queries: {len(fixed_queries)}/{total_queries}")
+    print(", ".join(str(id) for id in null_rewrite_fail_ids))
     # print(f"Total successful altered queries: {total_successful_altered_queries}/{total_queries}")
 
 
