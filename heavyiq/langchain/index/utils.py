@@ -1,39 +1,54 @@
-from collections.abc import Iterator
-from pathlib import Path
-from typing import Optional
+from enum import Enum
 
-from langchain.docstore.document import Document
+from langchain.schema import BaseRetriever
+from langchain.embeddings import HuggingFaceEmbeddings
+from langchain.indexes import VectorstoreIndexCreator
+from langchain.indexes.vectorstore import VectorStoreIndexWrapper
+from langchain.vectorstores import Chroma
+from langchain.text_splitter import TextSplitter
 
 from heavyiq.config import get_config
 
-table_documents_dir = get_config().table_documents_dir
 
-
-def read_table_documents(include: Optional[list[str]] = None) -> Iterator[Document]:
+def get_vectorstore_index_creator(persist_directory: str) -> VectorstoreIndexCreator:
     """
-    Iterate over a folder containing table documents and yield Document instances.
-    :param include: Optional list of table names to include. If None, all tables will be included.
-    :return: An iterator yielding Document instances for each table document.
+    Get a VectorstoreIndexCreator instance.
+    :param persist_directory: Path to the directory where the vector store index should be persisted.
+    :return: A VectorstoreIndexCreator instance.
     """
-    folder = Path(table_documents_dir)
-    for file_name in folder.iterdir():
-        if file_name.suffix == ".txt":
-            table_name = file_name.stem
-            if include is not None and table_name not in include:
-                continue
-            with open(file_name, "r") as f:
-                file_contents = f.read()
-            yield Document(page_content=file_contents, metadata={"source": table_name})
+    config = get_config()
+    huggingface_model_name = config.huggingface_embed_model
+    return VectorstoreIndexCreator(
+        vectorstore_kwargs={"persist_directory": persist_directory},
+        embedding=HuggingFaceEmbeddings(model_name=huggingface_model_name),
+    )
 
 
-def apply_retriever_filter(search_kwargs: dict, allowable_tables: Optional[list[str]] = None) -> dict:
-    """Apply a filter to the search_kwargs to only search for tables in the allowable_tables list.
-    If allowable_tables is None, no filter is applied."""
-    if allowable_tables is not None:
-        if len(allowable_tables) == 0:
-            raise Exception("No tables permitted to be searched.")
-        if len(allowable_tables) == 1:
-            search_kwargs["filter"] = {"source": allowable_tables[0]}
-        else:
-            search_kwargs["filter"] = {"$or": [{"source": table_name} for table_name in allowable_tables]}
-    return search_kwargs
+class SearchType(Enum):
+    SIMILARITY = "similarity"
+    MMR = "mmr"
+
+
+class HeavyIQIndexWrapper(VectorStoreIndexWrapper):
+    text_splitter: TextSplitter
+    vectorstore: Chroma
+
+    def as_retriever(
+        self,
+        search_type: SearchType = SearchType.SIMILARITY,
+        k: int = 6,
+        fetch_k: int = 20,
+    ) -> BaseRetriever:
+        """
+        Args:
+            search_type: Type of search to perform. Defaults to "similarity".
+                - similarity: Return docs most similar to query.
+                - mmr: Return docs selected using the maximal marginal relevance.
+            k: Number of Documents to return. Defaults to 6.
+            fetch_k: Number of Documents to fetch to pass to MMR algorithm. Defaults to 20.
+
+        Returns:
+            Retriever that can be used to search the index.
+        """
+        search_kwargs = {"k": k, "fetch_k": fetch_k}
+        return self.vectorstore.as_retriever(search_type=search_type.value, search_kwargs=search_kwargs)

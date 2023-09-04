@@ -10,6 +10,8 @@ from heavyiq.api.models import (
     QueryResponse,
     QuestionRequest,
     QuestionResponse,
+    AskHeavyAIDocsRequest,
+    AskHeavyAIDocsResponse,
 )
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
@@ -176,4 +178,19 @@ async def handle_generate_table_metadata_async(
         summary=res[chain.output_summary_key],
         columns=res[chain.output_columns_key],
         feedback_id=feedback_id,
+    )
+
+
+async def handle_ask_heavyai_docs_async(request: AskHeavyAIDocsRequest) -> AskHeavyAIDocsResponse:
+    """
+    Handles /ask-heavyai-docs request.
+    """
+    from heavyiq.langchain.index.docs.create_index import create_heavyai_docs_index
+
+    docs_index = create_heavyai_docs_index()
+    res = docs_index.ask_documentation(request.question)
+    return AskHeavyAIDocsResponse(
+        answer=res.answer,
+        sources=res.sources,
+        feedback_id=res.feedback_id,
     )

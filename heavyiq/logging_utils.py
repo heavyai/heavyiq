@@ -1,4 +1,5 @@
 import logging
+from logging import LogRecord
 from logging.handlers import RotatingFileHandler
 import getpass
 import time
@@ -12,9 +13,19 @@ from heavyiq.config import get_config
 from heavyiq.langchain.callbacks import FileCallbackHandler, AsyncLogFileCallbackHandler
 
 
+class MillisecondFormatter(logging.Formatter):
+    def formatTime(self, record: LogRecord, datefmt: str | None = None):
+        """Adds milliseconds to the default formatter"""
+        ct = self.converter(record.created)
+        if datefmt:
+            s = time.strftime(datefmt, ct)
+            return s + ".{:03d}".format(int((record.created % 1.0) * 1000))
+        return super().formatTime(record, datefmt)
+
+
 def get_default_formatter() -> logging.Formatter:
     log_format = "%(asctime)s %(remote_addr)s - %(username)s [%(levelname)s] %(pathname)s:%(lineno)d - %(message)s"
-    return logging.Formatter(log_format, datefmt="%Y-%m-%d %H:%M:%S")
+    return MillisecondFormatter(log_format, datefmt="%Y-%m-%d %H:%M:%S")
 
 
 def get_app_log_formatter() -> logging.Formatter:

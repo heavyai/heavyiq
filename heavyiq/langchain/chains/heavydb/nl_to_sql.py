@@ -18,6 +18,7 @@ from langchain.callbacks.manager import (
 )
 
 from heavyiq.config import get_config
+from heavyiq.langchain.llms import is_using_custom_trained_llm
 from heavyiq.langchain.heavydb import HeavyDB
 from heavyiq.langchain.chains import BaseChain
 from heavyiq.langchain.utils import populate_table_info_wrt_token_limit
@@ -40,14 +41,14 @@ Question: {input}
 SQLQuery:"""
 NL_TO_SQL_PROMPT = PromptTemplate.from_template(NL_TO_SQL_TEMPLATE)
 
-CUSTOM_LLM_NL_TO_SQL_TEMPLATE = """<|prompt|>
+CUSTOM_LLM_NL_TO_SQL_TEMPLATE = """<|sql prompt|>
 You are a experienced data analyst adept at writing SQL queries to answer user questions.
 
 You have access to the following relational tables, with schemas below.
 {table_info}
 Write a SQL query to answer the following question:
 {input}
-<|answer|>"""
+<|sql answer|>"""
 CUSTOM_LLM_NL_TO_SQL_PROMPT = PromptTemplate.from_template(CUSTOM_LLM_NL_TO_SQL_TEMPLATE)
 
 NL_TO_SQL_ERROR_TEMPLATE = """Correct the given SQL query:
@@ -154,8 +155,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
     """Prompt object to use."""
 
     def __init__(self, *args, **kwargs):
-        config = get_config()
-        if config.custom_llm_type == "API":
+        if is_using_custom_trained_llm():
             prompt = CUSTOM_LLM_NL_TO_SQL_PROMPT
         else:
             prompt = NL_TO_SQL_PROMPT
@@ -216,6 +216,12 @@ class NLtoSQLChain(BaseNLtoSQLChain):
             )
 
         self.write_callback_message(sql_cmd, run_manager=run_manager, color="green")
+        if get_config().enable_str_literal_correction:
+            self.write_callback_message(
+                "Attempting to correct string literals in SQL query.", run_manager=run_manager, color="blue"
+            )
+            sql_cmd = self.database.correct_string_literals(sql_cmd)
+            self.write_callback_message(f"Result of correction: {sql_cmd}", run_manager=run_manager, color="green")
 
         sql_complexity = self.database.complexity(sql_cmd)
 
@@ -284,6 +290,15 @@ class NLtoSQLChain(BaseNLtoSQLChain):
             )
 
         await self.write_callback_message_async(sql_cmd, run_manager=run_manager, color="green")
+
+        if get_config().enable_str_literal_correction:
+            await self.write_callback_message_async(
+                "Attempting to correct string literals in SQL query.", run_manager=run_manager, color="blue"
+            )
+            sql_cmd = self.database.correct_string_literals(sql_cmd)
+            await self.write_callback_message_async(
+                f"Result of correction: {sql_cmd}", run_manager=run_manager, color="green"
+            )
 
         sql_complexity = self.database.complexity(sql_cmd)
 
@@ -359,6 +374,13 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
 
         self.write_callback_message(sql_cmd, run_manager=run_manager, color="green")
 
+        if get_config().enable_str_literal_correction:
+            self.write_callback_message(
+                "Attempting to correct string literals in SQL query.", run_manager=run_manager, color="blue"
+            )
+            sql_cmd = self.database.correct_string_literals(sql_cmd)
+            self.write_callback_message(f"Result of correction: {sql_cmd}", run_manager=run_manager, color="green")
+
         sql_complexity = self.database.complexity(sql_cmd)
 
         return {self.output_key: strip_sql_comments(sql_cmd), self.output_complexity_key: str(sql_complexity)}
@@ -415,6 +437,15 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
             )
 
         await self.write_callback_message_async(sql_cmd, run_manager=run_manager, color="green")
+
+        if get_config().enable_str_literal_correction:
+            await self.write_callback_message_async(
+                "Attempting to correct string literals in SQL query.", run_manager=run_manager, color="blue"
+            )
+            sql_cmd = self.database.correct_string_literals(sql_cmd)
+            await self.write_callback_message_async(
+                f"Result of correction: {sql_cmd}", run_manager=run_manager, color="green"
+            )
 
         sql_complexity = self.database.complexity(sql_cmd)
 

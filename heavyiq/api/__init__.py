@@ -39,7 +39,7 @@ def create_app(config_path: str = "./config.toml", socket_io: bool = True) -> Fa
         print("Provided config path is not valid; service disabled.")
         return stripped_down_api()
 
-    get_config(config_path)  # loads config using specified path
+    config = get_config(config_path)  # loads config using specified path
     init_logs()  # initializes logs using config
     init_telemetrics()  # initializes langsmith
 
@@ -79,6 +79,20 @@ def create_app(config_path: str = "./config.toml", socket_io: bool = True) -> Fa
             }
         },
     )
+    if config.enable_debug_endpoints:
+        from heavyiq.api.routes.debug_router import debug_router
+
+        app.include_router(
+            debug_router,
+            prefix="/debug",
+            tags=["debug"],
+            responses={
+                500: {
+                    "description": "Internal Server Error",
+                    "model": ErrorResponse,
+                }
+            },
+        )
 
     # check heavydb connection
     @app.on_event("startup")

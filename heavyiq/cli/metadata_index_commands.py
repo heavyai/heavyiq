@@ -4,7 +4,7 @@ import click
 from langchain.vectorstores import Chroma
 
 from heavyiq.langchain import HeavyDB
-from heavyiq.langchain.index import (
+from heavyiq.langchain.index.heavydb import (
     create_and_write_table_document,
     get_vectorstore_index_creator,
     update_tables_in_index,

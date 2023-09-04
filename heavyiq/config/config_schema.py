@@ -26,7 +26,9 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     heavydb_protocol: str = "binary"
     huggingface_embed_model: str = "sentence-transformers/all-mpnet-base-v2"
     metadata_index_dir: str = "db"
+    docs_index_dir: str = "heavyai_docs"
     table_documents_dir: str = "table_documents"
+    enable_str_literal_correction: bool = False
     # TELEMETRICS
     langchain_endpoint: str = "https://api.smith.langchain.com"
     langsmith_api_key: Optional[str] = None
@@ -37,10 +39,12 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     heavyiq_log_level: str = "INFO"
     """Used for the log of the application code."""
     log_to_stdout: bool = False
+    enable_debug_endpoints: bool = False
     # CUSTOM LLM
     custom_llm_type: Optional[str] = None
-    """ 'API' or 'AZURE' """
+    """ 'API' or 'API_VLLM' or 'AZURE' """
     custom_llm_api_base: str = ""
+    custom_llm_api_vllm_beam_width: int = 1
     custom_llm_api_context_window: int = 2048
     custom_llm_azure_openai_api_version: str = "2023-03-15-preview"
     custom_llm_azure_openai_api_base: str = ""
