@@ -5,12 +5,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from heavydb.exceptions import Error as HeavyDBError  # type: ignore
 from starlette.exceptions import HTTPException
+from fastapi_socketio import SocketManager
 
 from heavyiq.config import get_config
 from heavyiq.api.middlewares import AsyncLoggingMiddleware
 from heavyiq.api.models.error import ErrorResponse
 from heavyiq.langchain.exceptions import NLtoSQLException
 from heavyiq.logging_utils import init_logs
+from heavyiq.api.handlers.socket_handler import register_socket_events
 from heavyiq.langchain.utils import init_telemetrics
 from heavyiq.api.routes import defaultrouter, iqrouter
 from heavyiq.api.handlers import exception_handler as exh
@@ -22,7 +24,7 @@ def stripped_down_api() -> FastAPI:
     return app
 
 
-def create_app(config_path: str = "./config.toml") -> FastAPI:
+def create_app(config_path: str = "./config.toml", socket_io: bool = True) -> FastAPI:
     """
     create and return a FastAPI instance.
 
@@ -43,7 +45,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
 
     app = FastAPI(title="HeavyIQ")
 
-    cors_origins = ["http://localhost"]
+    cors_origins = ["http://localhost", "http://localhost:3000"]
 
     # add middlewares
     app.add_middleware(
@@ -112,7 +114,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         """
         from heavyiq.logging_utils import heavyiq_logger as logger
 
-        logger.info("Shutting down FastAPI app.")
+        logger.info("Shutting down FastAPI app.")  # type: ignore
 
     def custom_openapi() -> dict[str, Any]:
         if app.openapi_schema:
@@ -140,5 +142,9 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
 
     # custom openapi
     app.openapi = custom_openapi  # type: ignore
+
+    if socket_io:
+        socket_manager = SocketManager(app=app, mount_location="", cors_allowed_origins=cors_origins)
+        register_socket_events(socket_manager)
 
     return app

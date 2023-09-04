@@ -1,3 +1,4 @@
+from fastapi.concurrency import run_in_threadpool
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Extra, Field
 
@@ -57,7 +58,21 @@ Example Input: 'Which table contains information on [topic]? What are the releva
             return "Error: LLM could not find a relevant table"
 
     async def _arun(self, query: str) -> str:
-        raise NotImplementedError("RetrieveRelevantSchemasTool does not support async")
+        try:
+            usable_table_names = await run_in_threadpool(self.db.get_usable_table_names)
+            retriever = get_heavydb_index().as_retriever(k=5, allowable_tables=list(usable_table_names))
+            chain = AskHeavyDBMetadataIndexChain.create(retriever=retriever)
+            res: dict[str, str] = await chain.acall({"question": query})
+            if res["answer"] == chain.no_results_answer:
+                return "Error: No relevant tables found for provided query. Feel free to rephrase and try again."
+            if len(res["tables"]) > 2:
+                table_info = await run_in_threadpool(self.db.get_table_info, res["tables"], include_samples=False, include_top_k=False)  # type: ignore
+            else:
+                table_info = await run_in_threadpool(self.db.get_table_info, res["tables"])  # type: ignore
+            return f"{res['answer']}\n{table_info}"
+        except Exception as e:
+            print(e)
+            return "Error: LLM could not find a relevant table"
 
 
 class QueryHeavyDBTool(BaseHeavyDBTool, BaseTool):
@@ -105,7 +120,12 @@ If an error occurs, revise and retry. Be familiar with table schemas and avoid c
             return f"Error: {e}"
 
     async def _arun(self, query: str) -> str:
-        raise NotImplementedError("QueryHeavyDBTool does not support async")
+        try:
+            await run_in_threadpool(self.db.validate_query, query)  # validate the query before running it
+            result = await run_in_threadpool(self.db.run_no_throw, query)
+            return result
+        except Exception as e:
+            return f"Error: {e}"
 
 
 class RetrieveTableSchemasTool(BaseHeavyDBTool, BaseTool):
@@ -134,4 +154,8 @@ Example Input: table1, table2, table3
         return self.db.get_table_info_no_throw([tn.strip() for tn in table_names.strip().split(",")])
 
     async def _arun(self, table_names: str) -> str:
-        raise NotImplementedError("RetrieveTableSchemasTool does not support async")
+        if "'" in table_names:
+            table_names = table_names.replace("'", "")
+        return await run_in_threadpool(
+            self.db.get_table_info_no_throw, [tn.strip() for tn in table_names.strip().split(",")]
+        )

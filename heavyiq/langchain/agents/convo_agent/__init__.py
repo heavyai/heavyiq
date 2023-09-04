@@ -1,14 +1,15 @@
 import json
 import re
-from typing import Any, Optional
 from collections.abc import Sequence
+from typing import Any, Optional
 
+from langchain.memory.chat_message_histories.in_memory import ChatMessageHistory
 from langchain.agents import AgentExecutor, AgentOutputParser, BaseMultiActionAgent, BaseSingleActionAgent
 from langchain.agents.conversational_chat.base import ConversationalChatAgent
 from langchain.agents.conversational_chat.prompt import PREFIX, SUFFIX
 from langchain.callbacks.base import BaseCallbackManager, Callbacks
 from langchain.chat_models.base import BaseChatModel
-from langchain.memory import CombinedMemory, ConversationBufferMemory
+from langchain.memory import CombinedMemory, ConversationBufferWindowMemory
 from langchain.schema.prompt_template import BasePromptTemplate
 from langchain.schema.messages import BaseMessage
 from langchain.prompts.chat import (
@@ -79,6 +80,34 @@ Use this if you want to respond directly to the human. Markdown code snippet for
 }}}}
 ```"""
 
+CHAT_FORMAT_INSTRUCTIONS = """RESPONSE FORMAT INSTRUCTIONS
+----------------------------
+
+When responding to me please, please output a response in one of two formats:
+
+**Option 1:**
+Use this if you want the human to use a tool.
+Markdown code snippet formatted in the following schema:
+
+```json
+{{{{
+    "thought": string \\ your initial thought
+    "action": string \\ The action to take. Must be one of {tool_names}
+    "action_input": string \\ The input to the action
+}}}}
+```
+
+**Option #2:**
+Use this if you want to respond directly to the human. Markdown code snippet formatted in the following schema:
+
+```json
+{{{{
+    "thought": string \\ your final thoughts
+    "action": "Final Answer"
+    "action_input": string \\ You should put what you want to return to human
+}}}}
+```"""
+
 
 class CustomOutputParser(AgentOutputParser):
     def get_format_instructions(self) -> str:
@@ -109,6 +138,39 @@ class CustomOutputParser(AgentOutputParser):
             return AgentFinish({"output": text.strip()}, text)
 
 
+class ChatOutputParser(AgentOutputParser):
+    """
+    Output Parser specifically used for chat agents.
+    """
+
+    def get_format_instructions(self) -> str:
+        return CHAT_FORMAT_INSTRUCTIONS
+
+    def parse(self, text: str) -> AgentAction | AgentFinish:
+        try:
+            cleaned_output = text.strip()
+            if "```json" in cleaned_output:
+                _, cleaned_output = cleaned_output.split("```json")
+            if "```" in cleaned_output:
+                cleaned_output, _ = cleaned_output.split("```")
+            if cleaned_output.startswith("```json"):
+                cleaned_output = cleaned_output[len("```json") :]
+            if cleaned_output.startswith("```"):
+                cleaned_output = cleaned_output[len("```") :]
+            if cleaned_output.endswith("```"):
+                cleaned_output = cleaned_output[: -len("```")]
+            cleaned_output = cleaned_output.strip()
+            response = json.loads(cleaned_output)
+            action, action_input, thought = response["action"], response["action_input"], response.get("thought")
+            if action == "Final Answer":
+                return AgentFinish({"output": action_input, "thought": thought}, text)
+            else:
+                return AgentAction(action, action_input, cleaned_output)
+        except Exception:
+            # bot forgot to speak json, just output the response as a final answer
+            return AgentFinish({"output": text.strip()}, text)
+
+
 class CustomConversationalChatAgent(ConversationalChatAgent):
     """
     Subclass of ConversationalChatAgent to include last_run_sql message inside ChatPromptTemplate messages which
@@ -134,6 +196,13 @@ class CustomConversationalChatAgent(ConversationalChatAgent):
         message_without_input, input_message = re.split(r"\b(?=USER'S INPUT)", final_prompt)
         messages: list[BaseMessagePromptTemplate | BaseChatPromptTemplate | BaseMessage] = [
             SystemMessagePromptTemplate.from_template(system_message),
+            # instruct Assistant to pick recently used table for consideration.
+            SystemMessagePromptTemplate.from_template(
+                """\nIf you're unsure about the table to use, consider referencing any recently used tables from the chat history to help determine the appropriate table for the SQL query.\n\
+                    To retrieve the last executed SQL query, you have to pick it from the prompt's SQL history section.
+                    User can use a shortcut command `!history` which tells the Agent to pick the last executed SQL query. 
+                    """
+            ),
             HumanMessagePromptTemplate.from_template(message_without_input),
             SystemMessagePromptTemplate.from_template("Chat History:\n------------------\n"),
             MessagesPlaceholder(variable_name="chat_history"),
@@ -152,15 +221,16 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
     """
 
     memory: CombinedMemory
+    max_iterations: Optional[int] = 10
 
     @property
     def _heavyiq_buffer_memory(self) -> HeavyIQQueryBufferWindowMemory:
         """
         Gets the instance of heavyiq buffer memory.
         """
-        return next(i for i in self.memory.memories if isinstance(i, HeavyIQQueryBufferWindowMemory))
+        return next(i for i in self.memory.memories if isinstance(i, HeavyIQQueryBufferWindowMemory))  # type: ignore
 
-    def _save_to_sql_memory(self, response: dict[str, Any]) -> bool:
+    def _save_to_sql_memory(self, response: dict[str, Any]) -> Optional[str]:
         """
         Helps to save the agentexecutor return to HeavyIQQueryBufferWindowMemory.
         """
@@ -171,8 +241,21 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
                 inputs = {heavyiq_buffer_memory.input_key: response["input"]}
                 outputs = {heavyiq_buffer_memory.output_key: agent_action.tool_input}
                 heavyiq_buffer_memory.save_context(inputs, outputs, manual_save=True)
-                return True
-        return False
+                return agent_action.tool_input
+        return None
+
+    def save_to_sql_memory(self, question: str, query: str) -> None:
+        """
+        Helps to save successfull sql query into heavyiq buffer memory.
+
+        Args:
+            question (str): NL question asked by user.
+            query (str): Query derived by run_sql_query tool.
+        """
+        heavyiq_buffer_memory = self._heavyiq_buffer_memory
+        inputs = {heavyiq_buffer_memory.input_key: question}
+        outputs = {heavyiq_buffer_memory.output_key: query}
+        heavyiq_buffer_memory.save_context(inputs, outputs, manual_save=True)
 
     def run(
         self,
@@ -189,7 +272,21 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
         response = self.__call__(inputs=inputs, callbacks=callbacks, tags=tags, metadata=metadata, **kwargs)
         status = self._save_to_sql_memory(response=response)
         if status:
-            logger.debug("Saved the last success query")
+            logger.debug("Saved the last success query")  # type: ignore
+        return response["output"]
+
+    async def arun(
+        self,
+        *args: Any,
+        callbacks: Callbacks = None,
+        tags: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        inputs = {"input": args[0]}
+        kwargs = {**kwargs, **inputs}
+        response = await self.acall(kwargs, callbacks=callbacks, tags=tags, metadata=metadata)
+        self._save_to_sql_memory(response=response)
         return response["output"]
 
     @classmethod
@@ -207,31 +304,38 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
         relevant default values has to be used. Why because, we need the executor to
         return intermediate_steps for catching the right query and also the memory should
         be an instance of CombinedMemory
-            1. ConversationBufferMemory used for storing chat history.
+            1. ConversationBufferWindowMemory used for storing chat history (recent 10 messages, k=10).
             2. HeavyIQQueryBufferWindowMemory used for storing n successful queries.
 
         Args:
             last_k [int] - last n successfull queries to save to the buffer.
         """
-        # pop out any memory being passed
         kwargs.pop("memory", None)
         kwargs.pop("return_intermediate_steps", None)
-        convo_memory = ConversationBufferMemory(
+        chat_history, sql_history = kwargs.pop("chat_history", None), kwargs.pop("sql_history", None)
+        convo_memory = ConversationBufferWindowMemory(
+            chat_memory=chat_history or ChatMessageHistory(),
             memory_key="chat_history",
             return_messages=True,
             ai_prefix="Assistant",
             input_key="input",
             output_key="output",
+            k=10,
         )
         latest_run_sql_memory = HeavyIQQueryBufferWindowMemory(
-            memory_key="last_run_sql", k=last_k, input_key="input", return_messages=True, output_key="output"
+            chat_memory=sql_history or ChatMessageHistory(),
+            memory_key="last_run_sql",
+            k=last_k,
+            input_key="input",
+            return_messages=True,
+            output_key="output",
         )
-        memory = CombinedMemory(memories=[convo_memory, latest_run_sql_memory])
+        combined_memory = CombinedMemory(memories=[convo_memory, latest_run_sql_memory])
         return cls(
             agent=agent,
             tools=tools,
             callback_manager=callback_manager,
-            memory=memory,
+            memory=combined_memory,
             return_intermediate_steps=True,
             **kwargs,
         )
@@ -250,7 +354,11 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
 
 
 def create_conversational_agent(
-    heavydb: Optional[HeavyDB] = None, chat_llm: Optional[BaseChatModel] = None, verbose: bool = False
+    heavydb: Optional[HeavyDB] = None,
+    chat_llm: Optional[BaseChatModel] = None,
+    chat_history: Optional[ChatMessageHistory] = None,
+    sql_history: Optional[ChatMessageHistory] = None,
+    verbose: bool = False,
 ) -> AgentExecutor:
     """This function creates an AgentExecutor instance that uses a language model to generate responses
     based on user inputs. The agent is designed to interact with a HeavyDB instance and has access
@@ -265,6 +373,8 @@ def create_conversational_agent(
     responses. If not provided, a default ChatOpenAI instance with GPT-4 will be used.
     - verbose (bool, optional): If True, the AgentExecutor will print additional information during
     execution. Defaults to False.
+    - chat_history (ChatMessageHistory, optional): history of chat messages for pre-loading
+    - sql_history (ChatMessageHistory, optional): history of sql messages for pre-loading
 
     Returns:
     - AgentExecutor: An AgentExecutor instance configured with the conversational agent and the set
@@ -280,10 +390,41 @@ def create_conversational_agent(
             llm=chat_llm,
             system_message=SYSTEM_MESSAGE,
             human_message=HUMAN_MESSAGE,
-            output_parser=CustomOutputParser(),
+            output_parser=ChatOutputParser(),
         ),
         tools=tools,
         last_k=1,
         verbose=verbose,
+        chat_history=chat_history,
+        sql_history=sql_history,
         callbacks=[ConvoAgentCallbackHandler()],
+    )
+
+
+async def create_conversational_agent_async(
+    heavydb: Optional[HeavyDB] = None,
+    chat_llm: Optional[BaseChatModel] = None,
+    chat_history: Optional[ChatMessageHistory] = None,
+    sql_history: Optional[ChatMessageHistory] = None,
+    verbose: bool = False,
+) -> AgentExecutor:
+    chat_llm = chat_llm or get_chat_llm(
+        tags=["agent", "conversational_sql_agent"], temperature=0, model=get_config().openai_gpt_model
+    )
+    heavydb = heavydb or await HeavyDB.from_env_async()
+    toolkit = HeavyDBToolkit(db=heavydb)
+    tools = toolkit.get_tools()
+    chat_history = chat_history or ChatMessageHistory()
+    return SaveSuccessQueryAgentExecutor.initialize(
+        agent_kwargs=dict(
+            llm=chat_llm,
+            system_message=SYSTEM_MESSAGE,
+            human_message=HUMAN_MESSAGE,
+            output_parser=ChatOutputParser(),
+        ),
+        tools=tools,
+        last_k=1,
+        verbose=verbose,
+        chat_history=chat_history,
+        sql_history=sql_history,
     )
