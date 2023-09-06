@@ -10,7 +10,7 @@ from heavyiq.config import get_config
 from heavyiq.api.middlewares import AsyncLoggingMiddleware
 from heavyiq.api.models.error import ErrorResponse
 from heavyiq.langchain.exceptions import NLtoSQLException
-from heavyiq.logging_utils import init_logs
+from heavyiq.logging_utils import init_logs, iq_logger
 from heavyiq.langchain.utils import init_telemetrics
 from heavyiq.api.routes import defaultrouter, iqrouter
 from heavyiq.api.handlers import exception_handler as exh
@@ -98,8 +98,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         """
         Code to be executed when application starts.
         """
-        from heavyiq.logging_utils import heavyiq_logger as logger
-
+        iq_logger.info("Application started!")
         # TODO: Disabled for now, as no guarantee heavydb is running before heavyiq
         # logger.info("Connecting to heavydb...")
         # await run_in_threadpool(get_heavydb_license_claims, config)
@@ -112,7 +111,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         """
         from heavyiq.logging_utils import heavyiq_logger as logger
 
-        logger.info("Shutting down FastAPI app.")
+        iq_logger.info("Shutting down FastAPI app.")
 
     def custom_openapi() -> dict[str, Any]:
         if app.openapi_schema:
