@@ -1,7 +1,4 @@
 import re
-import sys
-import importlib.util
-from typing import Any
 from multiprocessing.managers import SyncManager
 from typing import Generic, TypeVar, Optional
 
@@ -141,13 +138,3 @@ class LRUCache(Generic[KT, VT]):
         del self.cache[lru_key]
         # Remove the least recently used key from the front of the order list
         self.order.pop(0)
-
-
-def lazy_import(name: str) -> Any:
-    spec = importlib.util.find_spec(name)
-    loader = importlib.util.LazyLoader(spec.loader)
-    spec.loader = loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    loader.exec_module(module)
-    return module
