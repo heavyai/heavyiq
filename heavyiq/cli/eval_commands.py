@@ -9,7 +9,7 @@ from langchain.base_language import BaseLanguageModel
 
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.chains import get_nl_to_sql_chain_by_llm
-from heavyiq.langchain.llms import get_llm_by_model_name
+from heavyiq.langchain.llms import get_openai_llm_by_model_name
 from heavyiq.utils import strip_sql_comments
 
 
@@ -70,7 +70,7 @@ def run_model_on_questions(
         )
 
     heavydb = HeavyDB.from_env()
-    runner_llm = get_llm_by_model_name(model, temperature=temperature, client=None)
+    runner_llm = get_openai_llm_by_model_name(model, temperature=temperature, client=None)
     process_func = partial(process_question, eval_str, heavydb, runner_llm)
 
     with open("./eval/questions.tsv") as f:

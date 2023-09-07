@@ -7,7 +7,7 @@ from langchain.schema import HumanMessage, SystemMessage
 
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
-from heavyiq.langchain.llms import get_chat_llm
+from heavyiq.langchain.llms import get_llm
 
 
 table_summary_prompt = """With respect to the SQL table schema and sample data provided,
@@ -35,7 +35,7 @@ def get_table_summary_document(heavydb: HeavyDB, table: str) -> Document:
         Document: A Document object containing the table summary and metadata.
     """
     table_info = heavydb.get_table_info([table])
-    llm = get_chat_llm(model=CONFIG.openai_gpt_model, tags=["metadata_index", "table_summary"], temperature=0.2)
+    llm = get_llm(tags=["metadata_index", "table_summary"], temperature=0.2)
     messages = [
         SystemMessage(content=table_summary_prompt),
         HumanMessage(content=table_info),
@@ -65,9 +65,7 @@ def get_table_column_description_document(heavydb: HeavyDB, table: str) -> Docum
         Document: A Document object containing the column descriptions and metadata.
     """
     table_info = heavydb.get_table_info([table])
-    llm = get_chat_llm(
-        model=CONFIG.openai_gpt_model, tags=["metadata_index", "table_columns_description"], temperature=0.2
-    )
+    llm = get_llm(model=CONFIG.openai_gpt_model, tags=["metadata_index", "table_columns_description"], temperature=0.2)
     messages = [
         SystemMessage(content=column_description_prompt),
         HumanMessage(content=table_info),
