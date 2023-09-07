@@ -105,8 +105,16 @@ There are many different custom models available, but there are limited solution
 
 ## Chains
 
+### HeavyDB
+
+### HeavyDB Metadata
+
+### Documentation
+
 ## Indexes
 
-### HeavyDB Index
+### HeavyDB Metadata Index
 
-### Documentation Index
+### HeavyAI Documentation Index
+
+## Future Dev Musings
