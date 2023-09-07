@@ -89,7 +89,9 @@ def get_table_info_wrt_token_limit(
     else:
         from transformers import LlamaTokenizer
 
-        tokenizer = LlamaTokenizer.from_pretrained("./heavyiq/langchain/llama_model", local_files_only=True)
+        tokenizer = LlamaTokenizer.from_pretrained(
+            "./heavyiq/langchain/llama_model", local_files_only=True, legacy=False
+        )
         if config.dev:
             token_limit = llm.context_window - 306  # type: ignore # (256 response + 50 buffer)
         else:
