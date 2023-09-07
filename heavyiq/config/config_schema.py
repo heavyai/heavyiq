@@ -7,7 +7,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     port: int = 6275
     data: Optional[str] = None
     openai_api_key: str
-    openai_gpt_model: str = "gpt-3.5-turbo-16k"  # LLMType.ANY
+    openai_gpt_model: str = "gpt-3.5-turbo-16k"  # LLMType.DEFAULT
     openai_gpt_model_nl_to_sql: Optional[str] = None  # LLMType.NL_TO_SQL
     openai_gpt_model_sql_to_answer: Optional[str] = None  # LLMType.SQL_TO_ANSWER
     heavydb_dbname: Optional[str] = None
@@ -35,8 +35,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     # CUSTOM LLM
     custom_llm_type: Optional[str] = None
     """ 'API' or 'API_VLLM' or 'AZURE' """
-    custom_llm_api_base: str = ""  # LLMType.ANY
-    custom_llm_api_context_window: int = 2048  # LLMType.ANY
+    custom_llm_api_base: str = ""  # LLMType.DEFAULT
+    custom_llm_api_context_window: int = 2048  # LLMType.DEFAULT
     custom_llm_api_nl_to_sql_base: Optional[str] = None  # LLMType.NL_TO_SQL
     custom_llm_api_nl_to_sql_context_window: int = 2048  # LLMType.NL_TO_SQL
     custom_llm_api_sql_to_answer_base: Optional[str] = None  # LLMType.SQL_TO_ANSWER
