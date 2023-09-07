@@ -6,7 +6,6 @@ from langchain.schema.prompt import PromptValue
 
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
-from heavyiq.langchain.llms import is_using_custom_trained_llm
 
 
 is_langsmith_active = False
@@ -91,10 +90,7 @@ def get_table_info_wrt_token_limit(
         from transformers import LlamaTokenizer
 
         tokenizer = LlamaTokenizer.from_pretrained("./heavyiq/langchain/llama_model", local_files_only=True)
-        if is_using_custom_trained_llm():
-            token_limit = llm.context_window - 306  # type: ignore # (256 response + 50 buffer)
-        else:
-            token_limit = config.custom_llm_api_context_window - 306  # (256 response + 50 buffer)
+        token_limit = llm.context_window - 306  # type: ignore # (256 response + 50 buffer)
 
         def token_counter(text: str) -> int:
             """Token counter for the Llama model."""
