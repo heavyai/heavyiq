@@ -84,6 +84,16 @@ Although OpenAI's GPT models are generally equipped for a wide variety of tasks,
 
 **Response Parsing**
 
+LLMs communicate with strings, and programmatically parsing an LLM's response can prove difficult. As LLMs do not behave deterministically, the moment you feel you've covered each possible response formatting, you may be surprised by a new response format. LangChain does provide ['output parsers'](https://python.langchain.com/docs/modules/model_io/output_parsers/) that can be used to provide instructions to an LLM as to how to format their response as well as a utility that can parse a properly formatted response. GPT-4 handles formatting instructions very well, but custom models currently do not. You may want to coordinate with Todd to train the model to handle formatting instructions so that it can return an easily parsable response, such as JSON.
+
+**HeavyDB Credentials not Available in Production Config**
+
+Although the config allows you to specify the credentials for HeavyDB, these credentials are not available in production. A valid HeavyDB session id is provided with each API call that requires it. Certain future functionality may require the ability to connect to HeavyDB directly, but as storing credentials in the config is not secure, this is a dilemma. One possible solution is to kick these processes off manually from an administrative control panel in Immerse. An example of a feature that may require this is the creation of a HeavyDB metadata index: HeavyIQ would need to query the database for table schemas in order to create this index, but can't without a valid session id. Another example is the ability to persist LLM conversation history to HeavyDB: creating the table to store this data would require a valid session id (also migrations, etc).
+
+**Decaying Parts of the Codebase**
+
+Portions of the codebase that are not used in production have not been addressed in a while and may be out of date. This is especially true for the command-line interface (CLI) and the heavydb metadata index. The CLI was written before custom models were implemented, and many of them expect an OpenAI model name as an argument. The heavydb metadata index itself is fine, but chains that utilize it are not using the latest best practices from LangChain. Rewriting these chains should take a day and would be a good exercise for a new developer to become familiar with the codebase. Use `NLtoAnswerChain` as a reference for how to write a chain that uses modern LangChain best practices.
+
 ## Models
 
 ### Background
