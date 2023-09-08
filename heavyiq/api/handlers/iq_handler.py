@@ -15,7 +15,12 @@ from heavyiq.api.models import (
 )
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
-from heavyiq.langchain.chains import NLtoAnswerChain, GenerateTableMetadataChain, get_nl_to_sql_chain_by_llm
+from heavyiq.langchain.chains import (
+    NLtoAnswerChain,
+    GenerateTableMetadataChain,
+    get_nl_to_sql_chain_by_llm,
+    get_ask_docs_chain,
+)
 from heavyiq.langchain.llms import LLMType, get_llm_by_type
 from heavyiq.langchain.logging import log_chain_call, log_chain_call_async
 from heavyiq.logging_utils import get_heavyiq_logger
@@ -188,9 +193,11 @@ async def handle_ask_heavyai_docs_async(request: AskHeavyAIDocsRequest) -> AskHe
     from heavyiq.langchain.index.docs.create_index import create_heavyai_docs_index
 
     docs_index = create_heavyai_docs_index()
-    res = docs_index.ask_documentation(request.question)
+    chain = get_ask_docs_chain(docs_index, tags=["rest-api", "ask-heavyai-docs-endpoint"])
+    res = await log_chain_call_async(chain, request.question, "", chain_name="ask-heavyai-docs")
+    feedback_id = str(res["__run"].run_id) if "__run" in res else ""
     return AskHeavyAIDocsResponse(
-        answer=res.answer,
-        sources=res.sources,
-        feedback_id=res.feedback_id,
+        answer=res[chain.answer_key],
+        sources=[source.strip() for source in res[chain.sources_answer_key].split(",")],
+        feedback_id=feedback_id,
     )
