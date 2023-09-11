@@ -1,6 +1,7 @@
 import json
 from pydantic import BaseModel
 from typing import Literal, Any
+from fastapi.concurrency import run_in_threadpool
 from starlette.requests import Request
 from starlette.responses import Response
 from starlette.types import Message
@@ -138,6 +139,11 @@ class AsyncLoggingMiddleware(LoggingMiddleware):
                     ),
                 ]
             )
+
+        # write access log immediately when the request received
+        await run_in_threadpool(
+            self.write_log_data, [Log(type=app_logger, level="info", message="", extra={"request": request})]
+        )
 
         response = await call_next(request)
         # Code executed after the request has been processed
