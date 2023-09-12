@@ -158,10 +158,10 @@ class HeavyDB:
         return cls(conn, **kwargs)
 
     @classmethod
-    def from_env(cls: type[HeavyDB], **kwargs: Any) -> HeavyDB:
+    def from_env(cls: type[HeavyDB], db_name: Optional[str] = None, **kwargs: Any) -> HeavyDB:
         """Create a database connection from environment variables."""
         config = get_config()
-        if not config.heavydb_username or not config.heavydb_password or not config.heavydb_dbname:
+        if not config.heavydb_username or not config.heavydb_password or not (db_name and config.heavydb_dbname):
             raise ValueError("Please set the config variables heavydb_username, heavydb_password and heavydb_dbname")
 
         def connect_func() -> Connection:
@@ -170,7 +170,7 @@ class HeavyDB:
                 password=config.heavydb_password,
                 host=config.heavydb_host,
                 port=config.heavydb_port,
-                dbname=config.heavydb_dbname,
+                dbname=db_name or config.heavydb_dbname,
                 protocol=config.heavydb_protocol,
             )
 

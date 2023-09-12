@@ -12,10 +12,10 @@ class FileCallbackHandlerForChainMixin:
     def __init__(self, *args, **kwargs):
         logger = get_heavyiq_logger()
         config = get_config()
+        callbacks = kwargs.get("callbacks", None)
         # add langchain_cb_handler handler if callbacks are not specified
-        kwargs["callbacks"] = kwargs.get("callbacks", None) or [
-            logger.langchain_cb_handler(to_stdout=config.log_to_stdout)
-        ]
+        if callbacks is None:
+            kwargs["callbacks"] = [logger.langchain_cb_handler(to_stdout=config.log_to_stdout)]
         super().__init__(*args, **kwargs)  # type: ignore
 
 
