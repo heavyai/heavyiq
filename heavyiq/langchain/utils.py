@@ -92,10 +92,7 @@ def get_table_info_wrt_token_limit(
         tokenizer = LlamaTokenizer.from_pretrained(
             "./heavyiq/langchain/llama_model", local_files_only=True, legacy=False
         )
-        if config.dev:
-            token_limit = llm.context_window - 306  # type: ignore # (256 response + 50 buffer)
-        else:
-            token_limit = config.custom_llm_api_context_window - 306  # (256 response + 50 buffer)
+        token_limit = llm.context_window - 306  # type: ignore # (256 response + 50 buffer)
 
         def token_counter(text: str) -> int:
             """Token counter for the Llama model."""

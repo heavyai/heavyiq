@@ -69,6 +69,7 @@ def get_config(file: str = "./config.toml") -> HeavyIQConfig:
             app_config.iq.data = "./storage"
     if not os.path.exists(app_config.iq.data):
         os.makedirs(app_config.iq.data)
+
     _config = app_config.iq
 
     # disabled for now because HeavyIQ can startup before HeavyDB
