@@ -45,6 +45,7 @@ def getOptions(argv=None):
     parser.add_argument(
         "--add-columns-to-question-prompts", help="Add column specifications to question prompts", action="store_true"
     )
+    parser.add_argument("--add-columns-to-answers", help="Add column specifications to answer", action="store_true")
     return parser.parse_args(argv)
 
 
@@ -364,6 +365,14 @@ def get_table_schema(con, table_name):
     table_schema = re.sub(r"\s*WITH \(.*\);?", ";", table_schema)
 
     return table_schema
+
+
+def get_table_cols(con, table_name):
+    table_details = con.get_table_details(table_name)
+    cols = []
+    for col in table_details:
+        cols.append(table_name + "." + col.name)
+    return cols
 
 
 def get_table_str_cols(con, table_name):
@@ -780,6 +789,12 @@ def get_unique_columns(col_mappings: Dict[str, Tuple[str, str, str]]) -> List[Tu
     return sorted(list(unique_cols))
 
 
+def schema_order_columns(table_cols: List[str], used_cols: List[Tuple[str, str, str]]) -> List[str]:
+    used_col_strs = [used_col[1] + "." + used_col[2] for used_col in used_cols]
+    sorted_used_cols = sorted(used_col_strs, key=table_cols.index)
+    return sorted_used_cols
+
+
 def main(argv):
     options = getOptions(argv)
     openai.api_key = options.openai_api_key
@@ -818,12 +833,15 @@ def main(argv):
             successful_queries = 0
             db_tables = con.get_tables()
             table_schemas = []
+            table_cols = []
             table_schemas_map = {}
             top_k_str_vals_map = {}
             top_k_str_vals = []
             strings_cols_top_k = 5
             for db_table in db_tables:
                 table_schema = get_table_schema(con, db_table)
+                if options.add_columns_to_answers:
+                    table_cols.extend(get_table_cols(con, db_table))
                 table_schemas.append(table_schema)
                 table_schemas_map[db_table.lower()] = table_schema
                 if options.top_k_str_vals > 0:
@@ -913,6 +931,18 @@ def main(argv):
                             targeted_instruction = generate_instruction(filtered_table_schemas, [], query["question"])
                             targeted_instruction_tokens = tokenizer.tokenize(targeted_instruction)
                             num_targeted_instruction_tokens = len(targeted_instruction_tokens)
+                        if options.add_columns_to_answers:
+                            query_plan = get_query_plan(con, sql_query)
+                            col_mapping = extract_column_mappings(query_plan)
+                            unique_used_columns = get_unique_columns(col_mapping)
+                            sorted_used_columns = schema_order_columns(table_cols, unique_used_columns)
+                            output = "Columns used in the query:\n"
+                            for col in sorted_used_columns:
+                                output += col + "\n"
+                            output += "\n\nSQL query:\n" + sql_query
+                        else:
+                            output = copy.deepcopy(sql_query)
+
                         sql_query_tokens = tokenizer.tokenize(sql_query)
                         num_sql_query_tokens = len(sql_query_tokens)
                         # sql_query_with_semicolon = sql_query + ";" if sql_query[-1] != ";" else sql_query
@@ -924,7 +954,7 @@ def main(argv):
                                 "tables": filtered_tables,
                                 "instruction": instruction,
                                 "targeted_instruction": targeted_instruction,
-                                "output": sql_query,
+                                "output": output,
                                 "instruction_tokens": num_instruction_tokens,
                                 "targeted_instruction_tokens": num_targeted_instruction_tokens,
                                 "output_tokens": num_sql_query_tokens,
