@@ -19,6 +19,8 @@
 
 Welcome to HeavyIQ! This document is intended to be a quick reference for developers new to the HeavyIQ codebase. It is not intended to be a comprehensive guide to the codebase, but rather a quick reference for common tasks, concepts and a couple quirks to keep in mind ('gotchyas').
 
+If you are an uber-nerd and just need to know a good entrypoint to explore the code (by tracing imports and reading docs as necessary), you can get started with `create_app` in `heavyiq/api/__init__.py`. Godspeed!
+
 ### Notable Modules
 
 #### **Langchain**
@@ -80,7 +82,7 @@ HeavyIQ can be supplied a path to the config file at startup which is optimal fo
 
 **Custom LLM Types**
 
-Although OpenAI's GPT models are generally equipped for a wide variety of tasks, local models are often trained on a specific task and are not equipped for other tasks. For example, a model that was trained to translate natural language queries into SQL queries might be unable to use SQL query results to answer a user's question. The code found in `heavyiq/langchain/llms/__init__.py` provides the means with which to init and retrieve different models for different purposes by means of the `LLMType` enum. When the config specifies that custom models are to be used instead of OpenAI (or Azure OpenAI), you can correlate that model to a specific `LLMType` and use that `LLMType` to retrieve the model. The default `LLMType.ANY` is used to retrieve the default model, which in the case of OpenAI will be the OpenAI model.
+Although OpenAI's GPT models are generally equipped for a wide variety of tasks, local models are often trained on a specific task and are not equipped for other tasks. For example, a model that was trained to translate natural language queries into SQL queries might be unable to use SQL query results to answer a user's question. The code found in `heavyiq/langchain/llms/__init__.py` provides the means with which to init and retrieve different models for different purposes by means of the `LLMType` enum. When the config specifies that custom models are to be used instead of OpenAI (or Azure OpenAI), you can correlate that model to a specific `LLMType` and use that `LLMType` to retrieve the model. The default `LLMType.DEFAULT` is used to retrieve the default model. [Relevant PR](https://github.com/heavyai/heavyiq/pull/117)
 
 **Response Parsing**
 
