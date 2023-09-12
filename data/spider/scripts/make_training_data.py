@@ -17,6 +17,16 @@ def getOptions(argv=None):
     parser.add_argument("--nl-answers", help="NL Answers file", default=None)
     parser.add_argument("--nl-answers-instruction-prompt", help="NL Answers instruction prompt", default=None)
     parser.add_argument("--nl-answers-output-prompt", help="NL Answers output prompt", default=None)
+    parser.add_argument("--questions-table-level", help="Table questions file", default=None)
+    parser.add_argument(
+        "--questions-table-level-instruction-prompt", help="Table questions instruction prompt", default=None
+    )
+    parser.add_argument("--questions-table-level-output-prompt", help="Table questions output prompt", default=None)
+    parser.add_argument("--questions-column-level", help="Column questions file", default=None)
+    parser.add_argument(
+        "--questions-column-level-instruction-prompt", help="Column questions instruction prompt", default=None
+    )
+    parser.add_argument("--questions-column-level-output-prompt", help="Column questions output prompt", default=None)
     parser.add_argument("-t", "--max-token-length", help="Max token length", default=768)
     parser.add_argument("-o", "--output-dir", help="Output directory", default=None)
     parser.add_argument("--create-combo-dataset", help="Create combo dataset", action="store_true")
@@ -77,7 +87,44 @@ def load_nl_answers(con, nl_answers_path, nl_answers_instruction_prompt, nl_answ
     con.execute(export_eval_sql)
 
 
-def create_combo_dataset(con, version, instruction_table, sql_table, nl_answers_table, only_sql_in_eval, output_dir):
+def load_questions(
+    con, questions_path, questions_instruction_prompt, questions_output_prompt, version, is_col_level, output_dir
+):
+    questions_type = "column" if is_col_level else "table"
+    drop_table_sql = f"DROP TABLE IF EXISTS heavyiq_questions_{questions_type}_v{version}"
+    create_table_sql = f"CREATE TABLE heavyiq_questions_{questions_type}_v{version} (query_id INT, db_id TEXT, data_split TEXT, instruction TEXT, output TEXT);"
+    load_sql = f"COPY heavyiq_questions_{questions_type}_v{version} FROM '{questions_path}' WITH (header='t');"
+    add_prompt_col_sql = f"ALTER TABLE heavyiq_questions_{questions_type}_v{version} ADD COLUMN prompt TEXT;"
+    add_answer_col_sql = f"ALTER TABLE heavyiq_questions_{questions_type}_v{version} ADD COLUMN answer TEXT;"
+    update_prompt_col_sql = f"UPDATE heavyiq_questions_{questions_type}_v{version} SET prompt = instruction;"
+    if questions_instruction_prompt and questions_output_prompt is not None:
+        update_prompt_col_sql = f"UPDATE heavyiq_questions_{questions_type}_v{version} SET prompt = '{questions_instruction_prompt}\n' || instruction || '\n{questions_output_prompt}\n';"
+    update_answer_col_sql = f"UPDATE heavyiq_questions_{questions_type}_v{version} SET answer = output;"
+    export_train_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_questions_{questions_type}_v{version} WHERE SAMPLE_RATIO(0.9)) TO '{output_dir}/heavyiq_questions_{questions_type}_v{version}_train.csv' WITH (header='t');"
+    export_eval_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_questions_{questions_type}_v{version} WHERE NOT SAMPLE_RATIO(0.9)) TO '{output_dir}/heavyiq_questions_{questions_type}_v{version}_eval.csv' WITH (header='t');"
+
+    con.execute(drop_table_sql)
+    con.execute(create_table_sql)
+    con.execute(load_sql)
+    con.execute(add_prompt_col_sql)
+    con.execute(add_answer_col_sql)
+    con.execute(update_prompt_col_sql)
+    con.execute(update_answer_col_sql)
+    con.execute(export_train_sql)
+    con.execute(export_eval_sql)
+
+
+def create_combo_dataset(
+    con,
+    version,
+    instruction_table,
+    sql_table,
+    nl_answers_table,
+    questions_table_table,
+    questions_column_table,
+    only_sql_in_eval,
+    output_dir,
+):
     assert only_sql_in_eval, "only_sql_in_eval must be True"
 
     drop_table_sql = f"DROP TABLE IF EXISTS heavyiq_combo_v{version}"
@@ -86,7 +133,15 @@ def create_combo_dataset(con, version, instruction_table, sql_table, nl_answers_
     )
     load_dolly_sql = f"INSERT INTO heavyiq_combo_v{version} SELECT id + 2000000, 'INVALID', 'train', prompt, answer FROM {instruction_table} WHERE length(prompt) < 1760 AND length(answer) < 640;"
     load_sql_sql = f"INSERT INTO heavyiq_combo_v{version} SELECT query_id, db_id, CASE WHEN data_split <> 'dev' THEN 'train' ELSE 'eval' END, prompt, answer FROM {sql_table};"
-    load_answers_sql = f"INSERT INTO heavyiq_combo_v{version} SELECT query_id + 1000000, db_id, 'train', prompt, answer FROM {nl_answers_table};"
+    load_answers_sql = None
+    if nl_answers_table is not None:
+        load_answers_sql = f"INSERT INTO heavyiq_combo_v{version} SELECT query_id + 1000000, db_id, 'train', prompt, answer FROM {nl_answers_table};"
+    load_questions_table_sql = None
+    if questions_table_table is not None:
+        load_questions_table_sql = f"INSERT INTO heavyiq_combo_v{version} SELECT query_id + 3000000, db_id, 'train', prompt, answer FROM {questions_table_table};"
+    load_questions_column_sql = None
+    if questions_column_table is not None:
+        load_questions_column_sql = f"INSERT INTO heavyiq_combo_v{version} SELECT query_id + 4000000, db_id, 'train', prompt, answer FROM {questions_column_table};"
     export_train_sql = f"COPY (SELECT id, db_id, prompt, answer FROM heavyiq_combo_v{version} WHERE data_split = 'train') TO '{output_dir}/heavyiq_combo_v{version}_train.csv' WITH (header='t');"
     export_eval_sql = f"COPY (SELECT id, db_id, prompt, answer FROM heavyiq_combo_v{version} WHERE data_split = 'eval') TO '{output_dir}/heavyiq_combo_v{version}_eval.csv' WITH (header='t');"
 
@@ -94,7 +149,13 @@ def create_combo_dataset(con, version, instruction_table, sql_table, nl_answers_
     con.execute(create_table_sql)
     con.execute(load_dolly_sql)
     con.execute(load_sql_sql)
-    con.execute(load_answers_sql)
+    if load_answers_sql is not None:
+        print(load_answers_sql)
+        con.execute(load_answers_sql)
+    if load_questions_table_sql is not None:
+        con.execute(load_questions_table_sql)
+    if load_questions_column_sql is not None:
+        con.execute(load_questions_column_sql)
     con.execute(export_train_sql)
     con.execute(export_eval_sql)
 
@@ -102,6 +163,9 @@ def create_combo_dataset(con, version, instruction_table, sql_table, nl_answers_
 def main(argv):
     options = getOptions(argv)
     con = heavyai.connect(user=options.user, password=options.password, host=options.host, dbname=options.database)
+    nl_answers_table = None
+    questions_table_table = None
+    questions_column_table = None
     if options.queries is not None:
         load_queries(
             con,
@@ -121,13 +185,40 @@ def main(argv):
             options.version,
             options.output_dir,
         )
+        nl_answers_table = f"heavyiq_nl_answers_v{options.version}"
+    if options.questions_table_level is not None:
+        load_questions(
+            con,
+            options.questions_table_level,
+            options.questions_table_level_instruction_prompt,
+            options.questions_table_level_output_prompt,
+            options.version,
+            False,
+            options.output_dir,
+        )
+        questions_table_table = f"heavyiq_questions_table_v{options.version}"
+
+    if options.questions_column_level is not None:
+        load_questions(
+            con,
+            options.questions_column_level,
+            options.questions_column_level_instruction_prompt,
+            options.questions_column_level_output_prompt,
+            options.version,
+            True,
+            options.output_dir,
+        )
+        questions_column_table = f"heavyiq_questions_column_v{options.version}"
+
     if options.create_combo_dataset and options.queries and options.nl_answers:
         create_combo_dataset(
             con,
             options.version,
             options.instruction_table,
             f"heavyiq_text_to_sql_v{options.version}_{options.max_token_length}_tokens",
-            f"heavyiq_nl_answers_v{options.version}",
+            nl_answers_table,
+            questions_table_table,
+            questions_column_table,
             True,
             options.output_dir,
         )
