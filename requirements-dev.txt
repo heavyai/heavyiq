@@ -1,6 +1,7 @@
 # Remainder of dependencies used for dev and the command line interface
 autoflake==2.2.0
 black==23.7.0
+chromadb==0.4.8
 click==8.1.7
 flake8==6.1.0
 flake8-annotations==3.0.1

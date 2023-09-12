@@ -1,6 +1,5 @@
 # All dependencies required to run the REST API in Production
 aiofiles==23.2.1
-chromadb==0.4.8
 confz==2.0.1
 connexion[swagger-ui]==2.14.2
 fastapi==0.99.1
