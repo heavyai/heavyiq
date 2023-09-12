@@ -48,7 +48,7 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
             LLMType.SQL_TO_ANSWER: config.openai_gpt_model_sql_to_answer,
         }
         model_name: str = openai_llm_mapping[LLMType.DEFAULT] if openai_llm_mapping[model_type] is None else openai_llm_mapping[model_type]  # type: ignore
-        return get_openai_llm_by_model_name(model=model_name, model_type=model_type, **kwargs)
+        return get_openai_llm_by_model_name(model=model_name, **kwargs)
     else:
         custom_llm_mapping: dict[LLMType, tuple[str | None, int]] = {
             LLMType.DEFAULT: (config.custom_llm_api_base, config.custom_llm_api_context_window),

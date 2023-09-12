@@ -100,7 +100,7 @@ def get_ask_docs_chain(
     docs_index: HeavyAIDocsIndex, retriever_kwargs: dict[str, Any] = {}, **kwargs
 ) -> BaseQAWithSourcesChain:
     llm = get_llm_by_type(LLMType.SQL_TO_ANSWER, temperature=0.2)
-    if is_using_custom_trained_llm:
+    if is_using_custom_trained_llm():
         chain_type_kwargs = {"prompt": CUSTOM_PROMPT, "document_prompt": CUSTOM_EXAMPLE_PROMPT}
     else:
         chain_type_kwargs = {"prompt": OPENAI_PROMPT, "document_prompt": OPENAI_EXAMPLE_PROMPT}
