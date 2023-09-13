@@ -11,6 +11,7 @@ from ..utils import get_vectorstore_index_creator
 
 heavyai_docs_index = None
 
+
 def create_heavyai_docs_index() -> HeavyAIDocsIndex:
     global heavyai_docs_index
     if heavyai_docs_index is not None:
