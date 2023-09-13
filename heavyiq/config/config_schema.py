@@ -21,6 +21,10 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     docs_index_dir: str = "heavyai_docs"
     table_documents_dir: str = "table_documents"
     enable_str_literal_correction: bool = False
+    column_top_k_cardinality_threshold: int = 5
+    """If the cardinality of a column is less than this threshold, we will include each value of the column in the prompt"""
+    column_top_k_high_cardinality_sample: int = 3
+    """If the cardinality of a column is greater than the threshold, we will sample this many values from the column"""
     # TELEMETRICS
     langchain_endpoint: str = "https://api.smith.langchain.com"
     langsmith_api_key: Optional[str] = None
