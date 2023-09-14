@@ -41,7 +41,7 @@ def test_should_pass_for_generate_table_metadata_endpoint(mock: Callable, expect
     """
 
     payload = {
-        "session_id": "x" * 32,
+        "session_id": "x" * 32,  # type: ignore
         "table_name": "us_pois_safegraph",
     }
     response = client.post("/api/v1/generate-table-metadata", json=payload)
