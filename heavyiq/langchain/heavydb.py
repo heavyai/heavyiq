@@ -158,10 +158,10 @@ class HeavyDB:
         return cls(conn, **kwargs)
 
     @classmethod
-    def from_env(cls: type[HeavyDB], **kwargs: Any) -> HeavyDB:
+    def from_env(cls: type[HeavyDB], db_name: Optional[str] = None, **kwargs: Any) -> HeavyDB:
         """Create a database connection from environment variables."""
         config = get_config()
-        if not config.heavydb_username or not config.heavydb_password or not config.heavydb_dbname:
+        if not config.heavydb_username or not config.heavydb_password or not (db_name and config.heavydb_dbname):
             raise ValueError("Please set the config variables heavydb_username, heavydb_password and heavydb_dbname")
 
         def connect_func() -> Connection:
@@ -170,7 +170,7 @@ class HeavyDB:
                 password=config.heavydb_password,
                 host=config.heavydb_host,
                 port=config.heavydb_port,
-                dbname=config.heavydb_dbname,
+                dbname=db_name or config.heavydb_dbname,
                 protocol=config.heavydb_protocol,
             )
 
@@ -287,17 +287,31 @@ class HeavyDB:
         with self.lock:
             return self._conn._client.sql_validate(self._conn._session, query)
 
-    def get_column_top_k(self, table: str, column: str, k: int = 5) -> Optional[list[str]]:
+    def get_column_top_k(self, table: str, column: str, _k: int = 5) -> tuple[Optional[list[str]], bool]:
+        config = get_config()
+        cardinality_threshold = config.column_top_k_cardinality_threshold
+        high_cardinality_sample = config.column_top_k_high_cardinality_sample
+        # check to see if the column is low cardinality
+        # fetch top (threshold + 1)
+        # if there are < (threshold + 1) values, it's low cardinality and we can return all of them
+        # if there are >= (threshold + 1) values, it's high cardinality and we need to sample the top high_cardinality_sample
         """Get the top k values for a column."""
         self.logger.debug(f"Getting top k values for column {column} in table {table}")
-        top_k_statement = f"SELECT {column}, COUNT(*) as cnt FROM {table} WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {k};"
+        top_k_statement = f"SELECT {column}, COUNT(*) as cnt FROM {table} WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {cardinality_threshold + 1};"
         with self.lock:
             cursor = self._conn.execute(top_k_statement)
         top_k_res: list[str] = [str(v[0]) for v in cursor.fetchall()]
+        is_high_cardinality = len(top_k_res) > cardinality_threshold
+        if is_high_cardinality:
+            # high-cardinality, return sample
+            self.logger.debug(f"Column {column} is high-cardinality. Returning top {high_cardinality_sample} values")
+            top_k_res = top_k_res[:high_cardinality_sample]
+        else:
+            self.logger.debug(f"Column {column} is low-cardinality.")
         self.logger.debug(f"Got top k values for column {column} in table {table}")
         if not any([v for v in top_k_res if v.startswith("MULTIPOLYGON")]):
-            return top_k_res
-        return None
+            return top_k_res, is_high_cardinality
+        return None, is_high_cardinality
 
     def get_sample_rows(self, table_name: str) -> str:
         self.logger.debug(f"Getting sample rows for table {table_name}")
@@ -337,10 +351,23 @@ class HeavyDB:
             for c in self.get_table_columns(table_name)
             if c.type == "STR" and c.encoding == "DICT" and c.is_array is False
         ]
-        top_k_strings = "Sample values for text columns (comma-separated):\n"
+        low_cardinality_columns = []
+        high_cardinality_columns = []
         for col in text_columns:
-            top_k_res = self.get_column_top_k(table_name, col)
+            top_k_res, is_high_cardinality = self.get_column_top_k(table_name, col)
             if top_k_res:
+                if is_high_cardinality:
+                    high_cardinality_columns.append((col, top_k_res))
+                else:
+                    low_cardinality_columns.append((col, top_k_res))
+        top_k_strings = ""
+        if low_cardinality_columns:
+            top_k_strings += "Low cardinality columns and every possible value:\n"
+            for col, top_k_res in low_cardinality_columns:
+                top_k_strings += f"{col}: {', '.join(top_k_res)}\n"
+        if high_cardinality_columns:
+            top_k_strings += "High cardinality columns and most common values:\n"
+            for col, top_k_res in high_cardinality_columns:
                 top_k_strings += f"{col}: {', '.join(top_k_res)}\n"
         self.top_k_cache.put(table_name, top_k_strings)
         self.logger.debug(f"Got top k values for table {table_name}")

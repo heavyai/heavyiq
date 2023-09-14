@@ -1,6 +1,6 @@
 from typing import Optional
 
-from chromadb.api import Where
+from chromadb.api.types import Where
 from langchain.schema import Document, BaseRetriever
 
 from heavyiq.langchain.chains import (

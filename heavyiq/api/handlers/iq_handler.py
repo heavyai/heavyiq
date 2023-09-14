@@ -15,34 +15,15 @@ from heavyiq.api.models import (
 )
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
-from heavyiq.langchain.chains import NLtoAnswerChain, GenerateTableMetadataChain, get_nl_to_sql_chain_by_llm
+from heavyiq.langchain.chains import (
+    NLtoAnswerChain,
+    GenerateTableMetadataChain,
+    get_nl_to_sql_chain_by_llm,
+    get_ask_docs_chain,
+)
 from heavyiq.langchain.llms import LLMType, get_llm_by_type
-from heavyiq.langchain.logging import log_chain_call, log_chain_call_async
+from heavyiq.langchain.logging import log_chain_call_async
 from heavyiq.logging_utils import iq_logger
-
-
-def handle_query_request(request: QueryRequest) -> QueryResponse:
-    """
-    Handles /query request.
-
-    Args:
-        request (QueryRequest): request payload
-
-    Returns:
-        QueryResponse: response content
-    """
-    tables = request.tables
-    db = HeavyDB.from_session(request.session_id, include_tables=tables)
-    question = request.question
-    llm = get_llm_by_type(LLMType.NL_TO_SQL, temperature=0.0)
-    chain_cls = get_nl_to_sql_chain_by_llm(llm=llm)
-    chain = chain_cls(llm=llm, database=db, tags=["rest-api", "query-endpoint"])  # type: ignore
-    chain_input = {chain.input_key: question, "tables": tables}
-    res = log_chain_call(chain, chain_input, "")
-    feedback_id = str(res["__run"].run_id) if "__run" in res else ""
-    return QueryResponse(
-        sql=res[chain.output_key], sql_complexity=res[chain.output_complexity_key], feedback_id=feedback_id
-    )
 
 
 async def handle_query_request_async(request: QueryRequest, db: HeavyDB) -> QueryResponse:
@@ -65,41 +46,6 @@ async def handle_query_request_async(request: QueryRequest, db: HeavyDB) -> Quer
     feedback_id = str(res["__run"].run_id) if "__run" in res else ""
     return QueryResponse(
         sql=res[chain.output_key], sql_complexity=res[chain.output_complexity_key], feedback_id=feedback_id
-    )
-
-
-def handle_question_request(request: QuestionRequest) -> QuestionResponse:
-    """
-    Handles /question request.
-
-    Args:
-        request (QuestionRequest): request payload
-
-    Returns:
-        QuestionResponse: response content
-    """
-    db = HeavyDB.from_session(request.session_id, include_tables=request.tables)
-    iq_logger.info("Request Received")
-    iq_logger.info("Table(s): %s", ", ".join(request.tables))
-    nl_sql_llm = get_llm_by_type(LLMType.NL_TO_SQL, temperature=0.0)
-    nl_sql_chain = get_nl_to_sql_chain_by_llm(llm=nl_sql_llm)(
-        llm=nl_sql_llm, database=db, tags=["rest-api", "question-endpoint"]  # type: ignore
-    )
-    llm = get_llm_by_type(LLMType.SQL_TO_ANSWER, temperature=0.0)
-    chain = NLtoAnswerChain(
-        llm=llm,
-        nl_sql_chain=nl_sql_chain,
-        database=db,
-        tags=["rest-api", "question-endpoint"],
-    )
-    chain_input = {chain.input_key: request.question, "tables": request.tables}
-    res = log_chain_call(chain, chain_input, "")
-    feedback_id = str(res["__run"].run_id) if "__run" in res else ""
-    return QuestionResponse(
-        answer=res[chain.output_key],
-        sql=res[chain.output_sql_key],
-        sql_complexity=res[chain.output_sql_complexity_key],
-        feedback_id=feedback_id,
     )
 
 
@@ -185,9 +131,11 @@ async def handle_ask_heavyai_docs_async(request: AskHeavyAIDocsRequest) -> AskHe
     from heavyiq.langchain.index.docs.create_index import create_heavyai_docs_index
 
     docs_index = create_heavyai_docs_index()
-    res = docs_index.ask_documentation(request.question)
+    chain = get_ask_docs_chain(docs_index, tags=["rest-api", "ask-heavyai-docs-endpoint"])
+    res = await log_chain_call_async(chain, request.question, "", chain_name="ask-heavyai-docs")
+    feedback_id = str(res["__run"].run_id) if "__run" in res else ""
     return AskHeavyAIDocsResponse(
-        answer=res.answer,
-        sources=res.sources,
-        feedback_id=res.feedback_id,
+        answer=res[chain.answer_key],
+        sources=[source.strip() for source in res[chain.sources_answer_key].split(",")],
+        feedback_id=feedback_id,
     )

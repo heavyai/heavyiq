@@ -11,10 +11,10 @@ class FileCallbackHandlerForChainMixin:
 
     def __init__(self, *args, **kwargs):
         config = get_config()
+        callbacks = kwargs.get("callbacks", None)
         # add langchain_cb_handler handler if callbacks are not specified
-        kwargs["callbacks"] = kwargs.get("callbacks", None) or [
-            iq_logger.langchain_cb_handler(to_stdout=config.log_to_stdout)  # type: ignore
-        ]
+        if callbacks is None:
+            kwargs["callbacks"] = [iq_logger.langchain_cb_handler(to_stdout=config.log_to_stdout)]
         super().__init__(*args, **kwargs)  # type: ignore
 
 

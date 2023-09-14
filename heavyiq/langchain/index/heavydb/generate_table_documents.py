@@ -7,7 +7,7 @@ from langchain.schema import HumanMessage, SystemMessage
 
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
-from heavyiq.langchain.llms import get_chat_llm
+from heavyiq.langchain.llms import get_llm
 
 
 table_summary_prompt = """With respect to the SQL table schema and sample data provided,
@@ -19,8 +19,6 @@ Keywords: Identify a set of essential keywords and relationships that facilitate
 
 Upon completion, evaluate the coherence, accuracy, and relevance of the generated response to ensure that it adheres to the requirements outlined above,
 maximizing its value and usefulness for search and retrieval tasks."""
-
-CONFIG = get_config()
 
 
 def get_table_summary_document(heavydb: HeavyDB, table: str) -> Document:
@@ -35,7 +33,7 @@ def get_table_summary_document(heavydb: HeavyDB, table: str) -> Document:
         Document: A Document object containing the table summary and metadata.
     """
     table_info = heavydb.get_table_info([table])
-    llm = get_chat_llm(model=CONFIG.openai_gpt_model, tags=["metadata_index", "table_summary"], temperature=0.2)
+    llm = get_llm(tags=["metadata_index", "table_summary"], temperature=0.2)
     messages = [
         SystemMessage(content=table_summary_prompt),
         HumanMessage(content=table_info),
@@ -64,10 +62,9 @@ def get_table_column_description_document(heavydb: HeavyDB, table: str) -> Docum
     Returns:
         Document: A Document object containing the column descriptions and metadata.
     """
+    CONFIG = get_config()
     table_info = heavydb.get_table_info([table])
-    llm = get_chat_llm(
-        model=CONFIG.openai_gpt_model, tags=["metadata_index", "table_columns_description"], temperature=0.2
-    )
+    llm = get_llm(model=CONFIG.openai_gpt_model, tags=["metadata_index", "table_columns_description"], temperature=0.2)
     messages = [
         SystemMessage(content=column_description_prompt),
         HumanMessage(content=table_info),
@@ -126,6 +123,7 @@ def generate_table_documents() -> list[str]:
     Saves them to the table_documents directory.
     Returns a list of tables that had summaries generated.
     """
+    CONFIG = get_config()
     tables_with_documents_already = get_table_names_from_documents(CONFIG.table_documents_dir)
     print("Generating summaries and column descriptions.")
     print(f"Tables with documents already (skipping): {tables_with_documents_already}")
