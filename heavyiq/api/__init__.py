@@ -22,7 +22,7 @@ def stripped_down_api() -> FastAPI:
     return app
 
 
-def create_app(config_path: str = "./config2.toml") -> FastAPI:
+def create_app(config_path: str = "./config.toml") -> FastAPI:
     """
     create and return a FastAPI instance.
 
