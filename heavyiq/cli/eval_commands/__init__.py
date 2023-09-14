@@ -1,0 +1,78 @@
+from uuid import uuid4
+import os
+import io
+
+import click
+
+from heavyiq.langchain import HeavyDB
+from heavyiq.langchain.chains import get_nl_to_sql_chain_by_llm
+from heavyiq.langchain.llms import get_llm_by_type, LLMType
+
+from .utils import sql_rate_reply, write_eval_results_header, write_eval_results_row, summarize_eval_results
+
+
+@click.group()
+def eval():
+    """Evaluate models."""
+    pass
+
+
+@eval.command()
+@click.option("--temperature", default=0.0, help="Temperature for LLM (Defaults to 0.0)", type=float)
+@click.option("--verbose", default=False, help="Verbose output", type=bool)
+@click.argument("eval_dataset_tsv", type=str)
+@click.pass_context
+def run_config_model_on_questions(ctx: click.Context, eval_dataset_tsv: str, temperature: float, verbose: bool) -> None:
+    """Call the NL to SQL Chain on each question in eval_questions.tsv using LLM from config file"""
+    if not os.path.exists(eval_dataset_tsv):
+        raise Exception(f"eval_dataset_tsv does not exist: {eval_dataset_tsv}")
+
+    eval_id = uuid4().hex[:8]
+    eval_str = f"eval_{eval_id}"
+    print(f"Eval ID: {eval_id}")
+
+    # tsv must have columns: id (optional), db_id, tables, question, answer
+    f: io.TextIOWrapper
+    with open(eval_dataset_tsv) as f:
+        header = f.readline().strip()
+        has_id = "id" == header.split("\t")[0]
+
+        write_eval_results_header(eval_str, has_id)
+
+        for line in f.readlines():
+            if has_id:
+                query_id, db_id, tables, question, gold_query = line.strip().split("\t")
+            else:
+                query_id = None
+                db_id, tables, question, gold_query = line.strip().split("\t")
+            tables: list[str] = [table.strip("'") for table in str(tables).split(",")]
+            print(f"Processing Question: {question}")
+            llm = get_llm_by_type(LLMType.NL_TO_SQL, temperature=temperature)
+            db = HeavyDB.from_env(db_name=db_id, include_tables=tables)
+            chain = get_nl_to_sql_chain_by_llm(llm)(
+                database=db, llm=llm, callbacks=None if verbose else [], verbose=verbose, tags=[eval_str, "cli"]
+            )
+            try:
+                pred_query = chain({chain.input_key: question})[chain.output_key]
+                print(f"Generated SQL: {pred_query}")
+                print("Evaluating SQL")
+                eval_res = sql_rate_reply(db_id, gold_query, pred_query)
+                print(f"Evaluation Success: {eval_res['success']}")
+                print(f"Evaluation Status: {eval_res['status']}")
+                print("=====================================")
+                write_eval_results_row(
+                    eval_str,
+                    db_id,
+                    gold_query,
+                    eval_res["success"],
+                    eval_res["status"],
+                    pred_query,
+                    query_id=query_id,
+                    error=eval_res["error"],
+                )
+            except Exception as e:
+                print(e)
+                print("Failed to generate SQL")
+                write_eval_results_row(eval_str, db_id, gold_query, False, "failed_to_generate_sql", query_id=query_id)
+
+    summarize_eval_results(eval_str)
