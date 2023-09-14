@@ -41,7 +41,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
     init_logs()  # initializes logs using config
     init_telemetrics()  # initializes langsmith
 
-    app = FastAPI(title="HeavyIQ", servers=[{"url": "http://localhost:8000", "description": "Local server"}])
+    app = FastAPI(title="HeavyIQ")
 
     cors_origins = ["http://localhost"]
 
@@ -124,7 +124,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
             description="",
             routes=app.routes,
             tags=app.openapi_tags,
-            servers=app.servers,
+            servers=[{"url": "http://localhost:8000", "description": "Local server"}],
         )
 
         # hard way to remove certain schemas from default openapi schema

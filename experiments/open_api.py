@@ -1,10 +1,10 @@
-import os
-import requests
 import json
+import os
 import sys
-from typing import Any
+
+import requests
 from langchain.agents.agent_toolkits.openapi import planner
-from langchain.agents.agent_toolkits.openapi.spec import reduce_openapi_spec, ReducedOpenAPISpec
+from langchain.agents.agent_toolkits.openapi.spec import ReducedOpenAPISpec, reduce_openapi_spec
 from langchain.requests import RequestsWrapper
 
 # append the current directory to the sys path, so that you could run this script
@@ -18,7 +18,7 @@ from heavyiq.langchain.llms import get_chat_llm
 os.environ["OPENAI_API_KEY"] = get_config().openai_api_key
 
 
-def get_spec(spec_path="http://localhost:8000/openapi.json") -> ReducedOpenAPISpec:
+def get_spec(spec_path: str = "http://localhost:8000/openapi.json") -> ReducedOpenAPISpec:
     """
     return the spec dict from swagger url.
     """
