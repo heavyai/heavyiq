@@ -97,7 +97,7 @@ def eval():
 @click.argument("eval_dataset_tsv", type=str)
 @click.pass_context
 def run_config_model_on_questions(ctx: click.Context, eval_dataset_tsv: str, temperature: float, verbose: bool) -> None:
-    """Call the NL to SQL Chain on each question in eval_questions.tsv using LLM from config file"""
+    """Call the NL to SQL Chain on each question in eval_dataset_tsv using LLM from config file"""
     eval_id = uuid4().hex[:8]
     eval_str = f"eval_{eval_id}"
     print(f"Eval ID: {eval_id}")
