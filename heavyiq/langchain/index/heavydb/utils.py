@@ -6,8 +6,6 @@ from langchain.docstore.document import Document
 
 from heavyiq.config import get_config
 
-table_documents_dir = get_config().table_documents_dir
-
 
 def read_table_documents(include: Optional[list[str]] = None) -> Iterator[Document]:
     """
@@ -15,6 +13,7 @@ def read_table_documents(include: Optional[list[str]] = None) -> Iterator[Docume
     :param include: Optional list of table names to include. If None, all tables will be included.
     :return: An iterator yielding Document instances for each table document.
     """
+    table_documents_dir = get_config().table_documents_dir
     folder = Path(table_documents_dir)
     for file_name in folder.iterdir():
         if file_name.suffix == ".txt":
