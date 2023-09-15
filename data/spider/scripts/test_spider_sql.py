@@ -405,12 +405,12 @@ def generate_instruction(table_schemas, top_k_str_vals, user_question=None):
             top_k_str_vals_str += "\n".join(table_top_k_str_vals)
             top_k_str_vals_str += "\n"
     if user_question is not None:
-        instruction = """You are a experienced data analyst adept at writing SQL queries to answer user questions.\nYou have access to the following relational tables, with schemas below.\n{table_schemas}\n\n{top_k_str_vals_str}\n\nWrite a SQL query to answer the following question:\n\n{user_question}\n""".format(
+        instruction = """You are a experienced data analyst adept at writing SQL queries to answer user questions.\nYou have access to the following relational tables, with schemas below.\n{table_schemas}\n\n{top_k_str_vals_str}\nWrite a SQL query to answer the following question:\n\n{user_question}\n""".format(
             table_schemas="\n\n".join(table_schemas), top_k_str_vals_str=top_k_str_vals_str, user_question=user_question
         )
         return instruction
     else:
-        instruction = """You are a experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n\n{table_schemas}\n\n{top_k_str_vals_str}\n\nWrite a compelling question to ask of the above data:\n""".format(
+        instruction = """You are a experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n\n{table_schemas}\n\n{top_k_str_vals_str}\nWrite a compelling question to ask of the above data:\n""".format(
             table_schemas="\n\n".join(table_schemas), top_k_str_vals_str=top_k_str_vals_str
         )
         return instruction
@@ -430,7 +430,7 @@ def generate_question(table_schemas, top_k_str_vals, unique_columns=None):
                 unique_columns_str += unique_column[1] + "." + unique_column[2] + "\n"
         else:
             unique_columns_str += "COUNT(*)\n"
-        instruction = """You are a experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n\n{table_schemas}\n\n{top_k_str_vals_str}\n\nUse the following columns to generate the question a compelling question of the data:\n\n{unique_columns_str}\n""".format(
+        instruction = """You are a experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n\n{table_schemas}\n\n{top_k_str_vals_str}\nUse the following columns to generate the question a compelling question of the data:\n\n{unique_columns_str}\n""".format(
             table_schemas="\n\n".join(table_schemas),
             top_k_str_vals_str=top_k_str_vals_str,
             unique_columns_str=unique_columns_str,
