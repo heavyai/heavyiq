@@ -4,6 +4,7 @@ import io
 import csv
 
 import click
+from langsmith import Client
 
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.chains import get_nl_to_sql_chain_by_llm
@@ -25,6 +26,8 @@ def eval():
 @click.pass_context
 def run_config_model_on_questions(ctx: click.Context, eval_dataset_csv: str, temperature: float, verbose: bool) -> None:
     """Call the NL to SQL Chain on each question in eval_questions.csv using LLM from config file"""
+    from heavyiq.langchain.utils import is_langsmith_active
+
     if not os.path.exists(eval_dataset_csv):
         raise Exception(f"eval_dataset_csv does not exist: {eval_dataset_csv}")
 
@@ -55,12 +58,20 @@ def run_config_model_on_questions(ctx: click.Context, eval_dataset_csv: str, tem
                 database=db, llm=llm, callbacks=None if verbose else [], verbose=verbose, tags=[eval_str, "cli"]
             )
             try:
-                pred_query = chain({chain.input_key: question})[chain.output_key]
+                res = chain({chain.input_key: question}, include_run_info=is_langsmith_active)
+                pred_query = res[chain.output_key]
                 print(f"Generated SQL: {pred_query}")
                 print("Evaluating SQL")
                 eval_res = sql_rate_reply(db_id, gold_query, pred_query)
                 print(f"Evaluation Success: {eval_res['success']}")
                 print(f"Evaluation Status: {eval_res['status']}")
+                if is_langsmith_active:
+                    feedback_id = str(res["__run"].run_id)
+                    print(f"Langsmith Run ID: {feedback_id}")
+                    langsmith_client = Client()
+                    langsmith_client.create_feedback(
+                        feedback_id, "eval_status", score=eval_res["success"], comment=eval_res["status"]
+                    )
                 print("=====================================")
                 write_eval_results_row(
                     eval_str,
