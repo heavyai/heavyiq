@@ -33,7 +33,7 @@ for db in eval_databases:
     for table in tables:
         print(f"Table: {table}")
         export_path = f"{export_db_path}/{table}.dump.lz4"
-        dump_table_sql = f"DUMP TABLE {table} TO '{export_path}'"
+        dump_table_sql = f"DUMP TABLE {table} TO '{export_path}' WITH (COMPRESSION = 'LZ4');"
         print(dump_table_sql)
         con.execute(dump_table_sql)
 

@@ -1,4 +1,4 @@
-mport heavyai
+import heavyai
 import pathlib
 
 eval_databases = [
@@ -33,10 +33,10 @@ for db in eval_databases:
     local_import_dir = f"{local_import_base_dir}/{db}"
     dump_files = pathlib.Path(local_import_dir).glob("*.dump.lz4")
     print(dump_files)
-    tables = [str(dump_file).split('.')[0].split('/')[-1] for dump_file in dump_files]
+    tables = [str(dump_file).split(".")[0].split("/")[-1] for dump_file in dump_files]
     for table in tables:
         print(f"Table: {table}")
-        restore_sql = f"RESTORE TABLE {table} FROM '{local_import_dir}/{table}.dump.lz4'"
+        restore_sql = f"RESTORE TABLE {table} FROM '{local_import_dir}/{table}.dump.lz4' WITH (COMPRESSION = 'LZ4');"
         print(restore_sql)
         try:
             con.execute(restore_sql)
