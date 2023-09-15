@@ -44,8 +44,8 @@ def extract_column_mappings(query_plan: str) -> Dict[str, Tuple[str, str, str]]:
 
 def extract_str_literal_ops(query_plan):
     result = {}
-    pattern1 = r"(LIKE|PG_ILIKE|>=|<=|<>|=)\(\$(\d+), '([\w ]+)'"
-    pattern2 = r"(LIKE|PG_ILIKE|>=|<=|<>|=)\('([\w+ ]+)', \$(\d+)\)"
+    pattern1 = r"(LIKE|PG_ILIKE|>=|<=|<>|=)\(\$(\d+), '([\w\- ]+)'"
+    pattern2 = r"(LIKE|PG_ILIKE|>=|<=|<>|=)\('([\w\- ]+)', \$(\d+)\)"
 
     matches1 = re.findall(pattern1, query_plan)
     matches2 = re.findall(pattern2, query_plan)
