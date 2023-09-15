@@ -23,5 +23,5 @@ langchain_call_log.db
 config.toml
 .chroma/
 
-eval/results/
+eval/results/*.csv
 *.log

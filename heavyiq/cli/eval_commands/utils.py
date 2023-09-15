@@ -2,6 +2,7 @@ from typing import Any, Optional
 from itertools import permutations
 from collections import Counter
 import io
+import csv
 
 import pandas as pd
 import numpy as np
@@ -79,9 +80,13 @@ def sql_rate_reply(db_id: str, gold_query: str, pred_query: str) -> dict[str, An
 
 def write_eval_results_header(eval_str: str, has_id: bool):
     wf: io.TextIOWrapper
-    with open(f"./eval/results/{eval_str}_results.tsv", "a") as wf:
-        header_prefix = "id\t" if has_id else ""
-        wf.write(f"{header_prefix}db_id\tgold_query\tpred_query\tsuccess\tstatus\terror\n")
+    with open(f"./eval/results/{eval_str}_results.csv", "a", newline="") as wf:
+        csv_writer = csv.writer(wf)
+        if has_id:
+            header = ["id", "db_id", "gold_query", "pred_query", "success", "status", "error"]
+        else:
+            header = ["db_id", "gold_query", "pred_query", "success", "status", "error"]
+        csv_writer.writerow(header)
 
 
 def write_eval_results_row(
@@ -94,20 +99,18 @@ def write_eval_results_row(
     error: Optional[str] = None,
     query_id: Optional[str] = None,
 ):
-    db_id = db_id.replace("\n", " ").replace("\r", " ")
-    gold_query = gold_query.replace("\n", " ").replace("\r", " ")
-    status = status.replace("\n", " ").replace("\r", " ")
-    pred_query = pred_query.replace("\n", " ").replace("\r", " ")
-    if error is not None:
-        error = error.replace("\n", " ").replace("\r", " ")
-    else:
-        error = ""
-    if query_id is not None:
-        query_id = query_id.replace("\n", " ").replace("\r", " ")
     wf: io.TextIOWrapper
-    with open(f"./eval/results/{eval_str}_results.tsv", "a") as wf:
-        row_prefix = f"{query_id}\t" if query_id is not None else ""
-        wf.write(f"{row_prefix}{db_id}\t{gold_query}\t{pred_query}\t{success}\t{status}\t{error}\n")
+    with open(f"./eval/results/{eval_str}_results.csv", "a", newline="") as wf:
+        csv_writer = csv.writer(wf)
+
+        # Clean the data
+        row_data = [db_id, gold_query, pred_query, success, status, error or ""]
+        row_data = [str(item).replace("\n", " ").replace("\r", " ") for item in row_data]
+
+        if query_id:
+            row_data.insert(0, query_id)
+
+        csv_writer.writerow(row_data)
 
 
 def summarize_eval_results(eval_str: str) -> None:
@@ -116,8 +119,8 @@ def summarize_eval_results(eval_str: str) -> None:
     status value, and prints a summary.
     """
     # Read the results tsv into a pandas DataFrame
-    results_path = f"./eval/results/{eval_str}_results.tsv"
-    df = pd.read_csv(results_path, sep="\t")
+    results_path = f"./eval/results/{eval_str}_results.csv"
+    df = pd.read_csv(results_path)
 
     # Count occurrences of each status value
     status_counts = Counter(df["status"])
