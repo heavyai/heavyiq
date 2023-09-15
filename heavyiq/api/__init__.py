@@ -1,3 +1,4 @@
+import os
 from typing import Any
 
 from fastapi import FastAPI
@@ -117,6 +118,11 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
     def custom_openapi() -> dict[str, Any]:
         if app.openapi_schema:
             return app.openapi_schema
+        # setting server on openapi from environ
+        # https://swagger.io/docs/specification/api-host-and-base-path/
+        # this part if necessary for the agents which act against heavyiq openapi spec.
+        server_url = os.environ.get("SERVER_URL", None)
+        servers = [{"url": server_url, "description": "Live server"}] if server_url else []
         openapi_schema = get_openapi(
             title="HeavyIQ Endpoints",
             version="0.0.1",
@@ -124,7 +130,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
             description="",
             routes=app.routes,
             tags=app.openapi_tags,
-            servers=[{"url": "http://localhost:8000", "description": "Local server"}],
+            servers=servers,
         )
 
         # hard way to remove certain schemas from default openapi schema
