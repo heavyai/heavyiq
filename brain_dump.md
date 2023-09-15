@@ -110,6 +110,9 @@ There are two main types of LLMs, text completion and conversational (chat). A t
 * **Context** - The text that is provided to the LLM as input. The context is typically a list of messages that the LLM will use to generate a response.
 * **Temperature** - Temperature is a parameter that controls the randomness of the LLM's responses. A higher temperature will result in more random responses, while a lower temperature will result in more predictable responses. A temperature of 0.0 is preferable for tasks that require a precise predictable response, such as natural language to SQL translation, but higher temperatures may be preferably for tasks that require more creativity, such as summarization or question answering.
 * **Beam Search** - Beam search is an algorithm that generates multiple responses in parallel until it finds an optimal string of tokens. The actual implementation of this algorithm take place on the LLM server, but the number of beams can be configured in the config for LLM servers that support it (VLLM as of this writing).
+* **Zero Shot Prompt** - A prompt that is used to generate a response without any additional training. For example, a zero shot prompt for a summarization model might be "Summarize the following text: " followed by the text to be summarized. Zero shot prompts are useful for generating responses without any additional training, but they are not as accurate as prompts that are trained for a specific task.
+* **One Shot Prompt** - A prompt that is used to generate a response with a single example of an ideal response for a contrived example input.
+* **Few Shot Prompt** - A prompt that is used to generate a response with a few examples of ideal responses for contrived example inputs.
 
 ### Custom Models
 
@@ -117,9 +120,39 @@ There are many different custom models available, but there are limited solution
 
 ## Chains
 
+Note that chains have two main methods that can be called, the sync and async versions. The REST API uses async, but the CLI uses sync. If you could figure out how to use async methods with the CLI module `click` you could stop maintaining two nearly identical methods on each chain.
+
 ### HeavyDB
 
+**Nl to SQL Chain**
+
+There are two chains here, one for text completion models and another for chat models. The idea was that instead of continuing to feed the table_info back to the text completion LLM on each call that it would be easier to use the message history of a conversation model to maintain the table_info. This is the only chain that has two versions for chat/text-completion.
+
+**Nl to Answer Chain**
+
+This chain uses the NL to SQL chain to generate a SQL query and then uses the results of that query to answer the question.
+
 ### HeavyDB Metadata
+
+**Ask HeavyDB Metadata Index Chain**
+
+Not used in production.
+
+This chain takes a natural language query and uses the HeavyDB metadata index to find the most relevant table and column names that could be used to answer the query. There are two types of questions that this chain can answer decently well:
+* Asking questions specifically about the schema of a table
+* Asking questions about the data in a database
+
+Early on I had done experiments in rephrasing a question to be about the schema of a table instead of data contained in the table. For example, if the input question was "How many flights flew into DFW in 2008?" the rephrased question would be "Which table(s) contain information about airports and/or flights?". This tended to result in better answers, but there was a latency overhead associated with the rephrasing.
+
+**SQL Metadata Question Transformer Chain**
+
+Not used in production.
+
+This is the chain mentioned above that can rephrase a question. You may never actually need to use this chain, but there is a good example of using an "[Example Selector](https://python.langchain.com/docs/modules/model_io/prompts/example_selectors)" to populate a 'few-shot prompt'.
+
+**Generate Table Metadata Chain**
+
+
 
 ### Documentation
 
