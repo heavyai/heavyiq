@@ -6,6 +6,7 @@ from threading import Lock
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from typing import Optional, Any, Iterable, TYPE_CHECKING, Callable, TypedDict
 from copy import deepcopy
+import sqlparse
 
 from heavyai import connect, Connection
 from heavyiq.config import get_config
@@ -42,6 +43,13 @@ class StringLiteralOp(TypedDict):
     database: str
     table: str
     column: str
+
+
+reserved_keywords = ["DATE", "RANK", "LANGUAGE", "YEAR", "QUARTER", "MONTH", "DAY", "LENGTH"]
+
+override_keywords = [
+    "DATE",
+]
 
 
 class HeavyDB:
@@ -589,6 +597,58 @@ class HeavyDB:
 
         self.logger.debug(f"Altered query: {altered_query}")
         return altered_query
+
+    def flatten(self, xs):
+        for x in xs:
+            if isinstance(x, Iterable) and not isinstance(x, (str, bytes)):
+                yield from self.flatten(x)
+            else:
+                yield x
+
+    def parse_keyword(self, token):
+        parsed_tokens = []
+        if token.is_group:
+            # Recursively handle keywords in the group
+            for inner in token.tokens:
+                parsed_tokens.append(self.parse_keyword(inner))
+        else:
+            print(token)
+            if token.ttype is sqlparse.tokens.Name:
+                print("Is identifier")
+            else:
+                print("Not identifier")
+            if token.ttype is sqlparse.tokens.Name and token.value.upper() in reserved_keywords:
+                parsed_tokens.append(f'"{token}"')
+            else:
+                if token.value.upper() in override_keywords:
+                    parsed_tokens.append(f'"{token}"')
+                else:
+                    parsed_tokens.append(token.value)
+        return parsed_tokens
+
+    def quote_reserved_keywords(self, sql_query):
+        # Parse the SQL query
+        parsed = sqlparse.parse(sql_query)
+
+        parsed_tokens = []
+        for stmt in parsed:
+            for token in stmt.tokens:
+                parsed_tokens.append(self.parse_keyword(token))
+        parsed_tokens = self.flatten(parsed_tokens)
+        new_sql = "".join(token for token in parsed_tokens)
+        return new_sql
+
+    def correct_reserved_keyword_quoting(self, query: str) -> str:
+        config = get_config()
+        if not config.enable_reserved_keyword_quote_correction:
+            return query
+        self.logger.debug(f"Correcting reserved keyword quoting in query: {query}")
+        try:
+            altered_query = self.quote_reserved_keywords(deepcopy(query))
+            return altered_query
+        except Exception as e:
+            self.logger.info(f"Error correcting reserved keyword quoting: {e}")
+            return query
 
     def complexity(self, command: str) -> int:
         command = strip_sql_comments(command)

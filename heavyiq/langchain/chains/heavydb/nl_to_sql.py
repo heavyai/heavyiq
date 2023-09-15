@@ -216,6 +216,16 @@ class NLtoSQLChain(BaseNLtoSQLChain):
             )
 
         self.write_callback_message(sql_cmd, run_manager=run_manager, color="green")
+
+        if get_config().enable_reserved_keyword_quote_correction:
+            self.write_callback_message(
+                "Attempting to correct quoting for reserved keywords in SQL query.",
+                run_manager=run_manager,
+                color="blue",
+            )
+            sql_cmd = self.database.correct_reserved_keyword_quoting(sql_cmd)
+            self.write_callback_message(f"Result of correction: {sql_cmd}", run_manager=run_manager, color="green")
+
         if get_config().enable_str_literal_correction:
             self.write_callback_message(
                 "Attempting to correct string literals in SQL query.", run_manager=run_manager, color="blue"
@@ -290,6 +300,15 @@ class NLtoSQLChain(BaseNLtoSQLChain):
             )
 
         await self.write_callback_message_async(sql_cmd, run_manager=run_manager, color="green")
+
+        if get_config().enable_reserved_keyword_quote_correction:
+            self.write_callback_message(
+                "Attempting to correct quoting for reserved keywords in SQL query.",
+                run_manager=run_manager,
+                color="blue",
+            )
+            sql_cmd = self.database.correct_reserved_keyword_quoting(sql_cmd)
+            self.write_callback_message(f"Result of correction: {sql_cmd}", run_manager=run_manager, color="green")
 
         if get_config().enable_str_literal_correction:
             await self.write_callback_message_async(
@@ -374,6 +393,15 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
 
         self.write_callback_message(sql_cmd, run_manager=run_manager, color="green")
 
+        if get_config().enable_reserved_keyword_quote_correction:
+            self.write_callback_message(
+                "Attempting to correct quoting for reserved keywords in SQL query.",
+                run_manager=run_manager,
+                color="blue",
+            )
+            sql_cmd = self.database.correct_reserved_keyword_quoting(sql_cmd)
+            self.write_callback_message(f"Result of correction: {sql_cmd}", run_manager=run_manager, color="green")
+
         if get_config().enable_str_literal_correction:
             self.write_callback_message(
                 "Attempting to correct string literals in SQL query.", run_manager=run_manager, color="blue"
@@ -437,6 +465,15 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
             )
 
         await self.write_callback_message_async(sql_cmd, run_manager=run_manager, color="green")
+
+        if get_config().enable_reserved_keyword_quote_correction:
+            self.write_callback_message(
+                "Attempting to correct quoting for reserved keywords in SQL query.",
+                run_manager=run_manager,
+                color="blue",
+            )
+            sql_cmd = self.database.correct_reserved_keyword_quoting(sql_cmd)
+            self.write_callback_message(f"Result of correction: {sql_cmd}", run_manager=run_manager, color="green")
 
         if get_config().enable_str_literal_correction:
             await self.write_callback_message_async(

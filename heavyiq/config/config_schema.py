@@ -21,6 +21,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     docs_index_dir: str = "heavyai_docs"
     table_documents_dir: str = "table_documents"
     enable_str_literal_correction: bool = False
+    enable_reserved_keyword_quote_correction: bool = True
     column_top_k_cardinality_threshold: int = 5
     """If the cardinality of a column is less than this threshold, we will include each value of the column in the prompt"""
     column_top_k_high_cardinality_sample: int = 3
