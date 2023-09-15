@@ -258,7 +258,8 @@ class HeavyDB:
 
     def get_table_schema(self, table: str) -> str:
         self.logger.debug(f"Getting schema for table {table}")
-        cached_value = self.table_schema_cache.get(table)
+        cache_key = f"{self._conn._dbname}.{table}"
+        cached_value = self.table_schema_cache.get(cache_key)
         if cached_value is not None:
             self.logger.debug(f"Got schema for table {table} from cache")
             return cached_value
@@ -272,7 +273,7 @@ class HeavyDB:
         table_schema = re.sub(r"\n", "", table_schema)
         if "WITH (" in table_schema:
             table_schema = table_schema[: table_schema.index("WITH (")]
-        self.table_schema_cache.put(table, table_schema)
+        self.table_schema_cache.put(cache_key, table_schema)
         self.logger.debug(f"Got schema for table {table}")
         return table_schema
 
@@ -315,7 +316,8 @@ class HeavyDB:
 
     def get_sample_rows(self, table_name: str) -> str:
         self.logger.debug(f"Getting sample rows for table {table_name}")
-        cached_value = self.sample_rows_cache.get(table_name)
+        cache_key = f"{self._conn._dbname}.{table_name}"
+        cached_value = self.sample_rows_cache.get(cache_key)
         if cached_value is not None:
             self.logger.debug(f"Got sample rows for table {table_name} from cache")
             return cached_value
@@ -336,13 +338,14 @@ class HeavyDB:
 
         res = f"{self._sample_rows_in_table_info} rows from {table_name} table:\n{columns_str}\n{sample_rows_str}"
 
-        self.sample_rows_cache.put(table_name, res)
+        self.sample_rows_cache.put(cache_key, res)
         self.logger.debug(f"Got sample rows for table {table_name}")
         return res
 
     def get_top_k(self, table_name: str) -> str:
         self.logger.debug(f"Getting top k values for table {table_name}")
-        cached_value = self.top_k_cache.get(table_name)
+        cache_key = f"{self._conn._dbname}.{table_name}"
+        cached_value = self.top_k_cache.get(cache_key)
         if cached_value is not None:
             self.logger.debug(f"Got top k values for table {table_name} from cache")
             return cached_value
@@ -369,7 +372,7 @@ class HeavyDB:
             top_k_strings += "High cardinality columns and most common values:\n"
             for col, top_k_res in high_cardinality_columns:
                 top_k_strings += f"{col}: {', '.join(top_k_res)}\n"
-        self.top_k_cache.put(table_name, top_k_strings)
+        self.top_k_cache.put(cache_key, top_k_strings)
         self.logger.debug(f"Got top k values for table {table_name}")
         return top_k_strings
 
