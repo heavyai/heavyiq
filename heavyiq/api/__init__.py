@@ -121,8 +121,8 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         # setting server on openapi from environ
         # https://swagger.io/docs/specification/api-host-and-base-path/
         # this part if necessary for the agents which act against heavyiq openapi spec.
-        server_url = os.environ.get("SERVER_URL", None)
-        servers = [{"url": server_url, "description": "Live server"}] if server_url else []
+        base_url = os.environ.get("BASE_URL", None)
+        servers = [{"url": base_url, "description": "Live server"}] if base_url else []
         openapi_schema = get_openapi(
             title="HeavyIQ Endpoints",
             version="0.0.1",
