@@ -152,7 +152,7 @@ This is the chain mentioned above that can rephrase a question. You may never ac
 
 **Generate Table Metadata Chain**
 
-
+Not used in production, but API endpoint does exist.
 
 ### Documentation
 
