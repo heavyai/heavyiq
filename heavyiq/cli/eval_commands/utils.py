@@ -126,6 +126,10 @@ def summarize_eval_results(eval_str: str) -> None:
     status_counts = Counter(df["status"])
     total_count = len(df)
 
+    # Compute success metrics
+    success_count = df["success"].sum()  # Summing boolean column gives count of True values
+    success_percentage = (success_count / total_count) * 100
+
     # Print summary
     print(f"Summary for evaluation: {eval_str}")
     print(f"Results file: {results_path}")
@@ -134,3 +138,4 @@ def summarize_eval_results(eval_str: str) -> None:
         print(f"Status: {status} - Count: {count} - Percentage: {percentage:.2f}%")
 
     print(f"Total entries: {total_count}")
+    print(f"Total success: {success_count} - Success Percentage: {success_percentage:.2f}%")
