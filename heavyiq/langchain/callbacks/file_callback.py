@@ -3,7 +3,6 @@ import logging
 import re
 from re import Pattern
 from typing import Any, Optional, TextIO, cast
-from logging import LogRecord
 
 import aiofiles
 from aiofiles.threadpool.text import AsyncTextIOWrapper

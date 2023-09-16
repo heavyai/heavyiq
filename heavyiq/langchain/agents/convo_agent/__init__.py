@@ -28,7 +28,7 @@ from heavyiq.langchain.agents import HeavyDBToolkit
 from heavyiq.langchain.callbacks import ConvoAgentCallbackHandler
 from heavyiq.langchain.llms import get_chat_llm
 from heavyiq.langchain.memory import HeavyIQQueryBufferWindowMemory
-from heavyiq.logging_utils import heavyiq_logger as logger
+from heavyiq.logging_utils import iq_logger as logger
 
 
 SYSTEM_MESSAGE = """Assistant is a large language model trained by OpenAI.

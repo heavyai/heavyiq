@@ -10,6 +10,8 @@ from copy import deepcopy
 from heavyai import connect, Connection
 from heavyiq.config import get_config
 from heavyiq.utils import strip_sql_comments, is_destructive_sql, rate_sql_complexity, LRUCache
+from heavyiq.logging_utils import iq_logger
+
 
 if TYPE_CHECKING:
     from heavydb._parsers import ColumnDetails
@@ -63,9 +65,7 @@ class HeavyDB:
         if include_tables and ignore_tables:
             raise ValueError("Cannot specify both include_tables and ignore_tables")
 
-        from heavyiq.logging_utils import get_heavyiq_logger
-
-        self.logger = get_heavyiq_logger()
+        self.logger = iq_logger
         self._conn = conn
         self.lock = Lock()
 
@@ -111,7 +111,7 @@ class HeavyDB:
         return cls._manager
 
     @classmethod
-    def get_top_k_cache(cls) -> LRUCache[str, str]:
+    def get_top_k_cache(cls: type["HeavyDB"]) -> LRUCache[str, str]:
         if cls._top_k_cache is None:
             cls._top_k_cache = LRUCache[str, str](manager=cls.get_manager())
         return cls._top_k_cache

@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from fastapi.concurrency import run_in_threadpool
 
 from heavyiq.api.models.debug import DbSessionResponse, CallLLMRequest, CallLLMResponse
 from heavyiq.langchain.heavydb import HeavyDB
@@ -12,7 +13,9 @@ async def db_session() -> DbSessionResponse:
     """
     Get HeavyDB session id.
     """
-    heavydb_sessionid = HeavyDB.create_session_id()
+    # create_session_id involves establishing db connection which was considered as a blocking operation
+    # so let the fastapi to run the connection establishment inside a seperate thread w/o blocking the main thread
+    heavydb_sessionid = await run_in_threadpool(HeavyDB.create_session_id)
     return DbSessionResponse(session_id=heavydb_sessionid)
 
 

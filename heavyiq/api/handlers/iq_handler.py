@@ -23,7 +23,7 @@ from heavyiq.langchain.chains import (
 )
 from heavyiq.langchain.llms import LLMType, get_llm_by_type
 from heavyiq.langchain.logging import log_chain_call_async
-from heavyiq.logging_utils import get_heavyiq_logger
+from heavyiq.logging_utils import iq_logger
 
 
 async def handle_query_request_async(request: QueryRequest, db: HeavyDB) -> QueryResponse:
@@ -37,10 +37,9 @@ async def handle_query_request_async(request: QueryRequest, db: HeavyDB) -> Quer
         QueryResponse: response content
     """
     config = get_config()
-    logger = get_heavyiq_logger()
     llm = get_llm_by_type(LLMType.NL_TO_SQL, temperature=0.0)
     chain_cls = get_nl_to_sql_chain_by_llm(llm=llm)
-    file_callback_handler = logger.async_langchain_cb_handler(to_stdout=config.log_to_stdout)
+    file_callback_handler = iq_logger.async_langchain_cb_handler(to_stdout=config.log_to_stdout)  # type: ignore
     chain = chain_cls(llm=llm, database=db, callbacks=[file_callback_handler], tags=["rest-api", "query-endpoint"])  # type: ignore
     chain_input = {chain.input_key: request.question, "tables": request.tables}
     res = await log_chain_call_async(chain, chain_input, "")
@@ -61,13 +60,12 @@ async def handle_question_request_async(request: QuestionRequest, db: HeavyDB) -
         QuestionResponse: response content
     """
     config = get_config()
-    logger = get_heavyiq_logger()
-    file_callback_handler = logger.async_langchain_cb_handler(to_stdout=config.log_to_stdout)
+    file_callback_handler = iq_logger.async_langchain_cb_handler(to_stdout=config.log_to_stdout)  # type: ignore
     nl_sql_llm = get_llm_by_type(LLMType.NL_TO_SQL, temperature=0.0)
     nl_sql_chain = get_nl_to_sql_chain_by_llm(llm=nl_sql_llm)(
         llm=nl_sql_llm,
         database=db,
-        callbacks=[file_callback_handler],
+        callbacks=[file_callback_handler],  # type: ignore
         tags=["rest-api", "question-endpoint"],
     )
     llm = get_llm_by_type(LLMType.SQL_TO_ANSWER, temperature=0.0)

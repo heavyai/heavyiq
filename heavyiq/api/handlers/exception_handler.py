@@ -9,7 +9,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
 from heavyiq.api.models import ErrorResponse
 from heavyiq.langchain.exceptions import NLtoSQLException
-from heavyiq.logging_utils import get_heavyiq_logger
+from heavyiq.logging_utils import iq_logger
 
 
 def _build_error_response(title: str, msg: str) -> ErrorResponse:
@@ -23,7 +23,7 @@ def log_exception(func: Callable) -> Callable:
 
     @wraps(func)
     async def wrapper(request: Request, exc: Exception) -> Response:
-        get_heavyiq_logger().exception("Exception Occured: %s", str(exc))
+        iq_logger.exception("Exception Occured: %s", str(exc))
         result = await func(request, exc)
         return result
 

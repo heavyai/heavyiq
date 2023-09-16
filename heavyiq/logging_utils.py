@@ -1,16 +1,20 @@
 import logging
+import typing
+from abc import ABCMeta, abstractmethod
 from logging import LogRecord
 from logging.handlers import RotatingFileHandler
 import getpass
 import time
 import socket
 import os
-from typing import Any
+from typing import Any, Self, Callable
 import sys
 
-
 from heavyiq.config import get_config
-from heavyiq.langchain.callbacks import FileCallbackHandler, AsyncLogFileCallbackHandler
+
+
+if typing.TYPE_CHECKING:
+    from heavyiq.langchain.callbacks import AsyncLogFileCallbackHandler, FileCallbackHandler
 
 
 class MillisecondFormatter(logging.Formatter):
@@ -188,7 +192,7 @@ class HeavyIQLogger(BaseLogger):
         )
         self.info("HeavyIQ Logger initialized")
 
-    def langchain_cb_handler(self, to_stdout: bool = True) -> FileCallbackHandler:
+    def langchain_cb_handler(self, to_stdout: bool = True) -> "FileCallbackHandler":
         """
         Returns a file callback handler created from the log file.
 
@@ -198,9 +202,11 @@ class HeavyIQLogger(BaseLogger):
         Returns:
             FileCallbackHandler: callback handler mainly passed as callback for chains.
         """
+        from heavyiq.langchain.callbacks import FileCallbackHandler
+
         return FileCallbackHandler(self.log_file_path, to_stdout=to_stdout)
 
-    def async_langchain_cb_handler(self, to_stdout: bool = True) -> AsyncLogFileCallbackHandler:
+    def async_langchain_cb_handler(self, to_stdout: bool = True) -> "AsyncLogFileCallbackHandler":
         """
         Returns a file callback handler created from the log file.
 
@@ -208,8 +214,10 @@ class HeavyIQLogger(BaseLogger):
             to_stdout (bool, optional): whether to log stdout as well. Defaults to True.
 
         Returns:
-            FileCallbackHandler: callback handler mainly passed as callback for chains.
+            AsyncLogFileCallbackHandler: callback handler mainly passed as callback for chains.
         """
+        from heavyiq.langchain.callbacks import AsyncLogFileCallbackHandler
+
         return AsyncLogFileCallbackHandler(self.log_file_path, to_stdout=to_stdout)
 
 
@@ -350,3 +358,68 @@ def get_heavyiq_logger() -> HeavyIQLogger:
     if heavyiq_logger is None:
         init_logs()
     return heavyiq_logger  # type: ignore
+
+
+class LazyLogger(metaclass=ABCMeta):
+    """
+    Base logging utility that defers the initialization of logging resources until they are required.
+    """
+
+    error_msg: str = "Logging has not yet been initialized."
+
+    @abstractmethod
+    def instance(self) -> BaseLogger:
+        ...
+
+    def __getattr__(self, name: str) -> Callable[..., Any]:
+        """
+        whenever an attribute is accessed, this method is supposed to call instance abstract method.
+        """
+        # should be a logger attribute
+        return getattr(self.instance(), name)
+
+
+class LazyIQLogger(LazyLogger):
+    """
+    Lazy Heavy IQ Logger.
+    """
+
+    def __init__(self) -> None:
+        self._instance: HeavyIQLogger | None = None
+
+    def instance(self: Self) -> HeavyIQLogger:
+        if self._instance is None:
+            # Perform the lazy loading here
+            global heavyiq_logger
+
+            if heavyiq_logger is None:
+                raise AttributeError(self.error_msg)
+
+            self._instance = heavyiq_logger
+
+        return self._instance
+
+
+class LazyAccessLogger(LazyLogger):
+    """
+    Lazy Access Logger.
+    """
+
+    def __init__(self) -> None:
+        self._instance: _AccessLogger | None = None
+
+    def instance(self: Self) -> _AccessLogger:
+        if self._instance is None:
+            # Perform the lazy loading here
+            global _access_logger
+
+            if _access_logger is None:
+                raise AttributeError(self.error_msg)
+
+            self._instance = _access_logger
+
+        return self._instance
+
+
+iq_logger = LazyIQLogger()  # using iq_logger on global scope should raise AttributeError
+access_logger = LazyAccessLogger()
