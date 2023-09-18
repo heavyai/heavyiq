@@ -36,7 +36,7 @@ def get_vllm_model_kwargs(model_type: LLMType, **kwargs) -> tuple[dict[str, Any]
     if config.custom_llm_api_vllm_beam_width >= 2 and model_type == LLMType.NL_TO_SQL:
         model_kwargs["use_beam_search"] = True
         kwargs["best_of"] = config.custom_llm_api_vllm_beam_width
-        kwargs["n"] = 1 
+        kwargs["n"] = 1
     return kwargs, model_kwargs
 
 
