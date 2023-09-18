@@ -33,11 +33,45 @@ def conf_file(tmp_path: Path, request: FixtureRequest):
     [iq]
     openai_api_key = "some-dummy-key"
     """
+    custom_api_config_without_base = """
+    [iq]
+    openai_api_key = ""
+    custom_llm_type = "API"
+    custom_llm_api_base = ""
+    """
+    custom_api_config_with_base = """
+    [iq]
+    openai_api_key = ""
+    custom_llm_type = "API"
+    custom_llm_api_base = "http://localhost:9000/api/v1"
+    """
+    custom_api_vllm_config_without_base = """
+    [iq]
+    openai_api_key = ""
+    custom_llm_type = "API_VLLM"
+    custom_llm_api_base = ""
+    """
+    custom_api_vllm_config_with_base = """
+    [iq]
+    openai_api_key = ""
+    custom_llm_type = "API_VLLM"
+    custom_llm_api_base = "http://localhost:9000/api/v1"
+    """
+    custom_api_invalid = """
+    [iq]
+    openai_api_key = ""
+    custom_llm_type = "INVALID"
+    """
 
     configs = {
         "azure_config_with_options": azure_config_with_options,
         "azure_config_without_options": azure_config_without_options,
         "openai_config": openai_config,
+        "custom_api_config_without_base": custom_api_config_without_base,
+        "custom_api_config_with_base": custom_api_config_with_base,
+        "custom_api_vllm_config_without_base": custom_api_vllm_config_without_base,
+        "custom_api_vllm_config_with_base": custom_api_vllm_config_with_base,
+        "custom_api_invalid": custom_api_invalid,
     }
 
     # Get the custom value specified in the test function
