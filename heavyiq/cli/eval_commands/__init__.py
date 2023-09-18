@@ -7,6 +7,7 @@ import click
 from langsmith import Client
 
 from heavyiq.langchain import HeavyDB
+from heavyiq.langchain.exceptions import NLtoSQLException
 from heavyiq.langchain.chains import get_nl_to_sql_chain_by_llm
 from heavyiq.langchain.llms import get_llm_by_type, LLMType
 
@@ -83,9 +84,20 @@ def run_config_model_on_questions(ctx: click.Context, eval_dataset_csv: str, tem
                     query_id=query_id,
                     error=eval_res["error"],
                 )
+            except NLtoSQLException as e:
+                print(e)
+                print("Failed to generate SQL")
+                write_eval_results_row(
+                    eval_str,
+                    db_id,
+                    gold_query,
+                    False,
+                    "failed_to_generate_sql",
+                    e.failed_sql,
+                    query_id=query_id,
+                )
             except Exception as e:
                 print(e)
                 print("Failed to generate SQL")
-                write_eval_results_row(eval_str, db_id, gold_query, False, "failed_to_generate_sql", query_id=query_id)
 
     summarize_eval_results(eval_str)
