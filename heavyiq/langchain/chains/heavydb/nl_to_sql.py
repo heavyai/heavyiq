@@ -212,7 +212,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                 f"Failed to verify SQL query after {self.max_retries} retries.", run_manager=run_manager, color="red"
             )
             raise NLtoSQLException(
-                f"Language model failed to generate a valid SQL query after {self.max_retries} tries."
+                f"Language model failed to generate a valid SQL query after {self.max_retries} tries.", sql_cmd
             )
 
         self.write_callback_message(sql_cmd, run_manager=run_manager, color="green")
@@ -286,7 +286,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                 f"Failed to verify SQL query after {self.max_retries} retries.", run_manager=run_manager, color="red"
             )
             raise NLtoSQLException(
-                f"Language model failed to generate a valid SQL query after {self.max_retries} tries."
+                f"Language model failed to generate a valid SQL query after {self.max_retries} tries.", sql_cmd
             )
 
         await self.write_callback_message_async(sql_cmd, run_manager=run_manager, color="green")
@@ -369,7 +369,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
                 f"Failed to verify SQL query after {self.max_retries} retries.", run_manager=run_manager, color="red"
             )
             raise NLtoSQLException(
-                f"Language model failed to generate a valid SQL query after {self.max_retries} tries."
+                f"Language model failed to generate a valid SQL query after {self.max_retries} tries.", sql_cmd
             )
 
         self.write_callback_message(sql_cmd, run_manager=run_manager, color="green")
@@ -433,7 +433,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
                 f"Failed to verify SQL query after {self.max_retries} retries.", run_manager=run_manager, color="red"
             )
             raise NLtoSQLException(
-                f"Language model failed to generate a valid SQL query after {self.max_retries} tries."
+                f"Language model failed to generate a valid SQL query after {self.max_retries} tries.", sql_cmd
             )
 
         await self.write_callback_message_async(sql_cmd, run_manager=run_manager, color="green")
