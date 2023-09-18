@@ -20,7 +20,7 @@ def test_should_pass_query_endpoint(mock: Callable, expected_result: list[Any]):
     """
 
     payload = {
-        "session_id": "x" * 32,
+        "session_id": "x" * 32,  # type: ignore
         "question": "How many states begin with the letter A? What are they?",
         "tables": ["usa_states"],
     }
