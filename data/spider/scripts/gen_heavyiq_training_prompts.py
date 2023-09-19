@@ -32,6 +32,8 @@ def getOptions(argv=None):
     )
     parser.add_argument("--filter-null-groups", help="Add filters to remove null groups", action="store_true")
     parser.add_argument("--fix-queries-gpt", help="Try to fix failed queries with ChatGPT API", action="store_true")
+    parser.add_argument("--low-card-top-k-str-vals", help="Low cardinality top K string values", type=int, default=5)
+    parser.add_argument("--high-card-top-k-str-vals", help="High cardinality top K string values", type=int, default=3)
     parser.add_argument("--top-k-str-vals", help="Top K string values", type=int, default=5)
     parser.add_argument("--max-instruction-tokens", help="Max instruction tokens", type=int, default=704)
     parser.add_argument(
@@ -387,12 +389,28 @@ def get_top_k_vals(con, table_name, column_name, top_k):
     return [r[0] for r in results]
 
 
+def get_high_low_card_top_k_vals(con, table_name, column_name, low_card_top_k, high_card_top_k):
+    count_distinct_sql = (
+        f"""SELECT COUNT(DISTINCT "{column_name}") FROM "{table_name}" WHERE "{column_name}" IS NOT NULL"""
+    )
+    cardinality = list(con.execute(count_distinct_sql))[0][0]
+    top_k = high_card_top_k
+    if cardinality <= low_card_top_k:
+        top_k = low_card_top_k
+
+    top_k_vals_sql = f"""SELECT "{column_name}" FROM "{table_name}" WHERE "{column_name}" IS NOT NULL GROUP BY "{column_name}" ORDER BY COUNT(*) DESC LIMIT {top_k}"""
+    top_k_result = list(con.execute(top_k_vals_sql))
+    top_k_vals = [r[0] for r in top_k_result]
+    return {"table_name": table_name, "column_name": column_name, "cardinality": cardinality, "top_k_vals": top_k_vals}
+
+
 def get_top_k_vals_str(table_name, top_k_vals):
+    print(top_k_vals)
     # top_k_vals_strs = [
     #    f"The most common {len(values)} values for column {key} are: {', '.join(values)}."
     #    for key, values in top_k_vals.items()
     # ]
-    top_k_vals_strs = [f"{table_name}.{key}: {', '.join(values)}" for key, values in top_k_vals.items()]
+    top_k_vals_strs = [f"{table_name}.{key}: {', '.join(values['top_k_vals'])}" for key, values in top_k_vals.items()]
     return top_k_vals_strs
     # return "\n".join(top_k_vals_strs)
 
@@ -814,7 +832,9 @@ def generate_error_prompts(error_queries_file, output_file, options):
             if options.top_k_str_vals > 0:
                 table_str_cols = get_table_str_cols(con, db_table)
                 str_cols_top_k_vals = {
-                    str_col: get_top_k_vals(con, db_table, str_col, options.top_k_str_vals)
+                    str_col: get_high_low_card_top_k_vals(
+                        con, db_table, str_col, options.low_card_top_k_str_vals, options.high_card_top_k_str_vals
+                    )
                     for str_col in table_str_cols
                 }
                 top_k_str_col_vals_str = get_top_k_vals_str(db_table, str_cols_top_k_vals)
@@ -931,17 +951,22 @@ def main(argv):
                 table_schemas_map = {}
                 top_k_str_vals_map = {}
                 top_k_str_vals = []
-                strings_cols_top_k = 5
                 for db_table in db_tables:
                     table_schema = get_table_schema(con, db_table)
                     if options.add_columns_to_answers:
                         table_cols.extend(get_table_cols(con, db_table))
                     table_schemas.append(table_schema)
                     table_schemas_map[db_table.lower()] = table_schema
-                    if options.top_k_str_vals > 0:
+                    if options.low_card_top_k_str_vals > 0:
                         table_str_cols = get_table_str_cols(con, db_table)
                         str_cols_top_k_vals = {
-                            str_col: get_top_k_vals(con, db_table, str_col, strings_cols_top_k)
+                            str_col: get_high_low_card_top_k_vals(
+                                con,
+                                db_table,
+                                str_col,
+                                options.low_card_top_k_str_vals,
+                                options.high_card_top_k_str_vals,
+                            )
                             for str_col in table_str_cols
                         }
                         # print(str_cols_top_k_vals)
