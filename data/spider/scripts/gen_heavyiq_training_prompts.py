@@ -20,7 +20,8 @@ def getOptions(argv=None):
     parser.add_argument("-p", "--port", help="HeavyDB server port", default="6273")
     parser.add_argument("-u", "--user", help="HeavyDB user name", default="admin")
     parser.add_argument("-w", "--password", help="HeavyDB password", default="HyperInteractive")
-    parser.add_argument("-q", "--queries", help="Queries CSV file", default="./spider_qa.csv")
+    parser.add_argument("-q", "--queries", help="Queries CSV file", default=None)
+    parser.add_argument("-e", "--errors", help="Error Queries CSV file", default=None)
     parser.add_argument("-d", "--database", help="HeavyDB database", default=None)
     parser.add_argument("-k", "--openai-api-key", help="OpenAI API Key", default=None)
     parser.add_argument("-c", "--cache", help="Query cache file", default=None)
@@ -31,7 +32,7 @@ def getOptions(argv=None):
     )
     parser.add_argument("--filter-null-groups", help="Add filters to remove null groups", action="store_true")
     parser.add_argument("--fix-queries-gpt", help="Try to fix failed queries with ChatGPT API", action="store_true")
-    parser.add_argument("--top-k-str-vals", help="Top K string values", type=int, default=0)
+    parser.add_argument("--top-k-str-vals", help="Top K string values", type=int, default=5)
     parser.add_argument("--max-instruction-tokens", help="Max instruction tokens", type=int, default=704)
     parser.add_argument(
         "--write-sql-prompts", help="Write SQL prompts to file for successful queries", action="store_true"
@@ -795,260 +796,357 @@ def schema_order_columns(table_cols: List[str], used_cols: List[Tuple[str, str, 
     return sorted_used_cols
 
 
+def generate_error_prompts(error_queries_file, output_file, options):
+    errors_df = pd.read_csv(error_queries_file)
+    prompts = []
+    for index, row in errors_df.iterrows():
+        db = row["db_id"]
+        con = heavyai.connect(user=options.user, password=options.password, host=options.host, dbname=db)
+        db_tables = con.get_tables()
+        table_schemas = []
+        table_schemas_map = {}
+        top_k_str_vals = []
+        top_k_str_vals_map = {}
+        for db_table in db_tables:
+            table_schema = get_table_schema(con, db_table)
+            table_schemas.append(table_schema)
+            table_schemas_map[db_table.lower()] = table_schema
+            if options.top_k_str_vals > 0:
+                table_str_cols = get_table_str_cols(con, db_table)
+                str_cols_top_k_vals = {
+                    str_col: get_top_k_vals(con, db_table, str_col, options.top_k_str_vals)
+                    for str_col in table_str_cols
+                }
+                top_k_str_col_vals_str = get_top_k_vals_str(db_table, str_cols_top_k_vals)
+                top_k_str_vals_map[db_table] = top_k_str_col_vals_str
+                top_k_str_vals.append(top_k_str_col_vals_str)
+        print(table_schemas)
+        print(top_k_str_vals)
+        question = row["question"]
+        data_split = row["dataset"]
+        error_sql_query = row["error_sql_query"]
+        error = row["db_error_msg"]
+        correct_sql_query = row["correct_sql_query"]
+
+        filtered_tables = extract_tables_from_query(con, correct_sql_query)
+        filtered_table_schemas = []
+        for db_table in filtered_tables:
+            filtered_table_schemas.append(table_schemas_map[db_table.lower()])
+        filtered_top_k_str_vals = []
+        if options.top_k_str_vals > 0:
+            for db_table in filtered_tables:
+                filtered_top_k_str_vals.append(top_k_str_vals_map[db_table])
+        top_k_str_vals_str = ""
+        if filtered_top_k_str_vals is not None and len(filtered_top_k_str_vals) > 0:
+            top_k_str_vals_str = "Sample values for TEXT columns (comma-separated):\n"
+            for table_top_k_str_vals in filtered_top_k_str_vals:
+                top_k_str_vals_str += "\n".join(table_top_k_str_vals)
+                top_k_str_vals_str += "\n"
+
+        targeted_instruction = """You generated a SQL query that generated an exception when executed in the HeavyDB database.\n\nYou have access to the following relation tables, with schemas below.\n{table_schemas}\n\n{top_k_str_vals_str}\nIn attempting to answer the following user question:\n\n{question},\nyou generated the following SQL query:\n{error_sql_query}\n,which failed to run in the HeavyDB database, generating the following error:\n{error}\n\nPlease alter the query to run without error in HeavyDB:""".format(
+            table_schemas="\n\n".join(filtered_table_schemas),
+            top_k_str_vals_str=top_k_str_vals_str,
+            question=question,
+            error_sql_query=error_sql_query,
+            error=error,
+        )
+        prompts.append(
+            {
+                "query_id": row["query_id"],
+                "db_id": db,
+                "tables": filtered_tables,
+                "data_split": data_split,
+                "instruction": targeted_instruction,
+                "output": correct_sql_query,
+            }
+        )
+    fieldnames = [
+        "query_id",
+        "db_id",
+        "tables",
+        "data_split",
+        "instruction",
+        "output",
+    ]
+    prompts_to_write = [
+        (
+            obj["query_id"],
+            obj["db_id"],
+            obj["tables"],
+            obj["data_split"],
+            obj["instruction"],
+            obj["output"],
+        )
+        for obj in prompts
+    ]
+    with open(output_file, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(fieldnames)
+        writer.writerows(prompts_to_write)
+
+
 def main(argv):
     options = getOptions(argv)
     openai.api_key = options.openai_api_key
-    queries_by_db = getQueriesByDB(options.queries)
-    query_cache_by_db = {}
-    if options.cache is not None:
-        query_cache_by_db = load_query_cache(options.cache)
-    db_num = 0
-    total_queries = 0
-    total_successful_queries = 0
-    total_successful_altered_queries = 0
-    fixed_queries = []
-    failed_queries = []
-    prompts = []
-    english_prompts = []
-    question_prompts = []
-    question_prompts_with_cols = []
-    con = None
-    tokenizer = LlamaTokenizer.from_pretrained("test_model")
-    num_null_rewrite_successes = 0
-    num_null_rewrite_fails = 0
-    null_rewrite_fail_ids = []
-    for db_id, queries in queries_by_db.items():
-        try:
-            if db_num < options.start_db:
-                db_num += 1
-                continue
+    if options.errors is not None:
+        generate_error_prompts(options.errors, "sql_error_prompts.csv", options)
+
+    if options.queries is not None:
+        queries_by_db = getQueriesByDB(options.queries)
+        query_cache_by_db = {}
+        if options.cache is not None:
+            query_cache_by_db = load_query_cache(options.cache)
+        db_num = 0
+        total_queries = 0
+        total_successful_queries = 0
+        total_successful_altered_queries = 0
+        fixed_queries = []
+        failed_queries = []
+        prompts = []
+        english_prompts = []
+        question_prompts = []
+        question_prompts_with_cols = []
+        con = None
+        tokenizer = LlamaTokenizer.from_pretrained("test_model")
+        num_null_rewrite_successes = 0
+        num_null_rewrite_fails = 0
+        null_rewrite_fail_ids = []
+        for db_id, queries in queries_by_db.items():
             try:
-                con = heavyai.connect(user=options.user, password=options.password, host=options.host, dbname=db_id)
-            except Exception as e:
-                print(f"Error connecting to database {db_id}: {e}")
-                db_num += 1
-                continue
-            db_query_cache = query_cache_by_db[db_id] if db_id in query_cache_by_db else set()
-            num_queries = len(queries)
-            successful_queries = 0
-            db_tables = con.get_tables()
-            table_schemas = []
-            table_cols = []
-            table_schemas_map = {}
-            top_k_str_vals_map = {}
-            top_k_str_vals = []
-            strings_cols_top_k = 5
-            for db_table in db_tables:
-                table_schema = get_table_schema(con, db_table)
-                if options.add_columns_to_answers:
-                    table_cols.extend(get_table_cols(con, db_table))
-                table_schemas.append(table_schema)
-                table_schemas_map[db_table.lower()] = table_schema
-                if options.top_k_str_vals > 0:
-                    table_str_cols = get_table_str_cols(con, db_table)
-                    str_cols_top_k_vals = {
-                        str_col: get_top_k_vals(con, db_table, str_col, strings_cols_top_k)
-                        for str_col in table_str_cols
-                    }
-                    # print(str_cols_top_k_vals)
-                    top_k_str_col_vals_str = get_top_k_vals_str(db_table, str_cols_top_k_vals)
-                    # print(top_k_str_col_vals_str)
-                    top_k_str_vals_map[db_table] = top_k_str_col_vals_str
-                    top_k_str_vals.append(top_k_str_col_vals_str)
-
-            for query in queries:
-                query_id = query["query_id"]
-                original_sql_query = query["original_sql_query"]
-                modified_sql_query = query["modified_sql_query"]
-                data_split = query["data_split"]
-                english_explanation = query["english_explanation"]
-                sql_query = modified_sql_query if len(str(modified_sql_query)) > 3 else original_sql_query
-                sql_query = re.sub(" +", " ", sql_query)
-                sql_query = re.sub(" ,", ",", sql_query)
-                sql_query = sql_query + ";" if sql_query[-1] != ";" else sql_query
-                sql_query = uppercase_sql_keywords(sql_query)
-                filtered_tables = None
-                try:
-                    sql_query = adjust_identifier_case(table_schemas, sql_query)
-                    sql_query = normalize_order_by(sql_query)
-                    # sql_query = add_spaces_around_parentheses(sql_query)
-                    sql_query = remove_spaces_around_parentheses(sql_query)
-                    sql_query = remove_spaces_around_commas(sql_query)
-                    sql_query = adjust_alias_case(sql_query)
-                    sql_query = add_as_before_table_aliases(sql_query)
-                    if options.filter_null_groups:
-                        old_sql_query = copy.deepcopy(sql_query)
-                        sql_query = add_not_null_filters(sql_query)
-                        if sql_query != old_sql_query:
-                            try:
-                                con.execute(sql_query)
-                                print(f"Rewrite SUCCESS: {query_id}")
-                                num_null_rewrite_successes += 1
-                            except Exception as e:
-                                print(f"Rewrite FAIL: {query_id}")
-                                num_null_rewrite_fails += 1
-                                null_rewrite_fail_ids.append(query_id)
-                                sql_query = old_sql_query
-                    # sql_query = remove_join_aliases(table_schemas, sql_query)
-
-                    # query_and_tables = adjust_identifier_case(table_schemas, sql_query)
-                    # sql_query = query_and_tables["query"]
-                    # filtered_tables = query_and_tables["tables"]
-                except Exception as e:
-                    print(f"Exception Query ID: {query_id} DB: {db_id} Query: {sql_query}")
-                    print(e)
+                if db_num < options.start_db:
+                    db_num += 1
                     continue
-                # print(f"Query ID: {query_id} DB: {db_id} Query: {sql_query}")
-                sql_query = sql_query + ";" if sql_query[-1] != ";" else sql_query
-
-                # print(f"Query ID: {query_id}")
-                # print(f"SQL Query: {sql_query}")
                 try:
-                    if sql_query not in db_query_cache:
-                        con.execute(sql_query)
-                    successful_queries += 1
-                    if options.write_sql_prompts:
-                        filtered_tables = extract_tables_from_query(con, sql_query)
-                        # print(f"Query ID: {query_id} Tables: {filtered_tables} Query: {sql_query}")
-                        sql_query_tokens = tokenizer.tokenize(sql_query)
-                        num_sql_query_tokens = len(sql_query_tokens)
-                        filtered_table_schemas = []
-                        for db_table in filtered_tables:
-                            filtered_table_schemas.append(table_schemas_map[db_table.lower()])
-                        filtered_top_k_str_vals = []
-                        if options.top_k_str_vals > 0:
+                    con = heavyai.connect(user=options.user, password=options.password, host=options.host, dbname=db_id)
+                except Exception as e:
+                    print(f"Error connecting to database {db_id}: {e}")
+                    db_num += 1
+                    continue
+                db_query_cache = query_cache_by_db[db_id] if db_id in query_cache_by_db else set()
+                num_queries = len(queries)
+                successful_queries = 0
+                db_tables = con.get_tables()
+                table_schemas = []
+                table_cols = []
+                table_schemas_map = {}
+                top_k_str_vals_map = {}
+                top_k_str_vals = []
+                strings_cols_top_k = 5
+                for db_table in db_tables:
+                    table_schema = get_table_schema(con, db_table)
+                    if options.add_columns_to_answers:
+                        table_cols.extend(get_table_cols(con, db_table))
+                    table_schemas.append(table_schema)
+                    table_schemas_map[db_table.lower()] = table_schema
+                    if options.top_k_str_vals > 0:
+                        table_str_cols = get_table_str_cols(con, db_table)
+                        str_cols_top_k_vals = {
+                            str_col: get_top_k_vals(con, db_table, str_col, strings_cols_top_k)
+                            for str_col in table_str_cols
+                        }
+                        # print(str_cols_top_k_vals)
+                        top_k_str_col_vals_str = get_top_k_vals_str(db_table, str_cols_top_k_vals)
+                        # print(top_k_str_col_vals_str)
+                        top_k_str_vals_map[db_table] = top_k_str_col_vals_str
+                        top_k_str_vals.append(top_k_str_col_vals_str)
+
+                for query in queries:
+                    query_id = query["query_id"]
+                    original_sql_query = query["original_sql_query"]
+                    modified_sql_query = query["modified_sql_query"]
+                    data_split = query["data_split"]
+                    english_explanation = query["english_explanation"]
+                    sql_query = modified_sql_query if len(str(modified_sql_query)) > 3 else original_sql_query
+                    sql_query = re.sub(" +", " ", sql_query)
+                    sql_query = re.sub(" ,", ",", sql_query)
+                    sql_query = sql_query + ";" if sql_query[-1] != ";" else sql_query
+                    sql_query = uppercase_sql_keywords(sql_query)
+                    filtered_tables = None
+                    try:
+                        sql_query = adjust_identifier_case(table_schemas, sql_query)
+                        sql_query = normalize_order_by(sql_query)
+                        # sql_query = add_spaces_around_parentheses(sql_query)
+                        sql_query = remove_spaces_around_parentheses(sql_query)
+                        sql_query = remove_spaces_around_commas(sql_query)
+                        sql_query = adjust_alias_case(sql_query)
+                        sql_query = add_as_before_table_aliases(sql_query)
+                        if options.filter_null_groups:
+                            old_sql_query = copy.deepcopy(sql_query)
+                            sql_query = add_not_null_filters(sql_query)
+                            if sql_query != old_sql_query:
+                                try:
+                                    con.execute(sql_query)
+                                    print(f"Rewrite SUCCESS: {query_id}")
+                                    num_null_rewrite_successes += 1
+                                except Exception as e:
+                                    print(f"Rewrite FAIL: {query_id}")
+                                    num_null_rewrite_fails += 1
+                                    null_rewrite_fail_ids.append(query_id)
+                                    sql_query = old_sql_query
+                        # sql_query = remove_join_aliases(table_schemas, sql_query)
+
+                        # query_and_tables = adjust_identifier_case(table_schemas, sql_query)
+                        # sql_query = query_and_tables["query"]
+                        # filtered_tables = query_and_tables["tables"]
+                    except Exception as e:
+                        print(f"Exception Query ID: {query_id} DB: {db_id} Query: {sql_query}")
+                        print(e)
+                        continue
+                    # print(f"Query ID: {query_id} DB: {db_id} Query: {sql_query}")
+                    sql_query = sql_query + ";" if sql_query[-1] != ";" else sql_query
+
+                    # print(f"Query ID: {query_id}")
+                    # print(f"SQL Query: {sql_query}")
+                    try:
+                        if sql_query not in db_query_cache:
+                            con.execute(sql_query)
+                        successful_queries += 1
+                        if options.write_sql_prompts:
+                            filtered_tables = extract_tables_from_query(con, sql_query)
+                            # print(f"Query ID: {query_id} Tables: {filtered_tables} Query: {sql_query}")
+                            sql_query_tokens = tokenizer.tokenize(sql_query)
+                            num_sql_query_tokens = len(sql_query_tokens)
+                            filtered_table_schemas = []
                             for db_table in filtered_tables:
-                                filtered_top_k_str_vals.append(top_k_str_vals_map[db_table])
-                        instruction = generate_instruction(table_schemas, top_k_str_vals, query["question"])
-                        targeted_instruction = generate_instruction(
-                            filtered_table_schemas, filtered_top_k_str_vals, query["question"]
-                        )
-                        instruction_tokens = tokenizer.tokenize(instruction)
-                        num_instruction_tokens = len(instruction_tokens)
-                        targeted_instruction_tokens = tokenizer.tokenize(targeted_instruction)
-                        num_targeted_instruction_tokens = len(targeted_instruction_tokens)
-                        if num_targeted_instruction_tokens > options.max_instruction_tokens:
-                            targeted_instruction = generate_instruction(filtered_table_schemas, [], query["question"])
+                                filtered_table_schemas.append(table_schemas_map[db_table.lower()])
+                            filtered_top_k_str_vals = []
+                            if options.top_k_str_vals > 0:
+                                for db_table in filtered_tables:
+                                    filtered_top_k_str_vals.append(top_k_str_vals_map[db_table])
+                            instruction = generate_instruction(table_schemas, top_k_str_vals, query["question"])
+                            targeted_instruction = generate_instruction(
+                                filtered_table_schemas, filtered_top_k_str_vals, query["question"]
+                            )
+                            instruction_tokens = tokenizer.tokenize(instruction)
+                            num_instruction_tokens = len(instruction_tokens)
                             targeted_instruction_tokens = tokenizer.tokenize(targeted_instruction)
                             num_targeted_instruction_tokens = len(targeted_instruction_tokens)
-                        if options.add_columns_to_answers:
-                            query_plan = get_query_plan(con, sql_query)
-                            col_mapping = extract_column_mappings(query_plan)
-                            unique_used_columns = get_unique_columns(col_mapping)
-                            sorted_used_columns = schema_order_columns(table_cols, unique_used_columns)
-                            output = "Columns used in the query:\n"
-                            for col in sorted_used_columns:
-                                output += col + "\n"
-                            output += "\n\nSQL query:\n" + sql_query
-                        else:
-                            output = copy.deepcopy(sql_query)
+                            if num_targeted_instruction_tokens > options.max_instruction_tokens:
+                                targeted_instruction = generate_instruction(
+                                    filtered_table_schemas, [], query["question"]
+                                )
+                                targeted_instruction_tokens = tokenizer.tokenize(targeted_instruction)
+                                num_targeted_instruction_tokens = len(targeted_instruction_tokens)
+                            if options.add_columns_to_answers:
+                                query_plan = get_query_plan(con, sql_query)
+                                col_mapping = extract_column_mappings(query_plan)
+                                unique_used_columns = get_unique_columns(col_mapping)
+                                sorted_used_columns = schema_order_columns(table_cols, unique_used_columns)
+                                output = "Columns used in the query:\n"
+                                for col in sorted_used_columns:
+                                    output += col + "\n"
+                                output += "\n\nSQL query:\n" + sql_query
+                            else:
+                                output = copy.deepcopy(sql_query)
 
-                        sql_query_tokens = tokenizer.tokenize(sql_query)
-                        num_sql_query_tokens = len(sql_query_tokens)
-                        # sql_query_with_semicolon = sql_query + ";" if sql_query[-1] != ";" else sql_query
-                        prompts.append(
-                            {
-                                "db_id": db_id,
-                                "query_id": query_id,
-                                "data_split": data_split,
-                                "tables": filtered_tables,
-                                "instruction": instruction,
-                                "targeted_instruction": targeted_instruction,
-                                "output": output,
-                                "instruction_tokens": num_instruction_tokens,
-                                "targeted_instruction_tokens": num_targeted_instruction_tokens,
-                                "output_tokens": num_sql_query_tokens,
-                            }
-                        )
-                    if options.write_english_prompts:
-                        if len(english_explanation) > 4:
-                            cursor = con.execute(sql_query)
-                            results = str(cursor.fetchall())
-                            instruction = f"The user asked the following question:\n{query['question']}\n\nTo answer the question, the following SQL query was generated:\n{sql_query}\n\nThe following results were returned:\n\n{results}\n\nNow explain the results in English, referencing the question and the SQL query as needed."
-                            english_prompts.append(
+                            sql_query_tokens = tokenizer.tokenize(sql_query)
+                            num_sql_query_tokens = len(sql_query_tokens)
+                            # sql_query_with_semicolon = sql_query + ";" if sql_query[-1] != ";" else sql_query
+                            prompts.append(
+                                {
+                                    "db_id": db_id,
+                                    "query_id": query_id,
+                                    "data_split": data_split,
+                                    "tables": filtered_tables,
+                                    "instruction": instruction,
+                                    "targeted_instruction": targeted_instruction,
+                                    "output": output,
+                                    "instruction_tokens": num_instruction_tokens,
+                                    "targeted_instruction_tokens": num_targeted_instruction_tokens,
+                                    "output_tokens": num_sql_query_tokens,
+                                }
+                            )
+                        if options.write_english_prompts:
+                            if len(english_explanation) > 4:
+                                cursor = con.execute(sql_query)
+                                results = str(cursor.fetchall())
+                                instruction = f"The user asked the following question:\n{query['question']}\n\nTo answer the question, the following SQL query was generated:\n{sql_query}\n\nThe following results were returned:\n\n{results}\n\nNow explain the results in English, referencing the question and the SQL query as needed."
+                                english_prompts.append(
+                                    {
+                                        "db_id": db_id,
+                                        "query_id": query_id,
+                                        "data_split": data_split,
+                                        "instruction": instruction,
+                                        "output": english_explanation,
+                                    }
+                                )
+                        if options.write_question_prompts:
+                            filtered_tables = extract_tables_from_query(con, sql_query)
+                            filtered_table_schemas = []
+                            for db_table in filtered_tables:
+                                filtered_table_schemas.append(table_schemas_map[db_table.lower()])
+                            filtered_top_k_str_vals = []
+                            if options.top_k_str_vals > 0:
+                                for db_table in filtered_tables:
+                                    filtered_top_k_str_vals.append(top_k_str_vals_map[db_table])
+                            unique_columns = None
+                            if options.add_columns_to_question_prompts:
+                                query_plan = get_query_plan(con, sql_query)
+                                col_mapping = extract_column_mappings(query_plan)
+                                unique_columns = get_unique_columns(col_mapping)
+                            instruction = generate_question(
+                                filtered_table_schemas, filtered_top_k_str_vals, unique_columns
+                            )
+                            instruction_tokens = tokenizer.tokenize(instruction)
+                            num_instruction_tokens = len(instruction_tokens)
+                            if num_instruction_tokens > options.max_instruction_tokens:
+                                print(f"Instruction too long: {num_instruction_tokens}")
+                                instruction = generate_question(filtered_table_schemas, None, unique_columns)
+                            question_prompts.append(
                                 {
                                     "db_id": db_id,
                                     "query_id": query_id,
                                     "data_split": data_split,
                                     "instruction": instruction,
-                                    "output": english_explanation,
+                                    "output": query["question"],
                                 }
                             )
-                    if options.write_question_prompts:
-                        filtered_tables = extract_tables_from_query(con, sql_query)
-                        filtered_table_schemas = []
-                        for db_table in filtered_tables:
-                            filtered_table_schemas.append(table_schemas_map[db_table.lower()])
-                        filtered_top_k_str_vals = []
-                        if options.top_k_str_vals > 0:
-                            for db_table in filtered_tables:
-                                filtered_top_k_str_vals.append(top_k_str_vals_map[db_table])
-                        unique_columns = None
-                        if options.add_columns_to_question_prompts:
-                            query_plan = get_query_plan(con, sql_query)
-                            col_mapping = extract_column_mappings(query_plan)
-                            unique_columns = get_unique_columns(col_mapping)
-                        instruction = generate_question(filtered_table_schemas, filtered_top_k_str_vals, unique_columns)
-                        instruction_tokens = tokenizer.tokenize(instruction)
-                        num_instruction_tokens = len(instruction_tokens)
-                        if num_instruction_tokens > options.max_instruction_tokens:
-                            print(f"Instruction too long: {num_instruction_tokens}")
-                            instruction = generate_question(filtered_table_schemas, None, unique_columns)
-                        question_prompts.append(
-                            {
-                                "db_id": db_id,
-                                "query_id": query_id,
-                                "data_split": data_split,
-                                "instruction": instruction,
-                                "output": query["question"],
-                            }
-                        )
 
-                except Exception as e:
-                    print(f"Exception Query ID: {query_id} DB: {db_id} Query: {sql_query}")
-                    query_fixed = False
-                    if options.fix_queries:
-                        fixed_query = fix_failed_query_unquoted_keyword(con, query_id, sql_query, e)
-                        if fixed_query is None:
-                            fixed_query = fix_failed_query_implicit_group_by(con, query_id, sql_query, e)
-                        if fixed_query is not None:
-                            fixed_queries.append({"query_id": query_id, "db_id": db_id, "sql_query": fixed_query})
-                            query_fixed = True
-                    if options.fix_queries_gpt and not query_fixed:
-                        fixed_query = fix_failed_query_gpt(con, query_id, sql_query, e)
-                        if fixed_query is not None:
-                            # print(f"Fixed query: {fixed_query}")
-                            fixed_queries.append({"query_id": query_id, "db_id": db_id, "sql_query": fixed_query})
-                            query_fixed = True
-                    if not query_fixed:
-                        failed_queries.append({"query_id": query_id, "db_id": db_id, "sql_query": sql_query})
-            total_queries += num_queries
-            total_successful_queries += successful_queries
-            print(f"{db_num}: {db_id} successful queries: {successful_queries}/{num_queries}")
-            db_num += 1
-            if options.num_dbs != None and db_num >= options.num_dbs + options.start_db:
-                break
-        except Exception as e:
-            pass
-    failures_df = pd.DataFrame(failed_queries)
-    failures_df.to_csv("failed_queries.csv", index=False)
-    if options.fix_queries or options.fix_queries_gpt:
-        fixes_df = pd.DataFrame(fixed_queries)
-        fixes_df.to_csv("fixed_queries.csv", index=False)
-    if options.write_sql_prompts:
-        with open("sql_all_prompts.json", "w") as file:
-            json.dump(prompts, file, indent=4)
-        write_sql_prompts_to_csv(prompts, "sql_all_prompts.csv")
-    if options.write_english_prompts:
-        write_english_prompts_to_csv(english_prompts, "sql_english_prompts.csv")
-    if options.write_question_prompts:
-        write_question_prompts_to_csv(question_prompts, "sql_question_prompts.csv")
+                    except Exception as e:
+                        print(f"Exception Query ID: {query_id} DB: {db_id} Query: {sql_query}")
+                        query_fixed = False
+                        if options.fix_queries:
+                            fixed_query = fix_failed_query_unquoted_keyword(con, query_id, sql_query, e)
+                            if fixed_query is None:
+                                fixed_query = fix_failed_query_implicit_group_by(con, query_id, sql_query, e)
+                            if fixed_query is not None:
+                                fixed_queries.append({"query_id": query_id, "db_id": db_id, "sql_query": fixed_query})
+                                query_fixed = True
+                        if options.fix_queries_gpt and not query_fixed:
+                            fixed_query = fix_failed_query_gpt(con, query_id, sql_query, e)
+                            if fixed_query is not None:
+                                # print(f"Fixed query: {fixed_query}")
+                                fixed_queries.append({"query_id": query_id, "db_id": db_id, "sql_query": fixed_query})
+                                query_fixed = True
+                        if not query_fixed:
+                            failed_queries.append({"query_id": query_id, "db_id": db_id, "sql_query": sql_query})
+                total_queries += num_queries
+                total_successful_queries += successful_queries
+                print(f"{db_num}: {db_id} successful queries: {successful_queries}/{num_queries}")
+                db_num += 1
+                if options.num_dbs != None and db_num >= options.num_dbs + options.start_db:
+                    break
+            except Exception as e:
+                pass
+        failures_df = pd.DataFrame(failed_queries)
+        failures_df.to_csv("failed_queries.csv", index=False)
+        if options.fix_queries or options.fix_queries_gpt:
+            fixes_df = pd.DataFrame(fixed_queries)
+            fixes_df.to_csv("fixed_queries.csv", index=False)
+        if options.write_sql_prompts:
+            with open("sql_all_prompts.json", "w") as file:
+                json.dump(prompts, file, indent=4)
+            write_sql_prompts_to_csv(prompts, "sql_all_prompts.csv")
+        if options.write_english_prompts:
+            write_english_prompts_to_csv(english_prompts, "sql_english_prompts.csv")
+        if options.write_question_prompts:
+            write_question_prompts_to_csv(question_prompts, "sql_question_prompts.csv")
 
-    print(f"\n\nTotal NULL Rewrite SUCCESSES: {num_null_rewrite_successes}, FAILS: {num_null_rewrite_fails}")
-    print(f"\n\nTotal successful queries: {total_successful_queries}/{total_queries}")
-    print(f"Total successful fixed queries: {len(fixed_queries)}/{total_queries}")
-    print(", ".join(str(id) for id in null_rewrite_fail_ids))
-    # print(f"Total successful altered queries: {total_successful_altered_queries}/{total_queries}")
+        print(f"\n\nTotal NULL Rewrite SUCCESSES: {num_null_rewrite_successes}, FAILS: {num_null_rewrite_fails}")
+        print(f"\n\nTotal successful queries: {total_successful_queries}/{total_queries}")
+        print(f"Total successful fixed queries: {len(fixed_queries)}/{total_queries}")
+        print(", ".join(str(id) for id in null_rewrite_fail_ids))
+        # print(f"Total successful altered queries: {total_successful_altered_queries}/{total_queries}")
 
 
 if __name__ == "__main__":
