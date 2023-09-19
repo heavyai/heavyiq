@@ -33,6 +33,11 @@ def conf_file(tmp_path: Path, request: FixtureRequest):
     [iq]
     openai_api_key = "some-dummy-key"
     """
+    openai_config_with_data_dir = """
+    data = "test-data-dir"
+    [iq]
+    openai_api_key = "some-dummy-key"
+    """
     custom_api_config_without_base = """
     [iq]
     openai_api_key = ""
@@ -72,6 +77,7 @@ def conf_file(tmp_path: Path, request: FixtureRequest):
         "custom_api_vllm_config_without_base": custom_api_vllm_config_without_base,
         "custom_api_vllm_config_with_base": custom_api_vllm_config_with_base,
         "custom_api_invalid": custom_api_invalid,
+        "openai_config_with_data_dir": openai_config_with_data_dir,
     }
 
     # Get the custom value specified in the test function
