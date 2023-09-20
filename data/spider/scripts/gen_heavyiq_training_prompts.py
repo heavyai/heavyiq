@@ -410,27 +410,54 @@ def get_top_k_vals_str(table_name, top_k_vals):
     #    f"The most common {len(values)} values for column {key} are: {', '.join(values)}."
     #    for key, values in top_k_vals.items()
     # ]
-    top_k_vals_strs = [f"{table_name}.{key}: {', '.join(values['top_k_vals'])}" for key, values in top_k_vals.items()]
+    top_k_vals_strs = [
+        f"{table_name}.{key}: {'top_k_vals': ', '.join(values['top_k_vals']), 'cardinality': values['cardinality']}"
+        for key, values in top_k_vals.items()
+    ]
     return top_k_vals_strs
     # return "\n".join(top_k_vals_strs)
 
 
-def generate_instruction(table_schemas, top_k_str_vals, user_question=None):
-    # print(top_k_str_vals)
-    top_k_str_vals_str = ""
-    if top_k_str_vals is not None and len(top_k_str_vals) > 0:
-        top_k_str_vals_str = "Sample values for TEXT columns (comma-separated):\n"
-        for table_top_k_str_vals in top_k_str_vals:
-            top_k_str_vals_str += "\n".join(table_top_k_str_vals)
-            top_k_str_vals_str += "\n"
+def generate_table_metadata_str(table_schemas, top_k_str_vals, low_card_col_threshold):
+    assert len(table_schemas) == len(top_k_str_vals) or len(top_k_str_vals) == 0
+    table_metadata_str = ""
+    for idx, table_schema in enumerate(table_schemas):
+        table_metadata_str += table_schema + "\n"
+        if len(top_k_str_vals) > 0:
+            table_top_k_str_vals = top_k_str_vals[idx]
+            low_card_str_cols = [
+                top_k_str_col
+                for top_k_str_col in table_top_k_str_vals
+                if top_k_str_col["cardinality"] <= low_card_col_threshold
+            ]
+            high_card_str_cols = [
+                top_k_str_col
+                for top_k_str_col in table_top_k_str_vals
+                if top_k_str_col["cardinality"] > low_card_col_threshold
+            ]
+            if len(low_card_str_cols) > 0:
+                table_metadata_str += "Low cardinality columns and every possible value:\n"
+                for top_k_str_col in low_card_str_cols:
+                    table_metadata_str += f"{top_k_str_col['column_name']}: {', '.join(top_k_str_col['top_k_vals'])}\n"
+            if len(high_card_str_cols) > 0:
+                table_metadata_str += "High cardinality columns and most common values:\n"
+                for top_k_str_col in high_card_str_cols:
+                    table_metadata_str += f"{top_k_str_col['column_name']}: {', '.join(top_k_str_col['top_k_vals'])}\n"
+        table_metadata_str += "\n"
+
+    print(table_metadata_str)
+    return table_metadata_str
+
+
+def generate_instruction(table_metadata, user_question=None):
     if user_question is not None:
-        instruction = """You are a experienced data analyst adept at writing SQL queries to answer user questions.\nYou have access to the following relational tables, with schemas below.\n{table_schemas}\n\n{top_k_str_vals_str}\nWrite a SQL query to answer the following question:\n\n{user_question}\n""".format(
-            table_schemas="\n\n".join(table_schemas), top_k_str_vals_str=top_k_str_vals_str, user_question=user_question
+        instruction = """You are a experienced data analyst adept at writing SQL queries to answer user questions.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nWrite a SQL query to answer the following question:\n\n{user_question}\n""".format(
+            table_metadata=table_metadata, user_question=user_question
         )
         return instruction
     else:
-        instruction = """You are a experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n\n{table_schemas}\n\n{top_k_str_vals_str}\nWrite a compelling question to ask of the above data:\n""".format(
-            table_schemas="\n\n".join(table_schemas), top_k_str_vals_str=top_k_str_vals_str
+        instruction = """You are a experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nWrite a compelling question to ask of the above data:\n""".format(
+            table_metadata=table_metadata
         )
         return instruction
 
@@ -837,11 +864,11 @@ def generate_error_prompts(error_queries_file, output_file, options):
                     )
                     for str_col in table_str_cols
                 }
-                top_k_str_col_vals_str = get_top_k_vals_str(db_table, str_cols_top_k_vals)
+                # top_k_str_col_vals_str = get_top_k_vals_str(db_table, str_cols_top_k_vals)
                 top_k_str_vals_map[db_table] = top_k_str_col_vals_str
                 top_k_str_vals.append(top_k_str_col_vals_str)
         print(table_schemas)
-        print(top_k_str_vals)
+        # print(top_k_str_vals)
         question = row["question"]
         data_split = row["dataset"]
         error_sql_query = row["error_sql_query"]
@@ -959,8 +986,8 @@ def main(argv):
                     table_schemas_map[db_table.lower()] = table_schema
                     if options.low_card_top_k_str_vals > 0:
                         table_str_cols = get_table_str_cols(con, db_table)
-                        str_cols_top_k_vals = {
-                            str_col: get_high_low_card_top_k_vals(
+                        str_cols_top_k_vals = [
+                            get_high_low_card_top_k_vals(
                                 con,
                                 db_table,
                                 str_col,
@@ -968,12 +995,12 @@ def main(argv):
                                 options.high_card_top_k_str_vals,
                             )
                             for str_col in table_str_cols
-                        }
+                        ]
                         # print(str_cols_top_k_vals)
-                        top_k_str_col_vals_str = get_top_k_vals_str(db_table, str_cols_top_k_vals)
+                        # top_k_str_col_vals_str = get_top_k_vals_str(db_table, str_cols_top_k_vals)
                         # print(top_k_str_col_vals_str)
-                        top_k_str_vals_map[db_table] = top_k_str_col_vals_str
-                        top_k_str_vals.append(top_k_str_col_vals_str)
+                        top_k_str_vals_map[db_table] = str_cols_top_k_vals
+                        top_k_str_vals.append(str_cols_top_k_vals)
 
                 for query in queries:
                     query_id = query["query_id"]
@@ -1038,18 +1065,26 @@ def main(argv):
                             if options.top_k_str_vals > 0:
                                 for db_table in filtered_tables:
                                     filtered_top_k_str_vals.append(top_k_str_vals_map[db_table])
-                            instruction = generate_instruction(table_schemas, top_k_str_vals, query["question"])
-                            targeted_instruction = generate_instruction(
-                                filtered_table_schemas, filtered_top_k_str_vals, query["question"]
+                            print(top_k_str_vals)
+                            print(filtered_top_k_str_vals)
+                            full_table_metadata = generate_table_metadata_str(
+                                table_schemas, top_k_str_vals, options.low_card_top_k_str_vals
                             )
+                            filtered_table_metadata = generate_table_metadata_str(
+                                filtered_table_schemas, filtered_top_k_str_vals, options.low_card_top_k_str_vals
+                            )
+
+                            instruction = generate_instruction(full_table_metadata, query["question"])
+                            targeted_instruction = generate_instruction(filtered_table_metadata, query["question"])
                             instruction_tokens = tokenizer.tokenize(instruction)
                             num_instruction_tokens = len(instruction_tokens)
                             targeted_instruction_tokens = tokenizer.tokenize(targeted_instruction)
                             num_targeted_instruction_tokens = len(targeted_instruction_tokens)
                             if num_targeted_instruction_tokens > options.max_instruction_tokens:
-                                targeted_instruction = generate_instruction(
-                                    filtered_table_schemas, [], query["question"]
+                                filtered_table_metadata = generate_table_metadata_str(
+                                    filtered_table_schemas, [], options.low_card_top_k_str_vals
                                 )
+                                targeted_instruction = generate_instruction(filtered_table_metadata, query["question"])
                                 targeted_instruction_tokens = tokenizer.tokenize(targeted_instruction)
                                 num_targeted_instruction_tokens = len(targeted_instruction_tokens)
                             if options.add_columns_to_answers:
