@@ -390,9 +390,7 @@ def get_top_k_vals(con, table_name, column_name, top_k):
 
 
 def get_high_low_card_top_k_vals(con, table_name, column_name, low_card_top_k, high_card_top_k):
-    count_distinct_sql = (
-        f"""SELECT COUNT(DISTINCT "{column_name}") FROM "{table_name}" WHERE "{column_name}" IS NOT NULL"""
-    )
+    count_distinct_sql = f"""SELECT COUNT(DISTINCT "{column_name}") FROM "{table_name}" WHERE "{column_name}" IS NOT NULL AND LENGTH("{column_name}") > 0"""
     cardinality = list(con.execute(count_distinct_sql))[0][0]
     top_k = high_card_top_k
     if cardinality <= low_card_top_k:
@@ -405,7 +403,6 @@ def get_high_low_card_top_k_vals(con, table_name, column_name, low_card_top_k, h
 
 
 def get_top_k_vals_str(table_name, top_k_vals):
-    print(top_k_vals)
     # top_k_vals_strs = [
     #    f"The most common {len(values)} values for column {key} are: {', '.join(values)}."
     #    for key, values in top_k_vals.items()
@@ -445,7 +442,6 @@ def generate_table_metadata_str(table_schemas, top_k_str_vals, low_card_col_thre
                     table_metadata_str += f"{top_k_str_col['column_name']}: {', '.join(top_k_str_col['top_k_vals'])}\n"
         table_metadata_str += "\n"
 
-    print(table_metadata_str)
     return table_metadata_str
 
 
@@ -462,13 +458,7 @@ def generate_instruction(table_metadata, user_question=None):
         return instruction
 
 
-def generate_question(table_schemas, top_k_str_vals, unique_columns=None):
-    top_k_str_vals_str = ""
-    if top_k_str_vals is not None and len(top_k_str_vals) > 0:
-        top_k_str_vals_str = "Sample values for TEXT columns (comma-separated):\n"
-        for table_top_k_str_vals in top_k_str_vals:
-            top_k_str_vals_str += "\n".join(table_top_k_str_vals)
-            top_k_str_vals_str += "\n"
+def generate_question(table_metadata, unique_columns=None):
     if unique_columns is not None:
         unique_columns_str = ""
         if len(unique_columns) > 0:
@@ -476,15 +466,14 @@ def generate_question(table_schemas, top_k_str_vals, unique_columns=None):
                 unique_columns_str += unique_column[1] + "." + unique_column[2] + "\n"
         else:
             unique_columns_str += "COUNT(*)\n"
-        instruction = """You are a experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n\n{table_schemas}\n\n{top_k_str_vals_str}\nUse the following columns to generate the question a compelling question of the data:\n\n{unique_columns_str}\n""".format(
-            table_schemas="\n\n".join(table_schemas),
-            top_k_str_vals_str=top_k_str_vals_str,
+        instruction = """You are a experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nUse the following columns to generate the question a compelling question of the data:\n\n{unique_columns_str}\n""".format(
+            table_metadata=table_metadata,
             unique_columns_str=unique_columns_str,
         )
         return instruction
     else:
-        instruction = """You are a experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n\n{table_schemas}\n\n{top_k_str_vals_str}\n\nWrite a compelling question to ask of the above data:\n""".format(
-            table_schemas="\n\n".join(table_schemas), top_k_str_vals_str=top_k_str_vals_str
+        instruction = """You are a experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nWrite a compelling question to ask of the above data:\n""".format(
+            table_metadata=table_metadata
         )
         return instruction
 
@@ -867,7 +856,6 @@ def generate_error_prompts(error_queries_file, output_file, options):
                 # top_k_str_col_vals_str = get_top_k_vals_str(db_table, str_cols_top_k_vals)
                 top_k_str_vals_map[db_table] = top_k_str_col_vals_str
                 top_k_str_vals.append(top_k_str_col_vals_str)
-        print(table_schemas)
         # print(top_k_str_vals)
         question = row["question"]
         data_split = row["dataset"]
@@ -1065,8 +1053,6 @@ def main(argv):
                             if options.top_k_str_vals > 0:
                                 for db_table in filtered_tables:
                                     filtered_top_k_str_vals.append(top_k_str_vals_map[db_table])
-                            print(top_k_str_vals)
-                            print(filtered_top_k_str_vals)
                             full_table_metadata = generate_table_metadata_str(
                                 table_schemas, top_k_str_vals, options.low_card_top_k_str_vals
                             )
@@ -1144,14 +1130,18 @@ def main(argv):
                                 query_plan = get_query_plan(con, sql_query)
                                 col_mapping = extract_column_mappings(query_plan)
                                 unique_columns = get_unique_columns(col_mapping)
-                            instruction = generate_question(
-                                filtered_table_schemas, filtered_top_k_str_vals, unique_columns
+                            filtered_table_metadata = generate_table_metadata_str(
+                                filtered_table_schemas, filtered_top_k_str_vals, options.low_card_top_k_str_vals
                             )
+                            instruction = generate_question(filtered_table_metadata, unique_columns)
                             instruction_tokens = tokenizer.tokenize(instruction)
                             num_instruction_tokens = len(instruction_tokens)
                             if num_instruction_tokens > options.max_instruction_tokens:
                                 print(f"Instruction too long: {num_instruction_tokens}")
-                                instruction = generate_question(filtered_table_schemas, None, unique_columns)
+                                filtered_table_metadata = generate_table_metadata_str(
+                                    filtered_table_schemas, [], options.low_card_top_k_str_vals
+                                )
+                                instruction = generate_question(filtered_table_metadata, unique_columns)
                             question_prompts.append(
                                 {
                                     "db_id": db_id,
