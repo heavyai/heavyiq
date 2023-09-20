@@ -3,8 +3,10 @@ from unittest.mock import patch
 import pytest
 from confz import DataSource
 
+from heavyiq.config import get_config
 from heavyiq.config.config_schema import HeavyIQConfig
 from heavyiq.langchain import HeavyDB
+from tests.langchain import FakeChatOpenAI, FakeOpenAI
 
 
 @pytest.fixture(scope="package")
@@ -30,3 +32,23 @@ def mock_heavy_db():
         yield None
 
     print("Tearing heavydb mock client")
+
+
+@pytest.fixture(scope="package")
+def fake_chat_llm():
+    config: HeavyIQConfig = get_config()
+    yield FakeChatOpenAI(
+        model=config.openai_gpt_model_nl_to_sql or config.openai_gpt_model,
+        temperature=0.0,
+        openai_api_key=config.openai_api_key,
+    )
+
+
+@pytest.fixture(scope="package")
+def fake_llm():
+    config: HeavyIQConfig = get_config()
+    yield FakeOpenAI(
+        model=config.openai_gpt_model_sql_to_answer or config.openai_gpt_model,
+        temperature=0.0,
+        openai_api_key=config.openai_api_key,
+    )
