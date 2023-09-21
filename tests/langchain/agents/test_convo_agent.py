@@ -1,11 +1,16 @@
 import re
+from unittest.mock import patch
 from langchain.agents import AgentExecutor
 from heavyiq.langchain import HeavyDB
 from langchain.schema import HumanMessage, AIMessage
 from heavyiq.langchain.agents.convo_agent import create_conversational_agent
 
 
-def test_should_create_and_run_chat_sql_agent_which_saves_last_run_sql_into_memory(mock_heavy_db: HeavyDB):
+@patch("heavyiq.config.get_config")
+def test_should_create_and_run_chat_sql_agent_which_saves_last_run_sql_into_memory(
+    MockConfig, mock_heavy_db: HeavyDB, heavyiq_config
+):
+    MockConfig.return_value = heavyiq_config
     agent: AgentExecutor = create_conversational_agent(mock_heavy_db)
     assert isinstance(agent, AgentExecutor)
     question = "What is the total population in the USA according to the data in the usa_states table?"
