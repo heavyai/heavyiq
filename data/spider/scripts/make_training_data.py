@@ -27,6 +27,9 @@ def getOptions(argv=None):
         "--questions-column-level-instruction-prompt", help="Column questions instruction prompt", default=None
     )
     parser.add_argument("--questions-column-level-output-prompt", help="Column questions output prompt", default=None)
+    parser.add_argument("-e", "--errors", help="Errors file", default=None)
+    parser.add_argument("--errors-instruction-prompt", help="Errors instruction prompt", default=None)
+    parser.add_argument("--errors-output-prompt", help="Errors output prompt", default=None)
     parser.add_argument("-t", "--max-token-length", help="Max token length", default=768)
     parser.add_argument("-o", "--output-dir", help="Output directory", default=None)
     parser.add_argument("--create-combo-dataset", help="Create combo dataset", action="store_true")
@@ -114,6 +117,30 @@ def load_questions(
     con.execute(export_eval_sql)
 
 
+def load_errors(con, errors_path, errors_instruction_prompt, errors_output_prompt, version, output_dir):
+    drop_table_sql = f"DROP TABLE IF EXISTS heavyiq_errors_v{version}"
+    create_table_sql = f"CREATE TABLE heavyiq_errors_v{version} (query_id INT, db_id TEXT, tables TEXT[], data_split TEXT, instruction TEXT, output TEXT);"
+    load_sql = f"COPY heavyiq_errors_v{version} FROM '{errors_path}' WITH (header='t', array_marker='[]');"
+    add_prompt_col_sql = f"ALTER TABLE heavyiq_errors_v{version} ADD COLUMN prompt TEXT;"
+    add_answer_col_sql = f"ALTER TABLE heavyiq_errors_v{version} ADD COLUMN answer TEXT;"
+    update_prompt_col_sql = f"UPDATE heavyiq_errors_v{version} SET prompt = instruction;"
+    if errors_instruction_prompt and errors_output_prompt is not None:
+        update_prompt_col_sql = f"UPDATE heavyiq_errors_v{version} SET prompt = '{errors_instruction_prompt}\n' || instruction || '\n{errors_output_prompt}\n';"
+    update_answer_col_sql = f"UPDATE heavyiq_errors_v{version} SET answer = output;"
+    export_train_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_errors_v{version} WHERE SAMPLE_RATIO(0.9)) TO '{output_dir}/heavyiq_errors_v{version}_train.csv' WITH (header='t');"
+    export_eval_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_errors_v{version} WHERE NOT SAMPLE_RATIO(0.9)) TO '{output_dir}/heavyiq_errors_v{version}_eval.csv' WITH (header='t');"
+
+    con.execute(drop_table_sql)
+    con.execute(create_table_sql)
+    con.execute(load_sql)
+    con.execute(add_prompt_col_sql)
+    con.execute(add_answer_col_sql)
+    con.execute(update_prompt_col_sql)
+    con.execute(update_answer_col_sql)
+    con.execute(export_train_sql)
+    con.execute(export_eval_sql)
+
+
 def create_combo_dataset(
     con,
     version,
@@ -122,6 +149,7 @@ def create_combo_dataset(
     nl_answers_table,
     questions_table_table,
     questions_column_table,
+    errors_table,
     only_sql_in_eval,
     output_dir,
 ):
@@ -142,6 +170,9 @@ def create_combo_dataset(
     load_questions_column_sql = None
     if questions_column_table is not None:
         load_questions_column_sql = f"INSERT INTO heavyiq_combo_v{version} SELECT query_id + 4000000, db_id, 'train', prompt, answer FROM {questions_column_table};"
+    load_errors_sql = None
+    if errors_table is not None:
+        load_errors_sql = f"INSERT INTO heavyiq_combo_v{version} SELECT query_id + 5000000, db_id, 'train', prompt, answer FROM {errors_table};"
     export_train_sql = f"COPY (SELECT id, db_id, prompt, answer FROM heavyiq_combo_v{version} WHERE data_split = 'train') TO '{output_dir}/heavyiq_combo_v{version}_train.csv' WITH (header='t');"
     export_eval_sql = f"COPY (SELECT id, db_id, prompt, answer FROM heavyiq_combo_v{version} WHERE data_split = 'eval') TO '{output_dir}/heavyiq_combo_v{version}_eval.csv' WITH (header='t');"
 
@@ -156,6 +187,8 @@ def create_combo_dataset(
         con.execute(load_questions_table_sql)
     if load_questions_column_sql is not None:
         con.execute(load_questions_column_sql)
+    if load_errors_sql is not None:
+        con.execute(load_errors_sql)
     con.execute(export_train_sql)
     con.execute(export_eval_sql)
 
@@ -166,6 +199,7 @@ def main(argv):
     nl_answers_table = None
     questions_table_table = None
     questions_column_table = None
+    errors_table = None
     if options.queries is not None:
         load_queries(
             con,
@@ -210,6 +244,17 @@ def main(argv):
         )
         questions_column_table = f"heavyiq_questions_column_v{options.version}"
 
+    if options.errors is not None:
+        load_errors(
+            con,
+            options.errors,
+            options.errors_instruction_prompt,
+            options.errors_output_prompt,
+            options.version,
+            options.output_dir,
+        )
+        errors_table = f"heavyiq_errors_v{options.version}"
+
     if options.create_combo_dataset and options.queries and options.nl_answers:
         create_combo_dataset(
             con,
@@ -219,6 +264,7 @@ def main(argv):
             nl_answers_table,
             questions_table_table,
             questions_column_table,
+            errors_table,
             True,
             options.output_dir,
         )
