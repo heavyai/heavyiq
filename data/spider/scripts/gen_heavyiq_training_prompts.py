@@ -845,17 +845,16 @@ def generate_error_prompts(error_queries_file, output_file, options):
             table_schema = get_table_schema(con, db_table)
             table_schemas.append(table_schema)
             table_schemas_map[db_table.lower()] = table_schema
-            if options.top_k_str_vals > 0:
+            if options.high_card_top_k_str_vals > 0 or options.low_card_top_k_str_vals > 0:
                 table_str_cols = get_table_str_cols(con, db_table)
-                str_cols_top_k_vals = {
-                    str_col: get_high_low_card_top_k_vals(
+                str_cols_top_k_vals = [
+                    get_high_low_card_top_k_vals(
                         con, db_table, str_col, options.low_card_top_k_str_vals, options.high_card_top_k_str_vals
                     )
                     for str_col in table_str_cols
-                }
-                # top_k_str_col_vals_str = get_top_k_vals_str(db_table, str_cols_top_k_vals)
-                top_k_str_vals_map[db_table] = top_k_str_col_vals_str
-                top_k_str_vals.append(top_k_str_col_vals_str)
+                ]
+                top_k_str_vals_map[db_table] = str_cols_top_k_vals
+                top_k_str_vals.append(str_cols_top_k_vals)
         # print(top_k_str_vals)
         question = row["question"]
         data_split = row["dataset"]
@@ -864,23 +863,21 @@ def generate_error_prompts(error_queries_file, output_file, options):
         correct_sql_query = row["correct_sql_query"]
 
         filtered_tables = extract_tables_from_query(con, correct_sql_query)
+        print(filtered_tables)
         filtered_table_schemas = []
         for db_table in filtered_tables:
             filtered_table_schemas.append(table_schemas_map[db_table.lower()])
         filtered_top_k_str_vals = []
-        if options.top_k_str_vals > 0:
+        if options.high_card_top_k_str_vals > 0 or options.low_card_top_k_str_vals > 0:
             for db_table in filtered_tables:
                 filtered_top_k_str_vals.append(top_k_str_vals_map[db_table])
         top_k_str_vals_str = ""
-        if filtered_top_k_str_vals is not None and len(filtered_top_k_str_vals) > 0:
-            top_k_str_vals_str = "Sample values for TEXT columns (comma-separated):\n"
-            for table_top_k_str_vals in filtered_top_k_str_vals:
-                top_k_str_vals_str += "\n".join(table_top_k_str_vals)
-                top_k_str_vals_str += "\n"
+        filtered_table_metadata = generate_table_metadata_str(
+            filtered_table_schemas, filtered_top_k_str_vals, options.low_card_top_k_str_vals
+        )
 
-        targeted_instruction = """You generated a SQL query that generated an exception when executed in the HeavyDB database.\n\nYou have access to the following relation tables, with schemas below.\n{table_schemas}\n\n{top_k_str_vals_str}\nIn attempting to answer the following user question:\n\n{question},\nyou generated the following SQL query:\n{error_sql_query}\n,which failed to run in the HeavyDB database, generating the following error:\n{error}\n\nPlease alter the query to run without error in HeavyDB:""".format(
-            table_schemas="\n\n".join(filtered_table_schemas),
-            top_k_str_vals_str=top_k_str_vals_str,
+        targeted_instruction = """You generated a SQL query that generated an exception when executed in the HeavyDB database.\n\nYou have access to the following relation tables, with schemas below.\n{table_metadata}\nIn attempting to answer the following user question:\n\n{question},\nyou generated the following SQL query:\n{error_sql_query}\n,which failed to run in the HeavyDB database, generating the following error:\n{error}\n\nPlease alter the query to run without error in HeavyDB:""".format(
+            table_metadata=filtered_table_metadata,
             question=question,
             error_sql_query=error_sql_query,
             error=error,
@@ -1122,7 +1119,7 @@ def main(argv):
                             for db_table in filtered_tables:
                                 filtered_table_schemas.append(table_schemas_map[db_table.lower()])
                             filtered_top_k_str_vals = []
-                            if options.top_k_str_vals > 0:
+                            if options.high_card_top_k_str_vals > 0 or options.low_card_top_k_str_vals > 0:
                                 for db_table in filtered_tables:
                                     filtered_top_k_str_vals.append(top_k_str_vals_map[db_table])
                             unique_columns = None
