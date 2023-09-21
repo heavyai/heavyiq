@@ -9,19 +9,14 @@ from heavyiq.langchain import HeavyDB
 from tests.langchain import FakeChatOpenAI, FakeOpenAI
 
 
-@pytest.fixture(scope="package")
-def heavyiq_config():
-    """
-    Fixture that supposed to return HeavyIQConfig by reading the config from `config.test.toml` or `config.test.conf` file.
-    Fallbacks to `config.toml`.
-    """
-    test_config_file = "./config.toml"
-    test_config_files = glob("config.test.*", root_dir=".")
-    if test_config_files:
-        test_config_file = f"./{test_config_files[0]}"  # type: ignore
-    print(f"Getting config from {test_config_file}")
-    with patch("heavyiq.config._config", new=None):
-        yield get_config(test_config_file)
+# @pytest.fixture(scope="package")
+# def heavyiq_config(config_file_path):
+#     """
+#     Fixture that supposed to return HeavyIQConfig by reading the config from passed config_file_path fixture..
+#     """
+#     print(f"Getting config from {config_file_path}")
+#     with patch("heavyiq.config._config", new=None):
+#         yield get_config(config_file_path)
 
 
 # Stayed here for reference

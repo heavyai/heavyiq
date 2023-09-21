@@ -1,11 +1,6 @@
 # Run Unit Tests:
 
-```bash
-python -m unittest discover
-```
-
-OR
 
 ```bash
-pytest tests --disable-warnings
+pytest tests --disable-warnings -rs --config-path="./config.test.toml"
 ```

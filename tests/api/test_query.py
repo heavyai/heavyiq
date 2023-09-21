@@ -1,6 +1,6 @@
 import pytest
 from typing import Any, Callable
-from .base import client, RunId
+from tests.api import RunId
 from unittest.mock import patch
 
 
@@ -14,7 +14,7 @@ async def mock_log_chain_call_async(chain: Any, chain_input: dict, model_name: s
 
 @pytest.mark.parametrize("expected_result", [{"sql": SQL, "sql_complexity": 3, "feedback_id": "acf2132"}])
 @patch("heavyiq.api.handlers.iq_handler.log_chain_call_async", side_effect=mock_log_chain_call_async)
-def test_should_pass_query_endpoint(mock: Callable, expected_result: list[Any]):
+def test_should_pass_query_endpoint(mock: Callable, expected_result: list[Any], client):
     """
     Test query endpoint.
     """

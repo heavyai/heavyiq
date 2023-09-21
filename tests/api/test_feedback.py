@@ -1,10 +1,9 @@
 from typing import Any
-from .base import client
 from unittest.mock import patch
 
 
 @patch("heavyiq.langchain.utils.is_langsmith_active", False)
-def test_should_fail_upon_submitting_feedback():
+def test_should_fail_upon_submitting_feedback(client):
     """
     Test /submit-feedback endpoint.
     """
@@ -20,7 +19,7 @@ def test_should_fail_upon_submitting_feedback():
 
 @patch("heavyiq.langchain.utils.is_langsmith_active", True)
 @patch("heavyiq.api.handlers.iq_handler.Client")
-def test_should_pass_upon_submitting_feedback(MockClient: Any):
+def test_should_pass_upon_submitting_feedback(MockClient: Any, client):
     """
     Test /submit-feedback endpoint.
     """
