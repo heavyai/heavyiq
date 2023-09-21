@@ -833,29 +833,34 @@ def schema_order_columns(table_cols: List[str], used_cols: List[Tuple[str, str, 
 def generate_error_prompts(error_queries_file, output_file, options):
     errors_df = pd.read_csv(error_queries_file)
     prompts = []
+    last_db = None
+    table_schemas = []
+    table_schemas_map = {}
+    top_k_str_vals = []
+    top_k_str_vals_map = {}
+    con = None
+    db_tables = None
+
     for index, row in errors_df.iterrows():
         db = row["db_id"]
-        con = heavyai.connect(user=options.user, password=options.password, host=options.host, dbname=db)
-        db_tables = con.get_tables()
-        table_schemas = []
-        table_schemas_map = {}
-        top_k_str_vals = []
-        top_k_str_vals_map = {}
-        for db_table in db_tables:
-            table_schema = get_table_schema(con, db_table)
-            table_schemas.append(table_schema)
-            table_schemas_map[db_table.lower()] = table_schema
-            if options.high_card_top_k_str_vals > 0 or options.low_card_top_k_str_vals > 0:
-                table_str_cols = get_table_str_cols(con, db_table)
-                str_cols_top_k_vals = [
-                    get_high_low_card_top_k_vals(
-                        con, db_table, str_col, options.low_card_top_k_str_vals, options.high_card_top_k_str_vals
-                    )
-                    for str_col in table_str_cols
-                ]
-                top_k_str_vals_map[db_table] = str_cols_top_k_vals
-                top_k_str_vals.append(str_cols_top_k_vals)
-        # print(top_k_str_vals)
+        if db != last_db:
+            con = heavyai.connect(user=options.user, password=options.password, host=options.host, dbname=db)
+            db_tables = con.get_tables()
+            for db_table in db_tables:
+                table_schema = get_table_schema(con, db_table)
+                table_schemas.append(table_schema)
+                table_schemas_map[db_table.lower()] = table_schema
+                if options.high_card_top_k_str_vals > 0 or options.low_card_top_k_str_vals > 0:
+                    table_str_cols = get_table_str_cols(con, db_table)
+                    str_cols_top_k_vals = [
+                        get_high_low_card_top_k_vals(
+                            con, db_table, str_col, options.low_card_top_k_str_vals, options.high_card_top_k_str_vals
+                        )
+                        for str_col in table_str_cols
+                    ]
+                    top_k_str_vals_map[db_table] = str_cols_top_k_vals
+                    top_k_str_vals.append(str_cols_top_k_vals)
+            last_db = copy.deepcopy(db)
         question = row["question"]
         data_split = row["dataset"]
         error_sql_query = row["error_sql_query"]
@@ -863,7 +868,6 @@ def generate_error_prompts(error_queries_file, output_file, options):
         correct_sql_query = row["correct_sql_query"]
 
         filtered_tables = extract_tables_from_query(con, correct_sql_query)
-        print(filtered_tables)
         filtered_table_schemas = []
         for db_table in filtered_tables:
             filtered_table_schemas.append(table_schemas_map[db_table.lower()])
