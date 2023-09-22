@@ -10,6 +10,15 @@ def pytest_addoption(parser):
     parser.addoption("--config-path", action="store")
 
 
+# Global variable to store the config file path
+CONFIG_FILE = None
+
+
+def pytest_configure(config):
+    global CONFIG_FILE
+    CONFIG_FILE = config.getoption("--config-path")
+
+
 @pytest.fixture(scope="session")
 def config_file_path(pytestconfig):
     """
