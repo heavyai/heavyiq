@@ -70,6 +70,24 @@ NewSQLQuery:
 """
 NL_TO_SQL_ERROR_PROMPT = PromptTemplate.from_template(NL_TO_SQL_ERROR_TEMPLATE)
 
+CUSTOM_NL_TO_SQL_ERROR_TEMPLATE = """<|sql error prompt|>
+You generated a SQL query that generated an exception when executed in the HeavyDB database.
+You have access to the following relation tables, with schemas below.
+{table_info}
+In attempting to answer the following user question:
+
+{input},
+you generated the following SQL query:
+{sql_cmd}
+, which failed to run in the HeavyDB database, generating the following error:
+{error}
+
+Please alter the query to run without error in HeavyDB:
+<|sql error answer|>"""
+
+CUSTOM_NL_TO_SQL_ERROR_PROMPT = PromptTemplate.from_template(CUSTOM_NL_TO_SQL_ERROR_TEMPLATE)
+
+
 NL_TO_SQL_CHAT_TEMPLATE = """Create a syntactically correct SQL query to answer the input question.
 Only query relevant columns, avoiding SELECT * for any table.
 Only create one query.
@@ -157,9 +175,11 @@ class NLtoSQLChain(BaseNLtoSQLChain):
     def __init__(self, *args, **kwargs):
         if is_using_custom_trained_llm():
             prompt = CUSTOM_LLM_NL_TO_SQL_PROMPT
+            error_prompt = CUSTOM_NL_TO_SQL_ERROR_PROMPT
         else:
             prompt = NL_TO_SQL_PROMPT
-        super().__init__(*args, prompt=prompt, **kwargs)  # type: ignore
+            error_prompt = NL_TO_SQL_ERROR_PROMPT
+        super().__init__(*args, prompt=prompt, error_prompt=error_prompt, **kwargs)  # type: ignore
 
     def _call(
         self,
