@@ -199,7 +199,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
         response = self.llm.generate_prompt(
             [gen_sql_prompt], callbacks=run_manager.get_child() if run_manager else None
         )
-        sql_cmd = response.generations[0][0].text.strip()
+        sql_cmd = response.generations[0][0].text.strip()  # type: ignore
         verified = False
         retries = 0
 
@@ -225,7 +225,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                 response = self.llm.generate_prompt(
                     [correct_error_prompt], callbacks=run_manager.get_child() if run_manager else None
                 )
-                sql_cmd = response.generations[0][0].text.strip()
+                sql_cmd = response.generations[0][0].text.strip()  # type: ignore
 
         if not verified:
             self.write_callback_message(
@@ -265,7 +265,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
         response = await self.llm.agenerate_prompt(
             [gen_sql_prompt], callbacks=run_manager.get_child() if run_manager else None
         )
-        sql_cmd = response.generations[0][0].text.strip()
+        sql_cmd = response.generations[0][0].text.strip()  # type: ignore
         verified = False
         retries = 0
 
@@ -274,7 +274,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                 await self.write_callback_message_async(
                     f"Verifying SQL Query: {sql_cmd}", run_manager=run_manager, color="blue"
                 )
-                self.database.validate_query(sql_cmd)
+                await run_in_threadpool(self.database.validate_query, sql_cmd)
                 verified = True
             except Exception as e:
                 retries += 1
@@ -299,7 +299,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                 response = await self.llm.agenerate_prompt(
                     [correct_error_prompt], callbacks=run_manager.get_child() if run_manager else None
                 )
-                sql_cmd = response.generations[0][0].text.strip()
+                sql_cmd = response.generations[0][0].text.strip()  # type: ignore
 
         if not verified:
             await self.write_callback_message_async(
@@ -315,12 +315,12 @@ class NLtoSQLChain(BaseNLtoSQLChain):
             await self.write_callback_message_async(
                 "Attempting to correct string literals in SQL query.", run_manager=run_manager, color="blue"
             )
-            sql_cmd = self.database.correct_string_literals(sql_cmd)
+            sql_cmd = await run_in_threadpool(self.database.correct_string_literals, sql_cmd)
             await self.write_callback_message_async(
                 f"Result of correction: {sql_cmd}", run_manager=run_manager, color="green"
             )
 
-        sql_complexity = self.database.complexity(sql_cmd)
+        sql_complexity = await run_in_threadpool(self.database.complexity, sql_cmd)
 
         return {self.output_key: strip_sql_comments(sql_cmd), self.output_complexity_key: str(sql_complexity)}
 
@@ -432,7 +432,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
                 await self.write_callback_message_async(
                     f"Verifying SQL Query: {sql_cmd}", run_manager=run_manager, color="blue"
                 )
-                self.database.validate_query(sql_cmd)
+                await run_in_threadpool(self.database.validate_query, sql_cmd)
                 verified = True
             except Exception as e:
                 retries += 1
@@ -446,7 +446,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
                 response = await self.llm.agenerate(
                     [messages], callbacks=run_manager.get_child() if run_manager else None
                 )
-                sql_cmd = self.get_sql_query(response.generations[0][0].text)
+                sql_cmd = self.get_sql_query(response.generations[0][0].text)  # type: ignore
 
         if not verified:
             await self.write_callback_message_async(
@@ -462,12 +462,12 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
             await self.write_callback_message_async(
                 "Attempting to correct string literals in SQL query.", run_manager=run_manager, color="blue"
             )
-            sql_cmd = self.database.correct_string_literals(sql_cmd)
+            sql_cmd = await run_in_threadpool(self.database.correct_string_literals, sql_cmd)
             await self.write_callback_message_async(
                 f"Result of correction: {sql_cmd}", run_manager=run_manager, color="green"
             )
 
-        sql_complexity = self.database.complexity(sql_cmd)
+        sql_complexity = await run_in_threadpool(self.database.complexity, sql_cmd)
 
         return {self.output_key: strip_sql_comments(sql_cmd), self.output_complexity_key: str(sql_complexity)}
 
