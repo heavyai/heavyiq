@@ -142,3 +142,14 @@ class AsyncLoggingMiddleware(LoggingMiddleware):
 
         response.background = BackgroundTask(self.write_log_data, logs)
         return response
+
+
+async def log_request_middleware(request: Request):
+    heavyiq_logger: HeavyIQLogger = get_heavyiq_logger()
+    log = Log(
+        type=heavyiq_logger,
+        level="debug",
+        message="Request Body: %s",
+        values=[await request.json() if request.method != "GET" else ""],
+    )
+    await run_in_threadpool(AsyncLoggingMiddleware.write_log_data, [log])

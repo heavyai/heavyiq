@@ -1,13 +1,13 @@
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from heavydb.exceptions import Error as HeavyDBError  # type: ignore
 from starlette.exceptions import HTTPException
 
 from heavyiq.config import get_config
-from heavyiq.api.middlewares import AsyncLoggingMiddleware
+from heavyiq.api.middlewares import AsyncLoggingMiddleware, log_request_middleware
 from heavyiq.api.models.error import ErrorResponse
 from heavyiq.langchain.exceptions import NLtoSQLException
 from heavyiq.logging_utils import init_logs
@@ -76,6 +76,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
                 "model": ErrorResponse,
             }
         },
+        dependencies=[Depends(log_request_middleware)],
     )
     if config.enable_debug_endpoints:
         from heavyiq.api.routes.debug_router import debug_router
