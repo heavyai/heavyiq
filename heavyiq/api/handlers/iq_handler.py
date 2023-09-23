@@ -1,6 +1,7 @@
 import asyncio
 import functools
 
+from fastapi.concurrency import run_in_threadpool
 from langsmith import Client
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -106,12 +107,15 @@ async def handle_submit_feedback_request_async(request: FeedbackRequest) -> Feed
 
     if not is_langsmith_active:
         raise StarletteHTTPException(status_code=400, detail="Feedback is not enabled in the config.")
+
     langsmith_client = Client()
-    loop = asyncio.get_running_loop()
-    await loop.run_in_executor(None, functools.partial(langsmith_client.create_feedback,
-                                                       request.feedback_id, "user_feedback",
-                                                       score=request.score,
-                                                       comment=request.comment))
+    await run_in_threadpool(
+        langsmith_client.create_feedback,
+        request.feedback_id,
+        "user_feedback",
+        score=request.score,
+        comment=request.comment,
+    )
 
     return FeedbackResponse()
 
