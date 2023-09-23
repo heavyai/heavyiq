@@ -4,7 +4,6 @@ from typing import Literal, Any
 from fastapi.concurrency import run_in_threadpool
 from starlette.requests import Request
 from starlette.responses import Response
-from starlette.types import Message
 from starlette.background import BackgroundTask
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from heavyiq.logging_utils import _get_access_logger, get_heavyiq_logger, HeavyIQLogger, _AccessLogger
@@ -16,28 +15,6 @@ class LoggingMiddleware(BaseHTTPMiddleware):
     Supports logging before and after each http request.
     """
 
-    async def set_body(self, request: Request):
-        """
-        Avails the response body to be logged within a middleware as, it is generally not a standard practice.
-        """
-        receive_ = await request._receive()
-
-        async def receive() -> Message:
-            return receive_
-
-        request._receive = receive
-
-    async def _get_request_body(self, request: Request) -> str:
-        """
-        Gets the request body.
-        """
-        try:
-            body = await request.json()
-        except Exception:
-            body = ""
-
-        return body
-
     async def _get_response_body(self, response: Response) -> tuple[Response, str]:
         """
         Gets the response body for logging from Response object.
@@ -46,7 +23,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         response.__setattr__("body_iterator", AsyncIteratorWrapper(resp_body_sections))
 
         try:
-            resp_body: str = json.loads(resp_body_sections[0].decode())
+            resp_body: str = json.loads(resp_body_sections[0].decode())  # type: ignore
         except Exception:
             resp_body = str(resp_body_sections)
 
@@ -59,10 +36,8 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         is_api_request = "/api/v1/" in str(request.url)
         # Code executed before the request is processed
 
-        await self.set_body(request)
         if is_api_request:
             get_heavyiq_logger().debug("Request Path: %s", request.url.path)
-            get_heavyiq_logger().debug("Request Body: %s", await request.json())
 
         response = await call_next(request)
 
@@ -121,24 +96,13 @@ class AsyncLoggingMiddleware(LoggingMiddleware):
         """
         is_api_request = "/api/v1/" in str(request.url)
         # Code executed before the request is processed
-        await self.set_body(request)
 
         logs: list[Log] = []
         heavyiq_logger: HeavyIQLogger = get_heavyiq_logger()
         app_logger: _AccessLogger = _get_access_logger()
 
         if is_api_request:
-            logs.extend(
-                [
-                    Log(type=heavyiq_logger, level="debug", message="Request Path: %s", values=[request.url.path]),
-                    Log(
-                        type=heavyiq_logger,
-                        level="debug",
-                        message="Request Body: %s",
-                        values=[await request.json() if request.method != "GET" else ""],
-                    ),
-                ]
-            )
+            logs.append(Log(type=heavyiq_logger, level="debug", message="Request Path: %s", values=[request.url.path]))
 
         # write access log immediately when the request received
         await run_in_threadpool(
@@ -154,7 +118,6 @@ class AsyncLoggingMiddleware(LoggingMiddleware):
         if is_api_request:
             try:
                 reponse, response_body = await self._get_response_body(response)
-                # get_heavyiq_logger().debug("Response Content: %s", response_body, extra={"request": request})
                 logs.append(
                     Log(
                         type=heavyiq_logger,
