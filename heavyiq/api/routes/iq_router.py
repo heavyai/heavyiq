@@ -25,8 +25,9 @@ from heavyiq.api.handlers import (
     handle_generate_table_metadata_async,
     handle_ask_heavyai_docs_async,
 )
+from heavyiq.api.routes.log_route import LoggingRoute
 
-iqrouter = APIRouter()
+iqrouter = APIRouter(route_class=LoggingRoute)
 
 
 @iqrouter.post("/query", response_model=QueryResponse)

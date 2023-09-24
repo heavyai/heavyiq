@@ -1,6 +1,7 @@
 from typing import Callable
 from functools import wraps
 
+from fastapi.concurrency import run_in_threadpool
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import Response
 from starlette.requests import Request
@@ -23,7 +24,8 @@ def log_exception(func: Callable) -> Callable:
 
     @wraps(func)
     async def wrapper(request: Request, exc: Exception) -> Response:
-        get_heavyiq_logger().exception("Exception Occured: %s", str(exc))
+        logger = get_heavyiq_logger()
+        await run_in_threadpool(logger.exception, f"Exception Occured: {exc}")
         result = await func(request, exc)
         return result
 
