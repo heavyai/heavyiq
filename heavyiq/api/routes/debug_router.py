@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-
+from fastapi.concurrency import run_in_threadpool
 from heavyiq.api.models.debug import DbSessionResponse, CallLLMRequest, CallLLMResponse
 from heavyiq.langchain.heavydb import HeavyDB
 from heavyiq.langchain.llms import get_llm_by_type
@@ -21,6 +21,8 @@ async def call_llm(request: CallLLMRequest) -> CallLLMResponse:
     """
     Call LLM.
     """
-    llm = get_llm_by_type(request.llm_type, temperature=request.temperature, max_tokens=request.max_tokens)
+    llm = await run_in_threadpool(
+        get_llm_by_type, request.llm_type, temperature=request.temperature, max_tokens=request.max_tokens
+    )
     response = await llm.apredict(request.prompt)
     return CallLLMResponse(response=response)

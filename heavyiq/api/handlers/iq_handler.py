@@ -42,7 +42,7 @@ async def handle_query_request_async(request: QueryRequest, db: HeavyDB) -> Quer
     """
     config = get_config()
     logger = get_heavyiq_logger()
-    llm = get_llm_by_type(LLMType.NL_TO_SQL, temperature=0.0)
+    llm = await run_in_threadpool(get_llm_by_type, LLMType.NL_TO_SQL, temperature=0.0)
     chain_cls = get_nl_to_sql_chain_by_llm(llm=llm)
     file_callback_handler = logger.async_langchain_cb_handler(to_stdout=config.log_to_stdout)
     chain = chain_cls(llm=llm, database=db, callbacks=[file_callback_handler], tags=["rest-api", "query-endpoint"])  # type: ignore
@@ -67,14 +67,14 @@ async def handle_question_request_async(request: QuestionRequest, db: HeavyDB) -
     config = get_config()
     logger = get_heavyiq_logger()
     file_callback_handler = logger.async_langchain_cb_handler(to_stdout=config.log_to_stdout)
-    nl_sql_llm = get_llm_by_type(LLMType.NL_TO_SQL, temperature=0.0)
+    nl_sql_llm = await run_in_threadpool(get_llm_by_type, LLMType.NL_TO_SQL, temperature=0.0)
     nl_sql_chain = get_nl_to_sql_chain_by_llm(llm=nl_sql_llm)(
         llm=nl_sql_llm,
         database=db,
         callbacks=[file_callback_handler],
         tags=["rest-api", "question-endpoint"],
     )
-    llm = get_llm_by_type(LLMType.SQL_TO_ANSWER, temperature=0.0)
+    llm = await run_in_threadpool(get_llm_by_type, LLMType.SQL_TO_ANSWER, temperature=0.0)
     chain = NLtoAnswerChain(
         llm=llm,
         nl_sql_chain=nl_sql_chain,
@@ -126,7 +126,7 @@ async def handle_generate_table_metadata_async(
     """
     Handles /generate-table-metadata request.
     """
-    llm = get_llm_by_type(LLMType.SQL_TO_ANSWER, temperature=0.0)
+    llm = await run_in_threadpool(get_llm_by_type, LLMType.SQL_TO_ANSWER, temperature=0.0)
     chain = GenerateTableMetadataChain(llm=llm, database=db, tags=["rest-api", "generate-table-metadata-endpoint"])
     res = await log_chain_call_async(chain, request.table_name, "")
     feedback_id = str(res["__run"].run_id) if "__run" in res else ""
