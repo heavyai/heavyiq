@@ -29,6 +29,7 @@ def get_vllm_model_name(api_base: str) -> str:
     return response.json()["data"][0]["id"]
 
 
+@lru_cache
 def get_vllm_model_kwargs(model_type: LLMType, **kwargs) -> tuple[dict[str, Any], dict[str, Any]]:
     config = get_config()
     model_kwargs: dict[str, Any] = {}
