@@ -41,6 +41,11 @@ def get_vllm_model_kwargs(model_type: LLMType, **kwargs) -> tuple[dict[str, Any]
 
 
 def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
+    """
+    Gets the relevant instantiated LLM class by llm type.
+    Make sure to run this func inside run_in_threapool when called from a coroutine
+    since it makes a network call to identify vllm.model_name.
+    """
     config = get_config()
     if config.custom_llm_type is None or config.custom_llm_type == "AZURE":
         openai_llm_mapping: dict[LLMType, str | None] = {
