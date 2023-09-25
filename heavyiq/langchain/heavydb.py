@@ -555,7 +555,7 @@ class HeavyDB:
                 return altered_literal
         elif total_count == 0:
             lower_literal = literal["literal"].lower()
-            similarity_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS n FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) FROM distinct_values WHERE LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) < 5 ORDER BY LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) ASC LIMIT 1;"
+            similarity_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) FROM distinct_values WHERE LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) < 5 ORDER BY LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) ASC, num_str_values DESC LIMIT 2;"
 
             with self.lock:
                 cursor = self._conn.execute(similarity_query)
@@ -564,7 +564,16 @@ class HeavyDB:
             num_similarity_rows = len(similarity_rows)
 
             if num_similarity_rows > 0:
-                altered_literal["literal"] = str(similarity_rows[0][0])
+                if num_similarity_rows > 1 and similarity_rows[0][1] == 0 and similarity_rows[0][1] == similarity_rows[1][1]:
+                    # Here there are at least two matches such that the user-provided literal is a full substring of
+                    # the column value. In this case, we will match against all strings that our string literal
+                    # is a substring of
+                    altered_literal["literal"] = f"%{lower_literal}%"
+                else:
+                    # There was only one match, or two matches and at least one did have a 0 distance score, so pick the
+                    # top returned value (we've sorted in ascending order by score and descending order by number
+                    # of string matches)
+                    altered_literal["literal"] = str(similarity_rows[0][0])
                 if literal["operator"] == "<>":
                     altered_literal["operator"] = "NOT ILIKE"
                 else:
