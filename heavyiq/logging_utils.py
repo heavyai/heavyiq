@@ -7,10 +7,14 @@ import socket
 import os
 from typing import Any
 import sys
-
-
+import copy
+from loguru import logger as loguru_logger
 from heavyiq.config import get_config
+from .loguru_logging import BaseAsyncLogger
 from heavyiq.langchain.callbacks import FileCallbackHandler, AsyncLogFileCallbackHandler
+
+# remove existing handlers on the logger instance
+loguru_logger.remove()
 
 
 class MillisecondFormatter(logging.Formatter):
@@ -152,7 +156,7 @@ class BaseLogger(logging.Logger):
             self.addFilter(filter)
 
 
-class HeavyIQLogger(BaseLogger):
+class HeavyIQLogger(BaseAsyncLogger):
     """
     HeavyIQ Logger class specifically used for logging intermediate messages.
     This is the default logger which has to be used throughout the application.
@@ -178,13 +182,14 @@ class HeavyIQLogger(BaseLogger):
         level: str | None = None,
         enable_console_logging: bool = True,
     ):
+        iq_logger = copy.deepcopy(loguru_logger)
         super().__init__(
             name,
+            iq_logger,
             level=level,
             log_file_path=log_file_path,
-            filter=HeavyIQFilter(),
-            formatter=get_default_formatter(),
             enable_console_logging=enable_console_logging,
+            max_file_size=1048576,
         )
         self.info("HeavyIQ Logger initialized")
 
@@ -198,6 +203,7 @@ class HeavyIQLogger(BaseLogger):
         Returns:
             FileCallbackHandler: callback handler mainly passed as callback for chains.
         """
+        assert self.log_file_path
         return FileCallbackHandler(self.log_file_path, to_stdout=to_stdout)
 
     def async_langchain_cb_handler(self, to_stdout: bool = True) -> AsyncLogFileCallbackHandler:
@@ -210,10 +216,11 @@ class HeavyIQLogger(BaseLogger):
         Returns:
             FileCallbackHandler: callback handler mainly passed as callback for chains.
         """
+        assert self.log_file_path
         return AsyncLogFileCallbackHandler(self.log_file_path, to_stdout=to_stdout)
 
 
-class _AccessLogger(BaseLogger):
+class _AccessLogger(BaseAsyncLogger):
     """
     FastAPI App logger class specifically used for logging http request calls which
     gets triggered after every api request.
@@ -238,17 +245,18 @@ class _AccessLogger(BaseLogger):
 
     def __init__(
         self,
-        name: str = "app",
+        name: str = "access",
         log_file_path: str | None = None,
         level: str | None = None,
         enable_console_logging: bool = True,
     ):
+        access_logger = copy.deepcopy(loguru_logger)
         super().__init__(
             name,
+            access_logger,
             level=level,
             log_file_path=log_file_path,
-            filter=AppFilter(),
-            formatter=get_app_log_formatter(),
+            max_file_size=1048576,
             enable_console_logging=enable_console_logging,
         )
 

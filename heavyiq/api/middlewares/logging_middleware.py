@@ -30,7 +30,7 @@ class AsyncLoggingMiddleware(BaseHTTPMiddleware):
     running it as seperate Background Task.
     """
 
-    @staticmethod
+    @staticmethod  # type: ignore
     def write_log_data(logs: list[Log]):
         """
         Supposed to write log data to terminal or to a file or both.
@@ -40,7 +40,10 @@ class AsyncLoggingMiddleware(BaseHTTPMiddleware):
         """
         for log in logs:
             log_func = getattr(log.type, log.level)
-            log_func(log.message, *log.values, extra=log.extra)
+            log_message = log.message
+            if log.values:
+                log_message = log_message % tuple(log.values)
+            log_func(log_message, extra=log.extra)
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         """
@@ -57,14 +60,21 @@ class AsyncLoggingMiddleware(BaseHTTPMiddleware):
             logs.append(Log(type=heavyiq_logger, level="debug", message="Request Path: %s", values=[request.url.path]))
 
         # write access log immediately when the request received
-        await run_in_threadpool(
-            self.write_log_data, [Log(type=app_logger, level="info", message="", extra={"request": request})]
+        self.write_log_data(
+            [Log(type=app_logger, level="info", message="Request Received!", extra={"request": request})]
         )
 
         response = await call_next(request)
         # Code executed after the request has been processed
         # create access log
-        logs.append(Log(type=app_logger, level="info", message="", extra={"response": response, "request": request}))
+        logs.append(
+            Log(
+                type=app_logger,
+                level="info",
+                message="Response Generated!",
+                extra={"response": response, "request": request},
+            )
+        )
 
         if is_api_request:
             logs.append(
