@@ -4,6 +4,8 @@ from typing import Any, Optional
 
 from pydantic import Extra
 
+import re
+
 from fastapi.concurrency import run_in_threadpool
 from langchain.chat_models.base import BaseChatModel
 from langchain.schema.language_model import BaseLanguageModel
@@ -213,6 +215,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                 if retries > self.max_retries:
                     break
                 self.write_callback_message(f"Invalid SQL Query: {e}.", run_manager=run_manager, color="red")
+                
                 truncated_error = str(e)[0:150] if len(str(e)) > 150 else str(e)
                 partial_error_prompt = self.error_prompt.partial(
                     input=inputs[self.input_key],
@@ -283,7 +286,20 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                 await self.write_callback_message_async(
                     f"Invalid SQL Query: {e}.", run_manager=run_manager, color="red"
                 )
-                truncated_error = str(e)[0:150] if len(str(e)) > 150 else str(e)
+                def extract_error_message(error_str):
+                    # Define the regular expression pattern to capture the inner error message
+                    pattern = r'TDBException\(error_msg="(.+?)"\)'
+                    
+                    # Use the search method to find the pattern in the given error string
+                    match = re.search(pattern, error_str)
+                    
+                    # If a match is found, extract the inner message. Otherwise, return the original string.
+                    if match:
+                        return match.group(1)
+                    else:
+                        return error_str
+                extracted_error = extract_error_message(str(e))
+                truncated_error = extracted_error[0:150] if len(extracted_error) > 150 else extracted_error
                 partial_error_prompt = self.error_prompt.partial(
                     input=inputs[self.input_key],
                     sql_cmd=sql_cmd,
