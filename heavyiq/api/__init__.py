@@ -7,7 +7,7 @@ from heavydb.exceptions import Error as HeavyDBError  # type: ignore
 from starlette.exceptions import HTTPException
 
 from heavyiq.config import get_config
-from heavyiq.api.middlewares import AsyncLoggingMiddleware
+from heavyiq.api.middlewares import LogRequestsMiddleware, AsyncLoggingMiddleware
 from heavyiq.api.models.error import ErrorResponse
 from heavyiq.langchain.exceptions import NLtoSQLException
 from heavyiq.logging_utils import init_logs

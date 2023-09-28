@@ -4,6 +4,8 @@ from typing import Any, Optional
 
 from pydantic import Extra
 
+import re
+
 from fastapi.concurrency import run_in_threadpool
 from langchain.chat_models.base import BaseChatModel
 from langchain.schema.language_model import BaseLanguageModel
@@ -69,6 +71,24 @@ Error: {error}
 NewSQLQuery:
 """
 NL_TO_SQL_ERROR_PROMPT = PromptTemplate.from_template(NL_TO_SQL_ERROR_TEMPLATE)
+
+CUSTOM_NL_TO_SQL_ERROR_TEMPLATE = """<|sql error prompt|>
+You generated a SQL query that generated an exception when executed in the HeavyDB database.
+You have access to the following relation tables, with schemas below.
+{table_info}
+In attempting to answer the following user question:
+
+{input},
+you generated the following SQL query:
+{sql_cmd}
+, which failed to run in the HeavyDB database, generating the following error:
+{error}
+
+Please alter the query to run without error in HeavyDB:
+<|sql error answer|>"""
+
+CUSTOM_NL_TO_SQL_ERROR_PROMPT = PromptTemplate.from_template(CUSTOM_NL_TO_SQL_ERROR_TEMPLATE)
+
 
 NL_TO_SQL_CHAT_TEMPLATE = """Create a syntactically correct SQL query to answer the input question.
 Only query relevant columns, avoiding SELECT * for any table.
@@ -157,9 +177,11 @@ class NLtoSQLChain(BaseNLtoSQLChain):
     def __init__(self, *args, **kwargs):
         if is_using_custom_trained_llm():
             prompt = CUSTOM_LLM_NL_TO_SQL_PROMPT
+            error_prompt = CUSTOM_NL_TO_SQL_ERROR_PROMPT
         else:
             prompt = NL_TO_SQL_PROMPT
-        super().__init__(*args, prompt=prompt, **kwargs)  # type: ignore
+            error_prompt = NL_TO_SQL_ERROR_PROMPT
+        super().__init__(*args, prompt=prompt, error_prompt=error_prompt, **kwargs)  # type: ignore
 
     def _call(
         self,
@@ -179,7 +201,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
         response = self.llm.generate_prompt(
             [gen_sql_prompt], callbacks=run_manager.get_child() if run_manager else None
         )
-        sql_cmd = response.generations[0][0].text.strip()
+        sql_cmd = response.generations[0][0].text.strip()  # type: ignore
         verified = False
         retries = 0
 
@@ -193,6 +215,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                 if retries > self.max_retries:
                     break
                 self.write_callback_message(f"Invalid SQL Query: {e}.", run_manager=run_manager, color="red")
+                
                 truncated_error = str(e)[0:150] if len(str(e)) > 150 else str(e)
                 partial_error_prompt = self.error_prompt.partial(
                     input=inputs[self.input_key],
@@ -205,14 +228,14 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                 response = self.llm.generate_prompt(
                     [correct_error_prompt], callbacks=run_manager.get_child() if run_manager else None
                 )
-                sql_cmd = response.generations[0][0].text.strip()
+                sql_cmd = response.generations[0][0].text.strip()  # type: ignore
 
         if not verified:
             self.write_callback_message(
                 f"Failed to verify SQL query after {self.max_retries} retries.", run_manager=run_manager, color="red"
             )
             raise NLtoSQLException(
-                f"Language model failed to generate a valid SQL query after {self.max_retries} tries."
+                f"Language model failed to generate a valid SQL query after {self.max_retries} tries.", sql_cmd
             )
 
         self.write_callback_message(sql_cmd, run_manager=run_manager, color="green")
@@ -245,7 +268,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
         response = await self.llm.agenerate_prompt(
             [gen_sql_prompt], callbacks=run_manager.get_child() if run_manager else None
         )
-        sql_cmd = response.generations[0][0].text.strip()
+        sql_cmd = response.generations[0][0].text.strip()  # type: ignore
         verified = False
         retries = 0
 
@@ -254,7 +277,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                 await self.write_callback_message_async(
                     f"Verifying SQL Query: {sql_cmd}", run_manager=run_manager, color="blue"
                 )
-                self.database.validate_query(sql_cmd)
+                await run_in_threadpool(self.database.validate_query, sql_cmd)
                 verified = True
             except Exception as e:
                 retries += 1
@@ -263,7 +286,20 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                 await self.write_callback_message_async(
                     f"Invalid SQL Query: {e}.", run_manager=run_manager, color="red"
                 )
-                truncated_error = str(e)[0:150] if len(str(e)) > 150 else str(e)
+                def extract_error_message(error_str):
+                    # Define the regular expression pattern to capture the inner error message
+                    pattern = r'TDBException\(error_msg="(.+?)"\)'
+                    
+                    # Use the search method to find the pattern in the given error string
+                    match = re.search(pattern, error_str)
+                    
+                    # If a match is found, extract the inner message. Otherwise, return the original string.
+                    if match:
+                        return match.group(1)
+                    else:
+                        return error_str
+                extracted_error = extract_error_message(str(e))
+                truncated_error = extracted_error[0:150] if len(extracted_error) > 150 else extracted_error
                 partial_error_prompt = self.error_prompt.partial(
                     input=inputs[self.input_key],
                     sql_cmd=sql_cmd,
@@ -279,14 +315,14 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                 response = await self.llm.agenerate_prompt(
                     [correct_error_prompt], callbacks=run_manager.get_child() if run_manager else None
                 )
-                sql_cmd = response.generations[0][0].text.strip()
+                sql_cmd = response.generations[0][0].text.strip()  # type: ignore
 
         if not verified:
             await self.write_callback_message_async(
                 f"Failed to verify SQL query after {self.max_retries} retries.", run_manager=run_manager, color="red"
             )
             raise NLtoSQLException(
-                f"Language model failed to generate a valid SQL query after {self.max_retries} tries."
+                f"Language model failed to generate a valid SQL query after {self.max_retries} tries.", sql_cmd
             )
 
         await self.write_callback_message_async(sql_cmd, run_manager=run_manager, color="green")
@@ -295,12 +331,12 @@ class NLtoSQLChain(BaseNLtoSQLChain):
             await self.write_callback_message_async(
                 "Attempting to correct string literals in SQL query.", run_manager=run_manager, color="blue"
             )
-            sql_cmd = self.database.correct_string_literals(sql_cmd)
+            sql_cmd = await run_in_threadpool(self.database.correct_string_literals, sql_cmd)
             await self.write_callback_message_async(
                 f"Result of correction: {sql_cmd}", run_manager=run_manager, color="green"
             )
 
-        sql_complexity = self.database.complexity(sql_cmd)
+        sql_complexity = await run_in_threadpool(self.database.complexity, sql_cmd)
 
         return {self.output_key: strip_sql_comments(sql_cmd), self.output_complexity_key: str(sql_complexity)}
 
@@ -369,7 +405,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
                 f"Failed to verify SQL query after {self.max_retries} retries.", run_manager=run_manager, color="red"
             )
             raise NLtoSQLException(
-                f"Language model failed to generate a valid SQL query after {self.max_retries} tries."
+                f"Language model failed to generate a valid SQL query after {self.max_retries} tries.", sql_cmd
             )
 
         self.write_callback_message(sql_cmd, run_manager=run_manager, color="green")
@@ -412,7 +448,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
                 await self.write_callback_message_async(
                     f"Verifying SQL Query: {sql_cmd}", run_manager=run_manager, color="blue"
                 )
-                self.database.validate_query(sql_cmd)
+                await run_in_threadpool(self.database.validate_query, sql_cmd)
                 verified = True
             except Exception as e:
                 retries += 1
@@ -426,14 +462,14 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
                 response = await self.llm.agenerate(
                     [messages], callbacks=run_manager.get_child() if run_manager else None
                 )
-                sql_cmd = self.get_sql_query(response.generations[0][0].text)
+                sql_cmd = self.get_sql_query(response.generations[0][0].text)  # type: ignore
 
         if not verified:
             await self.write_callback_message_async(
                 f"Failed to verify SQL query after {self.max_retries} retries.", run_manager=run_manager, color="red"
             )
             raise NLtoSQLException(
-                f"Language model failed to generate a valid SQL query after {self.max_retries} tries."
+                f"Language model failed to generate a valid SQL query after {self.max_retries} tries.", sql_cmd
             )
 
         await self.write_callback_message_async(sql_cmd, run_manager=run_manager, color="green")
@@ -442,12 +478,12 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
             await self.write_callback_message_async(
                 "Attempting to correct string literals in SQL query.", run_manager=run_manager, color="blue"
             )
-            sql_cmd = self.database.correct_string_literals(sql_cmd)
+            sql_cmd = await run_in_threadpool(self.database.correct_string_literals, sql_cmd)
             await self.write_callback_message_async(
                 f"Result of correction: {sql_cmd}", run_manager=run_manager, color="green"
             )
 
-        sql_complexity = self.database.complexity(sql_cmd)
+        sql_complexity = await run_in_threadpool(self.database.complexity, sql_cmd)
 
         return {self.output_key: strip_sql_comments(sql_cmd), self.output_complexity_key: str(sql_complexity)}
 

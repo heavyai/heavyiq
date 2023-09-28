@@ -258,7 +258,8 @@ class HeavyDB:
 
     def get_table_schema(self, table: str) -> str:
         self.logger.debug(f"Getting schema for table {table}")
-        cached_value = self.table_schema_cache.get(table)
+        cache_key = f"{self._conn._dbname}.{table}"
+        cached_value = self.table_schema_cache.get(cache_key)
         if cached_value is not None:
             self.logger.debug(f"Got schema for table {table} from cache")
             return cached_value
@@ -272,7 +273,7 @@ class HeavyDB:
         table_schema = re.sub(r"\n", "", table_schema)
         if "WITH (" in table_schema:
             table_schema = table_schema[: table_schema.index("WITH (")]
-        self.table_schema_cache.put(table, table_schema)
+        self.table_schema_cache.put(cache_key, table_schema)
         self.logger.debug(f"Got schema for table {table}")
         return table_schema
 
@@ -291,6 +292,24 @@ class HeavyDB:
         config = get_config()
         cardinality_threshold = config.column_top_k_cardinality_threshold
         high_cardinality_sample = config.column_top_k_high_cardinality_sample
+
+        # We need to ensure that column names that are reserved keywords are double quoted otherwise an error will occur
+        # Todo (todd): These are only a partial list of reserved keywords, ensure we have an exhaustive list
+        reserved_keywords = [
+            "LANGUAGE",
+            "RANK",
+            "RESULT",
+            "DATE",
+            "TIMESTAMP",
+            "LENGTH",
+            "YEAR",
+            "QUARTER",
+            "MONTH",
+            "WEEK",
+            "DAY",
+        ]
+        if column.upper() in reserved_keywords:
+            column = f'"{column}"'
         # check to see if the column is low cardinality
         # fetch top (threshold + 1)
         # if there are < (threshold + 1) values, it's low cardinality and we can return all of them
@@ -315,7 +334,8 @@ class HeavyDB:
 
     def get_sample_rows(self, table_name: str) -> str:
         self.logger.debug(f"Getting sample rows for table {table_name}")
-        cached_value = self.sample_rows_cache.get(table_name)
+        cache_key = f"{self._conn._dbname}.{table_name}"
+        cached_value = self.sample_rows_cache.get(cache_key)
         if cached_value is not None:
             self.logger.debug(f"Got sample rows for table {table_name} from cache")
             return cached_value
@@ -336,13 +356,14 @@ class HeavyDB:
 
         res = f"{self._sample_rows_in_table_info} rows from {table_name} table:\n{columns_str}\n{sample_rows_str}"
 
-        self.sample_rows_cache.put(table_name, res)
+        self.sample_rows_cache.put(cache_key, res)
         self.logger.debug(f"Got sample rows for table {table_name}")
         return res
 
     def get_top_k(self, table_name: str) -> str:
         self.logger.debug(f"Getting top k values for table {table_name}")
-        cached_value = self.top_k_cache.get(table_name)
+        cache_key = f"{self._conn._dbname}.{table_name}"
+        cached_value = self.top_k_cache.get(cache_key)
         if cached_value is not None:
             self.logger.debug(f"Got top k values for table {table_name} from cache")
             return cached_value
@@ -369,7 +390,7 @@ class HeavyDB:
             top_k_strings += "High cardinality columns and most common values:\n"
             for col, top_k_res in high_cardinality_columns:
                 top_k_strings += f"{col}: {', '.join(top_k_res)}\n"
-        self.top_k_cache.put(table_name, top_k_strings)
+        self.top_k_cache.put(cache_key, top_k_strings)
         self.logger.debug(f"Got top k values for table {table_name}")
         return top_k_strings
 
@@ -534,7 +555,7 @@ class HeavyDB:
                 return altered_literal
         elif total_count == 0:
             lower_literal = literal["literal"].lower()
-            similarity_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS n FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) FROM distinct_values WHERE LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) < 5 ORDER BY LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) ASC LIMIT 1;"
+            similarity_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) FROM distinct_values WHERE LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) < 5 ORDER BY LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) ASC, num_str_values DESC LIMIT 2;"
 
             with self.lock:
                 cursor = self._conn.execute(similarity_query)
@@ -543,7 +564,16 @@ class HeavyDB:
             num_similarity_rows = len(similarity_rows)
 
             if num_similarity_rows > 0:
-                altered_literal["literal"] = str(similarity_rows[0][0])
+                if num_similarity_rows > 1 and similarity_rows[0][1] == 0 and similarity_rows[0][1] == similarity_rows[1][1]:
+                    # Here there are at least two matches such that the user-provided literal is a full substring of
+                    # the column value. In this case, we will match against all strings that our string literal
+                    # is a substring of
+                    altered_literal["literal"] = f"%{lower_literal}%"
+                else:
+                    # There was only one match, or two matches and at least one did have a 0 distance score, so pick the
+                    # top returned value (we've sorted in ascending order by score and descending order by number
+                    # of string matches)
+                    altered_literal["literal"] = str(similarity_rows[0][0])
                 if literal["operator"] == "<>":
                     altered_literal["operator"] = "NOT ILIKE"
                 else:

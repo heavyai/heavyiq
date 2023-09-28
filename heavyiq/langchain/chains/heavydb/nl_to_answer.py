@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from pydantic import Extra
-
+from fastapi.concurrency import run_in_threadpool
 from langchain.schema.language_model import BaseLanguageModel
 from langchain.schema import BasePromptTemplate
 from langchain.prompts.prompt import PromptTemplate
@@ -152,7 +152,7 @@ class NLtoAnswerChain(BaseChain):
         )
         sql_cmd = nl_sql_results[self.nl_sql_chain.output_key]
         await self.write_callback_message_async(sql_cmd, run_manager=run_manager, color="green")
-        sql_result = self.database.run(sql_cmd)
+        sql_result = await run_in_threadpool(self.database.run, sql_cmd)
         await self.write_callback_message_async("\nSQLResult: ", run_manager=run_manager, color="yellow")
         await self.write_callback_message_async(sql_result, run_manager=run_manager, color="yellow")
 
@@ -164,7 +164,7 @@ class NLtoAnswerChain(BaseChain):
         response = await self.llm.agenerate_prompt(
             [gen_answer_prompt], callbacks=run_manager.get_child() if run_manager else None
         )
-        answer = response.generations[0][0].text.strip()
+        answer = response.generations[0][0].text.strip()  # type: ignore
         await self.write_callback_message_async(f"\nAnswer:\n{answer}", run_manager=run_manager, color="green")
 
         return {
