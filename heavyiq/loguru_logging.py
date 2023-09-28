@@ -134,26 +134,37 @@ class BaseAsyncLogger:
                 filter=self._get_filter(name),
             )
 
-    def debug(self, msg, extra=None):
+    def debug(self, msg, extra=None, depth=0):
+        """
+        Depth kwarg is needed to identify the caller.
+        Here by default we put 1 level depth, so that the logger will log the caller (module, line_no) as the function which actually
+        calls this method.
+        """
         extra = extra or {}
-        self.logger.opt(depth=1).debug(msg, **extra)
+        depth += 1
+        self.logger.opt(depth=depth).debug(msg, **extra)
 
-    def info(self, msg, extra=None):
+    def info(self, msg, extra=None, depth=0):
         extra = extra or {}
-        self.logger.opt(depth=1).info(msg, **extra)
+        depth += 1
+        self.logger.opt(depth=depth).info(msg, **extra)
 
-    def warning(self, msg, extra=None):
+    def warning(self, msg, extra=None, depth=0):
         extra = extra or {}
-        self.logger.opt(depth=1).warning(msg, **extra)
+        depth += 1
+        self.logger.opt(depth=depth).warning(msg, **extra)
 
-    def error(self, msg, extra=None):
+    def error(self, msg, extra=None, depth=0):
         extra = extra or {}
-        self.logger.opt(depth=1).error(msg, **extra)
+        depth += 1
+        self.logger.opt(depth=depth).error(msg, **extra)
 
-    def exception(self, msg, extra=None):
+    def exception(self, msg, extra=None, depth=0):
         extra = extra or {}
-        self.logger.opt(depth=1).exception(msg, **extra)
+        depth += 1
+        self.logger.opt(depth=depth).exception(msg, **extra)
 
-    def critical(self, msg, extra=None):
+    def critical(self, msg, extra=None, depth=0):
         extra = extra or {}
-        self.logger.opt(depth=1).critical(msg, **extra)
+        depth += 1
+        self.logger.opt(depth=depth).critical(msg, **extra)

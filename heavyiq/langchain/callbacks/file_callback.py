@@ -108,29 +108,11 @@ class AsyncLogFileCallbackHandler(AsyncFileCallbackHandler):
         super().__init__(*args, **kwargs)
         self._logger = get_heavyiq_logger()
 
-    def _text_to_log(self, text: str) -> str:
-        # fn, lno, func, sinfo = self._logger.findCaller(stack_info=False, stacklevel=1)
-        # log_record = self._logger.makeRecord(
-        #     self._logger.name, logging.INFO, fn, lno, text, (), None, func=func, sinfo=sinfo
-        # )
-        # # diable some record attributes
-        # log_record.remote_addr = "-"
-        # log_record.username = "-"
-        # return self._logger.info(text)
-        return text
-
     async def print_text_async(self, text: str, end: str = "", color: Optional[str] = None, bold: bool = False):
         """
         Optional write to stdout and log the text to file.
         """
-        # text = self._text_to_log(text)
-        # if self.to_stdout:
-        #     bolded_text = get_bolded_text(text) if bold else text
-        #     text_to_print = get_colored_text(bolded_text, color) if color else bolded_text
-        #     print(text_to_print, end=end)
-
-        # await self.append_to_file(f"{text}{end}")
-        self._logger.info(text)
+        self._logger.info(text, depth=1)
 
 
 def print_text(
