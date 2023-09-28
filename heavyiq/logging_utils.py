@@ -1,159 +1,15 @@
-import logging
-from logging import LogRecord
-from logging.handlers import RotatingFileHandler
 import getpass
 import time
 import socket
 import os
-from typing import Any
-import sys
 import copy
 from loguru import logger as loguru_logger
 from heavyiq.config import get_config
-from .loguru_logging import BaseAsyncLogger
+from .loguru_logging import BaseAsyncLogger, iq_formatter, access_formatter
 from heavyiq.langchain.callbacks import FileCallbackHandler, AsyncLogFileCallbackHandler
 
 # remove existing handlers on the logger instance
 loguru_logger.remove()
-
-
-class MillisecondFormatter(logging.Formatter):
-    def formatTime(self, record: LogRecord, datefmt: str | None = None):
-        """Adds milliseconds to the default formatter"""
-        ct = self.converter(record.created)
-        if datefmt:
-            s = time.strftime(datefmt, ct)
-            return s + ".{:03d}".format(int((record.created % 1.0) * 1000))
-        return super().formatTime(record, datefmt)
-
-
-def get_default_formatter() -> logging.Formatter:
-    log_format = "%(asctime)s %(remote_addr)s - %(username)s [%(levelname)s] %(pathname)s:%(lineno)d - %(message)s"
-    return MillisecondFormatter(log_format, datefmt="%Y-%m-%d %H:%M:%S")
-
-
-def get_app_log_formatter() -> logging.Formatter:
-    log_format = '%(remote_addr)s - %(username)s [%(asctime)s] "%(request_method)s %(request_uri)s %(protocol)s" "%(referrer)s" "%(user_agent)s" %(status_code)s %(response_size)s'
-    return logging.Formatter(log_format, datefmt="%Y-%m-%d %H:%M:%S")
-
-
-def get_rotating_file_handler(
-    log_file_path: str, formatter: logging.Formatter | None = None, level: str = "DEBUG"
-) -> RotatingFileHandler:
-    formatter = formatter or get_default_formatter()
-    file_handler = RotatingFileHandler(log_file_path, maxBytes=1048576, backupCount=5)
-    file_handler.setLevel(level)
-    file_handler.setFormatter(formatter)
-
-    return file_handler
-
-
-def get_console_handler(formatter: logging.Formatter | None = None, level: str = "DEBUG") -> logging.StreamHandler:
-    formatter = formatter or get_default_formatter()
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(level=level)
-    console_handler.setFormatter(formatter)
-
-    return console_handler
-
-
-# Define a custom filter to extract remote_addr and username from the request object
-class HeavyIQFilter(logging.Filter):
-    """
-    Filter which attaches extra attributes from request object to the record object.
-    """
-
-    def filter(self, record: Any) -> bool:
-        try:
-            request = getattr(record, "request")
-            record.remote_addr = request.client.host
-            record.username = request.headers.get("X-Remote-User") or "-"
-        except RuntimeError:
-            # accessing through CLI
-            record.remote_addr = "-"
-            record.username = "CLI"
-        except AttributeError:
-            # request object not been attached to the log record
-            record.remote_addr = "-"
-            record.username = "-"
-
-        return True
-
-
-class AppFilter(logging.Filter):
-    """
-    Filter out attributes from response object and attach it to the log record.
-    """
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        # Get the request, response from record
-        request: Any = getattr(record, "request", None)
-        response: Any | None = getattr(record, "response", None)
-
-        record.remote_addr = request.client.host
-        record.username = request.headers.get("X-Remote-User") or "-"
-        record.request_method = request.method
-        record.request_uri = str(request.url)
-        record.referrer = request.headers.get("Referer")
-        record.user_agent = request.headers.get("User-Agent")
-        record.protocol = request.scope.get("scheme")
-        record.status_code = response.status_code if response else "-"
-        record.response_size = response.headers["Content-Length"] if response else "-"
-
-        return True
-
-
-def create_custom_logger(name: str, log_file_path: str | None = None) -> logging.Logger:
-    """
-    Creates a custom logger with predefined formatters and handlers.
-
-    Args:
-        name (str): The name of the logger.
-
-    Returns:
-        logging.Logger: The custom logger.
-    """
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
-
-    if not logger.hasHandlers():
-        # Create a formatter for the log messages
-        formatter = get_default_formatter()
-        console_handler = get_console_handler(formatter=formatter)
-        logger.addHandler(console_handler)
-
-        # Optional: Create a rotating file handler if a log file path is provided
-        if log_file_path:
-            file_handler = get_rotating_file_handler(log_file_path, formatter=formatter)
-            logger.addHandler(file_handler)
-
-    return logger
-
-
-class BaseLogger(logging.Logger):
-    def __init__(
-        self,
-        name: str,
-        level: str | None = "DEBUG",
-        log_file_path: str | None = None,
-        filter: logging.Filter | None = None,
-        formatter: logging.Formatter | None = None,
-        enable_console_logging: bool = True,
-    ) -> None:
-        level = level or "DEBUG"
-        super().__init__(name, level)
-        formatter = formatter or get_default_formatter()
-        self.log_formatter = formatter
-        self.log_file_path = ""
-        if enable_console_logging:
-            console_handler = get_console_handler(formatter=formatter, level=level)
-            self.addHandler(console_handler)
-        if log_file_path:
-            file_handler = get_rotating_file_handler(log_file_path, formatter=formatter, level=level)
-            self.addHandler(file_handler)
-            self.log_file_path = log_file_path
-        if filter:
-            self.addFilter(filter)
 
 
 class HeavyIQLogger(BaseAsyncLogger):
@@ -187,6 +43,7 @@ class HeavyIQLogger(BaseAsyncLogger):
             name,
             iq_logger,
             level=level,
+            format=iq_formatter,
             log_file_path=log_file_path,
             enable_console_logging=enable_console_logging,
             max_file_size=1048576,
@@ -255,6 +112,7 @@ class _AccessLogger(BaseAsyncLogger):
             name,
             access_logger,
             level=level,
+            format=access_formatter,
             log_file_path=log_file_path,
             max_file_size=1048576,
             enable_console_logging=enable_console_logging,

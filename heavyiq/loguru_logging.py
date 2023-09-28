@@ -1,8 +1,9 @@
-import logging
 import sys
 from typing import Callable, Any
 from copy import deepcopy
-from loguru import logger as loguru_logger
+from starlette.requests import Request
+from starlette.responses import Response
+from loguru._defaults import LOGURU_FORMAT as DEFAULT_LOGURU_FORMAT
 from loguru._logger import Logger
 import datetime
 
@@ -20,64 +21,74 @@ class Rotator:
         return False
 
 
-def formatter(record):
-    # Note this function returns the string to be formatted, not the actual message to be logged
-    extra = record["extra"].copy()
-    request, response = extra.get("request"), extra.get("response")
-    cleaned_extra = {k: v for k, v in extra.items() if k not in ["request", "response"]}
-    if not (request or response):
-        record["extra"] = cleaned_extra
-        return (
-            "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
-            "<yellow>{extra[logger_name]}</yellow> | "
-            "<level>{level: <2}</level> | "
-            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>\n"
-        )
-    request_method, remote_addr, request_uri, username, referrer, user_agent, protocol, status_code, response_size = (
-        "-",
-        "-",
-        "-",
-        "-",
-        "-",
-        "-",
-        "-",
-        "-",
-        "-",
-    )
-    if request:
-        remote_addr = request.client.host
-        username = request.headers.get("X-Remote-User") or "-"
-        request_method = request.method
-        request_uri = str(request.url)
-        referrer = request.headers.get("Referer")
-        user_agent = request.headers.get("User-Agent")
-        protocol = request.scope.get("scheme") or "-"
-    if response:
-        status_code = response.status_code or "-"
-        response_size = response.headers["Content-Length"] if response else "-"
+def serialize(record: dict) -> dict:
+    """
+    Serializes a loguru record's expecially the request and response objects.
+    """
+    if record["extra"].get("has_serialized"):
+        return record["extra"]
 
-    extra_dict = {
-        "protocol": protocol,
-        "request_method": request_method,
-        "request_uri": request_uri,
-        "remote_addr": remote_addr,
-        "username": username,
-        "referrer": referrer,
-        "user_agent": user_agent,
-        "response_size": response_size,
-        "status_code": status_code,
-    }
+    record_extra = record["extra"].copy()
+    # not yet serialized
+    request, response = record_extra.get("request"), record_extra.get("response")
+    request_dict, response_dict = {}, {"status_code": "-", "response_size": "-"}
+    request_id = record_extra.get("request_id", None)
+    if request and isinstance(request, Request):
+        request_dict["remote_addr"] = request.client.host
+        request_dict["username"] = request.headers.get("X-Remote-User") or "-"
+        request_dict["request_method"] = request.method
+        request_dict["request_uri"] = str(request.url)
+        request_dict["referrer"] = request.headers.get("Referer")
+        request_dict["user_agent"] = request.headers.get("User-Agent")
+        request_dict["protocol"] = request.scope.get("scheme") or "-"
+        request_id = request.headers.get("x-request-id")
 
-    record["extra"] = {**cleaned_extra, **extra_dict}
+    if response and isinstance(response, Response):
+        response_dict["status_code"] = response.status_code or "-"
+        response_dict["response_size"] = response.headers["Content-Length"] if response else "-"
+        request_id = request.headers.get("x-request-id")
+
+    request_id = request_id or "-"
+
+    # remove request and response keys
+    record_extra.pop("request", None)
+    record_extra.pop("response", None)
+
+    return {**record_extra, "request_id": request_id, **request_dict, **response_dict, "has_serialized": True}
+
+
+def iq_formatter(record: dict) -> Callable[[Any], str]:
+    """
+    Formatter relevant to the HeavyIQ Logger.
+    """
+    # cleaned_extra = {k: v for k, v in extra.items() if k not in ["request", "response"]}
+    record["extra"] = serialize(record)
+    return (
+        "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+        "<yellow>{extra[logger_name]}</yellow> | "
+        "<level>{level: <2}</level> | "
+        "<level>{process: <2}</level> | "
+        "<level>{thread: <2}</level> | "
+        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> (<blue>{extra[request_id]}</blue>) - <level>{message}</level>\n"
+    )  # type: ignore
+
+
+def access_formatter(record: dict) -> Callable[[Any], str]:
+    """
+    Formatter relevant to the Access Logger.
+    """
+    record["extra"] = serialize(record)
 
     return (
         "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
         "<yellow>{extra[logger_name]}</yellow> | "
         "<level>{level: <2}</level> | "
+        "<level>{process: <2}</level> | "
+        "<level>{thread: <2}</level> | "
         "{extra[protocol]} {extra[request_method]} {extra[request_uri]} {extra[remote_addr]} {extra[username]} {extra[referrer]} {extra[user_agent]} | "
-        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level> | "
+        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> (<blue>{extra[request_id]}</blue>) - <level>{message}</level> | "
         "{extra[response_size]} {extra[status_code]}\n"
-    )
+    )  # type: ignore
 
 
 class BaseAsyncLogger:
@@ -96,6 +107,7 @@ class BaseAsyncLogger:
         name: str,
         logger: Logger,
         level: str | None = "DEBUG",
+        format: Callable | str = DEFAULT_LOGURU_FORMAT,  # type: ignore
         log_file_path: str | None = None,
         max_file_size: int | None = None,
         enable_console_logging: bool = True,
@@ -107,7 +119,7 @@ class BaseAsyncLogger:
 
         if enable_console_logging:
             self.logger.add(
-                sys.stderr, level=level, format=formatter, enqueue=True, colorize=True, filter=self._get_filter(name)
+                sys.stderr, level=level, format=format, enqueue=True, colorize=True, filter=self._get_filter(name)
             )
         if log_file_path:
             rotator = Rotator(size=max_file_size)
@@ -115,7 +127,7 @@ class BaseAsyncLogger:
                 log_file_path,
                 rotation=rotator.should_rotate,
                 level=level,
-                format=formatter,
+                format=format,
                 enqueue=True,
                 colorize=False,
                 filter=self._get_filter(name),
