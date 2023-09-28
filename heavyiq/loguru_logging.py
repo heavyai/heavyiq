@@ -126,6 +126,7 @@ class BaseAsyncLogger:
             self.logger.add(
                 log_file_path,
                 rotation=rotator.should_rotate,
+                retention=5,
                 level=level,
                 format=format,
                 enqueue=True,
