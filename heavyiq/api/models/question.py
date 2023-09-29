@@ -35,6 +35,10 @@ class QuestionResponse(BaseModel):
     feedback_id: str = Field(
         ..., description="A unique identifier for this request that can be used to submit feedback about the response"
     )
+    info: str = Field(
+        default="",
+        description="Additional information about the generated answer or reason about why answer wasn't generated.",
+    )
 
     class Config:
         schema_extra = {
@@ -44,6 +48,14 @@ class QuestionResponse(BaseModel):
                     "sql": "SELECT COUNT(*) AS num_states, STATE_NAME FROM usa_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;",
                     "sql_complexity": 3,
                     "feedback_id": "(Optional) xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-                }
+                    "info": "",
+                },
+                {
+                    "answer": "",
+                    "sql": "SELECT COUNT(*) AS num_states, STATE_NAME FROM usa_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;",
+                    "sql_complexity": 3,
+                    "feedback_id": "(Optional) xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+                    "info": "Generated SQL query resultset exceeds the defined maximum result set size. Please add some limitations to your question.",
+                },
             ]
         }

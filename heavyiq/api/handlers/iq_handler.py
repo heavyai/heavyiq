@@ -1,6 +1,3 @@
-import asyncio
-import functools
-
 from fastapi.concurrency import run_in_threadpool
 from langsmith import Client
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -90,6 +87,7 @@ async def handle_question_request_async(request: QuestionRequest, db: HeavyDB) -
         sql=res[chain.output_sql_key],
         sql_complexity=res[chain.output_sql_complexity_key],
         feedback_id=feedback_id,
+        info=res[chain.output_fail_reason_key],
     )
 
 

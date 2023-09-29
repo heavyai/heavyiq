@@ -10,6 +10,8 @@ huggingface_embed_model = "sentence-transformers/all-mpnet-base-v2"
 metadata_index_dir = "db"
 table_documents_dir = "table_documents"
 openai_gpt_model = "gpt-3.5-turbo-16k"
+max_rows_limit_sql_to_answer = 10
+max_columns_limit_sql_to_answer = 5
 
 # optional, don't copy to your config if you don't have these
 langsmith_project = ""
