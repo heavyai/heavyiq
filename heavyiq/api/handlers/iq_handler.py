@@ -83,11 +83,10 @@ async def handle_question_request_async(request: QuestionRequest, db: HeavyDB) -
     res = await log_chain_call_async(chain, chain_input, "")
     feedback_id = str(res["__run"].run_id) if "__run" in res else ""
     return QuestionResponse(
-        answer=res[chain.output_key],
+        answer=res[chain.output_key] or res[chain.output_fail_reason_key],
         sql=res[chain.output_sql_key],
         sql_complexity=res[chain.output_sql_complexity_key],
         feedback_id=feedback_id,
-        info=res[chain.output_fail_reason_key],
     )
 
 
