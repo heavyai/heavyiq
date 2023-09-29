@@ -55,7 +55,7 @@ class QuestionResponse(BaseModel):
                     "sql": "SELECT COUNT(*) AS num_states, STATE_NAME FROM usa_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;",
                     "sql_complexity": 3,
                     "feedback_id": "(Optional) xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-                    "info": "Generated SQL query resultset exceeds the defined maximum result set size. Please add some limitations to your question.",
+                    "info": "Generated SQL query resultset exceeds the defined maximum result set size.",
                 },
             ]
         }

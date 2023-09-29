@@ -121,9 +121,8 @@ class NLtoAnswerChain(BaseChain):
             # return True in case of empty result
             return True
 
-        row_count, column_count = len(sql_result), len(sql_result[0])  # type: ignore
-        config = get_config()
-        if (row_count > config.max_rows_limit_sql_to_answer) or (column_count > config.max_columns_limit_sql_to_answer):
+        fields_count = len(sql_result) * len(sql_result[0])  # type: ignore
+        if fields_count > get_config().max_fields_limit_sql_to_answer:
             return False
 
         return True
