@@ -69,8 +69,8 @@ class HeavyDB:
         self.logger = get_heavyiq_logger()
         self._conn = conn
         self.lock = Lock()
-        self.semaphore = asyncio.Semaphore(5)
-        """semaphores are used to control access to resources with a maximum concurrency limit (here 5)"""
+        self.alock = asyncio.Lock()
+        """Async lock ensures exactly one coroutine was allowed to access a shared resource (db) at a time."""
 
         self._all_tables = set(self._conn.get_tables())
         self._include_tables = set(include_tables) if include_tables else set()
@@ -401,7 +401,7 @@ class HeavyDB:
         query = strip_sql_comments(query)
         if is_destructive_sql(query):
             raise ValueError("Destructive SQL is not allowed")
-        async with self.semaphore:
+        async with self.alock:
             cursor = await run_in_threadpool(self._conn.execute, f"EXPLAIN plan {query}")
         result: tuple[str] = cursor.fetchone()  # type: ignore
         return str(result[0])
@@ -419,7 +419,7 @@ class HeavyDB:
             raise ValueError("Destructive SQL is not allowed")
         if "::" in query:
             raise ValueError("Double colon cast syntax is not allowed. Use CAST() instead.")
-        async with self.semaphore:
+        async with self.alock:
             return await run_in_threadpool(self._conn._client.sql_validate, self._conn._session, query)
 
     async def aget_column_top_k(self, table: str, column: str, _k: int = 5) -> tuple[Optional[list[str]], bool]:
@@ -451,7 +451,7 @@ class HeavyDB:
         """Get the top k values for a column."""
         self.logger.debug(f"Getting top k values for column {column} in table {table}")
         top_k_statement = f"SELECT {column}, COUNT(*) as cnt FROM {table} WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {cardinality_threshold + 1};"
-        async with self.semaphore:
+        async with self.alock:
             cursor = await run_in_threadpool(self._conn.execute, top_k_statement)
         top_k_res: list[str] = [str(v[0]) for v in cursor.fetchall()]
         is_high_cardinality = len(top_k_res) > cardinality_threshold
@@ -469,7 +469,7 @@ class HeavyDB:
     async def aget_table_columns(self, table: str) -> list[ColumnDetails]:
         """Get details about the columns in a table."""
         self.logger.debug(f"Getting columns for table {table}")
-        async with self.semaphore:
+        async with self.alock:
             try:
                 table_details = await run_in_threadpool(self._conn.get_table_details, table)
                 self.logger.debug(f"Got columns for table {table}")
@@ -493,7 +493,7 @@ class HeavyDB:
         """Get the schema of a table."""
         create_command = f"SHOW CREATE TABLE {table};"
 
-        async with self.semaphore:
+        async with self.alock:
             cursor = await run_in_threadpool(self._conn.execute, create_command)
 
         table_schema = cursor.fetchone()[0]  # type: ignore
@@ -524,7 +524,7 @@ class HeavyDB:
         columns_str = ",".join([col.name for col in self.get_table_columns(table_name)])
 
         # get the sample rows
-        async with self.semaphore:
+        async with self.alock:
             sample_rows = await run_in_threadpool(self._conn.execute, command)
         # shorten values in the sample rows
         sample_rows = list(map(lambda ls: [str(i)[:100] for i in ls], sample_rows))
@@ -623,7 +623,7 @@ class HeavyDB:
         command = strip_sql_comments(command)
         if is_destructive_sql(command):
             raise ValueError("Destructive SQL is not allowed")
-        async with self.semaphore:
+        async with self.alock:
             cursor = await run_in_threadpool(self._conn.execute, command)
         if fetch == "all":
             result = cursor.fetchall()
