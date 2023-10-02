@@ -152,7 +152,7 @@ class NLtoAnswerChain(BaseChain):
         )
         sql_cmd = nl_sql_results[self.nl_sql_chain.output_key]
         await self.write_callback_message_async(sql_cmd, run_manager=run_manager, color="green")
-        sql_result = await run_in_threadpool(self.database.run, sql_cmd)
+        sql_result = await self.database.arun(sql_cmd)
         await self.write_callback_message_async("\nSQLResult: ", run_manager=run_manager, color="yellow")
         await self.write_callback_message_async(sql_result, run_manager=run_manager, color="yellow")
 

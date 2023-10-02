@@ -114,6 +114,53 @@ def get_table_info_wrt_token_limit(
     return table_info
 
 
+async def aget_table_info_wrt_token_limit(
+    llm: BaseLanguageModel,
+    heavydb: HeavyDB,
+    prompt: BasePromptTemplate | BaseChatPromptTemplate,
+    table_names_to_use: list[str] | None,
+) -> str:
+    """
+    Gets the info of all the tables with respect to the token limit async.
+    """
+    config = get_config()
+    if config.custom_llm_type is None or config.custom_llm_type == "AZURE":
+        token_limit = get_token_limit(llm.model_name)  # type: ignore
+        token_counter = llm.get_num_tokens
+        table_info_options: list[dict[str, bool]] = [
+            {},
+            {"include_top_k": False},
+            {"include_samples": False},
+            {"include_samples": False, "include_top_k": False},
+        ]
+    else:
+        from transformers import LlamaTokenizer
+
+        tokenizer = LlamaTokenizer.from_pretrained(
+            "./heavyiq/langchain/llama_model", local_files_only=True, legacy=False
+        )
+        token_limit = llm.context_window - 306  # type: ignore # (256 response + 50 buffer)
+
+        def token_counter(text: str) -> int:
+            """Token counter for the Llama model."""
+            return len(tokenizer.tokenize(text))
+
+        table_info_options = [
+            {"include_samples": False},
+            {"include_samples": False, "include_top_k": False},
+        ]
+
+    for options in table_info_options:
+        table_info = await heavydb.aget_table_info(table_names=table_names_to_use, **options)
+        formatted_prompt = prompt.format(table_info=table_info)
+        if token_counter(formatted_prompt) <= token_limit:
+            break
+    else:  # executed if the loop finished normally (no break)
+        raise RuntimeError("Couldn't find suitable prompt provided token limit")
+
+    return table_info
+
+
 def populate_table_info_wrt_token_limit(
     prompt: BasePromptTemplate | BaseChatPromptTemplate,
     llm: BaseLanguageModel,
@@ -121,5 +168,16 @@ def populate_table_info_wrt_token_limit(
     table_names_to_use: list[str] | None,
 ) -> PromptValue:
     table_info = get_table_info_wrt_token_limit(llm, heavydb, prompt, table_names_to_use)
+
+    return prompt.format_prompt(table_info=table_info)
+
+
+async def apopulate_table_info_wrt_token_limit(
+    prompt: BasePromptTemplate | BaseChatPromptTemplate,
+    llm: BaseLanguageModel,
+    heavydb: HeavyDB,
+    table_names_to_use: list[str] | None,
+) -> PromptValue:
+    table_info = await aget_table_info_wrt_token_limit(llm, heavydb, prompt, table_names_to_use)
 
     return prompt.format_prompt(table_info=table_info)

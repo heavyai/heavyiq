@@ -23,7 +23,7 @@ from heavyiq.config import get_config
 from heavyiq.langchain.llms import is_using_custom_trained_llm
 from heavyiq.langchain.heavydb import HeavyDB
 from heavyiq.langchain.chains import BaseChain
-from heavyiq.langchain.utils import populate_table_info_wrt_token_limit
+from heavyiq.langchain.utils import populate_table_info_wrt_token_limit, apopulate_table_info_wrt_token_limit
 from heavyiq.langchain.exceptions import NLtoSQLException
 from heavyiq.utils import strip_sql_comments
 
@@ -183,6 +183,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
             error_prompt = NL_TO_SQL_ERROR_PROMPT
         super().__init__(*args, prompt=prompt, error_prompt=error_prompt, **kwargs)  # type: ignore
 
+    # method definition exists here for reference, actually _acall method gets called since we are calling the chain async.
     def _call(
         self,
         inputs: dict[str, Any],
@@ -215,7 +216,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                 if retries > self.max_retries:
                     break
                 self.write_callback_message(f"Invalid SQL Query: {e}.", run_manager=run_manager, color="red")
-                
+
                 truncated_error = str(e)[0:150] if len(str(e)) > 150 else str(e)
                 partial_error_prompt = self.error_prompt.partial(
                     input=inputs[self.input_key],
@@ -261,8 +262,8 @@ class NLtoSQLChain(BaseNLtoSQLChain):
         table_names_to_use = inputs.get("tables")
 
         partial_gen_sql_prompt = self.prompt.partial(input=inputs[self.input_key])
-        gen_sql_prompt = await run_in_threadpool(
-            populate_table_info_wrt_token_limit, partial_gen_sql_prompt, self.llm, self.database, table_names_to_use
+        gen_sql_prompt = await apopulate_table_info_wrt_token_limit(
+            partial_gen_sql_prompt, self.llm, self.database, table_names_to_use
         )
 
         response = await self.llm.agenerate_prompt(
@@ -277,7 +278,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                 await self.write_callback_message_async(
                     f"Verifying SQL Query: {sql_cmd}", run_manager=run_manager, color="blue"
                 )
-                await run_in_threadpool(self.database.validate_query, sql_cmd)
+                await self.database.avalidate_query(sql_cmd)
                 verified = True
             except Exception as e:
                 retries += 1
@@ -286,18 +287,20 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                 await self.write_callback_message_async(
                     f"Invalid SQL Query: {e}.", run_manager=run_manager, color="red"
                 )
+
                 def extract_error_message(error_str):
                     # Define the regular expression pattern to capture the inner error message
                     pattern = r'TDBException\(error_msg="(.+?)"\)'
-                    
+
                     # Use the search method to find the pattern in the given error string
                     match = re.search(pattern, error_str)
-                    
+
                     # If a match is found, extract the inner message. Otherwise, return the original string.
                     if match:
                         return match.group(1)
                     else:
                         return error_str
+
                 extracted_error = extract_error_message(str(e))
                 truncated_error = extracted_error[0:150] if len(extracted_error) > 150 else extracted_error
                 partial_error_prompt = self.error_prompt.partial(
@@ -305,8 +308,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                     sql_cmd=sql_cmd,
                     error=truncated_error,
                 )
-                correct_error_prompt = await run_in_threadpool(
-                    populate_table_info_wrt_token_limit,
+                correct_error_prompt = await apopulate_table_info_wrt_token_limit(
                     partial_error_prompt,
                     self.llm,
                     self.database,
@@ -336,7 +338,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                 f"Result of correction: {sql_cmd}", run_manager=run_manager, color="green"
             )
 
-        sql_complexity = await run_in_threadpool(self.database.complexity, sql_cmd)
+        sql_complexity = await self.database.acomplexity(sql_cmd)
 
         return {self.output_key: strip_sql_comments(sql_cmd), self.output_complexity_key: str(sql_complexity)}
 
