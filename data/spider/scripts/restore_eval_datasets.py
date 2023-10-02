@@ -21,7 +21,7 @@ eval_databases = [
     "real_estate_properties",
 ]
 
-local_import_base_dir = "/home/paperspace/heavyiq_eval_dumps"
+local_import_base_dir = "/home/paperspace/heavyai/heavyiq_eval"
 heavyai_con = heavyai.connect(user="admin", password="HyperInteractive", host="localhost", dbname="heavyai")
 for db in eval_databases:
     create_db_sql = f"CREATE DATABASE IF NOT EXISTS {db}"

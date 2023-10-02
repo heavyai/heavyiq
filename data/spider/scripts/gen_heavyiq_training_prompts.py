@@ -49,6 +49,11 @@ def getOptions(argv=None):
         "--add-columns-to-question-prompts", help="Add column specifications to question prompts", action="store_true"
     )
     parser.add_argument("--add-columns-to-answers", help="Add column specifications to answer", action="store_true")
+    parser.add_argument(
+        "--sort-table-schemas-by-row-count",
+        help="Sort table schemas in reverse order by row count",
+        action="store_true",
+    )
     return parser.parse_args(argv)
 
 
@@ -413,6 +418,38 @@ def get_top_k_vals_str(table_name, top_k_vals):
     ]
     return top_k_vals_strs
     # return "\n".join(top_k_vals_strs)
+
+
+def sort_table_schemas_by_row_count(con, table_schemas):
+    table_row_counts = []
+    for table_schema in table_schemas:
+        match = re.search(r"CREATE TABLE (\w+)", table_schema)
+        if match:
+            table_name = match.group(1)
+            row_count_sql = f"""SELECT COUNT(*) FROM "{table_name}" """
+            row_count = list(con.execute(row_count_sql))[0][0]
+            table_row_counts.append((table_schema, row_count))
+        else:
+            print("No table name")
+            raise Exception("Could not find table name in schema")
+
+    # Sort table schemas by row_count in descending order
+    # Python's sorted is stable, so equal row counts will retain their relative ordering
+    sorted_table_schemas = [x[0] for x in sorted(table_row_counts, key=lambda x: x[1], reverse=True)]
+    return sorted_table_schemas
+
+
+def sort_tables_by_row_count(con, tables, reverse=True):
+    table_row_counts = []
+    for table in tables:
+        row_count_sql = f"""SELECT COUNT(*) FROM "{table}" """
+        row_count = list(con.execute(row_count_sql))[0][0]
+        table_row_counts.append((table, row_count))
+
+    # Sort tables by row_count
+    # Python's sorted is stable, so equal row counts will retain their relative ordering
+    sorted_tables = [x[0] for x in sorted(table_row_counts, key=lambda x: x[1], reverse=reverse)]
+    return sorted_tables
 
 
 def generate_table_metadata_str(table_schemas, top_k_str_vals, low_card_col_threshold):
@@ -880,7 +917,7 @@ def generate_error_prompts(error_queries_file, output_file, options):
             filtered_table_schemas, filtered_top_k_str_vals, options.low_card_top_k_str_vals
         )
 
-        targeted_instruction = """You generated a SQL query that generated an exception when executed in the HeavyDB database.\n\nYou have access to the following relation tables, with schemas below.\n{table_metadata}\nIn attempting to answer the following user question:\n\n{question},\nyou generated the following SQL query:\n{error_sql_query}\n,which failed to run in the HeavyDB database, generating the following error:\n{error}\n\nPlease alter the query to run without error in HeavyDB:""".format(
+        targeted_instruction = """You generated a SQL query that generated an exception when executed in the HeavyDB database.\n\nYou have access to the following relation tables, with schemas below.\n{table_metadata}\nIn attempting to answer the following user question:\n\n{question},\nyou generated the following SQL query:\n{error_sql_query}\n, which failed to run in the HeavyDB database, generating the following error:\n{error}\n\nPlease alter the query to run without error in HeavyDB:""".format(
             table_metadata=filtered_table_metadata,
             question=question,
             error_sql_query=error_sql_query,
@@ -962,6 +999,8 @@ def main(argv):
                 num_queries = len(queries)
                 successful_queries = 0
                 db_tables = con.get_tables()
+                if options.sort_table_schemas_by_row_count:
+                    db_tables = sort_tables_by_row_count(con, db_tables)
                 table_schemas = []
                 table_cols = []
                 table_schemas_map = {}
@@ -985,9 +1024,6 @@ def main(argv):
                             )
                             for str_col in table_str_cols
                         ]
-                        # print(str_cols_top_k_vals)
-                        # top_k_str_col_vals_str = get_top_k_vals_str(db_table, str_cols_top_k_vals)
-                        # print(top_k_str_col_vals_str)
                         top_k_str_vals_map[db_table] = str_cols_top_k_vals
                         top_k_str_vals.append(str_cols_top_k_vals)
 
@@ -1044,16 +1080,20 @@ def main(argv):
                         successful_queries += 1
                         if options.write_sql_prompts:
                             filtered_tables = extract_tables_from_query(con, sql_query)
+                            filtered_tables_set = set(filtered_tables)
                             # print(f"Query ID: {query_id} Tables: {filtered_tables} Query: {sql_query}")
                             sql_query_tokens = tokenizer.tokenize(sql_query)
                             num_sql_query_tokens = len(sql_query_tokens)
                             filtered_table_schemas = []
-                            for db_table in filtered_tables:
-                                filtered_table_schemas.append(table_schemas_map[db_table.lower()])
+                            for db_table in db_tables:
+                                if db_table in filtered_tables_set:
+                                    filtered_table_schemas.append(table_schemas_map[db_table.lower()])
+                            # for db_table in filtered_tables:
+                            #    filtered_table_schemas.append(table_schemas_map[db_table.lower()])
                             filtered_top_k_str_vals = []
                             if options.top_k_str_vals > 0:
-                                for db_table in filtered_tables:
-                                    filtered_top_k_str_vals.append(top_k_str_vals_map[db_table])
+                                for filtered_table in filtered_tables:
+                                    filtered_top_k_str_vals.append(top_k_str_vals_map[filtered_table])
                             full_table_metadata = generate_table_metadata_str(
                                 table_schemas, top_k_str_vals, options.low_card_top_k_str_vals
                             )
@@ -1155,6 +1195,7 @@ def main(argv):
 
                     except Exception as e:
                         print(f"Exception Query ID: {query_id} DB: {db_id} Query: {sql_query}")
+                        print(e)
                         query_fixed = False
                         if options.fix_queries:
                             fixed_query = fix_failed_query_unquoted_keyword(con, query_id, sql_query, e)
@@ -1178,6 +1219,7 @@ def main(argv):
                 if options.num_dbs != None and db_num >= options.num_dbs + options.start_db:
                     break
             except Exception as e:
+                print(e)
                 pass
         failures_df = pd.DataFrame(failed_queries)
         failures_df.to_csv("failed_queries.csv", index=False)
