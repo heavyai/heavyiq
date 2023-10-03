@@ -1,3 +1,3 @@
-from .logging_middleware import AsyncLoggingMiddleware, LogRequestsMiddleware
+from .logging_middleware import AsyncLoggingMiddleware
 
-__all__ = ["AsyncLoggingMiddleware", "LogRequestsMiddleware"]
+__all__ = ["AsyncLoggingMiddleware"]
