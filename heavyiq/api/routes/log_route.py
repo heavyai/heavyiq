@@ -8,8 +8,8 @@ from heavyiq.logging_utils import get_heavyiq_logger
 
 def log_info(req_body: Any, res_body: Any):
     logging = get_heavyiq_logger()
-    logging.debug("Request Body: %s", req_body)
-    logging.debug("Response Body: %s", res_body)
+    logging.debug(f"Request Body: {req_body}")
+    logging.debug(f"Response Body: {res_body}")
 
 
 class LoggingRoute(APIRoute):

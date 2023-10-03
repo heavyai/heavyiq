@@ -616,7 +616,7 @@ class HeavyDB:
         final_str = "\n\n".join(tasks_output)
         return final_str
 
-    async def arun(self, command: str, fetch: str = "all") -> str:
+    async def arun(self, command: str, fetch: str = "all", to_str: bool = True) -> str | tuple | list:
         """
         Execute a SQL command and return a string representing the results async.
         """
@@ -631,7 +631,9 @@ class HeavyDB:
             result = cursor.fetchone()
         else:
             raise ValueError("Fetch parameter must be either 'one' or 'all'")
-        return str(result)
+        if to_str:
+            return str(result)
+        return result  # type: ignore
 
     async def aget_detailed_query_plan(self, query: str) -> str:
         query = strip_sql_comments(query)
@@ -826,10 +828,13 @@ class HeavyDB:
         final_str = "\n\n".join(tables)
         return final_str
 
-    def run(self, command: str, fetch: str = "all") -> str:
+    def run(self, command: str, fetch: str = "all", to_str: bool = True) -> str | tuple | list:
         """Execute a SQL command and return a string representing the results.
         If the statement returns rows, a string of the results is returned.
         If the statement returns no rows, an empty string is returned.
+        If to_str is True (by default), result should be converted to string.
+        If fetch = one and to_str = False, then a tuple will be returned.
+        If fetch = all and to_str = False, then a list of tuples will be returned.
         """
         command = strip_sql_comments(command)
         if is_destructive_sql(command):
@@ -842,7 +847,9 @@ class HeavyDB:
             result = cursor.fetchone()
         else:
             raise ValueError("Fetch parameter must be either 'one' or 'all'")
-        return str(result)
+        if to_str:
+            return str(result)
+        return result  # type: ignore
 
     def get_query_plan(self, query: str) -> str:
         query = strip_sql_comments(query)

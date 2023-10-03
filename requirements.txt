@@ -16,3 +16,5 @@ SQLAlchemy==2.0.20
 uvicorn[standard]==0.23.2
 tiktoken==0.4.0
 transformers==4.33.1
+asgi-correlation-id==4.2.0
+loguru==0.7.2

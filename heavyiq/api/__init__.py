@@ -7,7 +7,8 @@ from heavydb.exceptions import Error as HeavyDBError  # type: ignore
 from starlette.exceptions import HTTPException
 
 from heavyiq.config import get_config
-from heavyiq.api.middlewares import LogRequestsMiddleware, AsyncLoggingMiddleware
+from heavyiq.api.middlewares import AsyncLoggingMiddleware
+from asgi_correlation_id import CorrelationIdMiddleware
 from heavyiq.api.models.error import ErrorResponse
 from heavyiq.langchain.exceptions import NLtoSQLException
 from heavyiq.logging_utils import init_logs
@@ -46,6 +47,8 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
     cors_origins = ["http://localhost"]
 
     # add middlewares
+    app.add_middleware(AsyncLoggingMiddleware)
+    app.add_middleware(CorrelationIdMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
@@ -53,7 +56,6 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    app.add_middleware(AsyncLoggingMiddleware)
 
     # add exception handlers
     app.add_exception_handler(AttributeError, exh.attribute_error_handler)

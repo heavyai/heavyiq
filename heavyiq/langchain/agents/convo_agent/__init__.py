@@ -28,7 +28,7 @@ from heavyiq.langchain.agents import HeavyDBToolkit
 from heavyiq.langchain.callbacks import ConvoAgentCallbackHandler
 from heavyiq.langchain.llms import get_chat_llm
 from heavyiq.langchain.memory import HeavyIQQueryBufferWindowMemory
-from heavyiq.logging_utils import heavyiq_logger as logger
+from heavyiq.logging_utils import get_heavyiq_logger
 
 
 SYSTEM_MESSAGE = """Assistant is a large language model trained by OpenAI.
@@ -189,7 +189,7 @@ class SaveSuccessQueryAgentExecutor(AgentExecutor):
         response = self.__call__(inputs=inputs, callbacks=callbacks, tags=tags, metadata=metadata, **kwargs)
         status = self._save_to_sql_memory(response=response)
         if status:
-            logger.debug("Saved the last success query")
+            get_heavyiq_logger().debug("Saved the last success query")
         return response["output"]
 
     @classmethod

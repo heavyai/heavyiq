@@ -7,6 +7,8 @@ from confz.config_source import ConfigSources, FileFormat
 from confz.exceptions import ConfigException, FileException
 from confz.loaders.file_loader import FileLoader
 from pydantic import BaseModel
+from confz import BaseConfig, ConfigSource
+from confz.loaders import get_loader
 
 # These overrides are responsible for modifying the default behaviour of the ConfZ library.
 # 1. Treating a .conf file as TOML
@@ -37,15 +39,23 @@ class OverrideFileLoader(FileLoader):
         return suffix_format
 
 
+def _populate_loader_config(config: dict, config_source: ConfigSource):
+    """
+    Incase of FileSource, replace the default FileLoader with the overrided `OverrideFileLoader` class.
+    Otherwise keep as it is since we not only uses FileSource but also some other sources such as DataSource (for testing), etc.
+    """
+    loader = get_loader(type(config_source))
+    loader = OverrideFileLoader if loader == FileLoader else loader
+    loader.populate_config(config, config_source)  # type: ignore
+
+
 def _load_config(config_kwargs: dict, confz_sources: ConfigSources) -> dict:
     config = config_kwargs.copy()
     if isinstance(confz_sources, list):
         for confz_source in confz_sources:
-            loader = OverrideFileLoader
-            loader.populate_config(config, confz_source)  # type: ignore
+            _populate_loader_config(config, confz_source)
     else:
-        loader = OverrideFileLoader
-        loader.populate_config(config, confz_sources)  # type: ignore
+        _populate_loader_config(config, confz_sources)
     return config
 
 

@@ -31,6 +31,7 @@ class QuestionResponse(BaseModel):
 
     answer: str = Field(..., description="Natural language answer")
     sql: str = Field(..., description="A SQL statement")
+    sql_result: str = Field(..., description="The result of the SQL statement")
     sql_complexity: int = Field(..., description="The complexity level of the SQL statement")
     feedback_id: str = Field(
         ..., description="A unique identifier for this request that can be used to submit feedback about the response"
@@ -42,8 +43,15 @@ class QuestionResponse(BaseModel):
                 {
                     "answer": "4 states start with the letter A; Alaska, Arizona, Arkansas, and Alabama.",
                     "sql": "SELECT COUNT(*) AS num_states, STATE_NAME FROM usa_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;",
+                    "sql_result": "[(1, 'Alaska'), (1, 'Arizona'), (1, 'Arkansas'), (1, 'Alabama')]",
                     "sql_complexity": 3,
                     "feedback_id": "(Optional) xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-                }
+                },
+                {
+                    "answer": "Generated SQL query resultset exceeds the defined maximum result set size.",
+                    "sql": "SELECT COUNT(*) AS num_states, STATE_NAME FROM usa_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;",
+                    "sql_complexity": 3,
+                    "feedback_id": "(Optional) xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+                },
             ]
         }

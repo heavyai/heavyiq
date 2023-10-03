@@ -30,7 +30,7 @@ class AsyncLoggingMiddleware(BaseHTTPMiddleware):
     running it as seperate Background Task.
     """
 
-    @staticmethod
+    @staticmethod  # type: ignore
     def write_log_data(logs: list[Log]):
         """
         Supposed to write log data to terminal or to a file or both.
@@ -40,7 +40,10 @@ class AsyncLoggingMiddleware(BaseHTTPMiddleware):
         """
         for log in logs:
             log_func = getattr(log.type, log.level)
-            log_func(log.message, *log.values, extra=log.extra)
+            log_message = log.message
+            if log.values:
+                log_message = log_message % tuple(log.values)
+            log_func(log_message, extra=log.extra)
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         """
@@ -53,52 +56,49 @@ class AsyncLoggingMiddleware(BaseHTTPMiddleware):
         heavyiq_logger: HeavyIQLogger = get_heavyiq_logger()
         app_logger: _AccessLogger = _get_access_logger()
 
-        if is_api_request:
-            logs.append(Log(type=heavyiq_logger, level="debug", message="Request Path: %s", values=[request.url.path]))
+        request_id = request.headers.get("x-request-id", "")
 
-        # write access log immediately when the request received
-        await run_in_threadpool(
-            self.write_log_data, [Log(type=app_logger, level="info", message="", extra={"request": request})]
-        )
+        with heavyiq_logger.logger.contextualize(request_id=request_id), app_logger.logger.contextualize(
+            request_id=request_id
+        ):
+            if is_api_request:
+                logs.append(
+                    Log(
+                        type=heavyiq_logger,
+                        level="debug",
+                        message="Request Path: %s",
+                        values=[request.url.path],
+                        extra={"request": request},
+                    )
+                )
 
-        response = await call_next(request)
-        # Code executed after the request has been processed
-        # create access log
-        logs.append(Log(type=app_logger, level="info", message="", extra={"response": response, "request": request}))
+            # write access log immediately when the request received
+            self.write_log_data(
+                [Log(type=app_logger, level="info", message="Request Received!", extra={"request": request})]
+            )
 
-        if is_api_request:
+            response = await call_next(request)
+            # Code executed after the request has been processed
+            # create access log
             logs.append(
                 Log(
-                    type=heavyiq_logger,
-                    level="debug",
-                    message="Response Status Code: %d",
-                    values=[response.status_code],
-                    extra={"request": request},
+                    type=app_logger,
+                    level="info",
+                    message="Response Generated!",
+                    extra={"response": response, "request": request},
                 )
             )
 
-        response.background = BackgroundTask(self.write_log_data, logs)
-        return response
-
-
-class LogRequestsMiddleware:
-    def __init__(self, app: ASGIApp) -> None:
-        self.app = app
-        self.logger = get_heavyiq_logger()
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        async def send_with_logs(message: Message):
-            """Log every request info and response status code."""
-            if message["type"] == "http.response.start":
-                # request info is stored in the scope
-                # status code is stored in the message
-                await run_in_threadpool(
-                    self.logger.info,
-                    f'{scope["client"][0]}:{scope["client"][1]} - '
-                    f'"{scope["method"]} {scope["path"]} '
-                    f'{scope["scheme"]}/{scope["http_version"]}" '
-                    f'{message["status"]}',
+            if is_api_request:
+                logs.append(
+                    Log(
+                        type=heavyiq_logger,
+                        level="debug",
+                        message="Response Status Code: %d",
+                        values=[response.status_code],
+                        extra={"request": request},
+                    )
                 )
-            await send(message)
 
-        await self.app(scope, receive, send_with_logs)
+            response.background = BackgroundTask(self.write_log_data, logs)
+            return response

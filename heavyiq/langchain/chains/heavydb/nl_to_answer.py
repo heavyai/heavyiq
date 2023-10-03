@@ -12,6 +12,7 @@ from langchain.callbacks.manager import (
 )
 
 from heavyiq.langchain.chains import BaseChain
+from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.llms import is_using_custom_trained_llm
 from .nl_to_sql import BaseNLtoSQLChain, get_nl_to_sql_chain_by_llm
@@ -63,6 +64,10 @@ class NLtoAnswerChain(BaseChain):
     output_sql_key: str = "sql"  #: :meta private:
     output_sql_complexity_key: str = "sql_complexity"  #: :meta private:
     output_results_key: str = "results"  #: :meta private:
+    output_fail_reason_key: str = "info"  #: :meta private:
+    output_fail_reasons: dict[str, str] = {
+        "max_size_reached": "Generated SQL query resultset exceeds the defined maximum result set size."
+    }
 
     def __init__(self, *args, **kwargs):
         if is_using_custom_trained_llm():
@@ -99,7 +104,27 @@ class NLtoAnswerChain(BaseChain):
 
         :meta private:
         """
-        return [self.output_key, self.output_results_key, self.output_sql_key, self.output_sql_complexity_key]
+        return [
+            self.output_key,
+            self.output_results_key,
+            self.output_sql_key,
+            self.output_sql_complexity_key,
+            self.output_fail_reason_key,
+        ]
+
+    def _should_forward_result_to_llm(self, sql_result: list) -> bool:
+        """
+        Based on the sql_result return a decision on whether to generate an answer using llm or not.
+        """
+        if not sql_result:
+            # return True in case of empty result
+            return True
+
+        fields_count = len(sql_result) * len(sql_result[0])  # type: ignore
+        if fields_count > get_config().max_fields_limit_sql_to_answer:
+            return False
+
+        return True
 
     def _call(
         self,
@@ -114,26 +139,39 @@ class NLtoAnswerChain(BaseChain):
         nl_sql_results = self.nl_sql_chain(nl_sql_inputs, callbacks=run_manager.get_child() if run_manager else None)
         sql_cmd = nl_sql_results[self.nl_sql_chain.output_key]
         self.write_callback_message(sql_cmd, run_manager=run_manager, color="green")
-        sql_result = self.database.run(sql_cmd)
+
+        sql_result = self.database.run(sql_cmd, to_str=False)
+        pass_result_to_llm = self._should_forward_result_to_llm(sql_result)  # type: ignore
+        sql_result = str(sql_result)
+
         self.write_callback_message("\nSQLResult: ", run_manager=run_manager, color="yellow")
         self.write_callback_message(sql_result, run_manager=run_manager, color="yellow")
 
-        gen_answer_prompt = self.prompt.format_prompt(
-            input=inputs[self.input_key],
-            sql_cmd=sql_cmd,
-            sql_result=sql_result,
-        )
-        response = self.llm.generate_prompt(
-            [gen_answer_prompt], callbacks=run_manager.get_child() if run_manager else None
-        )
-        answer = response.generations[0][0].text.strip()
-        self.write_callback_message(f"\nAnswer:\n{answer}", run_manager=run_manager, color="green")
+        if pass_result_to_llm:
+            gen_answer_prompt = self.prompt.format_prompt(
+                input=inputs[self.input_key],
+                sql_cmd=sql_cmd,
+                sql_result=sql_result,
+            )
+            response = self.llm.generate_prompt(
+                [gen_answer_prompt], callbacks=run_manager.get_child() if run_manager else None
+            )
+            answer, fail_reason = response.generations[0][0].text.strip(), ""  # type: ignore
+            self.write_callback_message(f"\nAnswer:\n{answer}", run_manager=run_manager, color="green")
+        else:
+            answer, fail_reason = "", self.output_fail_reasons["max_size_reached"]
+            self.write_callback_message(
+                f"\nFailed to generate answer: {fail_reason}\nAnswer:\n{answer}",
+                run_manager=run_manager,
+                color="yellow",
+            )
 
         return {
             self.output_key: answer,
             self.output_results_key: sql_result,
             self.output_sql_key: sql_cmd,
             self.output_sql_complexity_key: nl_sql_results[self.nl_sql_chain.output_complexity_key],
+            self.output_fail_reason_key: fail_reason,
         }
 
     async def _acall(
@@ -151,26 +189,39 @@ class NLtoAnswerChain(BaseChain):
         )
         sql_cmd = nl_sql_results[self.nl_sql_chain.output_key]
         await self.write_callback_message_async(sql_cmd, run_manager=run_manager, color="green")
-        sql_result = await self.database.arun(sql_cmd)
+
+        sql_result = await self.database.arun(sql_cmd, to_str=False)
+        pass_result_to_llm = self._should_forward_result_to_llm(sql_result)  # type: ignore
+        sql_result = str(sql_result)
+
         await self.write_callback_message_async("\nSQLResult: ", run_manager=run_manager, color="yellow")
         await self.write_callback_message_async(sql_result, run_manager=run_manager, color="yellow")
 
-        gen_answer_prompt = self.prompt.format_prompt(
-            input=inputs[self.input_key],
-            sql_cmd=sql_cmd,
-            sql_result=sql_result,
-        )
-        response = await self.llm.agenerate_prompt(
-            [gen_answer_prompt], callbacks=run_manager.get_child() if run_manager else None
-        )
-        answer = response.generations[0][0].text.strip()  # type: ignore
-        await self.write_callback_message_async(f"\nAnswer:\n{answer}", run_manager=run_manager, color="green")
+        if pass_result_to_llm:
+            gen_answer_prompt = self.prompt.format_prompt(
+                input=inputs[self.input_key],
+                sql_cmd=sql_cmd,
+                sql_result=sql_result,
+            )
+            response = await self.llm.agenerate_prompt(
+                [gen_answer_prompt], callbacks=run_manager.get_child() if run_manager else None
+            )
+            answer, fail_reason = response.generations[0][0].text.strip(), ""  # type: ignore
+            await self.write_callback_message_async(f"\nAnswer:\n{answer}", run_manager=run_manager, color="green")
+        else:
+            answer, fail_reason = "", self.output_fail_reasons["max_size_reached"]
+            await self.write_callback_message_async(
+                f"\nFailed to generate answer: {fail_reason}\nAnswer:\n{answer}",
+                run_manager=run_manager,
+                color="yellow",
+            )
 
         return {
             self.output_key: answer,
             self.output_results_key: sql_result,
             self.output_sql_key: sql_cmd,
             self.output_sql_complexity_key: nl_sql_results[self.nl_sql_chain.output_complexity_key],
+            self.output_fail_reason_key: fail_reason,
         }
 
     @property
