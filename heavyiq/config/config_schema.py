@@ -10,6 +10,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     openai_gpt_model: str = "gpt-3.5-turbo-16k"  # LLMType.DEFAULT
     openai_gpt_model_nl_to_sql: Optional[str] = None  # LLMType.NL_TO_SQL
     openai_gpt_model_sql_to_answer: Optional[str] = None  # LLMType.SQL_TO_ANSWER
+    max_fields_limit_sql_to_answer: int = 20  # LLMType.SQL_TO_ANSWER
+    """Max number of fields (rows x columns) allowed to pass onto sql_to_answer llm"""
     heavydb_dbname: Optional[str] = None
     heavydb_username: Optional[str] = None
     heavydb_password: Optional[str] = None

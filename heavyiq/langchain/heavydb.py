@@ -437,10 +437,13 @@ class HeavyDB:
         final_str = "\n\n".join(tables)
         return final_str
 
-    def run(self, command: str, fetch: str = "all") -> str:
+    def run(self, command: str, fetch: str = "all", to_str: bool = True) -> str | tuple | list:
         """Execute a SQL command and return a string representing the results.
         If the statement returns rows, a string of the results is returned.
         If the statement returns no rows, an empty string is returned.
+        If to_str is True (by default), result should be converted to string.
+        If fetch = one and to_str = False, then a tuple will be returned.
+        If fetch = all and to_str = False, then a list of tuples will be returned.
         """
         command = strip_sql_comments(command)
         if is_destructive_sql(command):
@@ -453,7 +456,9 @@ class HeavyDB:
             result = cursor.fetchone()
         else:
             raise ValueError("Fetch parameter must be either 'one' or 'all'")
-        return str(result)
+        if to_str:
+            return str(result)
+        return result  # type: ignore
 
     def get_query_plan(self, query: str) -> str:
         query = strip_sql_comments(query)
@@ -564,7 +569,11 @@ class HeavyDB:
             num_similarity_rows = len(similarity_rows)
 
             if num_similarity_rows > 0:
-                if num_similarity_rows > 1 and similarity_rows[0][1] == 0 and similarity_rows[0][1] == similarity_rows[1][1]:
+                if (
+                    num_similarity_rows > 1
+                    and similarity_rows[0][1] == 0
+                    and similarity_rows[0][1] == similarity_rows[1][1]
+                ):
                     # Here there are at least two matches such that the user-provided literal is a full substring of
                     # the column value. In this case, we will match against all strings that our string literal
                     # is a substring of
