@@ -1,6 +1,6 @@
 import pytest
 from typing import Any, Callable
-from .base import client, RunId
+from tests.api import RunId
 from unittest.mock import patch
 
 
@@ -35,13 +35,13 @@ async def mock_log_chain_call_async(chain: Any, chain_input: dict, model_name: s
     ],
 )
 @patch("heavyiq.api.handlers.iq_handler.log_chain_call_async", side_effect=mock_log_chain_call_async)
-def test_should_pass_for_generate_table_metadata_endpoint(mock: Callable, expected_result: dict[str, Any]):
+def test_should_pass_for_generate_table_metadata_endpoint(mock: Callable, expected_result: dict[str, Any], client):
     """
     Test /generate-table-metadata endpoint.
     """
 
     payload = {
-        "session_id": "x" * 32,
+        "session_id": "x" * 32,  # type: ignore
         "table_name": "us_pois_safegraph",
     }
     response = client.post("/api/v1/generate-table-metadata", json=payload)
