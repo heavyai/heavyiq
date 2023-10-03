@@ -521,7 +521,7 @@ class HeavyDB:
         command = f"SELECT * FROM {table_name} LIMIT {self._sample_rows_in_table_info}"
 
         # save the columns in string format
-        columns_str = ",".join([col.name for col in self.get_table_columns(table_name)])
+        columns_str = ",".join([col.name for col in await self.aget_table_columns(table_name)])
 
         # get the sample rows
         async with self.alock:
@@ -632,6 +632,156 @@ class HeavyDB:
         else:
             raise ValueError("Fetch parameter must be either 'one' or 'all'")
         return str(result)
+
+    async def aget_detailed_query_plan(self, query: str) -> str:
+        query = strip_sql_comments(query)
+        if is_destructive_sql(query):
+            raise ValueError("Destructive SQL is not allowed")
+        async with self.alock:
+            cursor = self._conn.execute(f"EXPLAIN CALCITE DETAILED {query}")
+        query_plan: tuple[str] = cursor.fetchone()  # type: ignore
+        return str(query_plan[0])
+
+    async def aextract_column_mappings(self, detailed_query_plan: str) -> dict[str, tuple[str, str, str]]:
+        self.logger.debug(f"Extracting column mappings from query plan: {detailed_query_plan}")
+        result = {}
+        # Use a regex pattern to capture (database, table, column) and literal values in LogicalFilter
+        pattern = r"\[\$([0-9]+)->db:([\w]+),tableName:([\w]+),colName:([\w]+)\]"
+        matches = re.findall(pattern, detailed_query_plan)
+        for id, db, table, column in matches:
+            col_id = (db, table, column)
+            result[id] = col_id
+
+        self.logger.debug("Finished extracting column mappings")
+        return result
+
+    async def aextract_string_literal_ops(self, detailed_query_plan: str) -> dict[str, tuple[str, str]]:
+        self.logger.debug(f"Extracting string literal operations from query plan: {detailed_query_plan}")
+        result = {}
+        pattern1 = r"(LIKE|PG_ILIKE|>=|<=|<>|=)\(\$(\d+), '([\w\- ]+)'"
+        pattern2 = r"(LIKE|PG_ILIKE|>=|<=|<>|=)\('([\w\- ]+)', \$(\d+)\)"
+
+        matches1 = re.findall(pattern1, detailed_query_plan)
+        matches2 = re.findall(pattern2, detailed_query_plan)
+        for op, id, literal in matches1:
+            result[id] = (op, literal)
+        for op, literal, id in matches2:
+            result[id] = (op, literal)
+
+        self.logger.debug("Finished extracting string literal operations")
+        return result
+
+    async def aget_string_literal_ops(self, query: str) -> list[StringLiteralOp]:
+        detailed_query_plan = await self.aget_detailed_query_plan(query)
+        col_mapping, str_literal_ops = await asyncio.gather(
+            self.aextract_column_mappings(detailed_query_plan), self.aextract_string_literal_ops(detailed_query_plan)
+        )
+        result: list[StringLiteralOp] = []
+        for id, (op, literal) in str_literal_ops.items():
+            db, table, column = col_mapping[id]
+            result.append({"operator": op, "literal": literal, "database": db, "table": table, "column": column})
+        return result
+
+    async def acorrect_string_literal(self, literal: StringLiteralOp, exact_match_threshold: float) -> StringLiteralOp:
+        """
+        Tries to correct a given string literal by searching for close matches in a database async.
+        """
+        self.logger.debug(f"Correcting string literal: {literal['column']} : {literal['literal']}")
+        case_match_query = f"SELECT {literal['column']}, COUNT(*) FROM {literal['database']}.{literal['table']} WHERE {literal['column']} ILIKE '{literal['literal']}' GROUP BY {literal['column']} ORDER BY COUNT(*) DESC;"
+        async with self.alock:
+            cursor = await run_in_threadpool(self._conn.execute, case_match_query)
+        case_match_rows = cursor.fetchall()
+
+        num_case_match_rows = len(case_match_rows)
+        exact_match_count = 0
+        total_count = 0
+        altered_literal = deepcopy(literal)
+
+        for row in case_match_rows:
+            if row[0] == literal["literal"]:
+                exact_match_count += row[1]  # type: ignore
+            total_count += row[1]  # type: ignore
+
+        if total_count > 0 and literal["operator"] != "ILIKE":
+            if exact_match_count == 0 and num_case_match_rows == 1:
+                altered_literal["literal"] = str(case_match_rows[0][0])
+                return literal
+            elif exact_match_count / total_count < exact_match_threshold:
+                if literal["operator"] == "<>":
+                    altered_literal["operator"] = "NOT ILIKE"
+                else:
+                    altered_literal["operator"] = "ILIKE"
+                return altered_literal
+        elif total_count == 0:
+            lower_literal = literal["literal"].lower()
+            similarity_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) FROM distinct_values WHERE LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) < 5 ORDER BY LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) ASC, num_str_values DESC LIMIT 2;"
+
+            async with self.alock:
+                cursor = await run_in_threadpool(self._conn.execute, similarity_query)
+            similarity_rows = cursor.fetchall()
+
+            num_similarity_rows = len(similarity_rows)
+
+            if num_similarity_rows > 0:
+                if (
+                    num_similarity_rows > 1
+                    and similarity_rows[0][1] == 0
+                    and similarity_rows[0][1] == similarity_rows[1][1]
+                ):
+                    # Here there are at least two matches such that the user-provided literal is a full substring of
+                    # the column value. In this case, we will match against all strings that our string literal
+                    # is a substring of
+                    altered_literal["literal"] = f"%{lower_literal}%"
+                else:
+                    # There was only one match, or two matches and at least one did have a 0 distance score, so pick the
+                    # top returned value (we've sorted in ascending order by score and descending order by number
+                    # of string matches)
+                    altered_literal["literal"] = str(similarity_rows[0][0])
+                if literal["operator"] == "<>":
+                    altered_literal["operator"] = "NOT ILIKE"
+                else:
+                    altered_literal["operator"] = "ILIKE"
+            return altered_literal
+
+        return altered_literal
+
+    async def acorrect_string_literals(self, query: str, exact_match_threshold: float = 0.999999) -> str:
+        config = get_config()
+        if not config.enable_str_literal_correction:
+            return query
+
+        self.logger.debug(f"Correcting string literals in query: {query}")
+        altered_query = query
+        try:
+            str_literal_ops_list = await self.aget_string_literal_ops(query)
+            if len(str_literal_ops_list) == 0:
+                self.logger.debug("No string literals found in query")
+                return query
+            for str_literal_op in str_literal_ops_list:
+                altered_str_literal_op = await self.acorrect_string_literal(str_literal_op, exact_match_threshold)
+                if altered_str_literal_op != str_literal_op:
+                    if altered_str_literal_op["operator"] != str_literal_op["operator"]:
+                        altered_query = altered_query.replace(
+                            f"{str_literal_op['column']} {str_literal_op['operator']} '{str_literal_op['literal']}'",
+                            f"{str_literal_op['column']} {altered_str_literal_op['operator']} '{altered_str_literal_op['literal']}'",
+                        )
+                        self.logger.debug(
+                            f"Operator changed from {str_literal_op['operator']} to {altered_str_literal_op['operator']}"
+                        )
+                    if altered_str_literal_op["literal"] != str_literal_op["literal"]:
+                        altered_query = altered_query.replace(
+                            f"{str_literal_op['column']} {altered_str_literal_op['operator']} '{str_literal_op['literal']}'",
+                            f"{str_literal_op['column']} {altered_str_literal_op['operator']} '{altered_str_literal_op['literal']}'",
+                        )
+                        self.logger.debug(
+                            f"Literal changed from {str_literal_op['literal']} to {altered_str_literal_op['literal']}"
+                        )
+        except Exception as e:
+            self.logger.info(f"Error correcting string literals: {e}")
+            return query
+
+        self.logger.debug(f"Altered query: {altered_query}")
+        return altered_query
 
     def get_single_table_info(self, table_name: str, include_samples: bool = True, include_top_k: bool = True) -> str:
         """Get information about a single table."""

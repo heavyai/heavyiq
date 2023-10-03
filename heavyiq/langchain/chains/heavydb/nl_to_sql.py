@@ -6,7 +6,6 @@ from pydantic import Extra
 
 import re
 
-from fastapi.concurrency import run_in_threadpool
 from langchain.chat_models.base import BaseChatModel
 from langchain.schema.language_model import BaseLanguageModel
 from langchain.schema import AIMessage, HumanMessage
@@ -333,7 +332,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
             await self.write_callback_message_async(
                 "Attempting to correct string literals in SQL query.", run_manager=run_manager, color="blue"
             )
-            sql_cmd = await run_in_threadpool(self.database.correct_string_literals, sql_cmd)
+            sql_cmd = await self.database.acorrect_string_literals(sql_cmd)
             await self.write_callback_message_async(
                 f"Result of correction: {sql_cmd}", run_manager=run_manager, color="green"
             )
@@ -434,8 +433,8 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
         table_names_to_use = inputs.get("tables")
 
         partial_gen_sql_prompt = self.prompt.partial(input=inputs[self.input_key])
-        gen_sql_prompt = await run_in_threadpool(
-            populate_table_info_wrt_token_limit, partial_gen_sql_prompt, self.llm, self.database, table_names_to_use
+        gen_sql_prompt = await apopulate_table_info_wrt_token_limit(
+            partial_gen_sql_prompt, self.llm, self.database, table_names_to_use
         )
 
         messages = gen_sql_prompt.to_messages()
@@ -450,7 +449,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
                 await self.write_callback_message_async(
                     f"Verifying SQL Query: {sql_cmd}", run_manager=run_manager, color="blue"
                 )
-                await run_in_threadpool(self.database.validate_query, sql_cmd)
+                await self.database.avalidate_query(sql_cmd)
                 verified = True
             except Exception as e:
                 retries += 1
@@ -480,12 +479,12 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
             await self.write_callback_message_async(
                 "Attempting to correct string literals in SQL query.", run_manager=run_manager, color="blue"
             )
-            sql_cmd = await run_in_threadpool(self.database.correct_string_literals, sql_cmd)
+            sql_cmd = await self.database.acorrect_string_literals(sql_cmd)
             await self.write_callback_message_async(
                 f"Result of correction: {sql_cmd}", run_manager=run_manager, color="green"
             )
 
-        sql_complexity = await run_in_threadpool(self.database.complexity, sql_cmd)
+        sql_complexity = await self.database.acomplexity(sql_cmd)
 
         return {self.output_key: strip_sql_comments(sql_cmd), self.output_complexity_key: str(sql_complexity)}
 

@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from pydantic import Extra
-from fastapi.concurrency import run_in_threadpool
 from langchain.schema.language_model import BaseLanguageModel
 from langchain.schema import BasePromptTemplate
 from langchain.prompts.prompt import PromptTemplate
