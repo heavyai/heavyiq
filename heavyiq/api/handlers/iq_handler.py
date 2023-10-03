@@ -88,6 +88,7 @@ async def handle_question_request_async(request: QuestionRequest, db: HeavyDB) -
     return QuestionResponse(
         answer=res[chain.output_key],
         sql=res[chain.output_sql_key],
+        sql_result=res[chain.output_results_key],
         sql_complexity=res[chain.output_sql_complexity_key],
         feedback_id=feedback_id,
     )
