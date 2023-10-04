@@ -1,7 +1,10 @@
 import click
 
+from fastapi.concurrency import run_in_threadpool
+from heavyiq.cli.decorators import coro
+from heavyiq.langchain.llms import get_llm_by_type, LLMType
 from heavyiq.langchain import HeavyDB
-from heavyiq.langchain.logging import log_chain_call
+from heavyiq.langchain.logging import log_chain_call, log_chain_call_async
 from heavyiq.langchain.index.heavydb import get_heavydb_index
 from heavyiq.langchain.index.utils import SearchType
 from heavyiq.langchain.chains import (
@@ -20,6 +23,7 @@ def chain():
 
 
 @chain.command()
+@coro
 @click.option(
     "--model",
     default="text-davinci-003",
@@ -29,17 +33,19 @@ def chain():
 @click.option("--tables", default="", help="Tables to use for answer (comma-separated)", type=str)
 @click.option("--verbose", default=False, help="Verbose output", type=bool)
 @click.argument("question", type=str)
-@click.pass_context
-def nl_to_sql(ctx: click.Context, question: str, model: str, tables: str, verbose: bool, temperature: float) -> None:
+@click.pass_context  # type: ignore
+async def nl_to_sql(
+    ctx: click.Context, question: str, model: str, tables: str, verbose: bool, temperature: float
+) -> None:
     """Call the NL to SQL Chain"""
-
-    heavydb = HeavyDB.from_env(include_tables=[t.strip() for t in tables.split(",")])
-    llm = get_openai_llm_by_model_name(model, temperature=temperature, client=None)
+    llm = await run_in_threadpool(get_llm_by_type, LLMType.NL_TO_SQL, temperature=temperature)
+    heavydb = await run_in_threadpool(HeavyDB.from_env, include_tables=[t.strip() for t in tables.split(",")])
     chain = get_nl_to_sql_chain_by_llm(llm)(database=heavydb, llm=llm, verbose=verbose, tags=["cli"])  # type: ignore
-    click.echo(log_chain_call(chain, question, ""))
+    click.echo(await log_chain_call_async(chain, question, ""))
 
 
 @chain.command()
+@coro
 @click.option(
     "--model",
     default="text-davinci-003",
@@ -49,13 +55,15 @@ def nl_to_sql(ctx: click.Context, question: str, model: str, tables: str, verbos
 @click.option("--tables", default="", help="Tables to use for answer (comma-separated)", type=str)
 @click.option("--verbose", default=False, help="Verbose output", type=bool)
 @click.argument("question", type=str)
-@click.pass_context
-def nl_to_answer(ctx: click.Context, question: str, model: str, tables: str, verbose: bool, temperature: float) -> None:
+@click.pass_context  # type: ignore
+async def nl_to_answer(
+    ctx: click.Context, question: str, model: str, tables: str, verbose: bool, temperature: float
+) -> None:
     """Call the NL to Answer Chain"""
-    heavydb = HeavyDB.from_env(include_tables=[t.strip() for t in tables.split(",")])
-    llm = get_openai_llm_by_model_name(model, temperature=temperature, client=None)
+    llm = await run_in_threadpool(get_llm_by_type, LLMType.NL_TO_SQL, temperature=temperature)
+    heavydb = await run_in_threadpool(HeavyDB.from_env, include_tables=[t.strip() for t in tables.split(",")])
     chain = NLtoAnswerChain.from_same_llm(llm=llm, database=heavydb, verbose=verbose, tags=["cli"])
-    click.echo(log_chain_call(chain, question, model))
+    click.echo(await log_chain_call_async(chain, question, model))
 
 
 @chain.command()
