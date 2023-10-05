@@ -21,6 +21,7 @@ def getOptions(argv=None):
     parser.add_argument("-u", "--user", help="HeavyDB user name", default="admin")
     parser.add_argument("-w", "--password", help="HeavyDB password", default="HyperInteractive")
     parser.add_argument("-q", "--queries", help="Queries CSV file", default=None)
+    parser.add_argument("--chained-queries", help="Chained queries CSV file", default=None)
     parser.add_argument("-e", "--errors", help="Error Queries CSV file", default=None)
     parser.add_argument("-d", "--database", help="HeavyDB database", default=None)
     parser.add_argument("-k", "--openai-api-key", help="OpenAI API Key", default=None)
@@ -38,6 +39,11 @@ def getOptions(argv=None):
     parser.add_argument("--max-instruction-tokens", help="Max instruction tokens", type=int, default=704)
     parser.add_argument(
         "--write-sql-prompts", help="Write SQL prompts to file for successful queries", action="store_true"
+    )
+    parser.add_argument(
+        "--write-chained-sql-prompts",
+        help="Write Chained SQL prompts to file for successful queries",
+        action="store_true",
     )
     parser.add_argument(
         "--write-english-prompts", help="Write English prompts to file for successful queries", action="store_true"
@@ -360,6 +366,44 @@ def getQueriesByDB(queries_file):
                 }
             )
     return queries_by_db
+
+
+def getChainedQueriesByDB(chained_queries_file):
+    queries_df = pd.read_csv(chained_queries_file)
+    queries_df["question"] = queries_df["question"].astype(str)
+    queries_df["sql"] = queries_df["sql"].astype(str)
+    queries_df["answer"] = queries_df["answer"].astype(str)
+    print(queries_df)
+    query_chains_by_db = {}
+    query_chain = []
+    last_set_id_num = None
+    for index, row in queries_df.iterrows():
+        query_id = row["query_id"]
+        db_id = row["db_id"]
+        set_id_num = row["set_id_num"]
+        question = row["question"].strip()
+        sql_query = row["sql"].strip()
+        answer = row["answer"].strip()
+        if set_id_num != last_set_id_num and len(query_chain) > 0:
+            last_db_id = query_chain[0]["db_id"]
+            if last_db_id not in query_chains_by_db:
+                query_chains_by_db[last_db_id] = [query_chain]
+            else:
+                query_chains_by_db[last_db_id].append(query_chain)
+            query_chain = []
+            last_set_id_num = set_id_num
+        query_chain.append(
+            {
+                "query_id": query_id,
+                "db_id": db_id,
+                "set_id_num": set_id_num,
+                "data_split": "train",
+                "question": question,
+                "sql_query": sql_query,
+                "english_explanation": answer,
+            }
+        )
+    return query_chains_by_db
 
 
 def get_table_schema(con, table_name):
@@ -958,11 +1002,57 @@ def generate_error_prompts(error_queries_file, output_file, options):
         writer.writerows(prompts_to_write)
 
 
+def genChainedQueryPrompts(options):
+    chained_queries_file = options.chained_queries
+    chained_queries_by_db = getChainedQueriesByDB(chained_queries_file)
+    successful_queries = 0
+    num_failed_queries = 0
+    failed_queries = []
+
+    db_idx = 0
+    failed_query_ids = []
+    for db_id, chained_query_sets in chained_queries_by_db.items():
+        db_successful_queries = 0
+        db_failed_queries = 0
+        con = heavyai.connect(user=options.user, password=options.password, host=options.host, dbname=db_id)
+        for chained_query_set in chained_query_sets:
+            for query in chained_query_set:
+                sql_query = query["sql_query"]
+                try:
+                    sql_result = con.execute(sql_query)
+                    db_successful_queries += 1
+                except Exception as e:
+                    db_failed_queries += 1
+                    failed_query_ids.append(query["query_id"])
+                    failed_queries.append(
+                        {"query_id": query["query_id"], "db_id": db_id, "sql_query": sql_query, "error": e}
+                    )
+                    # print(f"Error executing query for {db_id}: {sql_query}: {e}")
+        total_queries = db_successful_queries + db_failed_queries
+        print(
+            f"{db_id}: Query sets: {len(chained_query_sets)} Total queries: {total_queries} Successful queries: {db_successful_queries} Failed queries: {db_failed_queries}"
+        )
+        successful_queries += db_successful_queries
+        num_failed_queries += db_failed_queries
+        db_idx += 1
+        if db_idx >= options.num_dbs:
+            break
+    print(
+        f"Total queries: {successful_queries + num_failed_queries} Successful queries: {successful_queries} Failed queries: {num_failed_queries}"
+    )
+    print("Failed query ids: ", sorted(failed_query_ids))
+    failures_df = pd.DataFrame(failed_queries)
+    failures_df.to_csv("chain_failed_queries.csv", index=False)
+
+
 def main(argv):
     options = getOptions(argv)
     openai.api_key = options.openai_api_key
     if options.errors is not None:
         generate_error_prompts(options.errors, "sql_error_prompts.csv", options)
+
+    if options.chained_queries is not None:
+        genChainedQueryPrompts(options)
 
     if options.queries is not None:
         queries_by_db = getQueriesByDB(options.queries)

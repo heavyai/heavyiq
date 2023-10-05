@@ -21,33 +21,52 @@ def write_flattened_results_to_csv(data, filename):
     with open(filename, "w", newline="") as f:
         writer = csv.writer(f)
         # Write the header
-        writer.writerow(["id", "db_id", "num_turns", "turn_idx", "question_type", "question", "sql", "answer"])
+        writer.writerow(
+            [
+                "query_id",
+                "set_id",
+                "set_id_num",
+                "db_id",
+                "num_turns",
+                "turn_id",
+                "question_type",
+                "question",
+                "sql",
+                "answer",
+            ]
+        )
         idx = 0
         # Write the data
         for chain in data:
-            id = chain["id"]
+            set_id = chain["set_id"]
+            set_id_num = chain["set_id_num"]
             db_id = chain["db_id"]
             num_turns = chain["num_turns"]
             for turn in chain["turns"]:
-                turn_idx = turn["idx"]
+                id = turn["query_id"]
+                turn_id = turn["turn_id"]
                 question_type = turn["question_type"]
                 question = turn["question"]
                 sql = turn["sql"]
                 answer = turn["answer"]
-                writer.writerow([id, db_id, num_turns, turn_idx, question_type, question, sql, answer])
+                writer.writerow(
+                    [id, set_id, set_id_num, db_id, num_turns, turn_id, question_type, question, sql, answer]
+                )
             idx += 1
 
 
 def main(argv):
     options = getOptions(argv)
     data = read_data(options.input)
-    i = 0
+    set_id_num = 0
+    query_id = 0
     chains = []
     total_num_turns = 0
     for key, val in data.items():
         db_id = val["db_id"]
         chain = {}
-        chain["id"] = key
+        chain["set_id"] = key
+        chain["set_id_num"] = set_id_num
         chain["db_id"] = db_id
         num_turns = len(val["turns"])
         chain["turns"] = []
@@ -74,15 +93,19 @@ def main(argv):
                 current_turn["answer"] = utterance
             current_turn_keys = current_turn.keys()
             if "question" in current_turn_keys and "answer" in current_turn_keys and "sql" in current_turn_keys:
-                current_turn["idx"] = turn_idx
+                if current_turn["sql"] is not None:
+                    current_turn["sql"] = current_turn["sql"].replace('"', "'")
+                current_turn["query_id"] = query_id
+                current_turn["turn_id"] = turn_idx
+                query_id += 1
                 turn_idx += 1
                 chain["turns"].append(current_turn)
                 current_turn = {}
+        set_id_num += 1
         chain["num_turns"] = turn_idx
         total_num_turns += turn_idx
 
         chains.append(chain)
-        i += 1
         # if i > 1:
         #    break
     # print(chains)

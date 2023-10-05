@@ -61,7 +61,6 @@ def main(argv):
 
     larger_str_cols = [col for col in larger_table_cols if col["type"] == "STR" and col["encoding"] == "DICT"]
     smaller_table_str_cols = [col for col in smaller_table_cols if col["type"] == "STR" and col["encoding"] == "DICT"]
-    # larger_table_num_rows = getTableCardinality(con, larger_table)
 
     join_frac_threshold = 0.7
 
@@ -71,7 +70,6 @@ def main(argv):
             continue
         for smaller_table_str_col in smaller_table_str_cols:
             join_sql = f"""SELECT COUNT(*) FROM (SELECT DISTINCT "{larger_table_str_col['name']}" AS uniq_vals FROM "{larger_table}") a JOIN (SELECT DISTINCT "{smaller_table_str_col['name']}" AS uniq_vals FROM "{smaller_table}") b ON a.uniq_vals = b.uniq_vals"""
-            # join_sql = f"SELECT COUNT(*) FROM {larger_table} INNER JOIN {smaller_table} ON {larger_table}.{larger_str_col['name']} = {smaller_table}.{smaller_table_str_col['name']}"
             joined_num_rows = list(con.execute(join_sql))[0][0]
             join_frac = joined_num_rows * 1.0 / larger_col_cardinality
             if join_frac > join_frac_threshold:
