@@ -81,17 +81,6 @@ def sql_rate_reply(db_id: str, gold_query: str, pred_query: str) -> dict[str, An
         return query_metadata
 
 
-def write_eval_results_header(eval_str: str, has_id: bool):
-    wf: io.TextIOWrapper
-    with open(f"./eval/results/{eval_str}_results.csv", "a", newline="") as wf:
-        csv_writer = csv.writer(wf)
-        if has_id:
-            header = ["id", "db_id", "gold_query", "pred_query", "success", "status", "error"]
-        else:
-            header = ["db_id", "gold_query", "pred_query", "success", "status", "error"]
-        csv_writer.writerow(header)
-
-
 async def awrite_eval_results_header(eval_str: str, has_id: bool):
     async with aiofiles.open(f"./eval/results/{eval_str}_results.csv", "a", newline="") as wf:
         if has_id:
@@ -100,30 +89,6 @@ async def awrite_eval_results_header(eval_str: str, has_id: bool):
             header = ["db_id", "gold_query", "pred_query", "success", "status", "error"]
         writer = AsyncWriter(wf, dialect="unix")
         await writer.writerow(header)
-
-
-def write_eval_results_row(
-    eval_str: str,
-    db_id: str,
-    gold_query: str,
-    success: bool,
-    status: str,
-    pred_query: str = "",
-    error: Optional[str] = None,
-    query_id: Optional[str] = None,
-):
-    wf: io.TextIOWrapper
-    with open(f"./eval/results/{eval_str}_results.csv", "a", newline="") as wf:
-        csv_writer = csv.writer(wf)
-
-        # Clean the data
-        row_data = [db_id, gold_query, pred_query, success, status, error or ""]
-        row_data = [str(item).replace("\n", " ").replace("\r", " ") for item in row_data]
-
-        if query_id:
-            row_data.insert(0, query_id)
-
-        csv_writer.writerow(row_data)
 
 
 async def awrite_eval_results_row(

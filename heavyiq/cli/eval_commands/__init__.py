@@ -1,10 +1,7 @@
 from uuid import uuid4
 import os
-import io
 import asyncio
 import aiofiles
-import anyio
-import csv
 from aiocsv.readers import AsyncReader
 from langchain.llms.base import BaseLLM
 from langchain.chat_models.base import BaseChatModel
@@ -100,7 +97,7 @@ async def process_eval_row(
                 gold_query,
                 False,
                 "failed_to_generate_sql",
-                e.failed_sql,
+                e.failed_sql,  # type: ignore
                 query_id=query_id,
             )
         except Exception as e:
