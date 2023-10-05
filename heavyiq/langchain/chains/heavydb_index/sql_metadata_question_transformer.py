@@ -1,6 +1,6 @@
 from typing import Any, Optional
 
-from langchain.callbacks.manager import CallbackManagerForChainRun
+from langchain.callbacks.manager import CallbackManagerForChainRun, AsyncCallbackManagerForChainRun
 from langchain.chains import LLMChain
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.prompts import PromptTemplate, FewShotPromptTemplate
@@ -221,4 +221,30 @@ class SQLMetadataQuestionTransformerChain(BaseChain, BaseModel):
         res = llm_chain(inputs[self.input_key])
         if run_manager:
             run_manager.on_text(f"Rephrased input: {res[self.output_key]}", color="blue", verbose=self.verbose)
+        return {self.output_key: res[self.output_key].strip()}
+
+    async def _acall(
+        self,
+        inputs: dict[str, Any],
+        run_manager: Optional[AsyncCallbackManagerForChainRun] = None,
+    ) -> dict[str, str]:
+        if run_manager:
+            await run_manager.on_text(
+                f"Rephrasing input to be more database-centric: {inputs[self.input_key]}",
+                color="blue",
+                verbose=self.verbose,
+            )
+        rephrase_question_prompt = FewShotPromptTemplate(
+            example_selector=get_example_selector(),
+            example_prompt=example_prompt,
+            prefix="Rephrase the provided input to ask an index that contains descriptions about the SQL tables and columns required to respond to the input",
+            suffix="Input: {input}\nOutput:",
+            input_variables=["input"],
+        )
+        llm_chain = LLMChain(
+            llm=self.llm, prompt=rephrase_question_prompt, verbose=self.verbose, output_key=self.output_key
+        )
+        res = await llm_chain.acall(inputs[self.input_key])
+        if run_manager:
+            await run_manager.on_text(f"Rephrased input: {res[self.output_key]}", color="blue", verbose=self.verbose)
         return {self.output_key: res[self.output_key].strip()}

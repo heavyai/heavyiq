@@ -72,26 +72,42 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
         return _get_custom_llm(model_type, api_base, context_window, **kwargs)  # type: ignore
 
 
+def _get_custom_api_llm(model_type: LLMType, api_base: str, context_window: int, **kwargs):
+    """
+    Return the corresponding LLM class for the custom llm type API.(ie. llama2)
+    """
+    return OverrideOpenAI(
+        openai_api_key="nothing",
+        openai_api_base=api_base,
+        model=f"CUSTOM_LLM_{model_type.value}",
+        context_window=context_window,
+        **kwargs,
+    )
+
+
+def _get_custom_api_vllm_llm(model_type: LLMType, api_base: str, context_window: int, **kwargs):
+    """
+    Return the corresponding LLM class for the custom llm type API_VLLM.(ie. VLLM)
+    """
+    kwargs, model_kwargs = get_vllm_model_kwargs(model_type, **kwargs)
+    model_name = get_vllm_model_name(api_base)
+    return OverrideVLLMOpenAI(
+        openai_api_key="nothing",
+        openai_api_base=api_base,
+        model=model_name,
+        model_kwargs=model_kwargs,
+        context_window=context_window,
+        **kwargs,
+    )
+
+
 def _get_custom_llm(model_type: LLMType, api_base: str, context_window: int, **kwargs) -> BaseLLM:
     config = get_config()
     if config.custom_llm_type == "API":
-        return OverrideOpenAI(
-            openai_api_key="nothing",
-            openai_api_base=api_base,
-            model=f"CUSTOM_LLM_{model_type.value}",
-            context_window=context_window,
-            **kwargs,
-        )
+        return _get_custom_api_llm(model_type=model_type, api_base=api_base, context_window=context_window, **kwargs)
     elif config.custom_llm_type == "API_VLLM":
-        kwargs, model_kwargs = get_vllm_model_kwargs(model_type, **kwargs)
-        model_name = get_vllm_model_name(api_base)
-        return OverrideVLLMOpenAI(
-            openai_api_key="nothing",
-            openai_api_base=api_base,
-            model=model_name,
-            model_kwargs=model_kwargs,
-            context_window=context_window,
-            **kwargs,
+        return _get_custom_api_vllm_llm(
+            model_type=model_type, api_base=api_base, context_window=context_window, **kwargs
         )
     else:
         raise ValueError(f"Invalid custom LLM type: {config.custom_llm_type}")
