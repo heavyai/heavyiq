@@ -23,8 +23,8 @@ def getTableColumns(con, table):
 
 
 def getLargerSmallerTable(con, table_1, table_2):
-    table_1_rows = list(con.execute(f"SELECT COUNT(*) FROM {table_1}"))[0][0]
-    table_2_rows = list(con.execute(f"SELECT COUNT(*) FROM {table_2}"))[0][0]
+    table_1_rows = list(con.execute(f"""SELECT COUNT(*) FROM "{table_1}" """))[0][0]
+    table_2_rows = list(con.execute(f"""SELECT COUNT(*) FROM "{table_2}" """))[0][0]
     if table_1_rows >= table_2_rows:
         return (
             table_1,
@@ -35,11 +35,11 @@ def getLargerSmallerTable(con, table_1, table_2):
 
 
 def getTableCardinality(con, table):
-    return list(con.execute(f"SELECT COUNT(*) FROM {table}"))[0][0]
+    return list(con.execute(f"""SELECT COUNT(*) FROM "{table}" """))[0][0]
 
 
 def getColumnCardinality(con, table, column):
-    return list(con.execute(f"SELECT COUNT(DISTINCT {column}) FROM {table}"))[0][0]
+    return list(con.execute(f"""SELECT COUNT(DISTINCT "{column}") FROM "{table}" """))[0][0]
 
 
 def main(argv):
@@ -70,7 +70,7 @@ def main(argv):
         if larger_col_cardinality <= 1:
             continue
         for smaller_table_str_col in smaller_table_str_cols:
-            join_sql = f"SELECT COUNT(*) FROM (SELECT DISTINCT {larger_table_str_col['name']} AS uniq_vals FROM {larger_table}) a JOIN (SELECT DISTINCT {smaller_table_str_col['name']} AS uniq_vals FROM {smaller_table}) b ON a.uniq_vals = b.uniq_vals"
+            join_sql = f"""SELECT COUNT(*) FROM (SELECT DISTINCT "{larger_table_str_col['name']}" AS uniq_vals FROM "{larger_table}") a JOIN (SELECT DISTINCT "{smaller_table_str_col['name']}" AS uniq_vals FROM "{smaller_table}") b ON a.uniq_vals = b.uniq_vals"""
             # join_sql = f"SELECT COUNT(*) FROM {larger_table} INNER JOIN {smaller_table} ON {larger_table}.{larger_str_col['name']} = {smaller_table}.{smaller_table_str_col['name']}"
             joined_num_rows = list(con.execute(join_sql))[0][0]
             join_frac = joined_num_rows * 1.0 / larger_col_cardinality
