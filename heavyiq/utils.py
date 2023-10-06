@@ -1,4 +1,9 @@
 import re
+import aiofiles
+from typing import Generator
+from aiofiles.os import scandir
+from pathlib import Path
+from fastapi.concurrency import run_in_threadpool
 from multiprocessing.managers import SyncManager
 from typing import Generic, TypeVar, Optional
 
@@ -138,3 +143,24 @@ class LRUCache(Generic[KT, VT]):
         del self.cache[lru_key]
         # Remove the least recently used key from the front of the order list
         self.order.pop(0)
+
+
+async def is_path_exists(path: str) -> bool:
+    """
+    Check for the path exists or not asynchornously.
+    """
+    file_path = Path(path)
+    return await run_in_threadpool(file_path.exists)
+
+
+async def awrite_to_file(filename: str, content: str):
+    async with aiofiles.open(filename, mode="w") as file:
+        await file.write(content)
+
+
+async def aread_file(file_path: str) -> str:
+    """
+    Async file read.
+    """
+    async with aiofiles.open(file_path, mode="r") as file:
+        return await file.read()

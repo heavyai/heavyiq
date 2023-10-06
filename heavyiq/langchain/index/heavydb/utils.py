@@ -1,9 +1,13 @@
+import aiofiles
+import os
+from aiofiles.os import scandir
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Optional
+from typing import Optional, AsyncGenerator
 
 from langchain.docstore.document import Document
 
+from heavyiq.utils import aread_file
 from heavyiq.config import get_config
 
 
@@ -22,6 +26,22 @@ def read_table_documents(include: Optional[list[str]] = None) -> Iterator[Docume
                 continue
             with open(file_name, "r") as f:
                 file_contents = f.read()
+            yield Document(page_content=file_contents, metadata={"source": table_name})
+
+
+async def aread_table_documents(include: Optional[list[str]] = None) -> AsyncGenerator[Document, None]:
+    """
+    Iterate over a folder containing table documents and yield Document instances.
+    :param include: Optional list of table names to include. If None, all tables will be included.
+    :return: An iterator yielding Document instances for each table document.
+    """
+    table_documents_dir = get_config().table_documents_dir
+    for entry in await scandir(table_documents_dir):
+        if entry.is_file() and entry.name.endswith(".txt"):
+            table_name = entry.name.rstrip(".txt")
+            if include is not None and table_name not in include:
+                continue
+            file_contents = await aread_file(entry.path)
             yield Document(page_content=file_contents, metadata={"source": table_name})
 
 

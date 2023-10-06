@@ -14,16 +14,15 @@ from heavyiq.langchain.chains import (
     SQLMetadataQuestionTransformerChain,
     get_nl_to_sql_chain_by_llm,
 )
-from heavyiq.langchain.index.heavydb import get_heavydb_index
+from heavyiq.langchain.index.heavydb import create_index_if_nonexistent, acreate_index_if_nonexistent
 from heavyiq.langchain.index.utils import SearchType
 from heavyiq.langchain.llms import (
     LLMType,
     _get_custom_api_llm,
     _get_custom_api_vllm_llm,
-    get_llm_by_type,
     get_openai_llm_by_model_name,
 )
-from heavyiq.langchain.logging import log_chain_call, log_chain_call_async
+from heavyiq.langchain.logging import log_chain_call_async
 
 
 class LLMCategory(Enum):
@@ -193,6 +192,7 @@ async def question_rephraser(
 
 
 @chain.command()
+@coro
 @click.argument("question", type=str)
 @click.option(
     "--search-type", default=SearchType.SIMILARITY, help="Defaults to similarity. Can also be 'mmr'.", type=SearchType
@@ -200,8 +200,9 @@ async def question_rephraser(
 @click.option("--k", default=5, help="Number of Documents vector store will retrieve. Defaults to 5.", type=int)
 @click.option("--fetch-k", default=20, help="Number of Documents passed to MMR algorithm. Defaults to 20.", type=int)
 @click.pass_context  # type: ignore
-def ask_heavydb_index(ctx: click.Context, question: str, search_type: SearchType, k: int, fetch_k: int) -> None:
+async def ask_heavydb_index(ctx: click.Context, question: str, search_type: SearchType, k: int, fetch_k: int) -> None:
     """Ask the HeavyDB Metadata Index"""
-    retriever = get_heavydb_index().as_retriever(search_type=search_type, k=k, fetch_k=fetch_k)
+    heavdb_metadata_index = await acreate_index_if_nonexistent()
+    retriever = heavdb_metadata_index.as_retriever(search_type=search_type, k=k, fetch_k=fetch_k)
     chain = AskHeavyDBMetadataIndexChain.create(retriever=retriever)
-    click.echo(log_chain_call(chain, question, "", chain_name="ask-heavydb-index-chain"))
+    click.echo(await log_chain_call_async(chain, question, "", chain_name="ask-heavydb-index-chain"))

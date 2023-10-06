@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from typing import Optional, Any, Iterable, TYPE_CHECKING, Callable, TypedDict
 from copy import deepcopy
 import asyncio
+from async_lru import alru_cache
 from starlette.concurrency import run_in_threadpool
 from heavyai import connect, Connection
 from heavyiq.config import get_config
@@ -575,6 +576,7 @@ class HeavyDB:
         self.logger.debug(f"Got top k values for table {table_name}")
         return top_k_strings
 
+    @alru_cache(typed=True)
     async def aget_single_table_info(
         self, table_name: str, include_samples: bool = True, include_top_k: bool = True
     ) -> str:
