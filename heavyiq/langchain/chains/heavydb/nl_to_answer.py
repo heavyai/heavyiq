@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from pydantic import Extra
-from fastapi.concurrency import run_in_threadpool
 from langchain.schema.language_model import BaseLanguageModel
 from langchain.schema import BasePromptTemplate
 from langchain.prompts.prompt import PromptTemplate
@@ -191,7 +190,7 @@ class NLtoAnswerChain(BaseChain):
         sql_cmd = nl_sql_results[self.nl_sql_chain.output_key]
         await self.write_callback_message_async(sql_cmd, run_manager=run_manager, color="green")
 
-        sql_result = await run_in_threadpool(self.database.run, sql_cmd, to_str=False)
+        sql_result = await self.database.arun(sql_cmd, to_str=False)
         pass_result_to_llm = self._should_forward_result_to_llm(sql_result)  # type: ignore
         sql_result = str(sql_result)
 

@@ -2,6 +2,9 @@ from typing import Any, Optional
 from itertools import permutations
 from collections import Counter
 import io
+import aiofiles
+import aiocsv
+from aiocsv.writers import AsyncWriter
 import csv
 
 import pandas as pd
@@ -78,18 +81,17 @@ def sql_rate_reply(db_id: str, gold_query: str, pred_query: str) -> dict[str, An
         return query_metadata
 
 
-def write_eval_results_header(eval_str: str, has_id: bool):
-    wf: io.TextIOWrapper
-    with open(f"./eval/results/{eval_str}_results.csv", "a", newline="") as wf:
-        csv_writer = csv.writer(wf)
+async def awrite_eval_results_header(eval_str: str, has_id: bool):
+    async with aiofiles.open(f"./eval/results/{eval_str}_results.csv", "a", newline="") as wf:
         if has_id:
             header = ["id", "db_id", "gold_query", "pred_query", "success", "status", "error"]
         else:
             header = ["db_id", "gold_query", "pred_query", "success", "status", "error"]
-        csv_writer.writerow(header)
+        writer = AsyncWriter(wf, dialect="unix")
+        await writer.writerow(header)
 
 
-def write_eval_results_row(
+async def awrite_eval_results_row(
     eval_str: str,
     db_id: str,
     gold_query: str,
@@ -99,10 +101,8 @@ def write_eval_results_row(
     error: Optional[str] = None,
     query_id: Optional[str] = None,
 ):
-    wf: io.TextIOWrapper
-    with open(f"./eval/results/{eval_str}_results.csv", "a", newline="") as wf:
-        csv_writer = csv.writer(wf)
-
+    async with aiofiles.open(f"./eval/results/{eval_str}_results.csv", "a", newline="") as wf:
+        writer = AsyncWriter(wf, dialect="unix")
         # Clean the data
         row_data = [db_id, gold_query, pred_query, success, status, error or ""]
         row_data = [str(item).replace("\n", " ").replace("\r", " ") for item in row_data]
@@ -110,7 +110,7 @@ def write_eval_results_row(
         if query_id:
             row_data.insert(0, query_id)
 
-        csv_writer.writerow(row_data)
+        await writer.writerow(row_data)
 
 
 def summarize_eval_results(eval_str: str) -> None:
