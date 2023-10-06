@@ -1,10 +1,12 @@
 from __future__ import annotations
 import re
+import anyio
+import functools
 import multiprocessing
 from multiprocessing.managers import SyncManager
 from threading import Lock
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
-from typing import Optional, Any, Iterable, TYPE_CHECKING, Callable, TypedDict
+from typing import Optional, Any, Iterable, TYPE_CHECKING, Callable, TypedDict, Coroutine
 from copy import deepcopy
 import asyncio
 from async_lru import alru_cache
@@ -156,6 +158,42 @@ class HeavyDB:
                 raise Exception(f"HeavyDB failed to connect after {timeout} seconds")
 
     @classmethod
+    async def _aconnect_with_timeout(
+        cls: type[HeavyDB], coroutine: Coroutine[Any, Any, Connection], timeout: float = 10
+    ) -> Connection:
+        """
+        Runs a coroutine inside a CancellableScope.
+        """
+        connection = None
+        with anyio.move_on_after(timeout) as scope:
+            connection = await coroutine
+        if scope.cancel_called:
+            raise Exception(f"HeavyDB failed to connect after {timeout} seconds")
+        return connection
+
+    @classmethod
+    async def from_env_async(cls: type[HeavyDB], db_name: Optional[str] = None, **kwargs: Any) -> HeavyDB:
+        """Create a database connection from environment variables."""
+        config = get_config()
+        if not config.heavydb_username or not config.heavydb_password or not (db_name or config.heavydb_dbname):
+            raise ValueError("Please set the config variables heavydb_username, heavydb_password and heavydb_dbname")
+
+        async def aconnect_func() -> Connection:
+            func = functools.partial(
+                connect,
+                user=config.heavydb_username,
+                password=config.heavydb_password,
+                host=config.heavydb_host,
+                port=config.heavydb_port,
+                dbname=db_name or config.heavydb_dbname,
+                protocol=config.heavydb_protocol,
+            )
+            return await anyio.to_thread.run_sync(func, cancellable=True)
+
+        conn = await cls._aconnect_with_timeout(aconnect_func(), kwargs.pop("timeout", 10))
+        return cls(conn, **kwargs)
+
+    @classmethod
     def from_uri(cls: type[HeavyDB], database_uri: str, **kwargs: Any) -> HeavyDB:
         """Create a database connection from a database URI."""
         conn = cls._connect_with_timeout(lambda: connect(database_uri), kwargs.pop("timeout", 10))
@@ -195,6 +233,24 @@ class HeavyDB:
             )
 
         conn = cls._connect_with_timeout(connect_func, kwargs.pop("timeout", 10))
+        return cls(conn, **kwargs)
+
+    @classmethod
+    async def from_session_async(cls: type[HeavyDB], session_id: str, **kwargs: Any) -> HeavyDB:
+        """Create a database connection from environment variables."""
+        config = get_config()
+
+        async def aconnect_func() -> Connection:
+            func = functools.partial(
+                connect,
+                sessionid=session_id,
+                host=config.heavydb_host,
+                port=config.heavydb_port,
+                protocol=config.heavydb_protocol,
+            )
+            return await anyio.to_thread.run_sync(func, cancellable=True)
+
+        conn = await cls._aconnect_with_timeout(aconnect_func(), kwargs.pop("timeout", 10))
         return cls(conn, **kwargs)
 
     @classmethod

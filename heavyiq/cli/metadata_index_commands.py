@@ -3,9 +3,11 @@ from pathlib import Path
 import click
 from langchain.vectorstores import Chroma
 
+from heavyiq.cli.decorators import coro
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.index.heavydb import (
     create_and_write_table_document,
+    acreate_and_write_table_document,
     get_vectorstore_index_creator,
     update_tables_in_index,
 )
@@ -19,13 +21,14 @@ def metadata_index():
 
 
 @metadata_index.command()
+@coro
 @click.argument("table_name", type=str)
-@click.pass_context
-def generate_table_document(ctx: click.Context, table_name: str) -> None:
+@click.pass_context  # type: ignore
+async def generate_table_document(ctx: click.Context, table_name: str) -> None:
     """Generate a table document for a specified table. If file exists, it will be overwritten."""
-    heavydb = HeavyDB.from_env(include_tables=[table_name])
+    heavydb = await HeavyDB.from_env_async(include_tables=[table_name])
     click.echo(f"Generating table document for table: {table_name}")
-    create_and_write_table_document(heavydb, table_name)
+    await acreate_and_write_table_document(heavydb, table_name)
     click.echo(f"Done. You likely want to run `metadata-index reload-table-document {table_name}` now.")
 
 
