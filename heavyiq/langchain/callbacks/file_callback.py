@@ -16,7 +16,9 @@ from langchain.schema.agent import AgentAction, AgentFinish
 class AsyncFileCallbackHandler(AsyncCallbackHandler):
     """Async Callback Handler that write logs to a file."""
 
-    def __init__(self, filename: str, mode: str = "a", color: Optional[str] = None, to_stdout: bool = True) -> None:
+    def __init__(
+        self, filename: str | None = None, mode: str = "a", color: Optional[str] = None, to_stdout: bool = True
+    ) -> None:
         """
         Initialises Async file callback handler which logs the text to file and an optional stdout.
 
@@ -37,6 +39,7 @@ class AsyncFileCallbackHandler(AsyncCallbackHandler):
             self.file = cast(AsyncTextIOWrapper, await aiofiles.open(self.file_path, mode=self.mode))
 
     async def append_to_file(self, text: str):
+        assert self.file_path
         await self._open_file()
         if not self.file:
             raise ValueError("File instance for logging is not available.")
