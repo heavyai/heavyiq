@@ -1,0 +1,46 @@
+Description: The "us_pois_safegraph_mcdonalds" table is designed to store information about McDonald's locations in the United States. It includes various attributes such as the unique Safegraph place ID, parent Safegraph place ID, brand IDs, location name, brand name, top category, sub-category, NAICS code, latitude, longitude, street address, primary number, street pre-direction, street name, street post-direction, street suffix, city, region, postal code, open hours, category tags, polygon WKT (Well-Known Text) representation, polygon class, phone number, synthetic status, parking lot inclusion, and ISO country code.
+
+Primary Functionality: The primary functionality of this table is to provide a comprehensive and structured representation of McDonald's locations in the United States. It serves as a centralized repository for storing and managing location-specific information, allowing for easy retrieval and analysis.
+
+Secondary Functionality: The table also enables spatial analysis and mapping through the inclusion of the polygon WKT representation. This allows for the identification of McDonald's locations within specific geographic boundaries.
+
+Applications: The "us_pois_safegraph_mcdonalds" table can be utilized in various applications, including:
+
+1. Location-based Services: The table can be used to power location-based services and applications that provide information about nearby McDonald's locations based on user preferences and location.
+
+2. Market Analysis: Researchers and analysts can leverage the table to study the distribution and density of McDonald's locations across different regions, helping in market analysis and decision-making processes.
+
+3. Geospatial Analysis: The inclusion of the polygon WKT representation enables geospatial analysis, such as identifying clusters of McDonald's locations or analyzing their proximity to other points of interest.
+
+4. Data Integration: The table can be integrated with other datasets to enrich location-based information and enable more comprehensive analysis. For example, it can be combined with demographic data to understand the customer profile of different McDonald's locations.
+
+Keywords: McDonald's, United States, Safegraph place ID, brand, category, NAICS code, latitude, longitude, address, city, region, postal code, open hours, category tags, polygon, phone number, synthetic, parking lot, ISO country code.
+
+Column descriptions for us_pois_safegraph_mcdonalds table:
+- safegraph_place_id: A unique identifier for each place in the Safegraph dataset.
+- parent_safegraph_place_id: The safegraph_place_id of the parent place, if applicable.
+- safegraph_brand_ids: A comma-separated list of brand IDs associated with the place.
+- location_name: The name of the location.
+- brands: The brand associated with the location.
+- top_category: The top-level category of the location.
+- sub_category: The sub-category of the location.
+- naics_code: The NAICS code associated with the location.
+- latitude: The latitude coordinate of the location.
+- longitude: The longitude coordinate of the location.
+- street_address: The street address of the location.
+- primary_number: The primary number of the location's street address.
+- street_predirection: The pre-directional of the street address.
+- street_name: The name of the street.
+- street_postdirection: The post-directional of the street address.
+- street_suffix: The suffix of the street address.
+- city: The city where the location is located.
+- region: The region (state, province, etc.) where the location is located.
+- postal_code: The postal code of the location.
+- open_hours: The opening hours of the location.
+- category_tags: Additional tags or keywords associated with the location's category.
+- polygon_wkt: The well-known text representation of the location's polygon.
+- polygon_class: The class of the polygon.
+- phone_number: The phone number of the location.
+- is_synthetic: Indicates whether the location is synthetic or not.
+- includes_parking_lot: Indicates whether the location includes a parking lot or not.
+- iso_country_code: The ISO country code of the location.

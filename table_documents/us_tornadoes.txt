@@ -1,0 +1,38 @@
+Description:
+The "us_tornadoes" table is designed to store information about tornadoes that have occurred in the United States. It includes columns such as the tornado's ID, timestamps in both UTC and local time, the state abbreviation where the tornado occurred, the magnitude of the tornado, the number of injuries and fatalities, the property loss in dollars, the starting and ending latitude and longitude coordinates, the length of the tornado in miles, the width of the tornado in yards, and the number of states affected by the tornado. The primary functionality of this table is to provide a comprehensive record of tornado events, allowing for analysis and tracking of tornado activity.
+
+Secondary functionality includes the ability to retrieve specific tornado events based on various criteria such as state, magnitude, injuries, fatalities, property loss, and geographical location. The table also allows for the calculation of statistics such as the average magnitude, the total number of injuries and fatalities, and the total property loss caused by tornadoes.
+
+Applications:
+1. Disaster Management: The table can be used by disaster management agencies to track and analyze tornado events, assess the impact on affected areas, and allocate resources for relief and recovery efforts.
+
+2. Research and Analysis: Researchers and meteorologists can utilize the table to study tornado patterns, analyze the relationship between tornado characteristics (magnitude, length, width) and their impact, and identify trends and patterns in tornado occurrences.
+
+3. Insurance Claims: Insurance companies can use the table to assess property damage caused by tornadoes and process insurance claims accordingly. The property loss column provides valuable information for estimating the financial impact of tornado events.
+
+Keywords:
+- Tornado: The table stores information specifically related to tornado events, making this keyword essential for retrieving relevant records.
+- State: The state abbreviation column allows for filtering tornado events based on the affected state, enabling searches for tornadoes in specific regions.
+- Magnitude: This column represents the strength or intensity of the tornado, making it a crucial keyword for analyzing tornado events based on their severity.
+- Injuries and Fatalities: These columns provide information about the impact of tornadoes on human life, allowing for searches and analysis related to the number of injuries and fatalities caused by tornado events.
+- Property Loss: This keyword is important for assessing the financial impact of tornadoes and for retrieving records related to the extent of property damage.
+- Latitude and Longitude: These columns enable searches based on the geographical location of tornado events, facilitating analysis of tornado occurrences in specific areas.
+- Length and Width: These columns provide information about the physical dimensions of tornadoes, allowing for searches and analysis based on the size of tornado events.
+- Num States Affected: This column indicates the number of states affected by a tornado event, making it useful for analyzing the geographical spread of tornado occurrences.
+
+Column descriptions for us_tornadoes table:
+- us_tornadoes.id: Unique identifier for each tornado event.
+- us_tornadoes.timestamp_utc: The timestamp of the tornado event in UTC timezone.
+- us_tornadoes.timestamp_local: The timestamp of the tornado event in local timezone.
+- us_tornadoes.state_abbr: The abbreviation of the state where the tornado event occurred.
+- us_tornadoes.magnitude: The magnitude of the tornado event.
+- us_tornadoes.injuries: The number of injuries caused by the tornado event.
+- us_tornadoes.fatalities: The number of fatalities caused by the tornado event.
+- us_tornadoes.property_loss_dollars: The estimated property loss in dollars caused by the tornado event.
+- us_tornadoes.starting_lat: The latitude coordinate of the starting point of the tornado path.
+- us_tornadoes.starting_lon: The longitude coordinate of the starting point of the tornado path.
+- us_tornadoes.ending_lat: The latitude coordinate of the ending point of the tornado path.
+- us_tornadoes.ending_lon: The longitude coordinate of the ending point of the tornado path.
+- us_tornadoes.length_miles: The length of the tornado path in miles.
+- us_tornadoes.width_yards: The width of the tornado path in yards.
+- us_tornadoes.num_states_affected: The number of states affected by the tornado event.

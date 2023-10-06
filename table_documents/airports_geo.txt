@@ -1,0 +1,50 @@
+Description: The "airports_geo" table stores information about airports around the world. It includes columns such as the airport's ID, identifier, type, name, geographical coordinates (latitude and longitude), elevation, continent, country, region, municipality, scheduled service availability, GPS code, IATA code, local code, home link, Wikipedia link, keywords, and location (stored as a geometry point). The primary functionality of this table is to provide a comprehensive database of airports with their associated attributes.
+
+Secondary functionality includes enabling search and retrieval of airports based on various criteria such as location, type, country, region, and municipality. The table also allows for linking to external resources such as home links and Wikipedia pages for additional information.
+
+Applications: The "airports_geo" table can be used in various applications related to air travel, logistics, tourism, and research. Some potential use cases include:
+
+1. Flight booking systems: The table can be used to provide a list of available airports for users to select their departure and destination locations.
+
+2. Airport management systems: The table can assist in managing and organizing airport data, including tracking airport types, scheduled services, and geographical information.
+
+3. Travel planning applications: The table can be utilized to suggest airports based on user preferences such as continent, country, or region, helping users plan their trips efficiently.
+
+4. Research and analysis: Researchers can utilize the table to analyze airport data, such as studying airport distribution across continents or investigating the relationship between airport elevation and flight patterns.
+
+Keywords: Some essential keywords and relationships that facilitate search, retrieval, and document indexing in the "airports_geo" table include:
+
+- Airport types: small_airport, heliport, closed
+- Continents: NA, SA, EU
+- Countries: US, BR, JP
+- Regions: US-TX, US-CA, US-FL
+- Municipalities: Seoul, São Paulo, Los Angeles
+- Scheduled service availability: no, yes
+- GPS codes: SDPS, SWXR, EBLO
+- IATA codes: 0, LPE, NWT
+- Local codes: AMA, PRO, LAN
+- Wikipedia links: https://en.wikipedia.org/wiki/List_of_highway_airstrips_in_North_Korea, https://en.wikipedia.org/wiki/List_of_airports_in_the_Philippines, https://en.wikipedia.org/wiki/List_of_airports_in_the_Philippines#Military_airfields
+- Keywords: Mukho, Cheonmi-ri, Manhattan, New York City, NYC
+
+These keywords and relationships can be used to perform searches and retrieve relevant airports based on specific criteria.
+
+Column descriptions for airports_geo table:
+- id: The unique identifier for each row in the table.
+- ident: The identifier code for the airport.
+- type: The type of the airport (e.g., small_airport, heliport, closed).
+- name: The name of the airport.
+- latitude_deg: The latitude coordinate of the airport's location.
+- longitude_deg: The longitude coordinate of the airport's location.
+- elevation_ft: The elevation of the airport in feet.
+- continent: The continent where the airport is located.
+- iso_country: The ISO code of the country where the airport is located.
+- iso_region: The ISO code of the region where the airport is located.
+- municipality: The municipality or city where the airport is located.
+- scheduled_service: Indicates whether the airport has scheduled service (yes or no).
+- gps_code: The GPS code of the airport.
+- iata_code: The IATA code of the airport.
+- local_code: The local code of the airport.
+- home_link: The website link for the airport's homepage.
+- wikipedia_link: The Wikipedia link for the airport.
+- keywords: Keywords associated with the airport.
+- location: The geographical location of the airport in the form of a point (latitude and longitude coordinates).
