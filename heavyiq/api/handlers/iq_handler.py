@@ -47,7 +47,10 @@ async def handle_query_request_async(request: QueryRequest, db: HeavyDB) -> Quer
     res = await log_chain_call_async(chain, chain_input, "")
     feedback_id = str(res["__run"].run_id) if "__run" in res else ""
     return QueryResponse(
-        sql=res[chain.output_key], sql_complexity=res[chain.output_complexity_key], feedback_id=feedback_id
+        sql=res[chain.output_key],
+        sql_complexity=res[chain.output_complexity_key],
+        feedback_id=feedback_id,
+        logprobs=res[chain.output_logprobs_key],
     )
 
 
