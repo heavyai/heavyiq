@@ -166,7 +166,7 @@ class BaseNLtoSQLChain(BaseChain):
         if logprobs := first_generation.generation_info.get("logprobs", {}):
             logprobs = logprobs.to_dict_recursive()
 
-        return sql_cmd, logprobs
+        return sql_cmd, logprobs or {}
 
 
 class NLtoSQLChain(BaseNLtoSQLChain):

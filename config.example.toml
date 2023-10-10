@@ -32,3 +32,10 @@ custom_llm_api_vllm_beam_width = 2 # beam search disabled if <2
 custom_llm_azure_openai_api_version = "2023-05-15" # API specification version
 custom_llm_azure_openai_api_base = ""              # base url of API
 custom_llm_azure_deployment_name = ""              # name of deployment
+
+# SQL TO ANSWER
+max_fields_limit_sql_to_answer = 20  # generate answer only when the fields of the resultset has not more than this flag's limit
+
+# logprobs
+enable_logprobs = true # show/hide logprobs on nl-to-sql response
+custom_llm_logprobs_limit = 5  # max probabilities of token to be generated next.
