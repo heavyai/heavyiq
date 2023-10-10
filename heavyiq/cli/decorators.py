@@ -1,3 +1,4 @@
+import time
 import asyncio
 from typing import Callable, Any
 from functools import wraps
@@ -10,6 +11,11 @@ def coro(f: Callable) -> Callable:
 
     @wraps(f)
     def wrapper(*args, **kwargs) -> Any:
-        return asyncio.run(f(*args, **kwargs))
+        start_time = time.perf_counter()
+        out = asyncio.run(f(*args, **kwargs))
+        end_time = time.perf_counter()
+        elapsed_time = end_time - start_time
+        print(f"Elapsed time: {elapsed_time:.2f} seconds")
+        return out
 
     return wrapper
