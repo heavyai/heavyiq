@@ -8,6 +8,7 @@ from langchain.chat_models.base import BaseChatModel
 
 import click
 from langsmith import Client
+from heavyiq.config import get_config
 from fastapi.concurrency import run_in_threadpool
 from heavyiq.cli.decorators import coro
 from heavyiq.langchain import HeavyDB
@@ -17,6 +18,7 @@ from heavyiq.langchain.llms import get_llm_by_type, LLMType
 from heavyiq.logging_utils import get_heavyiq_logger
 
 from .utils import (
+    compute_prob_stats,
     sql_rate_reply,
     summarize_eval_results,
     awrite_eval_results_header,
@@ -59,11 +61,16 @@ async def process_eval_row(
             database=db, llm=llm, callbacks=None if verbose else [], verbose=verbose, tags=[eval_str, "cli"]
         )
 
+        prob_stats = None
         try:
             res = await chain.acall({chain.input_key: question}, include_run_info=is_langsmith_active)
             pred_query = res[chain.output_key]
             logger.info(f"Generated SQL: {pred_query}")
             logger.debug("Evaluating SQL")
+
+            if 'logprobs' in res and len(res['logprobs']) > 0:
+                prob_stats = await run_in_threadpool(compute_prob_stats, res['logprobs']['tokens'], res['logprobs']['top_logprobs'])
+
             eval_res = await run_in_threadpool(sql_rate_reply, db_id, gold_query, pred_query)
             logger.info(f"Evaluation Success: {eval_res['success']}")
             logger.debug(f"Evaluation Status: {eval_res['status']}")
@@ -88,6 +95,7 @@ async def process_eval_row(
                 pred_query,
                 query_id=query_id,
                 error=eval_res["error"],
+                prob_stats=prob_stats,
             )
         except NLtoSQLException as e:
             logger.exception(f"Failed to generate SQL: {e}")
@@ -99,6 +107,7 @@ async def process_eval_row(
                 "failed_to_generate_sql",
                 e.failed_sql,  # type: ignore
                 query_id=query_id,
+                prob_stats=prob_stats,
             )
         except Exception as e:
             logger.exception(f"Failed to generate SQL: {e}")
@@ -124,9 +133,11 @@ async def run_config_model_on_questions(
     eval_str = f"eval_{eval_id}"
     logger.info(f"Eval ID: {eval_id}")
 
-    tasks, semaphore = [], asyncio.Semaphore(3)  # Limit to 3 concurrent tasks
+    tasks, semaphore = [], asyncio.Semaphore(10)  # Limit to 10 concurrent tasks
 
     llm = await run_in_threadpool(get_llm_by_type, LLMType.NL_TO_SQL, temperature=temperature)
+
+    config = get_config()
 
     # csv must have columns: id (optional), db_id, tables, question, answer
     async with aiofiles.open(eval_dataset_csv, mode="r") as f:
@@ -134,7 +145,7 @@ async def run_config_model_on_questions(
         header = await anext(csv_reader)
         has_id = "id" == header[0]  # type: ignore
 
-        await awrite_eval_results_header(eval_str, has_id)
+        await awrite_eval_results_header(eval_str, has_id, config.enable_logprobs)
 
         async for row in csv_reader:
             task = asyncio.create_task(
