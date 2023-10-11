@@ -54,6 +54,9 @@ def getOptions(argv=None):
     parser.add_argument(
         "--add-columns-to-question-prompts", help="Add column specifications to question prompts", action="store_true"
     )
+    parser.add_argument(
+        "--write-table-prompts", help="Write table prompts to file for successful queries", action="store_true"
+    )
     parser.add_argument("--add-columns-to-answers", help="Add column specifications to answer", action="store_true")
     parser.add_argument(
         "--sort-table-schemas-by-row-count",
@@ -559,6 +562,23 @@ def generate_question(table_metadata, unique_columns=None):
         return instruction
 
 
+def generate_table_prompt(table_metadata, user_question):
+    instruction = """You are a experienced data analyst adept at analyzing user questions to determine the SQL tables required to generate an answer.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nEmit each table name along with a 1 if the table is required to answer the user question, or a 0 if the table is not required.\n\n{user_question}\n""".format(
+        table_metadata=table_metadata, user_question=user_question
+    )
+    return instruction
+
+
+def generate_table_prompt_output(all_tables, used_tables):
+    output = ""
+    for table in all_tables:
+        if table in used_tables:
+            output += f"{table}: 1\n"
+        else:
+            output += f"{table}: 0\n"
+    return output
+
+
 def extract_tables_from_query(con, query):
     explain_query = "EXPLAIN CALCITE " + query
     query_plan = con.execute(explain_query)
@@ -630,7 +650,7 @@ def write_english_prompts_to_csv(english_prompts, output_file):
         writer.writerows(prompts_to_write)
 
 
-def write_question_prompts_to_csv(question_prompts, output_file):
+def write_generic_prompts_to_csv(prompts, output_file):
     fieldnames = [
         "query_id",
         "db_id",
@@ -646,7 +666,7 @@ def write_question_prompts_to_csv(question_prompts, output_file):
             obj["instruction"],
             obj["output"],
         )
-        for obj in question_prompts
+        for obj in prompts
     ]
     with open(output_file, mode="w", newline="") as file:
         writer = csv.writer(file)
@@ -1068,6 +1088,7 @@ def main(argv):
         prompts = []
         english_prompts = []
         question_prompts = []
+        table_prompts = []
         question_prompts_with_cols = []
         con = None
         tokenizer = LlamaTokenizer.from_pretrained("test_model")
@@ -1282,6 +1303,20 @@ def main(argv):
                                     "output": query["question"],
                                 }
                             )
+                        if options.write_table_prompts:
+                            filtered_tables = extract_tables_from_query(con, sql_query)
+                            table_metadata = generate_table_metadata_str(table_schemas, [], 0)
+                            instruction = generate_table_prompt(table_metadata, query["question"])
+                            output = generate_table_prompt_output(db_tables, filtered_tables)
+                            table_prompts.append(
+                                {
+                                    "db_id": db_id,
+                                    "query_id": query_id,
+                                    "data_split": data_split,
+                                    "instruction": instruction,
+                                    "output": output,
+                                }
+                            )
 
                     except Exception as e:
                         print(f"Exception Query ID: {query_id} DB: {db_id} Query: {sql_query}")
@@ -1323,7 +1358,9 @@ def main(argv):
         if options.write_english_prompts:
             write_english_prompts_to_csv(english_prompts, "sql_english_prompts.csv")
         if options.write_question_prompts:
-            write_question_prompts_to_csv(question_prompts, "sql_question_prompts.csv")
+            write_generic_prompts_to_csv(question_prompts, "sql_question_prompts.csv")
+        if options.write_table_prompts:
+            write_generic_prompts_to_csv(table_prompts, "sql_table_prompts.csv")
 
         print(f"\n\nTotal NULL Rewrite SUCCESSES: {num_null_rewrite_successes}, FAILS: {num_null_rewrite_fails}")
         print(f"\n\nTotal successful queries: {total_successful_queries}/{total_queries}")
