@@ -57,15 +57,17 @@ def compute_prob_stats(selected_tokens: list[str], top_log_probs: list[dict[str,
     
     return prob_stats
 
-def sql_rate_reply(db_id: str, gold_query: str, pred_query: str) -> dict[str, Any]:
+def sql_rate_reply(gold_query: str, pred_query: str, db_id: str | None = None, db: HeavyDB | None = None) -> dict[str, Any]:
     # motivated by https://github.com/lm-sys/FastChat/tree/main/fastchat/pred
+    assert db_id or db, "sql_rate_reply expects either database_name or HeavyDB instance."
     query_metadata = {
         "success": False,
         "status": "success",
         "error": None,
     }
     try:
-        db = HeavyDB.from_env(db_name=db_id)
+        if not db:
+            db = HeavyDB.from_env(db_name=db_id)
         gold_df = pd.read_sql(gold_query, db._conn)
         pred_df = pd.read_sql(pred_query, db._conn)
         num_gold_rows = len(gold_df.axes[0])  # type: ignore
@@ -124,7 +126,7 @@ def sql_rate_reply(db_id: str, gold_query: str, pred_query: str) -> dict[str, An
         print(pred_query)
         return query_metadata
 
-async def awrite_eval_results_header(eval_str: str, has_id: bool, enable_logprobs):
+async def awrite_eval_results_header(eval_str: str, has_id: bool, enable_logprobs: bool, enable_query_stats: bool = True):
     async with aiofiles.open(f"./eval/results/{eval_str}_results.csv", "a", newline="") as wf:
         header = []
         if has_id:
@@ -132,6 +134,9 @@ async def awrite_eval_results_header(eval_str: str, has_id: bool, enable_logprob
         header.extend(["db_id", "gold_query", "pred_query", "success", "status", "error"])
         if enable_logprobs:
             header.extend(["num_tokens", "total_prob", "avg_prob", "min_prob", "prob_decile_histogram"])
+        if enable_query_stats:
+            header.extend(["num_joins", "num_unions", "num_aggs", "num_filters", "num_sorts"])
+        
         writer = AsyncWriter(wf, dialect="unix")
         await writer.writerow(header)
 
@@ -145,7 +150,8 @@ async def awrite_eval_results_row(
     pred_query: str = "",
     error: Optional[str] = None,
     query_id: Optional[str] = None,
-    prob_stats: Optional[dict] = None
+    prob_stats: Optional[dict] = None,
+    query_stats: Optional[dict] = None
 ):
     async with aiofiles.open(f"./eval/results/{eval_str}_results.csv", "a", newline="") as wf:
         writer = AsyncWriter(wf, dialect="unix")
@@ -156,6 +162,8 @@ async def awrite_eval_results_row(
         row_data.extend([db_id, gold_query, pred_query, success, status, error or ""])
         if prob_stats:
             row_data.extend([prob_stats["num_tokens"], prob_stats["total_prob"], prob_stats["avg_prob"], prob_stats["min_prob"], prob_stats["prob_decile_histogram"]])
+        if query_stats:
+            row_data.extend([query_stats["joins"], query_stats["unions"], query_stats["aggs"], query_stats["filters"], query_stats["sorts"]])
 
         row_data = [str(item).replace("\n", " ").replace("\r", " ") for item in row_data]
 
