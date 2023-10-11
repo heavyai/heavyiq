@@ -23,6 +23,9 @@ def init_telemetrics() -> None:
         os.environ["LANGCHAIN_PROJECT"] = config.langsmith_project
         is_langsmith_active = True
 
+    # chromadb telemetry opt-out
+    os.environ["ANONYMIZED_TELEMETRY"] = "false"
+
 
 def get_token_limit(model_name: str, response_tokens: int = 256) -> int:
     """
