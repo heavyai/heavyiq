@@ -52,7 +52,6 @@ async def process_eval_row(
     else:
         query_id = None
         db_id, tables, question, gold_query = row
-
     async with semaphore:
         tables = [table.strip("'") for table in str(tables).split(",")]
         logger.info(f"Processing Question: {question}")
@@ -62,6 +61,7 @@ async def process_eval_row(
         )
 
         prob_stats = None
+        query_stats = None
         try:
             res = await chain.acall({chain.input_key: question}, include_run_info=is_langsmith_active)
             pred_query = res[chain.output_key]
@@ -71,7 +71,8 @@ async def process_eval_row(
             if 'logprobs' in res and len(res['logprobs']) > 0:
                 prob_stats = await run_in_threadpool(compute_prob_stats, res['logprobs']['tokens'], res['logprobs']['top_logprobs'])
 
-            eval_res = await run_in_threadpool(sql_rate_reply, db_id, gold_query, pred_query)
+            eval_res = await run_in_threadpool(sql_rate_reply, gold_query, pred_query, db=db)
+            query_stats = await db.aquery_stats(pred_query)
             logger.info(f"Evaluation Success: {eval_res['success']}")
             logger.debug(f"Evaluation Status: {eval_res['status']}")
             if is_langsmith_active:
@@ -96,6 +97,7 @@ async def process_eval_row(
                 query_id=query_id,
                 error=eval_res["error"],
                 prob_stats=prob_stats,
+                query_stats=query_stats,
             )
         except NLtoSQLException as e:
             logger.exception(f"Failed to generate SQL: {e}")
@@ -108,6 +110,7 @@ async def process_eval_row(
                 e.failed_sql,  # type: ignore
                 query_id=query_id,
                 prob_stats=prob_stats,
+                query_stats=query_stats,
             )
         except Exception as e:
             logger.exception(f"Failed to generate SQL: {e}")
