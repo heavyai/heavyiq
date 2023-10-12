@@ -57,6 +57,9 @@ def getOptions(argv=None):
     parser.add_argument(
         "--write-table-prompts", help="Write table prompts to file for successful queries", action="store_true"
     )
+    parser.add_argument(
+        "--add-column-metadata-to-table-prompts", help="Add column metadata to table prompts", action="store_true"
+    )
     parser.add_argument("--add-columns-to-answers", help="Add column specifications to answer", action="store_true")
     parser.add_argument(
         "--sort-table-schemas-by-row-count",
@@ -563,7 +566,7 @@ def generate_question(table_metadata, unique_columns=None):
 
 
 def generate_table_prompt(table_metadata, user_question):
-    instruction = """You are a experienced data analyst adept at analyzing user questions to determine the SQL tables required to generate an answer.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nEmit each table name along with a 1 if the table is required to answer the user question, or a 0 if the table is not required.\n\n{user_question}\n""".format(
+    instruction = """You are a experienced data analyst adept at analyzing user questions to determine the SQL tables required to generate an answer.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nEmit each table name along with a 1 if the table is required to answer the following user question, or a 0 if the table is not required.\n\nQuestion: {user_question}\n""".format(
         table_metadata=table_metadata, user_question=user_question
     )
     return instruction
@@ -657,6 +660,7 @@ def write_generic_prompts_to_csv(prompts, output_file):
         "data_split",
         "instruction",
         "output",
+        "num_instruction_tokens",
     ]
     prompts_to_write = [
         (
@@ -665,6 +669,7 @@ def write_generic_prompts_to_csv(prompts, output_file):
             obj["data_split"],
             obj["instruction"],
             obj["output"],
+            obj["num_instruction_tokens"],
         )
         for obj in prompts
     ]
@@ -1294,6 +1299,8 @@ def main(argv):
                                     filtered_table_schemas, [], options.low_card_top_k_str_vals
                                 )
                                 instruction = generate_question(filtered_table_metadata, unique_columns)
+                                instruction_tokens = tokenizer.tokenize(instruction)
+                                num_instruction_tokens = len(instruction_tokens)
                             question_prompts.append(
                                 {
                                     "db_id": db_id,
@@ -1301,12 +1308,30 @@ def main(argv):
                                     "data_split": data_split,
                                     "instruction": instruction,
                                     "output": query["question"],
+                                    "num_instruction_tokens": num_instruction_tokens,
                                 }
                             )
                         if options.write_table_prompts:
                             filtered_tables = extract_tables_from_query(con, sql_query)
-                            table_metadata = generate_table_metadata_str(table_schemas, [], 0)
+                            table_metadata = None
+                            add_top_k_metadata = (
+                                options.add_column_metadata_to_table_prompts
+                                and options.high_card_top_k_str_vals > 0
+                                or options.low_card_top_k_str_vals > 0
+                            )
+                            if add_top_k_metadata:
+                                table_metadata = generate_table_metadata_str(table_schemas, top_k_str_vals, 0)
+                            else:
+                                table_metadata = generate_table_metadata_str(table_schemas, [], 0)
                             instruction = generate_table_prompt(table_metadata, query["question"])
+                            instruction_tokens = tokenizer.tokenize(instruction)
+                            num_instruction_tokens = len(instruction_tokens)
+                            if num_instruction_tokens > options.max_instruction_tokens and add_top_k_metadata:
+                                table_metadata = generate_table_metadata_str(table_schemas, [], 0)
+                                instruction = generate_table_prompt(table_metadata, query["question"])
+                                instruction_tokens = tokenizer.tokenize(instruction)
+                                num_instruction_tokens = len(instruction_tokens)
+
                             output = generate_table_prompt_output(db_tables, filtered_tables)
                             table_prompts.append(
                                 {
@@ -1315,6 +1340,7 @@ def main(argv):
                                     "data_split": data_split,
                                     "instruction": instruction,
                                     "output": output,
+                                    "num_instruction_tokens": num_instruction_tokens,
                                 }
                             )
 

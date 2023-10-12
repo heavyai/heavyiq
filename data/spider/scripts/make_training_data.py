@@ -122,19 +122,28 @@ def load_questions(
 
 
 def load_used_tables(
-    con, used_tables_path, used_tables_instruction_prompt, used_tables_output_prompt, version, output_dir
+    con,
+    used_tables_path,
+    used_tables_instruction_prompt,
+    used_tables_output_prompt,
+    max_token_length,
+    version,
+    output_dir,
 ):
-    drop_table_sql = f"DROP TABLE IF EXISTS heavyiq_used_tables_v{version}"
-    create_table_sql = f"CREATE TABLE heavyiq_used_tables_v{version} (query_id INT, db_id TEXT, data_split TEXT, instruction TEXT, output TEXT);"
-    load_sql = f"COPY heavyiq_used_tables_v{version} FROM '{used_tables_path}' WITH (header='t');"
-    add_prompt_col_sql = f"ALTER TABLE heavyiq_used_tables_v{version} ADD COLUMN prompt TEXT;"
-    add_answer_col_sql = f"ALTER TABLE heavyiq_used_tables_v{version} ADD COLUMN answer TEXT;"
-    update_prompt_col_sql = f"UPDATE heavyiq_used_tables_v{version} SET prompt = instruction;"
+    table_suffix = f"v{version}_{max_token_length}_tokens"
+    drop_table_sql = f"DROP TABLE IF EXISTS heavyiq_used_tables_{table_suffix}"
+    create_table_sql = f"CREATE TABLE heavyiq_used_tables_{table_suffix} (query_id INT, db_id TEXT, data_split TEXT, instruction TEXT, output TEXT, num_instruction_tokens INT);"
+    load_sql = f"COPY heavyiq_used_tables_{table_suffix} FROM '{used_tables_path}' WITH (header='t');"
+    add_prompt_col_sql = f"ALTER TABLE heavyiq_used_tables_{table_suffix} ADD COLUMN prompt TEXT;"
+    add_answer_col_sql = f"ALTER TABLE heavyiq_used_tables_{table_suffix} ADD COLUMN answer TEXT;"
+    update_prompt_col_sql = f"UPDATE heavyiq_used_tables_{table_suffix} SET prompt = instruction;"
     if used_tables_instruction_prompt and used_tables_output_prompt is not None:
-        update_prompt_col_sql = f"UPDATE heavyiq_used_tables_v{version} SET prompt = '{used_tables_instruction_prompt}\n' || instruction || '\n{used_tables_output_prompt}\n';"
-    update_answer_col_sql = f"UPDATE heavyiq_used_tables_v{version} SET answer = output;"
-    export_train_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_used_tables_v{version} WHERE data_split <> 'dev') TO '{output_dir}/heavyiq_used_tables_v{version}_train.csv' WITH (header='t');"
-    export_eval_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_used_tables_v{version} WHERE data_split = 'dev') TO '{output_dir}/heavyiq_used_tables_v{version}_eval.csv' WITH (header='t');"
+        update_prompt_col_sql = f"UPDATE heavyiq_used_tables_{table_suffix} SET prompt = '{used_tables_instruction_prompt}\n' || instruction || '\n{used_tables_output_prompt}\n';"
+    update_answer_col_sql = f"UPDATE heavyiq_used_tables_{table_suffix} SET answer = output;"
+    # Account for prompt tokens in max length
+    corrected_max_token_length = int(max_token_length) - 5
+    export_train_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_used_tables_{table_suffix} WHERE data_split <> 'dev' AND num_instruction_tokens <= {corrected_max_token_length}) TO '{output_dir}/heavyiq_used_tables_{table_suffix}_train.csv' WITH (header='t');"
+    export_eval_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_used_tables_{table_suffix} WHERE data_split = 'dev' AND num_instruction_tokens <= {corrected_max_token_length}) TO '{output_dir}/heavyiq_used_tables_{table_suffix}_eval.csv' WITH (header='t');"
 
     con.execute(drop_table_sql)
     con.execute(create_table_sql)
@@ -253,6 +262,7 @@ def main(argv):
             options.version,
             options.output_dir,
         )
+        queries_table = (f"heavyiq_text_to_sql_v{options.version}_{options.max_token_length}_tokens",)
     if options.nl_answers is not None:
         load_nl_answers(
             con,
@@ -293,10 +303,11 @@ def main(argv):
             options.used_tables,
             options.used_tables_instruction_prompt,
             options.used_tables_output_prompt,
+            options.max_token_length,
             options.version,
             options.output_dir,
         )
-        used_tables_table = f"heavyiq_used_tables_v{options.version}"
+        used_tables_table = f"heavyiq_used_tables_v{options.version}_{options.max_token_length}_tokens"
 
     if options.errors is not None:
         load_errors(
