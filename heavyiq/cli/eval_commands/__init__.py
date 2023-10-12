@@ -39,6 +39,9 @@ async def process_eval_row(
     eval_str: str,
     llm: BaseLLM | BaseChatModel,
     verbose: bool = True,
+    enable_logprobs: bool = True,
+    enable_querystats: bool = True,
+    langsmith_client: Client | None = None,
 ):
     """
     Function to process each row exists on eval dataset.
@@ -68,17 +71,19 @@ async def process_eval_row(
             logger.info(f"Generated SQL: {pred_query}")
             logger.debug("Evaluating SQL")
 
-            if 'logprobs' in res and len(res['logprobs']) > 0:
-                prob_stats = await run_in_threadpool(compute_prob_stats, res['logprobs']['tokens'], res['logprobs']['top_logprobs'])
+            if "logprobs" in res and len(res["logprobs"]) > 0:
+                prob_stats = await run_in_threadpool(
+                    compute_prob_stats, res["logprobs"]["tokens"], res["logprobs"]["top_logprobs"]
+                )
 
-            eval_res = await run_in_threadpool(sql_rate_reply, gold_query, pred_query, db=db)
-            query_stats = await db.aquery_stats(pred_query)
+            eval_res, query_stats = await asyncio.gather(
+                run_in_threadpool(sql_rate_reply, gold_query, pred_query, db=db), db.aquery_stats(pred_query)
+            )
             logger.info(f"Evaluation Success: {eval_res['success']}")
             logger.debug(f"Evaluation Status: {eval_res['status']}")
-            if is_langsmith_active:
+            if langsmith_client:
                 feedback_id = str(res["__run"].run_id)
                 logger.debug(f"Langsmith Run ID: {feedback_id}")
-                langsmith_client = Client()
                 await run_in_threadpool(
                     langsmith_client.create_feedback,
                     feedback_id,
@@ -98,6 +103,8 @@ async def process_eval_row(
                 error=eval_res["error"],
                 prob_stats=prob_stats,
                 query_stats=query_stats,
+                enable_logprobs=enable_logprobs,
+                enable_querystats=enable_querystats,
             )
         except NLtoSQLException as e:
             logger.exception(f"Failed to generate SQL: {e}")
@@ -111,6 +118,8 @@ async def process_eval_row(
                 query_id=query_id,
                 prob_stats=prob_stats,
                 query_stats=query_stats,
+                enable_logprobs=enable_logprobs,
+                enable_querystats=enable_querystats,
             )
         except Exception as e:
             logger.exception(f"Failed to generate SQL: {e}")
@@ -141,6 +150,7 @@ async def run_config_model_on_questions(
     llm = await run_in_threadpool(get_llm_by_type, LLMType.NL_TO_SQL, temperature=temperature)
 
     config = get_config()
+    langsmith_client = Client() if is_langsmith_active else None
 
     # csv must have columns: id (optional), db_id, tables, question, answer
     async with aiofiles.open(eval_dataset_csv, mode="r") as f:
@@ -152,7 +162,17 @@ async def run_config_model_on_questions(
 
         async for row in csv_reader:
             task = asyncio.create_task(
-                process_eval_row(semaphore, row, has_id=has_id, eval_str=eval_str, llm=llm, verbose=verbose)
+                process_eval_row(
+                    semaphore,
+                    row,
+                    has_id=has_id,
+                    eval_str=eval_str,
+                    llm=llm,
+                    verbose=verbose,
+                    enable_logprobs=config.enable_logprobs,
+                    enable_querystats=True,
+                    langsmith_client=langsmith_client,
+                )
             )
             tasks.append(task)
 
