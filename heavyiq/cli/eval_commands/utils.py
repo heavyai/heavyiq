@@ -180,7 +180,7 @@ async def awrite_eval_results_row(
                 ]
             )
         elif enable_logprobs:
-            row_data.extend(["", "", "", "", ""])
+            row_data.extend([None, None, None, None, None])
         if enable_querystats and query_stats:
             row_data.extend(
                 [
@@ -192,7 +192,7 @@ async def awrite_eval_results_row(
                 ]
             )
         elif enable_querystats:
-            row_data.extend(["", "", "", "", ""])
+            row_data.extend([None, None, None, None, None])
 
         row_data = [str(item).replace("\n", " ").replace("\r", " ") for item in row_data]
 
