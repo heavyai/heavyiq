@@ -248,7 +248,7 @@ class HeavyDB:
                 port=config.heavydb_port,
                 protocol=config.heavydb_protocol,
             )
-            return await anyio.to_thread.run_sync(func, cancellable=True)
+            return await anyio.to_thread.run_sync(func, cancellable=True)  # type: ignore
 
         conn = await cls._aconnect_with_timeout(aconnect_func(), kwargs.pop("timeout", 10))
         return cls(conn, **kwargs)
@@ -278,7 +278,7 @@ class HeavyDB:
         """Return string representation of dialect to use."""
         return "ANSI SQL"
 
-    def get_usable_table_names(self) -> Iterable[str]:
+    def get_usable_table_names(self) -> set[str]:
         """Get names of tables available."""
         if self._include_tables:
             return self._include_tables

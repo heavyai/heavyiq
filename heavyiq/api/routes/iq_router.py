@@ -2,9 +2,11 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from heavyiq.langchain import HeavyDB
 from heavyiq.api.dependencies import (
+    valid_db_session,
     valid_query_db_session,
     valid_question_db_session,
     validate_db_session_for_table_metadata,
+    valid_tables_db_session,
 )
 from heavyiq.api.models import (
     QueryRequest,
@@ -17,6 +19,8 @@ from heavyiq.api.models import (
     GenerateTableMetadataResponse,
     AskHeavyAIDocsRequest,
     AskHeavyAIDocsResponse,
+    TablesRequest,
+    TablesResponse,
 )
 from heavyiq.api.handlers import (
     handle_query_request_async,
@@ -24,6 +28,7 @@ from heavyiq.api.handlers import (
     handle_submit_feedback_request_async,
     handle_generate_table_metadata_async,
     handle_ask_heavyai_docs_async,
+    handle_tables_request_async,
 )
 from heavyiq.api.routes.log_route import LoggingRoute
 
@@ -66,7 +71,7 @@ async def submit_feedback(value: FeedbackRequest) -> FeedbackResponse:
 @iqrouter.post("/generate-table-metadata", response_model=GenerateTableMetadataResponse)
 async def generate_table_metadata(
     values: tuple[GenerateTableMetadataRequest, HeavyDB] = Depends(validate_db_session_for_table_metadata)
-) -> dict[Any, Any]:
+) -> GenerateTableMetadataResponse:
     """
     Endpoint which is reponsible for generating table metadata.
     """
@@ -78,3 +83,16 @@ async def generate_table_metadata(
 @iqrouter.post("/ask-heavyai-docs", response_model=AskHeavyAIDocsResponse)
 async def ask_heavyai_docs(value: AskHeavyAIDocsRequest) -> AskHeavyAIDocsResponse:
     return await handle_ask_heavyai_docs_async(value)
+
+
+@iqrouter.post("/tables", response_model=TablesResponse)
+async def tables(values: tuple[TablesRequest, HeavyDB] = Depends(valid_tables_db_session)) -> TablesResponse:
+    """
+    Request for tables with all the information:
+
+    - **question**: Actual NL question asked.
+    - **session_id**: HeavyDB session id.
+    \f
+    :param TablesRequest request: Request Body
+    """
+    return await handle_tables_request_async(*values)

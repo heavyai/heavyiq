@@ -1,5 +1,7 @@
 from fastapi.concurrency import run_in_threadpool
 from langsmith import Client
+from heavyiq.langchain.index import aget_heavydb_index
+from heavyiq.langchain.chains import AskHeavyDBMetadataIndexChain
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from heavyiq.api.models import (
@@ -13,11 +15,14 @@ from heavyiq.api.models import (
     QuestionResponse,
     AskHeavyAIDocsRequest,
     AskHeavyAIDocsResponse,
+    TablesRequest,
+    TablesResponse,
 )
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.chains import (
     NLtoAnswerChain,
+    NLtoTablesChain,
     GenerateTableMetadataChain,
     get_nl_to_sql_chain_by_llm,
     get_ask_docs_chain,
@@ -151,3 +156,30 @@ async def handle_ask_heavyai_docs_async(request: AskHeavyAIDocsRequest) -> AskHe
         sources=[source.strip() for source in res[chain.sources_answer_key].split(",")],
         feedback_id=feedback_id,
     )
+
+
+async def handle_tables_request_async(request: TablesRequest, db: HeavyDB) -> TablesResponse:
+    """
+    Hanles /tables request.
+    """
+    all_tables: set[str] = db.get_usable_table_names()
+    found_tables = set()
+
+    if len(all_tables) > 10:
+        # db tables count is greater than 10, so do a doc serach for relevant table names
+        heavydb_index = await aget_heavydb_index()
+        # this table name search does not call any llm
+        # it just searches the docs and shows the relevant tables
+        found_tables = set(
+            heavydb_index.simple_search_for_table_names(request.question, allowable_tables=list(all_tables))
+        )
+
+    config = get_config()
+    logger = get_heavyiq_logger()
+    llm = await run_in_threadpool(get_llm_by_type, LLMType.NL_TO_SQL, temperature=0.0)
+    file_callback_handler = logger.async_langchain_cb_handler(to_stdout=config.log_to_stdout)
+    chain = NLtoTablesChain(llm=llm, database=db, callbacks=[file_callback_handler], tags=["rest-api", "tables-endpoint"])  # type: ignore
+    chain_input = {chain.input_key: request.question, "tables": list(found_tables or all_tables)}
+    res = await log_chain_call_async(chain, chain_input, "")
+    # feedback_id = str(res["__run"].run_id) if "__run" in res else ""
+    return TablesResponse(tables=res[chain.output_key])

@@ -1,7 +1,7 @@
 from typing import Any
 from fastapi import Body
 from fastapi.concurrency import run_in_threadpool
-from heavyiq.api.models import QueryRequest, QuestionRequest, GenerateTableMetadataRequest
+from heavyiq.api.models import QueryRequest, QuestionRequest, GenerateTableMetadataRequest, TablesRequest
 from heavyiq.langchain import HeavyDB
 
 
@@ -36,3 +36,17 @@ async def validate_db_session_for_table_metadata(
     )
 
     return request_body, db
+
+
+async def valid_db_session(request: Any = Body(...)) -> tuple[Any, HeavyDB]:
+    """
+    Dependency where the injected handler function gets a tuple of query request and db objects.
+    """
+    return request, await HeavyDB.from_session_async(request.session_id)
+
+
+async def valid_tables_db_session(request: TablesRequest = Body(...)) -> tuple[TablesRequest, HeavyDB]:
+    """
+    Dependency where the injected handler function gets a tuple of query request and db objects.
+    """
+    return request, await HeavyDB.from_session_async(request.session_id)
