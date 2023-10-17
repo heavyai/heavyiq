@@ -467,7 +467,7 @@ class HeavyDB:
         command = strip_sql_comments(command)
         plan = await self.aget_query_plan(command)
         return rate_sql_complexity(plan)
-    
+
     async def aquery_stats(self, command: str) -> dict[str, int]:
         command = strip_sql_comments(command)
         plan = await self.aget_calcite_query_plan(command, detailed=False)
@@ -537,9 +537,6 @@ class HeavyDB:
                 self.logger.debug(f"Got columns for table {table}")
                 return table_details
             except Exception as e:
-                import traceback
-
-                print(traceback.format_exc())
                 raise e
 
     async def aget_table_schema(self, table: str):

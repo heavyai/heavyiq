@@ -8,11 +8,15 @@ SQL = "SELECT COUNT(*) AS num_states, STATE_NAME FROM usa_states WHERE STATE_NAM
 
 
 # Mock the log_chain_call_async function to return "foo"
-async def mock_log_chain_call_async(chain: Any, chain_input: dict, model_name: str) -> dict[str, str | int | RunId]:
-    return {"sql": SQL, "sql_complexity": 3, "__run": RunId("acf2132")}
+async def mock_log_chain_call_async(
+    chain: Any, chain_input: dict, model_name: str
+) -> dict[str, str | int | RunId | dict]:
+    return {"sql": SQL, "sql_complexity": 3, "__run": RunId("acf2132"), "logprobs": {"token_logprobs": []}}
 
 
-@pytest.mark.parametrize("expected_result", [{"sql": SQL, "sql_complexity": 3, "feedback_id": "acf2132"}])
+@pytest.mark.parametrize(
+    "expected_result", [{"sql": SQL, "sql_complexity": 3, "feedback_id": "acf2132", "logprobs": {"token_logprobs": []}}]
+)
 @patch("heavyiq.api.handlers.iq_handler.log_chain_call_async", side_effect=mock_log_chain_call_async)
 def test_should_pass_query_endpoint(mock: Callable, expected_result: list[Any], client):
     """

@@ -16,3 +16,4 @@ sphinx==7.2.5
 sphinx-click==5.0.1
 types-aiofiles==23.2.0.0
 types-requests==2.31.0.2
+pytest-asyncio==0.21.1
