@@ -14,7 +14,7 @@ from heavyiq.langchain.chains import (
     SQLMetadataQuestionTransformerChain,
     get_nl_to_sql_chain_by_llm,
 )
-from heavyiq.langchain.index.heavydb import create_index_if_nonexistent, acreate_index_if_nonexistent
+from heavyiq.langchain.index.heavydb import acreate_index_if_nonexistent
 from heavyiq.langchain.index.utils import SearchType
 from heavyiq.langchain.llms import (
     LLMType,
