@@ -3,7 +3,6 @@ import asyncio
 import aiofiles
 from enum import Enum, auto
 from aiocsv.readers import AsyncReader
-from datetime import datetime
 from typing import Any, Callable
 
 from heavyiq.config import get_config
@@ -106,41 +105,7 @@ async def test_table_retrieval(
     return total_overshot_correct, total_exactly_correct, total_partially_correct, total_incorrect
 
 
-def test_stuff(question_dicts: list[dict[str, Any]]) -> tuple[str, dict]:
-    simple = {
-        "total_overshot_correct": 0,
-        "total_exactly_correct": 0,
-        "total_partially_correct": 0,
-        "total_incorrect": 0,
-        "time_spent": 0.0,
-    }
-
-    for question_dict in question_dicts:
-        table_set = {question_dict["primary_table"]}
-        if question_dict["is_multi_table"]:
-            table_set.add(question_dict["secondary_table"])
-        question = question_dict["question"]
-        try:
-            simple_start = datetime.now()
-            simple_res = get_heavydb_index().ask_about_database(question)
-            simple_end = datetime.now()
-            simple["time_spent"] += (simple_end - simple_start).total_seconds()
-            simple_guessed_tables = set(simple_res["tables"])
-            if simple_guessed_tables == table_set:
-                simple["total_exactly_correct"] += 1
-            elif simple_guessed_tables.intersection(table_set) == table_set:
-                simple["total_overshot_correct"] += 1
-            elif len(simple_guessed_tables.intersection(table_set)) > 0:
-                simple["total_partially_correct"] += 1
-            else:
-                simple["total_incorrect"] += 1
-        except Exception:
-            simple["total_incorrect"] += 1
-
-    return ("Simple Ask", simple)
-
-
-async def main(questions_file):
+async def main(questions_file: str):
     question_dicts = await read_csv_file(questions_file)
     total_questions = len(question_dicts)
     heavydb_index = await aget_heavydb_index()
@@ -171,23 +136,6 @@ async def main(questions_file):
         )
         print(f"Total incorrect: {total_incorrect} ({total_incorrect / total_questions * 100:.2f}%)")
         print("=============================================================")
-
-    return
-    desc, result = test_stuff(question_dicts)
-    print(desc)
-    print(f"Total questions: {total_questions}")
-    print(
-        f"Total exactly correct: {result['total_exactly_correct']} ({result['total_exactly_correct'] / total_questions * 100:.2f}%)"
-    )
-    print(
-        f"Total overshot correct: {result['total_overshot_correct']} ({result['total_overshot_correct'] / total_questions * 100:.2f}%)"
-    )
-    print(
-        f"Total partially correct: {result['total_partially_correct']} ({result['total_partially_correct'] / total_questions * 100:.2f}%)"
-    )
-    print(f"Total incorrect: {result['total_incorrect']} ({result['total_incorrect'] / total_questions * 100:.2f}%)")
-    print(f"Time spent per question: {result['time_spent'] / total_questions:.2f} seconds")
-    print("=============================================================")
 
 
 if __name__ == "__main__":
