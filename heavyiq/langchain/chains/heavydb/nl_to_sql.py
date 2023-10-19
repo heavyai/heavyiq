@@ -188,67 +188,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
         inputs: dict[str, Any],
         run_manager: Optional[CallbackManagerForChainRun] = None,
     ) -> dict[str, str]:
-        self.write_callback_message(inputs[self.input_key], run_manager=run_manager)
-
-        # If not present, then defaults to None which is all tables available to HeavyDB wrapper instance
-        table_names_to_use = inputs.get("tables")
-
-        partial_gen_sql_prompt = self.prompt.partial(input=inputs[self.input_key])
-        gen_sql_prompt = populate_table_info_wrt_token_limit(
-            partial_gen_sql_prompt, self.llm, self.database, table_names_to_use
-        )
-
-        response = self.llm.generate_prompt(
-            [gen_sql_prompt], callbacks=run_manager.get_child() if run_manager else None
-        )
-        sql_cmd = response.generations[0][0].text.strip()  # type: ignore
-        verified = False
-        retries = 0
-
-        while not verified:
-            try:
-                self.write_callback_message(f"Verifying SQL Query: {sql_cmd}", run_manager=run_manager, color="blue")
-                self.database.validate_query(sql_cmd)
-                verified = True
-            except Exception as e:
-                retries += 1
-                if retries > self.max_retries:
-                    break
-                self.write_callback_message(f"Invalid SQL Query: {e}.", run_manager=run_manager, color="red")
-
-                truncated_error = str(e)[0:150] if len(str(e)) > 150 else str(e)
-                partial_error_prompt = self.error_prompt.partial(
-                    input=inputs[self.input_key],
-                    sql_cmd=sql_cmd,
-                    error=truncated_error,
-                )
-                correct_error_prompt = populate_table_info_wrt_token_limit(
-                    partial_error_prompt, self.llm, self.database, table_names_to_use
-                )
-                response = self.llm.generate_prompt(
-                    [correct_error_prompt], callbacks=run_manager.get_child() if run_manager else None
-                )
-                sql_cmd = response.generations[0][0].text.strip()  # type: ignore
-
-        if not verified:
-            self.write_callback_message(
-                f"Failed to verify SQL query after {self.max_retries} retries.", run_manager=run_manager, color="red"
-            )
-            raise NLtoSQLException(
-                f"Language model failed to generate a valid SQL query after {self.max_retries} tries.", sql_cmd
-            )
-
-        self.write_callback_message(sql_cmd, run_manager=run_manager, color="green")
-        if get_config().enable_str_literal_correction:
-            self.write_callback_message(
-                "Attempting to correct string literals in SQL query.", run_manager=run_manager, color="blue"
-            )
-            sql_cmd = self.database.correct_string_literals(sql_cmd)
-            self.write_callback_message(f"Result of correction: {sql_cmd}", run_manager=run_manager, color="green")
-
-        sql_complexity = self.database.complexity(sql_cmd)
-
-        return {self.output_key: strip_sql_comments(sql_cmd), self.output_complexity_key: str(sql_complexity)}
+        raise NotImplementedError("Sync call not supported for this chain type.")
 
     async def _acall(
         self,

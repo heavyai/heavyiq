@@ -42,7 +42,7 @@ class HeavyDBToolkit(BaseToolkit):
         - list[BaseTool]: A list of tools for interacting with the HeavyDB instance.
         """
         return [
-            RetrieveTableSchemasTool(db=self.db),
-            RetrieveRelevantSchemasTool(db=self.db),
-            QueryHeavyDBTool(db=self.db),
+            RetrieveTableSchemasTool(db=self.db),  # type: ignore
+            RetrieveRelevantSchemasTool(db=self.db),  # type: ignore
+            QueryHeavyDBTool(db=self.db),  # type: ignore
         ]

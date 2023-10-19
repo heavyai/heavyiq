@@ -1,7 +1,5 @@
 import os
-import sys
 
-sys.path.append("/Users/avinash/Heavy/heavynl")
 from aiofiles.os import listdir as alistdir
 import asyncio
 from fastapi.concurrency import run_in_threadpool
