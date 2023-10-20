@@ -13,7 +13,7 @@ from async_lru import alru_cache
 from starlette.concurrency import run_in_threadpool
 from heavyai import connect, Connection
 from heavyiq.config import get_config
-from heavyiq.utils import strip_sql_comments, is_destructive_sql, rate_sql_complexity, LRUCache
+from heavyiq.utils import strip_sql_comments, is_destructive_sql, rate_sql_complexity, calc_query_stats, LRUCache
 
 if TYPE_CHECKING:
     from heavydb._parsers import ColumnDetails
@@ -459,7 +459,7 @@ class HeavyDB:
         if is_destructive_sql(query):
             raise ValueError("Destructive SQL is not allowed")
         async with self.alock:
-            cursor = await run_in_threadpool(self._conn.execute, f"EXPLAIN plan {query}")
+            cursor = await run_in_threadpool(self._conn.execute, f"EXPLAIN PLAN {query}")
         result: tuple[str] = cursor.fetchone()  # type: ignore
         return str(result[0])
 
@@ -467,6 +467,11 @@ class HeavyDB:
         command = strip_sql_comments(command)
         plan = await self.aget_query_plan(command)
         return rate_sql_complexity(plan)
+
+    async def aquery_stats(self, command: str) -> dict[str, int]:
+        command = strip_sql_comments(command)
+        plan = await self.aget_calcite_query_plan(command, detailed=False)
+        return calc_query_stats(plan)
 
     async def avalidate_query(self, query: str) -> list:
         """Validate a query."""
@@ -532,9 +537,6 @@ class HeavyDB:
                 self.logger.debug(f"Got columns for table {table}")
                 return table_details
             except Exception as e:
-                import traceback
-
-                print(traceback.format_exc())
                 raise e
 
     async def aget_table_schema(self, table: str):
@@ -693,12 +695,13 @@ class HeavyDB:
             return str(result)
         return result  # type: ignore
 
-    async def aget_detailed_query_plan(self, query: str) -> str:
+    async def aget_calcite_query_plan(self, query: str, detailed: bool = False) -> str:
         query = strip_sql_comments(query)
         if is_destructive_sql(query):
             raise ValueError("Destructive SQL is not allowed")
+        sql_stmt = f"EXPLAIN CALCITE DETAILED {query}" if detailed else f"EXPLAIN CALCITE {query}"
         async with self.alock:
-            cursor = self._conn.execute(f"EXPLAIN CALCITE DETAILED {query}")
+            cursor = self._conn.execute(sql_stmt)
         query_plan: tuple[str] = cursor.fetchone()  # type: ignore
         return str(query_plan[0])
 
@@ -732,7 +735,7 @@ class HeavyDB:
         return result
 
     async def aget_string_literal_ops(self, query: str) -> list[StringLiteralOp]:
-        detailed_query_plan = await self.aget_detailed_query_plan(query)
+        detailed_query_plan = await self.aget_calcite_query_plan(query, detailed=True)
         col_mapping, str_literal_ops = await asyncio.gather(
             self.aextract_column_mappings(detailed_query_plan), self.aextract_string_literal_ops(detailed_query_plan)
         )
@@ -918,12 +921,13 @@ class HeavyDB:
         result: tuple[str] = cursor.fetchone()  # type: ignore
         return str(result[0])
 
-    def get_detailed_query_plan(self, query: str) -> str:
+    def get_calcite_query_plan(self, query: str, detailed: bool = False) -> str:
         query = strip_sql_comments(query)
         if is_destructive_sql(query):
             raise ValueError("Destructive SQL is not allowed")
+        sql_stmt = f"EXPLAIN CALCITE DETAILED {query}" if detailed else f"EXPLAIN CALCITE {query}"
         with self.lock:
-            cursor = self._conn.execute(f"EXPLAIN CALCITE DETAILED {query}")
+            cursor = self._conn.execute(sql_stmt)
         query_plan: tuple[str] = cursor.fetchone()  # type: ignore
         return str(query_plan[0])
 
@@ -957,7 +961,7 @@ class HeavyDB:
         return result
 
     def get_string_literal_ops(self, query: str) -> list[StringLiteralOp]:
-        detailed_query_plan = self.get_detailed_query_plan(query)
+        detailed_query_plan = self.get_calcite_query_plan(query, detailed=True)
         col_mapping = self.extract_column_mappings(detailed_query_plan)
         str_literal_ops = self.extract_string_literal_ops(detailed_query_plan)
         result: list[StringLiteralOp] = []
@@ -1082,6 +1086,11 @@ class HeavyDB:
         command = strip_sql_comments(command)
         plan = self.get_query_plan(command)
         return rate_sql_complexity(plan)
+
+    def query_stats(self, command: str) -> dict[str, Any]:
+        command = strip_sql_comments(command)
+        plan = self.get_calcite_query_plan(command, detailed=False)
+        return calc_query_stats(plan)
 
     def get_table_info_no_throw(self, table_names: Optional[list[str]] = None) -> str:
         """Get information about specified tables.

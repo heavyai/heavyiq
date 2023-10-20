@@ -24,7 +24,7 @@ def test_should_check_whether_custom_llm_used_or_not():
     "model_type, beam_width, method_kwargs, expected",
     [
         (LLMType.DEFAULT, 1, {"n": 1}, ({"n": 1}, {})),
-        (LLMType.NL_TO_SQL, 2, {"n": 2}, ({"n": 1, "best_of": 2}, {"use_beam_search": True})),
+        (LLMType.NL_TO_SQL, 2, {"n": 2}, ({"n": 1, "best_of": 2}, {"use_beam_search": True, "logprobs": 5})),
         (LLMType.SQL_TO_ANSWER, 2, {"n": 1}, ({"n": 1}, {})),
     ],
 )

@@ -11,7 +11,7 @@ from langchain.schema.language_model import BaseLanguageModel
 from langchain.schema import AIMessage, HumanMessage
 from langchain.prompts import HumanMessagePromptTemplate, SystemMessagePromptTemplate
 from langchain.prompts.chat import ChatPromptTemplate, BaseChatPromptTemplate
-from langchain.schema import BasePromptTemplate
+from langchain.schema import BasePromptTemplate, LLMResult
 from langchain.prompts.prompt import PromptTemplate
 from langchain.callbacks.manager import (
     AsyncCallbackManagerForChainRun,
@@ -134,6 +134,7 @@ class BaseNLtoSQLChain(BaseChain):
     input_key: str = "query"  #: :meta private:
     output_key: str = "sql"  #: :meta private:
     output_complexity_key: str = "sql_complexity"  #: :meta private:
+    output_logprobs_key: str = "logprobs"  #: :meta private:
     max_retries: int = 3
 
     class Config:
@@ -154,7 +155,18 @@ class BaseNLtoSQLChain(BaseChain):
         """Return the output keys.
         :meta private:
         """
-        return [self.output_key]
+        return [self.output_key, self.output_complexity_key, self.output_logprobs_key]
+
+    def get_sql_cmd_and_logprobs_from_llm_result(self, result: LLMResult) -> tuple[str, dict[str, Any]]:
+        """
+        Returns the generated sql and the lobprobs for each token.
+        """
+        first_generation = result.generations[0][0]  # type: ignore
+        sql_cmd = first_generation.text.strip()
+        if logprobs := first_generation.generation_info.get("logprobs", {}):
+            logprobs = logprobs.to_dict_recursive()
+
+        return sql_cmd, logprobs or {}
 
 
 class NLtoSQLChain(BaseNLtoSQLChain):
@@ -194,7 +206,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
         self,
         inputs: dict[str, Any],
         run_manager: Optional[AsyncCallbackManagerForChainRun] = None,
-    ) -> dict[str, str]:
+    ) -> dict[str, str | dict]:
         await self.write_callback_message_async(inputs[self.input_key], run_manager=run_manager)
 
         # If not present, then defaults to None which is all tables available to HeavyDB wrapper instance
@@ -208,7 +220,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
         response = await self.llm.agenerate_prompt(
             [gen_sql_prompt], callbacks=run_manager.get_child() if run_manager else None
         )
-        sql_cmd = response.generations[0][0].text.strip()  # type: ignore
+        sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
         verified = False
         retries = 0
 
@@ -256,7 +268,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                 response = await self.llm.agenerate_prompt(
                     [correct_error_prompt], callbacks=run_manager.get_child() if run_manager else None
                 )
-                sql_cmd = response.generations[0][0].text.strip()  # type: ignore
+                sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
 
         if not verified:
             await self.write_callback_message_async(
@@ -279,7 +291,11 @@ class NLtoSQLChain(BaseNLtoSQLChain):
 
         sql_complexity = await self.database.acomplexity(sql_cmd)
 
-        return {self.output_key: strip_sql_comments(sql_cmd), self.output_complexity_key: str(sql_complexity)}
+        return {
+            self.output_key: strip_sql_comments(sql_cmd),
+            self.output_complexity_key: str(sql_complexity),
+            self.output_logprobs_key: logprobs,
+        }
 
     @property
     def _chain_type(self) -> str:
@@ -308,65 +324,14 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
         self,
         inputs: dict[str, Any],
         run_manager: Optional[CallbackManagerForChainRun] = None,
-    ) -> dict[str, str]:
-        self.write_callback_message(inputs[self.input_key], run_manager=run_manager)
-
-        # If not present, then defaults to None which is all tables available to HeavyDB wrapper instance
-        table_names_to_use = inputs.get("tables")
-
-        partial_gen_sql_prompt = self.prompt.partial(input=inputs[self.input_key])
-        gen_sql_prompt = populate_table_info_wrt_token_limit(
-            partial_gen_sql_prompt, self.llm, self.database, table_names_to_use
-        )
-
-        messages = gen_sql_prompt.to_messages()
-        response = self.llm.generate([messages], callbacks=run_manager.get_child() if run_manager else None)
-        sql_cmd = self.get_sql_query(response.generations[0][0].text)
-        verified = False
-        retries = 0
-
-        while not verified:
-            try:
-                messages.append(AIMessage(content=sql_cmd))
-                self.write_callback_message(f"Verifying SQL Query: {sql_cmd}", run_manager=run_manager, color="blue")
-                self.database.validate_query(sql_cmd)
-                verified = True
-            except Exception as e:
-                retries += 1
-                if retries > self.max_retries:
-                    break
-                self.write_callback_message(f"Invalid SQL Query: {e}.", run_manager=run_manager, color="red")
-                truncated_error = str(e)[0:150] if len(str(e)) > 150 else str(e)
-                messages.append(HumanMessage(content=NL_TO_SQL_CHAT_ERROR_TEMPLATE.format(exception=truncated_error)))
-                response = self.llm.generate([messages], callbacks=run_manager.get_child() if run_manager else None)
-                sql_cmd = self.get_sql_query(response.generations[0][0].text)
-
-        if not verified:
-            self.write_callback_message(
-                f"Failed to verify SQL query after {self.max_retries} retries.", run_manager=run_manager, color="red"
-            )
-            raise NLtoSQLException(
-                f"Language model failed to generate a valid SQL query after {self.max_retries} tries.", sql_cmd
-            )
-
-        self.write_callback_message(sql_cmd, run_manager=run_manager, color="green")
-
-        if get_config().enable_str_literal_correction:
-            self.write_callback_message(
-                "Attempting to correct string literals in SQL query.", run_manager=run_manager, color="blue"
-            )
-            sql_cmd = self.database.correct_string_literals(sql_cmd)
-            self.write_callback_message(f"Result of correction: {sql_cmd}", run_manager=run_manager, color="green")
-
-        sql_complexity = self.database.complexity(sql_cmd)
-
-        return {self.output_key: strip_sql_comments(sql_cmd), self.output_complexity_key: str(sql_complexity)}
+    ) -> dict[str, str | dict]:
+        raise NotImplementedError("Sync call not supported for this chain type.")
 
     async def _acall(
         self,
         inputs: dict[str, Any],
         run_manager: Optional[AsyncCallbackManagerForChainRun] = None,
-    ) -> dict[str, str]:
+    ) -> dict[str, str | dict]:
         await self.write_callback_message_async(inputs[self.input_key], run_manager=run_manager)
 
         # If not present, then defaults to None which is all tables available to HeavyDB wrapper instance
@@ -379,7 +344,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
 
         messages = gen_sql_prompt.to_messages()
         response = await self.llm.agenerate([messages], callbacks=run_manager.get_child() if run_manager else None)
-        sql_cmd = self.get_sql_query(response.generations[0][0].text)
+        sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
         verified = False
         retries = 0
 
@@ -403,7 +368,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
                 response = await self.llm.agenerate(
                     [messages], callbacks=run_manager.get_child() if run_manager else None
                 )
-                sql_cmd = self.get_sql_query(response.generations[0][0].text)  # type: ignore
+                sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
 
         if not verified:
             await self.write_callback_message_async(
@@ -426,7 +391,11 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
 
         sql_complexity = await self.database.acomplexity(sql_cmd)
 
-        return {self.output_key: strip_sql_comments(sql_cmd), self.output_complexity_key: str(sql_complexity)}
+        return {
+            self.output_key: strip_sql_comments(sql_cmd),
+            self.output_complexity_key: str(sql_complexity),
+            self.output_logprobs_key: logprobs,
+        }
 
     @property
     def _chain_type(self) -> str:

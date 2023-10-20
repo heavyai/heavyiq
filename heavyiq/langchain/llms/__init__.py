@@ -33,6 +33,8 @@ def get_vllm_model_name(api_base: str) -> str:
 def get_vllm_model_kwargs(model_type: LLMType, **kwargs) -> tuple[dict[str, Any], dict[str, Any]]:
     config = get_config()
     model_kwargs: dict[str, Any] = {}
+    if config.enable_logprobs and model_type == LLMType.NL_TO_SQL:
+        model_kwargs["logprobs"] = config.custom_llm_logprobs_limit
     if config.custom_llm_api_vllm_beam_width >= 2 and model_type == LLMType.NL_TO_SQL:
         model_kwargs["use_beam_search"] = True
         kwargs["best_of"] = config.custom_llm_api_vllm_beam_width

@@ -73,6 +73,24 @@ def rate_sql_complexity(plan: str) -> int:
     return complexity
 
 
+def calc_query_stats(plan: str) -> dict[str, int]:
+    sql_features = {
+        "joins": ["LogicalJoin", "RelLeftDeepInnerJoin"],
+        "unions": ["LogicalUnion"],
+        "aggs": ["LogicalAggregate"],
+        "filters": ["LogicalFilter"],
+        "sorts": ["LogicalSort"],
+    }
+
+    query_stats = {}
+    for sql_feature, search_patterns in sql_features.items():
+        num_features_found = 0
+        for search_pattern in search_patterns:
+            num_features_found += plan.count(search_pattern)
+        query_stats[sql_feature] = num_features_found
+    return query_stats
+
+
 KT = TypeVar("KT")  # Key type
 VT = TypeVar("VT")  # Value type
 
