@@ -16,12 +16,13 @@ def chroma(request: pytest.FixtureRequest) -> Chroma:
     """
     Fixture supposed to create and return log file path corresponding to the test name.
     """
-    doc = Document(page_content="foo", metadata={"page": "0"})
+    doc_a = Document(page_content="This is a table regarding movie_actress.", metadata={"source": "movie_actress"})
+    doc_b = Document(page_content="This is a table regarding flights.", metadata={"source": "flights"})
     return Chroma.from_documents(
         collection_name="test_collection",
-        documents=[doc],
+        documents=[doc_a, doc_b],
         embedding=ConsistentFakeEmbeddings(),
-        ids=["doc1"],
+        ids=["doc_a", "doc_b"],
     )
 
 

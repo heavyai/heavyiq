@@ -16,8 +16,8 @@ class FakeChatOpenAI(ChatOpenAI):
     Uses: Mainly used to test NLtoSQL chain.
     """
 
-    generation_info = {"finish_reason": "stop"}
-    content = "Question: What is the total population in the USA according to the data in the usa_states table?\n\nSQLQuery: \nSELECT SUM(POPULATION) AS total_population\nFROM usa_states"
+    generation_info: dict = {"finish_reason": "stop"}
+    content: str = "Question: What is the total population in the USA according to the data in the usa_states table?\n\nSQLQuery: \nSELECT SUM(POPULATION) AS total_population\nFROM usa_states"
 
     @property
     def _llm_type(self) -> str:
