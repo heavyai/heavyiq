@@ -70,8 +70,12 @@ async def acreate_index_if_nonexistent() -> HeavyDBMetadataIndex:
         logger.debug("Splitting documents...")
         sub_docs = index_creator.text_splitter.split_documents(docs)
         logger.debug(f"Indexing documents with {huggingface_model_name}...")
-        vectorstore = index_creator.vectorstore_cls.from_documents(
-            sub_docs, index_creator.embedding, **index_creator.vectorstore_kwargs
+        # there is no async version of chroma.from_documents method. so wrap it in run_in_threadpool.
+        vectorstore = await run_in_threadpool(
+            index_creator.vectorstore_cls.from_documents,
+            sub_docs,
+            index_creator.embedding,
+            **index_creator.vectorstore_kwargs,
         )
         logger.debug("Done")
 
