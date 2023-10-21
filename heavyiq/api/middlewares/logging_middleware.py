@@ -1,12 +1,10 @@
 from pydantic import BaseModel
 from typing import Literal, Any
-from fastapi.concurrency import run_in_threadpool
 from starlette.requests import Request
 from starlette.responses import Response
 from starlette.background import BackgroundTask
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from heavyiq.logging_utils import _get_access_logger, get_heavyiq_logger, HeavyIQLogger, _AccessLogger
-from starlette.types import ASGIApp, Scope, Receive, Send, Message
 
 
 class Log(BaseModel):
@@ -59,7 +57,7 @@ class AsyncLoggingMiddleware(BaseHTTPMiddleware):
         request_id = request.headers.get("x-request-id", "")
 
         with heavyiq_logger.logger.contextualize(request_id=request_id), app_logger.logger.contextualize(
-            request_id=request_id
+            request_id=request_id  # type: ignore
         ):
             if is_api_request:
                 logs.append(

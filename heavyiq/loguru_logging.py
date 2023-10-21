@@ -45,7 +45,9 @@ def serialize(record: dict) -> dict:
 
     if response and isinstance(response, Response):
         response_dict["status_code"] = response.status_code or "-"
-        response_dict["response_size"] = response.headers["Content-Length"] if response else "-"
+        response_dict["response_size"] = (
+            response.headers["Content-Length"] if response and "Content-Length" in response.headers else "-"
+        )
         request_id = request.headers.get("x-request-id")
 
     request_id = request_id or "-"
