@@ -523,6 +523,6 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
 
 def get_nl_to_sql_chain_by_llm(llm: BaseLanguageModel) -> type[BaseNLtoSQLChain]:
     """
-    Gets the appropriate nt_to_sql chain class based upon the llm passed.
+    Gets the appropriate nl_to_sql chain class based upon the llm passed.
     """
     return NLtoSQLChatChain if isinstance(llm, BaseChatModel) else NLtoSQLChain  # type: ignore
