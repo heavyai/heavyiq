@@ -1,9 +1,4 @@
 from fastapi.concurrency import run_in_threadpool
-import asyncio
-from collections.abc import AsyncIterable, Awaitable
-
-from langchain.prompts.prompt import PromptTemplate
-from langchain.callbacks import AsyncIteratorCallbackHandler
 from langsmith import Client
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -159,31 +154,3 @@ async def handle_ask_heavyai_docs_async(request: AskHeavyAIDocsRequest) -> AskHe
         sources=[source.strip() for source in res[chain.sources_answer_key].split(",")],
         feedback_id=feedback_id,
     )
-
-
-async def streaming_test(message: str) -> AsyncIterable[str]:
-    callback = AsyncIteratorCallbackHandler()
-    llm = get_llm_by_type(LLMType.SQL_TO_ANSWER, temperature=0.0, streaming=True, callbacks=[callback])
-
-    async def wrap_done(fn: Awaitable, event: asyncio.Event):
-        """Wrap an awaitable with a event to signal when it's done or an exception is raised."""
-        try:
-            await fn
-        except Exception as e:
-            # TODO: handle exception
-            print(f"Caught exception: {e}")
-        finally:
-            # Signal the aiter to stop.
-            event.set()
-
-    prompt = PromptTemplate.from_template(message)
-
-    # Begin a task that runs in the background.
-    task = asyncio.create_task(
-        wrap_done(llm.agenerate_prompt([prompt.format_prompt()]), callback.done),
-    )
-
-    async for token in callback.aiter():
-        yield f"event: next_token\ndata: {token}\n\n"
-
-    await task

@@ -1,7 +1,4 @@
-from fastapi import APIRouter, Depends, Response
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-
+from fastapi import APIRouter, Depends
 from heavyiq.langchain import HeavyDB
 from heavyiq.api.dependencies import (
     valid_query_db_session,
@@ -26,7 +23,6 @@ from heavyiq.api.handlers import (
     handle_submit_feedback_request_async,
     handle_generate_table_metadata_async,
     handle_ask_heavyai_docs_async,
-    streaming_test,
 )
 from heavyiq.api.routes.log_route import LoggingRoute
 
@@ -81,16 +77,3 @@ async def generate_table_metadata(
 @iqrouter.post("/ask-heavyai-docs", response_model=AskHeavyAIDocsResponse)
 async def ask_heavyai_docs(value: AskHeavyAIDocsRequest) -> AskHeavyAIDocsResponse:
     return await handle_ask_heavyai_docs_async(value)
-
-
-class TestRequest(BaseModel):
-    message: str
-
-
-@iqrouter.post("/streaming-test", response_class=Response)
-def streaming_test_endpoint(value: TestRequest) -> StreamingResponse:
-    response = StreamingResponse(streaming_test(value.message), media_type="text/event-stream")
-    response.headers["Content-Type"] = "text/event-stream"
-    response.headers["Cache-Control"] = "no-cache"
-    response.headers["Connection"] = "keep-alive"
-    return response
