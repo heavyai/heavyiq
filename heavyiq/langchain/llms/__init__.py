@@ -30,8 +30,9 @@ def get_vllm_model_name(api_base: str) -> str:
 
 
 @lru_cache
-def get_vllm_model_kwargs(model_type: LLMType, **kwargs) -> tuple[dict[str, Any], dict[str, Any]]:
+def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str, Any]]:
     config = get_config()
+    kwargs: dict[str, Any] = {}
     model_kwargs: dict[str, Any] = {}
     if config.enable_logprobs and model_type == LLMType.NL_TO_SQL:
         model_kwargs["logprobs"] = config.custom_llm_logprobs_limit
@@ -91,7 +92,12 @@ def _get_custom_api_vllm_llm(model_type: LLMType, api_base: str, context_window:
     """
     Return the corresponding LLM class for the custom llm type API_VLLM.(ie. VLLM)
     """
-    kwargs, model_kwargs = get_vllm_model_kwargs(model_type, **kwargs)
+    # always pass immutable kwargs to the function decorated by lru_cache or otherwise you'll end up in
+    # unhashable type list (ie. mutable) when passing a mutable object.
+    vllm_kwargs, model_kwargs = get_vllm_model_kwargs(model_type)
+    if kwargs.get("streaming", False):
+        vllm_kwargs["best_of"] = 1
+        model_kwargs["use_beam_search"] = False
     model_name = get_vllm_model_name(api_base)
     return OverrideVLLMOpenAI(
         openai_api_key="nothing",
@@ -100,6 +106,7 @@ def _get_custom_api_vllm_llm(model_type: LLMType, api_base: str, context_window:
         model_kwargs=model_kwargs,
         context_window=context_window,
         **kwargs,
+        **vllm_kwargs,
     )
 
 

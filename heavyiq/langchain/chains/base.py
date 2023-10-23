@@ -1,7 +1,8 @@
 from langchain.chains.base import Chain
-from langchain.callbacks.manager import CallbackManagerForChainRun, AsyncCallbackManagerForChainRun
+from langchain.callbacks.manager import CallbackManagerForChainRun, AsyncCallbackManagerForChainRun, _ahandle_event
 from heavyiq.logging_utils import get_heavyiq_logger
 from heavyiq.config import get_config
+from langchain.callbacks import AsyncIteratorCallbackHandler
 
 
 class FileCallbackHandlerForChainMixin:
@@ -37,4 +38,38 @@ class BaseChain(FileCallbackHandlerForChainMixin, Chain):
         self, message: str, run_manager: AsyncCallbackManagerForChainRun | None = None, color: str | None = None
     ) -> None:
         if run_manager:
-            await run_manager.on_text(message, color=color, verbose=self.verbose)
+            non_stream_handlers = [
+                handler for handler in run_manager.handlers if not isinstance(handler, AsyncIteratorCallbackHandler)
+            ]
+            await _ahandle_event(
+                non_stream_handlers,  # type: ignore
+                "on_text",
+                None,
+                message,
+                run_id=run_manager.run_id,
+                parent_run_id=run_manager.parent_run_id,
+                tags=run_manager.tags,
+                verbose=self.verbose,
+            )
+
+    async def stream_callback_message(
+        self, message: str, run_manager: AsyncCallbackManagerForChainRun | None = None, event_type: str = "step"
+    ) -> None:
+        """
+        Put message for streaming.
+        """
+        if run_manager:
+            stream_handlers = [
+                handler for handler in run_manager.handlers if isinstance(handler, AsyncIteratorCallbackHandler)
+            ]
+            await _ahandle_event(
+                stream_handlers,  # type: ignore
+                "on_text",
+                None,
+                message,
+                run_id=run_manager.run_id,
+                parent_run_id=run_manager.parent_run_id,
+                tags=run_manager.tags,
+                event_type=event_type,
+                verbose=self.verbose,
+            )

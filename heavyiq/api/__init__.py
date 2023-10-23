@@ -13,7 +13,7 @@ from heavyiq.api.models.error import ErrorResponse
 from heavyiq.langchain.exceptions import NLtoSQLException
 from heavyiq.logging_utils import init_logs
 from heavyiq.langchain.utils import init_telemetrics
-from heavyiq.api.routes import defaultrouter, iqrouter
+from heavyiq.api.routes import defaultrouter, iqrouter, streamrouter
 from heavyiq.api.handlers import exception_handler as exh
 
 
@@ -72,6 +72,17 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         iqrouter,
         prefix="/api/v1",
         tags=["api.v1"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "model": ErrorResponse,
+            }
+        },
+    )
+    app.include_router(
+        streamrouter,
+        prefix="/api/stream/v1",
+        tags=["api.stream.v1"],
         responses={
             500: {
                 "description": "Internal Server Error",

@@ -1,4 +1,6 @@
+import asyncio
 from typing import Any, Iterable, Iterator
+from collections.abc import Awaitable
 
 
 class AsyncIteratorWrapper:
@@ -22,3 +24,16 @@ class AsyncIteratorWrapper:
         except StopIteration:
             raise StopAsyncIteration
         return value
+
+
+async def wrap_done(fn: Awaitable, event: asyncio.Event):
+    """Wrap an awaitable with a event to signal when it's done or an exception is raised."""
+    try:
+        return await fn
+    except Exception as e:
+        # TODO: handle exception
+        print(f"Caught exception: {e}")
+        raise e
+    finally:
+        # Signal the aiter to stop.
+        event.set()
