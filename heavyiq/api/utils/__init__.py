@@ -1,6 +1,10 @@
+import re
 import asyncio
-from typing import Any, Iterable, Iterator
+import json
+from typing import Any, Iterable, Iterator, Callable
 from collections.abc import Awaitable
+from fastapi.responses import StreamingResponse
+from starlette.types import Receive, Scope, Send
 
 
 class AsyncIteratorWrapper:
@@ -37,3 +41,38 @@ async def wrap_done(fn: Awaitable, event: asyncio.Event):
     finally:
         # Signal the aiter to stop.
         event.set()
+
+
+class NDJsonStreamingResponse(StreamingResponse):
+    """
+    This converts the text events received into newline delimited json
+    and then streams ndjson string as response.
+    """
+
+    media_type = "application/x-ndjson"
+    PARSE_CHUNK_RGX = re.compile(r"(?s)event: (.*?)\ndata: (.*?)\n\n")
+
+    async def _chunk_to_json(self, chunk: str) -> str:
+        """
+        Convert the text chunk to nd json chunk.
+        "event: event_name\ndata: message\n\n" -> {"event": "event_name", "data": "message"}\n
+        """
+        match = self.PARSE_CHUNK_RGX.search(chunk)
+        assert match
+        return json.dumps({"event": match.group(1), "data": match.group(2)}) + "\n"
+
+    async def stream_response(self, send: Send) -> None:
+        await send(
+            {
+                "type": "http.response.start",
+                "status": self.status_code,
+                "headers": self.raw_headers,
+            }
+        )
+        async for chunk in self.body_iterator:
+            if isinstance(chunk, str):
+                json_chunk = await self._chunk_to_json(chunk)
+                chunk = json_chunk.encode(self.charset)
+            await send({"type": "http.response.body", "body": chunk, "more_body": True})
+
+        await send({"type": "http.response.body", "body": b"", "more_body": False})

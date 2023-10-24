@@ -88,7 +88,7 @@ def _get_custom_api_llm(model_type: LLMType, api_base: str, context_window: int,
     )
 
 
-def _get_custom_api_vllm_llm(model_type: LLMType, api_base: str, context_window: int, **kwargs):
+def _get_custom_api_vllm_llm(model_type: LLMType, api_base: str, context_window: int, **kwargs) -> OverrideVLLMOpenAI:
     """
     Return the corresponding LLM class for the custom llm type API_VLLM.(ie. VLLM)
     """
