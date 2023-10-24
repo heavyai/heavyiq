@@ -1,14 +1,10 @@
 from starlette.responses import AsyncContentStream
 from fastapi import APIRouter, Depends, Response
 from heavyiq.langchain import HeavyDB
-from heavyiq.api.dependencies import (
-    valid_query_db_session,
-)
-from heavyiq.api.models import QueryRequest
+from heavyiq.api.dependencies import valid_query_db_session, valid_question_db_session
+from heavyiq.api.models import QueryRequest, QuestionRequest
 from fastapi.responses import StreamingResponse
-from heavyiq.api.handlers import (
-    streaming_query,
-)
+from heavyiq.api.handlers import streaming_query, streaming_question
 from heavyiq.api.utils import NDJsonStreamingResponse
 
 streamrouter = APIRouter()
@@ -49,6 +45,20 @@ async def streaming_query_with_token_endpoint(
     values: tuple[QueryRequest, HeavyDB] = Depends(valid_query_db_session)
 ) -> StreamingResponse:
     return await text_stream(streaming_query(*values, stream_llm_tokens=True))
+
+
+@streamrouter.post("/question", response_class=Response)
+async def streaming_question_endpoint(
+    values: tuple[QuestionRequest, HeavyDB] = Depends(valid_question_db_session)
+) -> StreamingResponse:
+    return await ndjson_stream(streaming_question(*values, stream_llm_tokens=False))
+
+
+@stream_token_router.post("/question", response_class=Response)
+async def streaming_question_with_token_endpoint(
+    values: tuple[QuestionRequest, HeavyDB] = Depends(valid_question_db_session)
+) -> StreamingResponse:
+    return await text_stream(streaming_question(*values, stream_llm_tokens=True))
 
 
 streamrouter.include_router(stream_token_router, prefix="/token")

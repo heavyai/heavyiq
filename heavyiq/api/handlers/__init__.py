@@ -5,4 +5,4 @@ from .iq_handler import (
     handle_generate_table_metadata_async,
     handle_ask_heavyai_docs_async,
 )
-from .iq_stream_handler import streaming_query
+from .iq_stream_handler import streaming_query, streaming_question

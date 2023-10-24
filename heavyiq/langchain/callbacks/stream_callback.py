@@ -2,6 +2,14 @@ from typing import Any
 from uuid import UUID
 from langchain.schema.output import LLMResult
 from langchain.callbacks import AsyncIteratorCallbackHandler
+from enum import Enum, auto
+
+
+class StreamEvent(Enum):
+    step = auto()
+    next_token = auto()
+    error = auto()
+    output = auto()
 
 
 class StreamingChainCallbackHandler(AsyncIteratorCallbackHandler):
@@ -46,14 +54,14 @@ class StreamingChainCallbackHandler(AsyncIteratorCallbackHandler):
         run_id: UUID,
         parent_run_id: UUID | None = None,
         tags: list[str] | None = None,
-        event_type: str = "step",
+        event_type: StreamEvent = StreamEvent.step,
         **kwargs: Any
     ) -> None:
-        self.queue.put_nowait({"type": event_type, "text": text})  # type: ignore
+        self.queue.put_nowait({"type": event_type.name, "text": text})  # type: ignore
 
     async def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
         if token is not None and token != "":
-            self.queue.put_nowait({"type": "next_token", "text": token})  # type: ignore
+            self.queue.put_nowait({"type": StreamEvent.next_token.name, "text": token})  # type: ignore
 
     async def on_chain_end(
         self,

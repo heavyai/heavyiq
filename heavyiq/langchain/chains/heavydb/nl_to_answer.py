@@ -16,6 +16,8 @@ from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.llms import is_using_custom_trained_llm
 from .nl_to_sql import BaseNLtoSQLChain, get_nl_to_sql_chain_by_llm
+from heavyiq.langchain.callbacks.stream_callback import StreamEvent
+
 
 ANSWER_TEMPLATE = """Given an input question, first create a syntactically correct SQL query to run, then look at the results of the query and return the answer.
 Use the following format:
@@ -180,6 +182,9 @@ class NLtoAnswerChain(BaseChain):
         run_manager: Optional[AsyncCallbackManagerForChainRun] = None,
     ) -> dict[str, str]:
         table_names_to_use = inputs.get("tables")
+        await self.stream_callback_message(
+            "Finding the relevant SQL query for the asked question...", run_manager=run_manager
+        )
         nl_sql_inputs = {
             self.nl_sql_chain.input_key: inputs[self.input_key],
             "tables": table_names_to_use,
@@ -187,17 +192,22 @@ class NLtoAnswerChain(BaseChain):
         nl_sql_results = await self.nl_sql_chain.acall(
             nl_sql_inputs, callbacks=run_manager.get_child() if run_manager else None
         )
+        await self.stream_callback_message("Found the associated SQL query...", run_manager=run_manager)
         sql_cmd = nl_sql_results[self.nl_sql_chain.output_key]
         await self.write_callback_message_async(sql_cmd, run_manager=run_manager, color="green")
 
+        await self.stream_callback_message("Running SQL query against HeavyDB...", run_manager=run_manager)
         sql_result = await self.database.arun(sql_cmd, to_str=False)
         pass_result_to_llm = self._should_forward_result_to_llm(sql_result)  # type: ignore
         sql_result = str(sql_result)
+        await self.stream_callback_message("SQL query result generated successfully.", run_manager=run_manager)
 
-        await self.write_callback_message_async("\nSQLResult: ", run_manager=run_manager, color="yellow")
-        await self.write_callback_message_async(sql_result, run_manager=run_manager, color="yellow")
+        await self.write_callback_message_async(f"\nSQLResult: \n{sql_result}", run_manager=run_manager, color="yellow")
 
         if pass_result_to_llm:
+            await self.stream_callback_message(
+                "Passing SQL query result to NL-to-Answer LLM...", run_manager=run_manager
+            )
             gen_answer_prompt = self.prompt.format_prompt(
                 input=inputs[self.input_key],
                 sql_cmd=sql_cmd,
@@ -207,6 +217,7 @@ class NLtoAnswerChain(BaseChain):
                 [gen_answer_prompt], callbacks=run_manager.get_child() if run_manager else None
             )
             answer, fail_reason = response.generations[0][0].text.strip(), ""  # type: ignore
+            await self.stream_callback_message("Answer generated successfully.", run_manager=run_manager)
             await self.write_callback_message_async(f"\nAnswer:\n{answer}", run_manager=run_manager, color="green")
         else:
             answer, fail_reason = "", self.output_fail_reasons["max_size_reached"]
@@ -214,6 +225,9 @@ class NLtoAnswerChain(BaseChain):
                 f"\nFailed to generate answer: {fail_reason}\nAnswer:\n{answer}",
                 run_manager=run_manager,
                 color="yellow",
+            )
+            await self.stream_callback_message(
+                f"Failed to generate answer: {fail_reason}", event_type=StreamEvent.error, run_manager=run_manager
             )
 
         return {

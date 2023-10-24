@@ -25,6 +25,8 @@ from heavyiq.langchain.chains import BaseChain
 from heavyiq.langchain.utils import populate_table_info_wrt_token_limit, apopulate_table_info_wrt_token_limit
 from heavyiq.langchain.exceptions import NLtoSQLException
 from heavyiq.utils import strip_sql_comments
+from heavyiq.langchain.callbacks.stream_callback import StreamEvent
+
 
 NL_TO_SQL_TEMPLATE = """Create a syntactically correct SQL query to answer the input question.
 Only query relevant columns, avoiding SELECT * for any table.
@@ -463,6 +465,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
         run_manager: Optional[AsyncCallbackManagerForChainRun] = None,
     ) -> dict[str, str | dict]:
         await self.write_callback_message_async(inputs[self.input_key], run_manager=run_manager)
+        await self.stream_callback_message("Generating LLM prompt...", run_manager=run_manager)
 
         # If not present, then defaults to None which is all tables available to HeavyDB wrapper instance
         table_names_to_use = inputs.get("tables")
@@ -471,50 +474,61 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
         gen_sql_prompt = await apopulate_table_info_wrt_token_limit(
             partial_gen_sql_prompt, self.llm, self.database, table_names_to_use
         )
+        await self.stream_callback_message("LLM prompt generated successfully!", run_manager=run_manager)
 
+        await self.stream_callback_message("Generating SQL query...", run_manager=run_manager)
         messages = gen_sql_prompt.to_messages()
         response = await self.llm.agenerate([messages], callbacks=run_manager.get_child() if run_manager else None)
+        await self.stream_callback_message("SQL query generated successfully!", run_manager=run_manager)
+
         sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
         verified = False
         retries = 0
 
         while not verified:
             try:
-                messages.append(AIMessage(content=sql_cmd))
+                await self.stream_callback_message("Verifying generated SQL query...", run_manager=run_manager)
                 await self.write_callback_message_async(
                     f"Verifying SQL Query: {sql_cmd}", run_manager=run_manager, color="blue"
                 )
+                messages.append(AIMessage(content=sql_cmd))
                 await self.database.avalidate_query(sql_cmd)
                 verified = True
+                await self.stream_callback_message("SQL query verified successfulyy!", run_manager=run_manager)
             except Exception as e:
+                await self.stream_callback_message("Invalid SQL query, retrying...", run_manager=run_manager)
                 retries += 1
                 if retries > self.max_retries:
                     break
                 await self.write_callback_message_async(
                     f"Invalid SQL Query: {e}.", run_manager=run_manager, color="red"
                 )
+                await self.stream_callback_message("Regenerating SQL query...", run_manager=run_manager)
                 truncated_error = str(e)[0:150] if len(str(e)) > 150 else str(e)
                 messages.append(HumanMessage(content=NL_TO_SQL_CHAT_ERROR_TEMPLATE.format(exception=truncated_error)))
                 response = await self.llm.agenerate(
                     [messages], callbacks=run_manager.get_child() if run_manager else None
                 )
                 sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
+                await self.stream_callback_message("SQL query re-generated successfully!", run_manager=run_manager)
 
         if not verified:
-            await self.write_callback_message_async(
-                f"Failed to verify SQL query after {self.max_retries} retries.", run_manager=run_manager, color="red"
-            )
-            raise NLtoSQLException(
-                f"Language model failed to generate a valid SQL query after {self.max_retries} tries.", sql_cmd
-            )
+            error_message = f"Language model failed to generate a valid SQL query after {self.max_retries} tries."
+            await self.stream_callback_message(error_message, run_manager=run_manager, event_type=StreamEvent.error)
+            await self.write_callback_message_async(error_message, run_manager=run_manager, color="red")
+            raise NLtoSQLException(error_message, sql_cmd)
 
         await self.write_callback_message_async(sql_cmd, run_manager=run_manager, color="green")
 
         if get_config().enable_str_literal_correction:
+            await self.stream_callback_message(
+                "Attempting to correct string literals in SQL query...", run_manager=run_manager
+            )
             await self.write_callback_message_async(
                 "Attempting to correct string literals in SQL query.", run_manager=run_manager, color="blue"
             )
             sql_cmd = await self.database.acorrect_string_literals(sql_cmd)
+            await self.stream_callback_message("Corrected string literals in SQL query.", run_manager=run_manager)
             await self.write_callback_message_async(
                 f"Result of correction: {sql_cmd}", run_manager=run_manager, color="green"
             )

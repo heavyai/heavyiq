@@ -3,6 +3,7 @@ from langchain.callbacks.manager import CallbackManagerForChainRun, AsyncCallbac
 from heavyiq.logging_utils import get_heavyiq_logger
 from heavyiq.config import get_config
 from langchain.callbacks import AsyncIteratorCallbackHandler
+from heavyiq.langchain.callbacks.stream_callback import StreamEvent
 
 
 class FileCallbackHandlerForChainMixin:
@@ -53,7 +54,10 @@ class BaseChain(FileCallbackHandlerForChainMixin, Chain):
             )
 
     async def stream_callback_message(
-        self, message: str, run_manager: AsyncCallbackManagerForChainRun | None = None, event_type: str = "step"
+        self,
+        message: str,
+        run_manager: AsyncCallbackManagerForChainRun | None = None,
+        event_type: StreamEvent = StreamEvent.step,
     ) -> None:
         """
         Put message for streaming.
