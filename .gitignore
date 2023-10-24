@@ -21,6 +21,7 @@ db/
 langchain_call_log.db
 
 config.toml
+config.test.toml
 .chroma/
 
 eval/results/*.csv

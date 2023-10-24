@@ -14,6 +14,7 @@ pip install -r requirements-dev.txt
 pyarmor reg pyarmor-regfile-5130.zip
 pyarmor gen ./heavyiq
 cp requirements-lockfile.txt ./dist/requirements.txt
+cp requirements-linux.txt ./dist/requirements-linux.txt
 rm requirements-lockfile.txt
 cp -r heavyiq/langchain/llama_model/ ./dist/heavyiq/langchain/llama_model/
 

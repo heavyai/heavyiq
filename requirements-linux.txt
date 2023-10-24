@@ -1,0 +1,2 @@
+# Linux-specific dependencies
+pysqlite3-binary==0.5.2
