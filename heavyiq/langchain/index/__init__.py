@@ -1,1 +1,1 @@
-from .heavydb import get_heavydb_index, HeavyDBMetadataIndex
+from .heavydb import aget_heavydb_index, HeavyDBMetadataIndex

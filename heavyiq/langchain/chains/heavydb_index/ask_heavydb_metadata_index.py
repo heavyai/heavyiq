@@ -130,21 +130,10 @@ class AskHeavyDBMetadataIndexChain(FileCallbackHandlerForChainMixin, RetrievalQA
         inputs: dict[str, Any],
         run_manager: Optional[CallbackManagerForChainRun] = None,
     ) -> dict[str, Any]:
-        _run_manager = run_manager or CallbackManagerForChainRun.get_noop_manager()
-        docs = self._get_docs(inputs, run_manager=_run_manager)
-        answer = self.combine_documents_chain.run(input_documents=docs, **inputs)
-        if re.search(r"SOURCES:\s", answer):
-            answer, tables = re.split(r"SOURCES:\s", answer)
-        else:
-            tables = ""
-        result: dict[str, Any] = {
-            self.answer_key: answer.strip(),
-            self.tables_answer_key: [tn.strip() for tn in tables.split(",")],
-        }
-        if self.return_source_documents:
-            result["source_documents"] = docs
-        # TODO?: fallback options if no results (rephrase / simple search)
-        return result
+        """
+        Synchronously execute the chain.
+        """
+        raise NotImplementedError("Sync call not supported for this chain type.")
 
     async def _acall(
         self, inputs: dict[str, Any], run_manager: Optional[AsyncCallbackManagerForChainRun] = None

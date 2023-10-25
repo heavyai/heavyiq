@@ -96,32 +96,10 @@ class GenerateTableMetadataChain(BaseChain):
         inputs: dict[str, Any],
         run_manager: Optional[CallbackManagerForChainRun] = None,
     ) -> dict[str, str]:
-        table_name = inputs[self.input_key]
-        self.write_callback_message(f"Generating table metadata prompt for {table_name}")
-
-        columns = self.database.get_table_columns(table_name)
-        output_parser = self.create_output_parser(columns)
-        gen_metadata_partial_prompt = self.prompt.partial(format_instructions=output_parser.get_format_instructions())
-        gen_metadata_prompt = populate_table_info_wrt_token_limit(
-            gen_metadata_partial_prompt, self.llm, self.database, [table_name]
-        )
-
-        self.write_callback_message("Calling LLM")
-        response = self.llm.generate_prompt(
-            [gen_metadata_prompt], callbacks=run_manager.get_child() if run_manager else None
-        )
-        try:
-            self.write_callback_message("Parsing LLM response")
-            parsed_response = output_parser.parse(self.clean_llm_response(response))
-        except Exception as e:
-            self.write_callback_message(f"Error parsing LLM response: {e}", color="red")
-            raise GenerateTableMetadataException("Language model returned unparseable response. Please try again.")
-
-        output = {self.output_summary_key: parsed_response["description"], self.output_columns_key: {}}
-        for column in columns:
-            output[self.output_columns_key][column.name] = parsed_response[column.name]
-
-        return output
+        """
+        Synchronously execute the chain.
+        """
+        raise NotImplementedError("Sync call not supported for this chain type.")
 
     async def _acall(
         self,

@@ -15,7 +15,7 @@ class FileCallbackHandlerForChainMixin:
         callbacks = kwargs.get("callbacks", None)
         # add langchain_cb_handler handler if callbacks are not specified
         if callbacks is None:
-            kwargs["callbacks"] = [logger.langchain_cb_handler(to_stdout=config.log_to_stdout)]
+            kwargs["callbacks"] = [logger.async_langchain_cb_handler(to_stdout=config.log_to_stdout)]
         super().__init__(*args, **kwargs)  # type: ignore
 
 

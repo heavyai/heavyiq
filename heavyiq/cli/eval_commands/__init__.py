@@ -2,6 +2,7 @@ from uuid import uuid4
 import os
 import asyncio
 import aiofiles
+from aiofiles.ospath import exists as aexists
 from aiocsv.readers import AsyncReader
 from langchain.llms.base import BaseLLM
 from langchain.chat_models.base import BaseChatModel
@@ -58,7 +59,7 @@ async def process_eval_row(
     async with semaphore:
         tables = [table.strip("'") for table in str(tables).split(",")]
         logger.info(f"Processing Question: {question}")
-        db = await run_in_threadpool(HeavyDB.from_env, db_name=db_id, include_tables=tables)
+        db = await HeavyDB.from_env_async(db_name=db_id, include_tables=tables)
         chain = get_nl_to_sql_chain_by_llm(llm)(
             database=db, llm=llm, callbacks=None if verbose else [], verbose=verbose, tags=[eval_str, "cli"]
         )
@@ -138,7 +139,7 @@ async def run_config_model_on_questions(
 
     logger = get_heavyiq_logger()
 
-    if not await run_in_threadpool(os.path.exists, eval_dataset_csv):
+    if not await aexists(eval_dataset_csv):
         raise Exception(f"eval_dataset_csv does not exist: {eval_dataset_csv}")
 
     eval_id = uuid4().hex[:8]

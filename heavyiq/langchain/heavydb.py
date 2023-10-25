@@ -1106,7 +1106,14 @@ class HeavyDB:
             """Format the error message"""
             return f"Error: {e}"
 
-    def run_no_throw(self, command: str, fetch: str = "all") -> str:
+    async def aget_table_info_no_throw(self, table_names: Optional[list[str]] = None) -> str:
+        try:
+            return await self.aget_table_info(table_names)
+        except ValueError as e:
+            """Format the error message"""
+            return f"Error: {e}"
+
+    def run_no_throw(self, command: str, fetch: str = "all") -> str | tuple | list:
         """Execute a SQL command and return a string representing the results.
         If the statement returns rows, a string of the results is returned.
         If the statement returns no rows, an empty string is returned.
@@ -1114,6 +1121,16 @@ class HeavyDB:
         """
         try:
             return self.run(command, fetch)
+        except Exception as e:
+            """Format the error message"""
+            return f"Error: {e}"
+
+    async def arun_no_throw(self, command: str, fetch: str = "all") -> str | tuple | list:
+        """
+        Execute a SQL command and return a string representing the results.
+        """
+        try:
+            return await self.arun(command, fetch)
         except Exception as e:
             """Format the error message"""
             return f"Error: {e}"

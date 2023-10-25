@@ -1,9 +1,14 @@
 from enum import Enum
 
+from langchain.llms.openai import OpenAI
+from typing import Any
 from langchain.schema import BaseRetriever
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.indexes import VectorstoreIndexCreator
 from langchain.indexes.vectorstore import VectorStoreIndexWrapper
+from langchain.schema.language_model import BaseLanguageModel
+from langchain.chains.qa_with_sources.retrieval import RetrievalQAWithSourcesChain
+from langchain.chains.retrieval_qa.base import RetrievalQA
 from langchain.vectorstores import Chroma
 from langchain.text_splitter import TextSplitter
 
@@ -52,3 +57,31 @@ class HeavyIQIndexWrapper(VectorStoreIndexWrapper):
         """
         search_kwargs = {"k": k, "fetch_k": fetch_k}
         return self.vectorstore.as_retriever(search_type=search_type.value, search_kwargs=search_kwargs)
+
+    async def aquery(
+        self,
+        question: str,
+        llm: BaseLanguageModel | None = None,
+        retriever_kwargs: dict[str, Any] | None = None,
+        **kwargs: Any
+    ) -> str:
+        """Query the vectorstore asynchronously."""
+        llm = llm or OpenAI(temperature=0)
+        retriever_kwargs = retriever_kwargs or {}
+        chain = RetrievalQA.from_chain_type(llm, retriever=self.vectorstore.as_retriever(**retriever_kwargs), **kwargs)
+        return await chain.arun(question)
+
+    async def aquery_with_sources(
+        self,
+        question: str,
+        llm: BaseLanguageModel | None = None,
+        retriever_kwargs: dict[str, Any] | None = None,
+        **kwargs: Any
+    ) -> dict:
+        """Query the vectorstore and get back sources asynchronously."""
+        llm = llm or OpenAI(temperature=0)
+        retriever_kwargs = retriever_kwargs or {}
+        chain = RetrievalQAWithSourcesChain.from_chain_type(
+            llm, retriever=self.vectorstore.as_retriever(**retriever_kwargs), **kwargs
+        )
+        return await chain.acall({chain.question_key: question})

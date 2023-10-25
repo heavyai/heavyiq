@@ -1,7 +1,7 @@
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Extra, Field
 
-from heavyiq.langchain.index import get_heavydb_index
+from heavyiq.langchain.index import aget_heavydb_index
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.chains import AskHeavyDBMetadataIndexChain
 
@@ -41,23 +41,24 @@ The output will be schemas for the tables that are relevant to the prompt.
 Example Input: 'Which table contains information on [topic]? What are the relevant columns for [foo] and [bar]?'"""
 
     def _run(self, query: str) -> str:
+        raise NotImplementedError("RetrieveRelevantSchemasTool does not support sync")
+
+    async def _arun(self, query: str) -> str:
         try:
-            retriever = get_heavydb_index().as_retriever(k=5, allowable_tables=list(self.db.get_usable_table_names()))
+            heavydb_index = await aget_heavydb_index()
+            retriever = heavydb_index.as_retriever(k=5, allowable_tables=list(self.db.get_usable_table_names()))
             chain = AskHeavyDBMetadataIndexChain.create(retriever=retriever)
-            res: dict[str, str] = chain(query)
+            res: dict[str, str] = await chain.acall(query)
             if res["answer"] == chain.no_results_answer:
                 return "Error: No relevant tables found for provided query. Feel free to rephrase and try again."
             if len(res["tables"]) > 2:
-                table_info = self.db.get_table_info(res["tables"], include_samples=False, include_top_k=False)  # type: ignore
+                table_info = await self.db.aget_table_info(res["tables"], include_samples=False, include_top_k=False)  # type: ignore
             else:
-                table_info = self.db.get_table_info(res["tables"])  # type: ignore
+                table_info = await self.db.aget_table_info(res["tables"])  # type: ignore
             return f"{res['answer']}\n{table_info}"
         except Exception as e:
             print(e)
             return "Error: LLM could not find a relevant table"
-
-    async def _arun(self, query: str) -> str:
-        raise NotImplementedError("RetrieveRelevantSchemasTool does not support async")
 
 
 class QueryHeavyDBTool(BaseHeavyDBTool, BaseTool):
@@ -96,16 +97,15 @@ If an error occurs, revise and retry. Be familiar with table schemas and avoid c
 - Using an ORDER BY clause without applying a NULLS LAST qualifier"""
 
     def _run(self, query: str) -> str:
+        raise NotImplementedError("QueryHeavyDBTool does not support sync")
+
+    async def _arun(self, query: str) -> str | tuple | list:
         """Execute the query, return the results or an error message."""
         try:
-            self.db.validate_query(query)  # validate the query before running it
-            result = self.db.run_no_throw(query)
-            return result
+            await self.db.avalidate_query(query)  # validate the query before running it
+            return await self.db.arun_no_throw(query)
         except Exception as e:
             return f"Error: {e}"
-
-    async def _arun(self, query: str) -> str:
-        raise NotImplementedError("QueryHeavyDBTool does not support async")
 
 
 class RetrieveTableSchemasTool(BaseHeavyDBTool, BaseTool):
@@ -129,9 +129,9 @@ Example Input: table1, table2, table3
 
     def _run(self, table_names: str) -> str:
         """Get the schema for tables in a comma-separated list."""
-        if "'" in table_names:
-            table_names = table_names.replace("'", "")
-        return self.db.get_table_info_no_throw([tn.strip() for tn in table_names.strip().split(",")])
+        raise NotImplementedError("RetrieveTableSchemasTool does not support async")
 
     async def _arun(self, table_names: str) -> str:
-        raise NotImplementedError("RetrieveTableSchemasTool does not support async")
+        if "'" in table_names:
+            table_names = table_names.replace("'", "")
+        return await self.db.aget_table_info_no_throw([tn.strip() for tn in table_names.strip().split(",")])

@@ -1,7 +1,4 @@
 from typing import Optional, Any
-import functools
-import pytest
-from unittest.mock import patch
 from openai.openai_object import OpenAIObject
 from langchain.schema import BaseMessage, LLMResult, ChatGeneration, AIMessage, ChatResult, Generation, PromptValue
 from langchain.callbacks.manager import CallbackManagerForLLMRun
@@ -17,8 +14,8 @@ class FakeChatOpenAI(ChatOpenAI):
     Uses: Mainly used to test NLtoSQL chain.
     """
 
-    generation_info = {"finish_reason": "stop", "logprobs": OpenAIObject.construct_from({"logprobs_token": []})}
-    content = "SELECT SUM(POPULATION) AS total_population\nFROM usa_states"
+    generation_info: dict = {"finish_reason": "stop", "logprobs": OpenAIObject.construct_from({"logprobs_token": []})}
+    content: str = "SELECT SUM(POPULATION) AS total_population\nFROM usa_states"
 
     @property
     def _llm_type(self) -> str:

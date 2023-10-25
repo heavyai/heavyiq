@@ -1,6 +1,7 @@
 from typing import Optional
 
 from chromadb.api.types import Where
+from starlette.concurrency import run_in_threadpool
 from langchain.schema import Document, BaseRetriever
 
 from heavyiq.langchain.chains import (
@@ -8,13 +9,13 @@ from heavyiq.langchain.chains import (
     AskHeavyDBMetadataIndexChain,
 )
 from heavyiq.langchain.llms import get_llm
-from heavyiq.langchain.logging import log_chain_call
-from .utils import read_table_documents, apply_retriever_filter
+from heavyiq.langchain.logging import log_chain_call_async
+from .utils import aread_table_documents, apply_retriever_filter
 from ..utils import HeavyIQIndexWrapper, SearchType
 
 
 class HeavyDBMetadataIndex(HeavyIQIndexWrapper):
-    def simple_search_for_table_docs(
+    async def simple_search_for_table_docs(
         self, search_string: str, allowable_tables: Optional[list[str]] = None, **kwargs
     ) -> list[Document]:
         """Does a simple search for documents that contain text similar to the search string.
@@ -27,9 +28,9 @@ class HeavyDBMetadataIndex(HeavyIQIndexWrapper):
             List of table Documents that MAY be relevant to the search string.
         """
         retriever = self.as_retriever(allowable_tables=allowable_tables, **kwargs)
-        return retriever.get_relevant_documents(search_string)
+        return await retriever.aget_relevant_documents(search_string)
 
-    def simple_search_for_table_names(
+    async def simple_search_for_table_names(
         self, search_string: str, allowable_tables: Optional[list[str]] = None, **kwargs
     ) -> list[str]:
         """Does a simple search for documents that contain text similar to the search string. Returns the table names.
@@ -43,10 +44,10 @@ class HeavyDBMetadataIndex(HeavyIQIndexWrapper):
         Returns:
             List of table names that MAY be relevant to the search string.
         """
-        docs = self.simple_search_for_table_docs(search_string, allowable_tables, **kwargs)
+        docs = await self.simple_search_for_table_docs(search_string, allowable_tables, **kwargs)
         return list(set([doc.metadata["source"] for doc in docs]))
 
-    def ask_about_database(
+    async def ask_about_database(
         self,
         question: str,
         allowable_tables: Optional[list[str]] = None,
@@ -65,7 +66,7 @@ class HeavyDBMetadataIndex(HeavyIQIndexWrapper):
         """
         retriever = self.as_retriever(allowable_tables=allowable_tables, **kwargs)
         chain = AskHeavyDBMetadataIndexChain.create(retriever=retriever)
-        res: dict[str, str] = log_chain_call(chain, question, "", chain_name="ask_heavydb_metadata_index")
+        res: dict[str, str] = await log_chain_call_async(chain, question, "", chain_name="ask_heavydb_metadata_index")
         if res[chain.answer_key] == chain.no_results_answer:
             # consider a fallback to a simple search
             raise Exception("No relevant tables found for query: " + question)
@@ -74,7 +75,7 @@ class HeavyDBMetadataIndex(HeavyIQIndexWrapper):
             "tables": res[chain.tables_answer_key],
         }
 
-    def rephrase_question(self, question: str) -> str:
+    async def rephrase_question(self, question: str) -> str:
         """Rephrase a question to be more like a question that this index can answer.
 
         Args:
@@ -85,9 +86,12 @@ class HeavyDBMetadataIndex(HeavyIQIndexWrapper):
         """
         llm = get_llm(temperature=0)
         chain = SQLMetadataQuestionTransformerChain(llm=llm)
-        return log_chain_call(chain, {chain.input_key: question}, "")[chain.output_key]
+        res: dict[str, str] = await log_chain_call_async(
+            chain, {chain.input_key: question}, "", chain_name="sql_metadata_question_transformer"
+        )
+        return res[chain.output_key]
 
-    def ask_using_rephrased_question(self, question: str, **kwargs) -> dict[str, str]:
+    async def ask_using_rephrased_question(self, question: str, **kwargs) -> dict[str, str]:
         """Ask a question by first rephrasing the input question and then using the rephrased question to query the database.
 
         Args:
@@ -98,17 +102,17 @@ class HeavyDBMetadataIndex(HeavyIQIndexWrapper):
             - answer: A natural language answer to the question.
             - tables: A list of table names relevant to the answer.
         """
-        rephrased_question = self.rephrase_question(question)
-        return self.ask_about_database(rephrased_question, **kwargs)
+        rephrased_question = await self.rephrase_question(question)
+        return await self.ask_about_database(rephrased_question, **kwargs)
 
-    def reindex_table_document(self, table_name: str) -> None:
-        docs = list(read_table_documents(include=[table_name]))
+    async def reindex_table_document(self, table_name: str) -> None:
+        docs = [doc async for doc in aread_table_documents(include=[table_name])]
         if len(docs) == 0:
             raise Exception(f"No document found for table {table_name}")
         where: Where = {"source": table_name}
-        self.vectorstore._collection.delete(where=where)
+        await run_in_threadpool(self.vectorstore._collection.delete, where=where)
         sub_docs = self.text_splitter.split_documents(docs)
-        self.vectorstore.add_documents(sub_docs)
+        await run_in_threadpool(self.vectorstore.add_documents, sub_docs)
 
     def as_retriever(
         self,
