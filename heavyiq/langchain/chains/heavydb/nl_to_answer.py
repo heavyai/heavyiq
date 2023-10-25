@@ -4,6 +4,7 @@ from typing import Any, Optional
 
 from pydantic import Extra
 from langchain.schema.language_model import BaseLanguageModel
+from langchain.callbacks import AsyncIteratorCallbackHandler
 from langchain.schema import BasePromptTemplate
 from langchain.prompts.prompt import PromptTemplate
 from langchain.callbacks.manager import (

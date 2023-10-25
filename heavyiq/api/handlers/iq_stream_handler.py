@@ -16,7 +16,11 @@ from heavyiq.api.models import QueryRequest, QueryResponse, QuestionRequest, Que
 from heavyiq.config import get_config
 from heavyiq.logging_utils import get_heavyiq_logger
 from heavyiq.api.utils import wrap_done
-from heavyiq.langchain.callbacks.stream_callback import StreamingChainCallbackHandler, StreamEvent as Event
+from heavyiq.langchain.callbacks.stream_callback import (
+    StreamingChainCallbackHandler,
+    StreamingChainCallbackWithoutDoneSetHandler,
+    StreamEvent as Event,
+)
 
 
 class MessageDict(TypedDict):
@@ -110,7 +114,7 @@ async def streaming_question(request: QuestionRequest, db: HeavyDB, stream_llm_t
     Yields:
         AsyncIterable[str]: A stream of strings representing the steps or tokens.
     """
-    callback, config, logger = StreamingChainCallbackHandler(), get_config(), get_heavyiq_logger()
+    callback, config, logger = StreamingChainCallbackWithoutDoneSetHandler(), get_config(), get_heavyiq_logger()
     file_callback_handler = logger.async_langchain_cb_handler(to_stdout=config.log_to_stdout)
 
     yield str(EventMessage(Event.step, "Finding the suitable LLM..."))

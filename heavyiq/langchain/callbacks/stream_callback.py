@@ -73,3 +73,23 @@ class StreamingChainCallbackHandler(AsyncIteratorCallbackHandler):
         **kwargs: Any
     ) -> None:
         self.done.set()
+
+
+class StreamingChainCallbackWithoutDoneSetHandler(StreamingChainCallbackHandler):
+    """
+    StreamingChainCallbackHandler which doesnot set the done event on_chain_end callback method.
+    This is useful when using the same  StreamingChainCallbackHandler instance as callback for multiple chains.
+    Note: Don't forget to wrap the caller chain within wrap_done coroutine by passing this handler as second argument,
+    so that the done event should be set manually upon task completion.
+    """
+
+    async def on_chain_end(
+        self,
+        outputs: dict[str, Any],
+        *,
+        run_id: UUID,
+        parent_run_id: UUID | None = None,
+        tags: list[str] | None = None,
+        **kwargs: Any
+    ) -> None:
+        pass
