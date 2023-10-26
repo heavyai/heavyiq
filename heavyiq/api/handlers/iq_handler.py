@@ -1,7 +1,6 @@
 from fastapi.concurrency import run_in_threadpool
 from langsmith import Client
 from starlette.exceptions import HTTPException as StarletteHTTPException
-import time
 
 from heavyiq.api.models import (
     FeedbackRequest,
@@ -43,37 +42,23 @@ async def handle_query_request_async(request: QueryRequest, db: HeavyDB) -> Quer
     """
     config = get_config()
     logger = get_heavyiq_logger()
-    time1 = time.perf_counter()
     llm = await run_in_threadpool(get_llm_by_type, LLMType.NL_TO_SQL, temperature=0.0)
-    time2 = time.perf_counter()
-    print("DEBUG: time 1-2 took %.3fs" % (time2 - time1))
     chain_cls = get_nl_to_sql_chain_by_llm(llm=llm)
-    time3 = time.perf_counter()
-    print("DEBUG: time 2-3 took %.3fs" % (time3 - time2))
     file_callback_handler = logger.async_langchain_cb_handler(to_stdout=config.log_to_stdout)
-    time4 = time.perf_counter()
-    print("DEBUG: time 3-4 took %.3fs" % (time4 - time3))
     chain = chain_cls(llm=llm, database=db, callbacks=[file_callback_handler], tags=["rest-api", "query-endpoint"])  # type: ignore
-    time5 = time.perf_counter()
-    print("DEBUG: time 4-5 took %.3fs" % (time5 - time4))
     chain_input = {
         chain.input_key: request.question,
         "tables": request.tables,
         "session_id": request.session_id
     }
     res = await log_chain_call_async(chain, chain_input, "")
-    time6 = time.perf_counter()
-    print("DEBUG: time 5-6 took %.3fs" % (time6 - time5))
     feedback_id = str(res["__run"].run_id) if "__run" in res else ""
-    resp = QueryResponse(
+    return QueryResponse(
         sql=res[chain.output_key],
         sql_complexity=res[chain.output_complexity_key],
         feedback_id=feedback_id,
         logprobs=res[chain.output_logprobs_key],
     )
-    time7 = time.perf_counter()
-    print("DEBUG: time 6-7 took %.3fs" % (time7 - time6))
-    return resp
 
 
 async def handle_question_request_async(request: QuestionRequest, db: HeavyDB) -> QuestionResponse:
