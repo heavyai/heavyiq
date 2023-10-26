@@ -75,20 +75,13 @@ async def handle_question_request_async(request: QuestionRequest, db: HeavyDB) -
     logger = get_heavyiq_logger()
     file_callback_handler = logger.async_langchain_cb_handler(to_stdout=config.log_to_stdout)
     nl_sql_llm = await run_in_threadpool(get_llm_by_type, LLMType.NL_TO_SQL, temperature=0.0)
-    time1 = time.perf_counter()
-
     nl_sql_chain = get_nl_to_sql_chain_by_llm(llm=nl_sql_llm)(
         llm=nl_sql_llm,
         database=db,
         callbacks=[file_callback_handler],
         tags=["rest-api", "question-endpoint"],
     )
-    time2 = time.perf_counter()
-    print("DEBUG: time 1-2 took %.3fs" % (time2 - time1))
-
     llm = await run_in_threadpool(get_llm_by_type, LLMType.SQL_TO_ANSWER, temperature=0.0)
-    time3 = time.perf_counter()
-    print("DEBUG: time 2-3 took %.3fs" % (time3 - time2))
     chain = NLtoAnswerChain(
         llm=llm,
         nl_sql_chain=nl_sql_chain,
@@ -96,27 +89,20 @@ async def handle_question_request_async(request: QuestionRequest, db: HeavyDB) -
         callbacks=[file_callback_handler],
         tags=["rest-api", "question-endpoint"],
     )
-    time4 = time.perf_counter()
-    print("DEBUG: time 3-4 took %.3fs" % (time4 - time3))
     chain_input = {
         chain.input_key: request.question,
         "tables": request.tables,
         "session_id": request.session_id
     }
     res = await log_chain_call_async(chain, chain_input, "")
-    time5 = time.perf_counter()
-    print("DEBUG: time 4-5 took %.3fs" % (time5 - time4))
     feedback_id = str(res["__run"].run_id) if "__run" in res else ""
-    resp = QuestionResponse(
+    return QuestionResponse(
         answer=res[chain.output_key] or res[chain.output_fail_reason_key],
         sql=res[chain.output_sql_key],
         sql_result=res[chain.output_results_key],
         sql_complexity=res[chain.output_sql_complexity_key],
         feedback_id=feedback_id,
     )
-    time6 = time.perf_counter()
-    print("DEBUG: time 5-6 took %.3fs" % (time6 - time5))
-    return resp
 
 
 async def handle_status_request_async(request: StatusRequest) -> StatusResponse:
