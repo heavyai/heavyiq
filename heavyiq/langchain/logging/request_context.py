@@ -12,7 +12,6 @@ from heavyiq.config import get_config
 
 # from .database import Session, RequestLog
 from .enums import LangChainType
-import time
 
 
 class RequestContext:
@@ -192,25 +191,16 @@ async def log_chain_call_async(
 ) -> dict:
     from heavyiq.langchain.utils import is_langsmith_active
 
-    time1 = time.perf_counter()
     if isinstance(input, str):
         input = {chain.input_keys[0]: input}
-    time2 = time.perf_counter()
-    print("DEBUG: time 1.1-2.1 took %.3fs" % (time2 - time1))
     async with chain_log_request_ctx_async(chain_name or chain._chain_type, model, input) as log_ctx:
-        time3 = time.perf_counter()
-        print("DEBUG: time 2.1-3.1 took %.3fs" % (time3 - time2))
         with get_openai_callback() as cb:
             try:
                 output = await chain.acall(input, include_run_info=is_langsmith_active, tags=[VERSION_TAG])
                 log_ctx.success(output, cb)
-                time4 = time.perf_counter()
-                print("DEBUG: time 3.1-4.1 took %.3fs" % (time4 - time3))
                 return output
             except Exception as e:
                 log_ctx.error(str(e), cb)
-                time4 = time.perf_counter()
-                print("DEBUG: time 3.1-4.1 took %.3fs" % (time4 - time3))
                 raise e
 
 
