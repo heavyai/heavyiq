@@ -70,7 +70,7 @@ async def status(session_id: str) -> StatusResponse:
     \f
     :param str session_id: Session ID from URL parameter
     """
-    request = StatusRequest(session_id=session_id)  # Do I need to create the StatusRequest object
+    request = StatusRequest(session_id=session_id)
     return await handle_status_request_async(request)
 
 
