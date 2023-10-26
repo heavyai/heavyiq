@@ -1,6 +1,7 @@
 from fastapi.concurrency import run_in_threadpool
 from langsmith import Client
 from starlette.exceptions import HTTPException as StarletteHTTPException
+import time
 
 from heavyiq.api.models import (
     FeedbackRequest,
@@ -13,6 +14,8 @@ from heavyiq.api.models import (
     QuestionResponse,
     AskHeavyAIDocsRequest,
     AskHeavyAIDocsResponse,
+    StatusRequest,
+    StatusResponse,
 )
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
@@ -25,6 +28,7 @@ from heavyiq.langchain.chains import (
 from heavyiq.langchain.llms import LLMType, get_llm_by_type
 from heavyiq.langchain.logging import log_chain_call_async
 from heavyiq.logging_utils import get_heavyiq_logger
+from heavyiq.status_utils import RequestStatusManager
 
 
 async def handle_query_request_async(request: QueryRequest, db: HeavyDB) -> QueryResponse:
@@ -39,19 +43,34 @@ async def handle_query_request_async(request: QueryRequest, db: HeavyDB) -> Quer
     """
     config = get_config()
     logger = get_heavyiq_logger()
+    time1 = time.perf_counter()
     llm = await run_in_threadpool(get_llm_by_type, LLMType.NL_TO_SQL, temperature=0.0)
+    time2 = time.perf_counter()
+    print("DEBUG: time 1-2 took %.3fs" % (time2 - time1))
     chain_cls = get_nl_to_sql_chain_by_llm(llm=llm)
+    time3 = time.perf_counter()
+    print("DEBUG: time 2-3 took %.3fs" % (time3 - time2))
     file_callback_handler = logger.async_langchain_cb_handler(to_stdout=config.log_to_stdout)
+    time4 = time.perf_counter()
+    print("DEBUG: time 3-4 took %.3fs" % (time4 - time3))
     chain = chain_cls(llm=llm, database=db, callbacks=[file_callback_handler], tags=["rest-api", "query-endpoint"])  # type: ignore
+    time5 = time.perf_counter()
+    print("DEBUG: time 4-5 took %.3fs" % (time5 - time4))
     chain_input = {chain.input_key: request.question, "tables": request.tables}
-    res = await log_chain_call_async(chain, chain_input, "")
+    # TODO[C]: Need to pass through request.session_id to be able to write to StatusManager
+    res = await log_chain_call_async(chain, chain_input, "", request.session_id)
+    time6 = time.perf_counter()
+    print("DEBUG: time 5-6 took %.3fs" % (time6 - time5))
     feedback_id = str(res["__run"].run_id) if "__run" in res else ""
-    return QueryResponse(
+    resp = QueryResponse(
         sql=res[chain.output_key],
         sql_complexity=res[chain.output_complexity_key],
         feedback_id=feedback_id,
         logprobs=res[chain.output_logprobs_key],
     )
+    time7 = time.perf_counter()
+    print("DEBUG: time 6-7 took %.3fs" % (time7 - time6))
+    return resp
 
 
 async def handle_question_request_async(request: QuestionRequest, db: HeavyDB) -> QuestionResponse:
@@ -68,13 +87,20 @@ async def handle_question_request_async(request: QuestionRequest, db: HeavyDB) -
     logger = get_heavyiq_logger()
     file_callback_handler = logger.async_langchain_cb_handler(to_stdout=config.log_to_stdout)
     nl_sql_llm = await run_in_threadpool(get_llm_by_type, LLMType.NL_TO_SQL, temperature=0.0)
+    time1 = time.perf_counter()
+
     nl_sql_chain = get_nl_to_sql_chain_by_llm(llm=nl_sql_llm)(
         llm=nl_sql_llm,
         database=db,
         callbacks=[file_callback_handler],
         tags=["rest-api", "question-endpoint"],
     )
+    time2 = time.perf_counter()
+    print("DEBUG: time 1-2 took %.3fs" % (time2 - time1))
+
     llm = await run_in_threadpool(get_llm_by_type, LLMType.SQL_TO_ANSWER, temperature=0.0)
+    time3 = time.perf_counter()
+    print("DEBUG: time 2-3 took %.3fs" % (time3 - time2))
     chain = NLtoAnswerChain(
         llm=llm,
         nl_sql_chain=nl_sql_chain,
@@ -82,16 +108,29 @@ async def handle_question_request_async(request: QuestionRequest, db: HeavyDB) -
         callbacks=[file_callback_handler],
         tags=["rest-api", "question-endpoint"],
     )
+    time4 = time.perf_counter()
+    print("DEBUG: time 3-4 took %.3fs" % (time4 - time3))
     chain_input = {chain.input_key: request.question, "tables": request.tables}
     res = await log_chain_call_async(chain, chain_input, "")
+    time5 = time.perf_counter()
+    print("DEBUG: time 4-5 took %.3fs" % (time5 - time4))
     feedback_id = str(res["__run"].run_id) if "__run" in res else ""
-    return QuestionResponse(
+    resp = QuestionResponse(
         answer=res[chain.output_key] or res[chain.output_fail_reason_key],
         sql=res[chain.output_sql_key],
         sql_result=res[chain.output_results_key],
         sql_complexity=res[chain.output_sql_complexity_key],
         feedback_id=feedback_id,
     )
+    time6 = time.perf_counter()
+    print("DEBUG: time 5-6 took %.3fs" % (time6 - time5))
+    return resp
+
+
+async def handle_status_request_async(request: StatusRequest) -> StatusResponse:
+    status_manager = RequestStatusManager()
+    response=status_manager.get_status(request.session_id)
+    return StatusResponse(response=response)
 
 
 async def handle_submit_feedback_request_async(request: FeedbackRequest) -> FeedbackResponse:

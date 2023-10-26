@@ -17,6 +17,8 @@ from heavyiq.api.models import (
     GenerateTableMetadataResponse,
     AskHeavyAIDocsRequest,
     AskHeavyAIDocsResponse,
+    StatusRequest,
+    StatusResponse,
 )
 from heavyiq.api.handlers import (
     handle_query_request_async,
@@ -24,6 +26,7 @@ from heavyiq.api.handlers import (
     handle_submit_feedback_request_async,
     handle_generate_table_metadata_async,
     handle_ask_heavyai_docs_async,
+    handle_status_request_async,
 )
 from heavyiq.api.routes.log_route import LoggingRoute
 
@@ -56,6 +59,18 @@ async def question(values: tuple[QuestionRequest, HeavyDB] = Depends(valid_quest
     :param QuestionRequest request: Request Body
     """
     return await handle_question_request_async(*values)
+
+
+@iqrouter.get("/status", response_model=StatusResponse)
+async def status(req: StatusRequest) -> StatusResponse:
+    """
+    Request for status update of currently processing question/query request:
+
+    - **session_id**: HeavyDB session id.
+    \f
+    :param StatusRequest request: Request Body
+    """
+    return await handle_status_request_async(req)
 
 
 @iqrouter.post("/submit-feedback", response_model=FeedbackResponse)

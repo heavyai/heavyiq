@@ -15,6 +15,7 @@ from heavyiq.logging_utils import init_logs
 from heavyiq.langchain.utils import init_telemetrics
 from heavyiq.api.routes import defaultrouter, iqrouter
 from heavyiq.api.handlers import exception_handler as exh
+from heavyiq.status_utils import RequestStatusManager
 
 
 def stripped_down_api() -> FastAPI:

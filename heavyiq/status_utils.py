@@ -22,6 +22,7 @@ class RequestStatusManager:
         with self._lock:
             self.request_status[session_id] = status
 
-    def get_status(self, session_id) -> str | None:
+    def get_status(self, session_id) -> str:
         with self._lock:
-            return self.request_status.get(session_id)
+            status = self.request_status.get(session_id)
+            return status if status is not None else f"No current process for session_id: {session_id}"
