@@ -189,7 +189,6 @@ async def log_chain_call_async(
     input: str | dict,
     model: str = "",
     chain_name: Optional[str] = None,
-    session_id: Optional[str] = None
 ) -> dict:
     from heavyiq.langchain.utils import is_langsmith_active
 

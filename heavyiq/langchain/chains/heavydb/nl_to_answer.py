@@ -179,11 +179,10 @@ class NLtoAnswerChain(BaseChain):
         self,
         inputs: dict[str, Any],
         run_manager: Optional[AsyncCallbackManagerForChainRun] = None,
-        session_id: Optional[str] = None
     ) -> dict[str, str]:
         status_manager = RequestStatusManager()
+        session_id = inputs.get("session_id", None)
 
-        # TODO[C]: Here is where we should be updating the status manager
         table_names_to_use = inputs.get("tables")
         nl_sql_inputs = {
             self.nl_sql_chain.input_key: inputs[self.input_key],

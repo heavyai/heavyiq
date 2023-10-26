@@ -56,9 +56,12 @@ async def handle_query_request_async(request: QueryRequest, db: HeavyDB) -> Quer
     chain = chain_cls(llm=llm, database=db, callbacks=[file_callback_handler], tags=["rest-api", "query-endpoint"])  # type: ignore
     time5 = time.perf_counter()
     print("DEBUG: time 4-5 took %.3fs" % (time5 - time4))
-    chain_input = {chain.input_key: request.question, "tables": request.tables}
-    # TODO[C]: Need to pass through request.session_id to be able to write to StatusManager
-    res = await log_chain_call_async(chain, chain_input, "", request.session_id)
+    chain_input = {
+        chain.input_key: request.question,
+        "tables": request.tables,
+        "session_id": request.session_id
+    }
+    res = await log_chain_call_async(chain, chain_input, "")
     time6 = time.perf_counter()
     print("DEBUG: time 5-6 took %.3fs" % (time6 - time5))
     feedback_id = str(res["__run"].run_id) if "__run" in res else ""
@@ -110,7 +113,11 @@ async def handle_question_request_async(request: QuestionRequest, db: HeavyDB) -
     )
     time4 = time.perf_counter()
     print("DEBUG: time 3-4 took %.3fs" % (time4 - time3))
-    chain_input = {chain.input_key: request.question, "tables": request.tables}
+    chain_input = {
+        chain.input_key: request.question,
+        "tables": request.tables,
+        "session_id": request.session_id
+    }
     res = await log_chain_call_async(chain, chain_input, "")
     time5 = time.perf_counter()
     print("DEBUG: time 4-5 took %.3fs" % (time5 - time4))

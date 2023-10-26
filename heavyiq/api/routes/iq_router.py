@@ -61,16 +61,17 @@ async def question(values: tuple[QuestionRequest, HeavyDB] = Depends(valid_quest
     return await handle_question_request_async(*values)
 
 
-@iqrouter.get("/status", response_model=StatusResponse)
-async def status(req: StatusRequest) -> StatusResponse:
+@iqrouter.get("/status/{session_id}", response_model=StatusResponse)
+async def status(session_id: str) -> StatusResponse:
     """
     Request for status update of currently processing question/query request:
 
     - **session_id**: HeavyDB session id.
     \f
-    :param StatusRequest request: Request Body
+    :param str session_id: Session ID from URL parameter
     """
-    return await handle_status_request_async(req)
+    request = StatusRequest(session_id=session_id)  # Do I need to create the StatusRequest object
+    return await handle_status_request_async(request)
 
 
 @iqrouter.post("/submit-feedback", response_model=FeedbackResponse)
