@@ -13,6 +13,7 @@ from typing import Dict, List, Tuple, Any
 import math
 import itertools
 from llama_cpp import Llama
+import requests
 
 from collections.abc import Iterable
 
@@ -73,6 +74,14 @@ def getOptions(argv=None):
         "--rate-query-perplexity",
         help="Rate query perplexity and store in output CSV",
         action="store_true",
+    )
+    parser.add_argument(
+        "--use-local-model",
+        help="Use local model for query perplexity evaluation",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--llm-remote-host", help="LLM remote host URL", default="https://urwh97t2l6r4w9-5000.proxy.runpod.net"
     )
     return parser.parse_args(argv)
 
@@ -1084,6 +1093,54 @@ def genChainedQueryPrompts(options):
     failures_df.to_csv("chain_failed_queries.csv", index=False)
 
 
+def compute_prob_stats_alt(selected_tokens: list[str], token_logprobs: list[float]) -> dict[str, Any]:
+    selected_tokens_and_probs = []
+    sum_log_probs = 0.0
+    min_prob = 1.0
+    min_prob_token = None
+    prob_decile_histogram = [0] * 10
+
+    num_calc_tokens = 0
+    select_seen = False
+    for selected_token, token_logprob in zip(selected_tokens, token_logprobs):
+        if token_logprob == None:
+            continue
+        selected_token_log_prob = token_logprob
+
+        # Convert the log probability to actual probability
+        selected_token_prob = math.exp(selected_token_log_prob)
+        # We don't use the probabilities on any tokens up to and including the first SELECT, as depending on the
+        # prompt the LLM will sometimes want to put a newline token first, so using these first probabilities
+        # will artifically lower the avg, total, and min probabilities
+
+        # Todo (Todd): Consider the case where we have a query starting with a WITH (CTE)
+
+        if select_seen:
+            num_calc_tokens += 1
+            sum_log_probs += selected_token_log_prob
+            prob_decile_histogram[int(selected_token_prob * 10)] += 1
+            if selected_token_prob < min_prob:
+                min_prob = selected_token_prob
+                min_prob_token = selected_token
+        else:
+            if selected_token == "▁SELECT" or selected_token == "SELECT":
+                select_seen = True
+
+        # Append the result to the list
+        selected_tokens_and_probs.append({"token": selected_token, "probability": selected_token_prob})
+
+    prob_stats = {}
+    prob_stats["num_tokens"] = len(selected_tokens)
+    prob_stats["total_prob"] = math.exp(sum_log_probs)
+    prob_stats["avg_prob"] = math.exp(sum_log_probs / num_calc_tokens)
+    prob_stats["min_prob"] = min_prob
+    prob_stats["min_prob_token"] = min_prob_token
+    prob_stats["prob_decile_histogram"] = prob_decile_histogram
+    prob_stats["selected_token_probs"] = selected_tokens_and_probs
+
+    return prob_stats
+
+
 def compute_prob_stats(selected_tokens: list[str], top_log_probs: list[dict[str, float]]) -> dict[str, Any]:
     selected_tokens_and_probs = []
     sum_log_probs = 0.0
@@ -1093,10 +1150,14 @@ def compute_prob_stats(selected_tokens: list[str], top_log_probs: list[dict[str,
 
     num_calc_tokens = 0
     select_seen = False
+    print("in prob stats")
     for selected_token, token_logprobs in zip(selected_tokens, top_log_probs):
+        print(selected_token)
+        print(token_logprobs)
         if token_logprobs == None:
             continue
         selected_token_log_prob = token_logprobs[selected_token]
+        print(selected_token_log_prob)
 
         # Convert the log probability to actual probability
         selected_token_prob = math.exp(selected_token_log_prob)
@@ -1136,14 +1197,21 @@ def main(argv):
     options = getOptions(argv)
     openai.api_key = options.openai_api_key
     llm = None
+    remote_model_name = None
     if options.rate_query_perplexity:
-        llm = Llama(
-            model_path="/Users/todd/llm_models/heavyiq/code-llama-34b-combo-768-sqlv31-v1/ggml-model-q6-k.gguf",
-            n_gqa=8,
-            n_ctx=2048,
-            n_gpu_layers=100,
-            logits_all=True,
-        )
+        if options.use_local_model:
+            llm = Llama(
+                model_path="/Users/todd/llm_models/heavyiq/code-llama-34b-combo-768-sqlv31-v1/ggml-model-q6-k.gguf",
+                n_gqa=8,
+                n_ctx=2048,
+                n_gpu_layers=100,
+                logits_all=True,
+            )
+        else:
+            models_url = options.llm_remote_host + "/v1/models"
+            response = requests.get(models_url)
+            remote_model_name = response.json()["data"][0]["id"]
+            print(remote_model_name)
 
     if options.errors is not None:
         generate_error_prompts(options.errors, "sql_error_prompts.csv", options)
@@ -1317,14 +1385,44 @@ def main(argv):
                             prob_stats = None
                             if options.rate_query_perplexity:
                                 full_prompt = f"<|sql prompt|>\n{targeted_instruction}\n<|sql answer|>\n{output}"
-                                result = llm(full_prompt, max_tokens=1, echo=True, logprobs=0)
-                                # print(result["choices"][0]["logprobs"]["tokens"])
-                                # print(result["choices"][0]["logprobs"]["top_logprobs"])
-                                prob_stats = compute_prob_stats(
-                                    result["choices"][0]["logprobs"]["tokens"],
-                                    result["choices"][0]["logprobs"]["top_logprobs"],
-                                )
-                                print(f'{output}: {prob_stats["avg_prob"]}')
+                                result = None
+                                if options.use_local_model:
+                                    result = llm(full_prompt, max_tokens=1, echo=True, logprobs=0)
+                                else:
+                                    request_headers = {"accept": "application/json", "Content-Type": "application/json"}
+                                    request_data = {
+                                        "model": remote_model_name,
+                                        "prompt": full_prompt,
+                                        "max_tokens": 32,
+                                        "temperature": 0.0,
+                                        "top_p": 1,
+                                        "n": 1,
+                                        "stream": False,
+                                        "prompt_logprobs": 1,
+                                        "logprobs": 1,
+                                        "echo": True,
+                                        "stop": ["string"],
+                                        "presence_penalty": 0,
+                                        "frequency_penalty": 0,
+                                        "best_of": 1,
+                                        "top_k": -1,
+                                        "ignore_eos": False,
+                                        "use_beam_search": False,
+                                    }
+                                    result = requests.post(
+                                        options.llm_remote_host + "/v1/completions",
+                                        headers=request_headers,
+                                        data=json.dumps(request_data),
+                                    ).json()
+                                try:
+                                    prob_stats = compute_prob_stats_alt(
+                                        result["choices"][0]["logprobs"]["tokens"],
+                                        result["choices"][0]["logprobs"]["token_logprobs"],
+                                        # result["choices"][0]["logprobs"]["top_logprobs"],
+                                    )
+                                    print(f'{output}: {prob_stats["avg_prob"]}')
+                                except Exception as e:
+                                    print(e)
 
                             sql_query_tokens = tokenizer.tokenize(sql_query)
                             num_sql_query_tokens = len(sql_query_tokens)
