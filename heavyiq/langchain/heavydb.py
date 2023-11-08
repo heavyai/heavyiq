@@ -1,19 +1,25 @@
 from __future__ import annotations
-import re
-import anyio
+
+import asyncio
 import functools
 import multiprocessing
+import re
+from collections.abc import AsyncGenerator
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
+from copy import deepcopy
 from multiprocessing.managers import SyncManager
 from threading import Lock
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
-from typing import Optional, Any, Iterable, TYPE_CHECKING, Callable, TypedDict, Coroutine
-from copy import deepcopy
-import asyncio
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Iterable, Optional, TypedDict
+
+import anyio
 from async_lru import alru_cache
+from heavyai import Connection, connect
 from starlette.concurrency import run_in_threadpool
-from heavyai import connect, Connection
+
 from heavyiq.config import get_config
-from heavyiq.utils import strip_sql_comments, is_destructive_sql, rate_sql_complexity, calc_query_stats, LRUCache
+from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
 
 if TYPE_CHECKING:
     from heavydb._parsers import ColumnDetails
@@ -1117,3 +1123,38 @@ class HeavyDB:
         except Exception as e:
             """Format the error message"""
             return f"Error: {e}"
+
+
+heavydb_var: ContextVar[HeavyDB | None] = ContextVar("heavydb_var", default=None)
+
+
+@asynccontextmanager  # type: ignore
+async def heavydb_context(session_id: str) -> AsyncGenerator[HeavyDB, None]:
+    """
+    Async Context which helps to create HeavyDB instance on Setup, set context var and yields it, finally reset
+    context var on teardown.
+
+    Example:
+        async with heavydb_context(session_id) as db:
+            assert heavydb_var.get() == db
+    """
+    db = await HeavyDB.from_session_async(session_id=session_id)
+    heavydb_var.set(db)
+    yield db
+    heavydb_var.set(None)
+
+
+async def get_db(session_id: str) -> HeavyDB:
+    """
+    Gets heavydb instance from context var if there's any, else create it from session_id.
+    Always call this function within a heavydb_context ctx in-order to avoid redundant heavydb conntection calls.
+    """
+    from heavyiq.logging_utils import get_heavyiq_logger
+
+    db = heavydb_var.get()
+    if db:
+        return db
+
+    logger = get_heavyiq_logger()
+    logger.warning("Establishing HeavyDB connection outside of heavydb_context!")
+    return await HeavyDB.from_session_async(session_id=session_id)
