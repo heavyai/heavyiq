@@ -28,25 +28,24 @@ class AnswerChainInputDict(TypedDict):
 class AnswerChainInputDictWithQuery(AnswerChainInputDict):
     # should be a verified/validated sql query. If you get the result from
     # sql_chain.chain runnable, then it should be a verified one.
-    sql_chain_output: SqlChainOutputDict
+    sql_cmd: str
 
 
 async def get_sql_result(inputs: AnswerChainInputDictWithQuery) -> Any:
     """
     Gets the SQL query result by running the generated query against the HeavyDB.
     """
-    sql_cmd = inputs["sql_chain_output"]["query"]
+    sql_cmd = inputs["sql_cmd"]
     heavydb = await get_db(inputs["session_id"])
     sql_result = await heavydb.arun(sql_cmd, to_str=True)
     return sql_result
 
 
 chain = (
-    RunnablePassthrough.assign(sql_chain_output=nl_to_sql_chain, input=lambda x: x["question"]).with_types(
+    RunnablePassthrough.assign(sql_cmd=nl_to_sql_chain, input=lambda x: x["question"]).with_types(
         input_type=AnswerChainInputDict  # type: ignore
     )
     | RunnablePassthrough.assign(
-        sql_cmd=lambda x: x["sql_chain_output"]["query"],
         sql_result=RunnableLambda(get_sql_result),  # type: ignore
     )
     | sql_to_answer_prompt_rbl

@@ -43,6 +43,10 @@ class SqlChainInputOutputDict(TypedDict):
 
 class SqlChainOutputDict(TypedDict):
     query: str
+
+
+class SqlChainOutputDictWithComplexity(TypedDict):
+    query: str
     sql_complexity: int
 
 
@@ -80,7 +84,7 @@ async def do_string_literal_correction(input_output: SqlChainInputOutputDict) ->
     return input_output
 
 
-async def calculate_sql_complexity(input_output: SqlChainInputOutputDict) -> SqlChainOutputDict:
+async def calculate_sql_complexity(input_output: SqlChainInputOutputDict) -> SqlChainOutputDictWithComplexity:
     """
     Calculate SQL complexity for the generated SQL query.
     """
@@ -92,6 +96,7 @@ async def calculate_sql_complexity(input_output: SqlChainInputOutputDict) -> Sql
 
 # runnable which stores the user input (ie. str or dict passed to runnable_chain.invoke method)
 input_runnable = RunnablePassthrough().with_types(input_type=SqlChainInputDict)  # type: ignore
+# Supposed to return the SQL query predicted by the llm
 query_runnable = (
     input_runnable
     | RunnablePassthrough.assign(
@@ -100,17 +105,25 @@ query_runnable = (
     | nl_to_sql_prompt_rbl
     | nl_to_sql_llm_rbl.bind(stop=["\nSQLResult:", "\n<|sql result|>"])
     | StrOutputParser()
+).with_config(
+    config={"tags": ["nl_to_sql_predict_query_runnable"], "run_name": "nl_to_sql_predict_query_runnable"}  # type: ignore
 )
 
+# Chain which does the validation and string literal correction on the
+# SQL query generated on the previous step (ie, by `query_runnable`)
 chain = (
-    (
-        RunnableParallel(inputs=input_runnable, query=query_runnable)
-        | RunnableLambda(validate_query)  # type: ignore
-        | RunnableLambda(do_string_literal_correction)  # type: ignore
-        | RunnableLambda(calculate_sql_complexity)  # type: ignore
-    )
-    .with_types(output_type=SqlChainOutputDict)  # type: ignore
-    .with_config(  # type: ignore
-        config={"tags": ["nl_to_sql_chain_runnable"], "run_name": "nl_to_sql_chain_runnable"}  # type: ignore
-    )
+    RunnableParallel(inputs=input_runnable, query=query_runnable)
+    | RunnableLambda(validate_query)  # type: ignore
+    | RunnableLambda(do_string_literal_correction)  # type: ignore
+    | RunnableLambda(lambda x: x["query"])  # type: ignore
+).with_config(  # type: ignore
+    config={"tags": ["nl_to_sql_chain_runnable"], "run_name": "nl_to_sql_chain_runnable"}  # type: ignore
 )
+
+chain_with_sql_complexity = (
+    (RunnableParallel(inputs=input_runnable, query=chain) | RunnableLambda(calculate_sql_complexity))  # type: ignore
+    .with_types(output_type=SqlChainOutputDictWithComplexity)  # type: ignore
+    .with_config(  # type: ignore
+        config={"tags": ["nl_to_sql_chain_with_sql_complexity_runnable"], "run_name": "nl_to_sql_chain_with_sql_complexity_runnable"}  # type: ignore
+    )
+)  # type: ignore
