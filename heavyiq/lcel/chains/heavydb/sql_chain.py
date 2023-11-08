@@ -67,8 +67,8 @@ sql_chain = (
     | nl_to_sql_prompt_rbl
     | nl_to_sql_llm_rbl.bind(stop=["\nSQLResult:", "\n<|sql result|>"])
     | StrOutputParser()
-).with_config(
-    config={"tags": ["nl_to_answer_chain_runnable"], "run_name": "nl_to_answer_chain_runnable"}  # type: ignore
 )
 
-chain = RunnablePassthrough.assign(query=sql_chain).with_types(input_type=InputType) | validate_query  # type: ignore
+chain = (RunnablePassthrough.assign(query=sql_chain).with_types(input_type=InputType) | validate_query).with_config(  # type: ignore
+    config={"tags": ["nl_to_sql_chain_runnable"], "run_name": "nl_to_sql_chain_runnable"}  # type: ignore
+)

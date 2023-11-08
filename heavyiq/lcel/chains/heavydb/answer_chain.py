@@ -50,4 +50,6 @@ chain = (
     | sql_to_answer_prompt_rbl
     | sql_to_answer_llm_rbl
     | StrOutputParser()
+).with_config(
+    config={"tags": ["nl_to_answer_chain_runnable"], "run_name": "nl_to_answer_chain_runnable"}  # type: ignore
 )

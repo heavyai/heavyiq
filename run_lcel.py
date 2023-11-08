@@ -5,8 +5,14 @@
 import asyncio
 import sys
 
+from langchain import callbacks
+
+from heavyiq.langchain.logging import log_chain_runnable
+from heavyiq.langchain.utils import init_telemetrics
 from heavyiq.lcel.chains.heavydb.answer_chain import chain as nl_to_answer_chain
 from heavyiq.lcel.chains.heavydb.sql_chain import chain as nl_to_sql_chain
+
+# init_telemetrics()
 
 
 async def nl_to_sql(session_id: str):
@@ -18,6 +24,29 @@ async def nl_to_sql(session_id: str):
         }
     )
     print(out)
+
+
+async def nl_to_sql_with_openai_cb(session_id: str):
+    out = await log_chain_runnable(
+        nl_to_sql_chain,
+        {
+            "question": "How many states begin with the letter A? What are they?",
+            "tables": ["usa_states"],
+            "session_id": session_id,
+        },
+    )
+    print(out)
+
+
+async def nl_to_sql_with_cb_collect_runs(session_id: str):
+    inputs = {
+        "question": "How many states begin with the letter A? What are they?",
+        "tables": ["usa_states"],
+        "session_id": session_id,
+    }
+    with callbacks.collect_runs() as cb:
+        out = await nl_to_sql_chain.ainvoke(inputs)
+        assert len(cb.traced_runs) == 1
 
 
 async def nl_to_sql_stream(session_id: str):
