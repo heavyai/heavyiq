@@ -14,7 +14,7 @@ from heavyiq.langchain.logging import log_chain_runnable
 from heavyiq.langchain.utils import init_telemetrics
 from heavyiq.lcel.chains.heavydb.answer_chain import chain as nl_to_answer_chain
 from heavyiq.lcel.chains.heavydb.sql_chain import chain as nl_to_sql_chain
-from heavyiq.lcel.chains.heavydb.sql_chain import chain_with_sql_complexity
+from heavyiq.lcel.chains.heavydb.sql_chain import complete_chain as nl_to_sql_complete_chain
 
 # init_telemetrics()
 
@@ -23,7 +23,7 @@ input_ctx_var: ContextVar[dict] = ContextVar("input_ctx_var", default={})
 
 async def nl_to_sql(session_id: str):
     async with heavydb_context(session_id):  # type: ignore
-        out = await chain_with_sql_complexity.ainvoke(input_ctx_var.get())
+        out = await nl_to_sql_complete_chain.ainvoke(input_ctx_var.get())
         print(out)
 
 
