@@ -19,30 +19,68 @@ from collections.abc import Iterable
 
 
 def getOptions(argv=None):
-    parser = argparse.ArgumentParser(description="Test Spider SQL queries against HeavyDB")
-    parser.add_argument("-s", "--host", help="HeavyDB server address", default="localhost")
+    parser = argparse.ArgumentParser(
+        description="Test Spider SQL queries against HeavyDB"
+    )
+    parser.add_argument(
+        "-s", "--host", help="HeavyDB server address", default="localhost"
+    )
     parser.add_argument("-p", "--port", help="HeavyDB server port", default="6273")
     parser.add_argument("-u", "--user", help="HeavyDB user name", default="admin")
-    parser.add_argument("-w", "--password", help="HeavyDB password", default="HyperInteractive")
+    parser.add_argument(
+        "-w", "--password", help="HeavyDB password", default="HyperInteractive"
+    )
     parser.add_argument("-q", "--queries", help="Queries CSV file", default=None)
-    parser.add_argument("--chained-queries", help="Chained queries CSV file", default=None)
+    parser.add_argument(
+        "--chained-queries", help="Chained queries CSV file", default=None
+    )
     parser.add_argument("-e", "--errors", help="Error Queries CSV file", default=None)
     parser.add_argument("-d", "--database", help="HeavyDB database", default=None)
     parser.add_argument("-k", "--openai-api-key", help="OpenAI API Key", default=None)
     parser.add_argument("-c", "--cache", help="Query cache file", default=None)
-    parser.add_argument("--start-db", help="Start from this database idx", type=int, default=None)
-    parser.add_argument("--num-dbs", help="Only process this many databases", type=int, default=0)
     parser.add_argument(
-        "--fix-queries", help="Try to fix failed queries with automatically applied corrections", action="store_true"
+        "--start-db", help="Start from this database idx", type=int, default=None
     )
-    parser.add_argument("--filter-null-groups", help="Add filters to remove null groups", action="store_true")
-    parser.add_argument("--fix-queries-gpt", help="Try to fix failed queries with ChatGPT API", action="store_true")
-    parser.add_argument("--low-card-top-k-str-vals", help="Low cardinality top K string values", type=int, default=5)
-    parser.add_argument("--high-card-top-k-str-vals", help="High cardinality top K string values", type=int, default=3)
-    parser.add_argument("--top-k-str-vals", help="Top K string values", type=int, default=5)
-    parser.add_argument("--max-instruction-tokens", help="Max instruction tokens", type=int, default=704)
     parser.add_argument(
-        "--write-sql-prompts", help="Write SQL prompts to file for successful queries", action="store_true"
+        "--num-dbs", help="Only process this many databases", type=int, default=0
+    )
+    parser.add_argument(
+        "--fix-queries",
+        help="Try to fix failed queries with automatically applied corrections",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--filter-null-groups",
+        help="Add filters to remove null groups",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--fix-queries-gpt",
+        help="Try to fix failed queries with ChatGPT API",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--low-card-top-k-str-vals",
+        help="Low cardinality top K string values",
+        type=int,
+        default=5,
+    )
+    parser.add_argument(
+        "--high-card-top-k-str-vals",
+        help="High cardinality top K string values",
+        type=int,
+        default=3,
+    )
+    parser.add_argument(
+        "--top-k-str-vals", help="Top K string values", type=int, default=5
+    )
+    parser.add_argument(
+        "--max-instruction-tokens", help="Max instruction tokens", type=int, default=704
+    )
+    parser.add_argument(
+        "--write-sql-prompts",
+        help="Write SQL prompts to file for successful queries",
+        action="store_true",
     )
     parser.add_argument(
         "--write-chained-sql-prompts",
@@ -50,21 +88,35 @@ def getOptions(argv=None):
         action="store_true",
     )
     parser.add_argument(
-        "--write-english-prompts", help="Write English prompts to file for successful queries", action="store_true"
+        "--write-english-prompts",
+        help="Write English prompts to file for successful queries",
+        action="store_true",
     )
     parser.add_argument(
-        "--write-question-prompts", help="Write question prompts to file for successful queries", action="store_true"
+        "--write-question-prompts",
+        help="Write question prompts to file for successful queries",
+        action="store_true",
     )
     parser.add_argument(
-        "--add-columns-to-question-prompts", help="Add column specifications to question prompts", action="store_true"
+        "--add-columns-to-question-prompts",
+        help="Add column specifications to question prompts",
+        action="store_true",
     )
     parser.add_argument(
-        "--write-table-prompts", help="Write table prompts to file for successful queries", action="store_true"
+        "--write-table-prompts",
+        help="Write table prompts to file for successful queries",
+        action="store_true",
     )
     parser.add_argument(
-        "--add-column-metadata-to-table-prompts", help="Add column metadata to table prompts", action="store_true"
+        "--add-column-metadata-to-table-prompts",
+        help="Add column metadata to table prompts",
+        action="store_true",
     )
-    parser.add_argument("--add-columns-to-answers", help="Add column specifications to answer", action="store_true")
+    parser.add_argument(
+        "--add-columns-to-answers",
+        help="Add column specifications to answer",
+        action="store_true",
+    )
     parser.add_argument(
         "--sort-table-schemas-by-row-count",
         help="Sort table schemas in reverse order by row count",
@@ -81,7 +133,21 @@ def getOptions(argv=None):
         action="store_true",
     )
     parser.add_argument(
-        "--llm-remote-host", help="LLM remote host URL", default="https://urwh97t2l6r4w9-5000.proxy.runpod.net"
+        "--llm-remote-host",
+        help="LLM remote host URL",
+        default="https://urwh97t2l6r4w9-5000.proxy.runpod.net",
+    )
+    parser.add_argument(
+        "--llm-remote-start-port",
+        help="LLM remote host start port",
+        type=int,
+        default=None,
+    )
+    parser.add_argument(
+        "--num-perplexity-model-shards",
+        help="Perplexity model is sharded",
+        type=int,
+        default=None,
     )
     return parser.parse_args(argv)
 
@@ -240,12 +306,18 @@ def adjust_identifier_case(table_statements: list[str], query: str) -> str:
                 table, column = part_stripped.split(".")
                 if column.lower() in column_map:
                     # Preserve the trailing comma if it was present
-                    select_parts[i] = f"{table}.{column_map[column.lower()]}" + ("," if part[-1] == "," else "")
+                    select_parts[i] = f"{table}.{column_map[column.lower()]}" + (
+                        "," if part[-1] == "," else ""
+                    )
             elif part_stripped.lower() in column_map:
                 # Preserve the trailing comma if it was present
-                select_parts[i] = column_map[part_stripped.lower()] + ("," if part[-1] == "," else "")
+                select_parts[i] = column_map[part_stripped.lower()] + (
+                    "," if part[-1] == "," else ""
+                )
             elif part_stripped.lower() in table_map:
-                select_parts[i] = table_map[part_stripped.lower()] + (";" if part[-1] == ";" else "")
+                select_parts[i] = table_map[part_stripped.lower()] + (
+                    ";" if part[-1] == ";" else ""
+                )
                 # if part_stripped.lower() not in used_tables:
                 #    used_tables_list.append(table_map[part_stripped.lower()])
                 #    used_tables.add(table_map[part_stripped.lower()])
@@ -341,10 +413,17 @@ def remove_join_aliases(table_statements: list[str], query: str) -> str:
         if alias_prefix_idx >= 0:
             alias_suffix_idx = alias_prefix_idx + len(alias_prefix)
             alias_name = ""
-            while alias_suffix_idx < len(query) and query[alias_suffix_idx].isalnum() or query[alias_suffix_idx] == "_":
+            while (
+                alias_suffix_idx < len(query)
+                and query[alias_suffix_idx].isalnum()
+                or query[alias_suffix_idx] == "_"
+            ):
                 alias_name += query[alias_suffix_idx]
                 alias_suffix_idx += 1
-            query = query[: alias_prefix_idx + len(table_name) + 1] + query[alias_suffix_idx:]
+            query = (
+                query[: alias_prefix_idx + len(table_name) + 1]
+                + query[alias_suffix_idx:]
+            )
             lower_query = query.lower()
             table_alias_map[alias_name] = table_name
 
@@ -433,7 +512,9 @@ def get_table_schema(con, table_name):
     res = con.execute(f"SHOW CREATE TABLE {table_name}")
     table_schema = list(res)[0][0]
     table_schema = re.sub(r" ENCODING .*\)([,\)])", r"\1", table_schema)
-    table_schema = re.sub(r",\n.*SHARED DICTIONARY.*REFERENCES.*\([A-Za-z0-9_]*\)", "", table_schema)
+    table_schema = re.sub(
+        r",\n.*SHARED DICTIONARY.*REFERENCES.*\([A-Za-z0-9_]*\)", "", table_schema
+    )
     table_schema = re.sub(r"\n", "", table_schema)
     table_schema = re.sub(r"\s+", " ", table_schema)
     table_schema = re.sub(r"\(\s+", "(", table_schema)
@@ -452,7 +533,11 @@ def get_table_cols(con, table_name):
 
 def get_table_str_cols(con, table_name):
     table_details = con.get_table_details(table_name)
-    return [col.name for col in table_details if col.type == "STR" and col.encoding == "DICT" and not col.is_array]
+    return [
+        col.name
+        for col in table_details
+        if col.type == "STR" and col.encoding == "DICT" and not col.is_array
+    ]
 
 
 def get_top_k_vals(con, table_name, column_name, top_k):
@@ -461,7 +546,9 @@ def get_top_k_vals(con, table_name, column_name, top_k):
     return [r[0] for r in results]
 
 
-def get_high_low_card_top_k_vals(con, table_name, column_name, low_card_top_k, high_card_top_k):
+def get_high_low_card_top_k_vals(
+    con, table_name, column_name, low_card_top_k, high_card_top_k
+):
     count_distinct_sql = f"""SELECT COUNT(DISTINCT "{column_name}") FROM "{table_name}" WHERE "{column_name}" IS NOT NULL AND LENGTH("{column_name}") > 0"""
     cardinality = list(con.execute(count_distinct_sql))[0][0]
     top_k = high_card_top_k
@@ -471,7 +558,12 @@ def get_high_low_card_top_k_vals(con, table_name, column_name, low_card_top_k, h
     top_k_vals_sql = f"""SELECT "{column_name}" FROM "{table_name}" WHERE "{column_name}" IS NOT NULL GROUP BY "{column_name}" ORDER BY COUNT(*) DESC LIMIT {top_k}"""
     top_k_result = list(con.execute(top_k_vals_sql))
     top_k_vals = [r[0] for r in top_k_result]
-    return {"table_name": table_name, "column_name": column_name, "cardinality": cardinality, "top_k_vals": top_k_vals}
+    return {
+        "table_name": table_name,
+        "column_name": column_name,
+        "cardinality": cardinality,
+        "top_k_vals": top_k_vals,
+    }
 
 
 def get_top_k_vals_str(table_name, top_k_vals):
@@ -502,7 +594,9 @@ def sort_table_schemas_by_row_count(con, table_schemas):
 
     # Sort table schemas by row_count in descending order
     # Python's sorted is stable, so equal row counts will retain their relative ordering
-    sorted_table_schemas = [x[0] for x in sorted(table_row_counts, key=lambda x: x[1], reverse=True)]
+    sorted_table_schemas = [
+        x[0] for x in sorted(table_row_counts, key=lambda x: x[1], reverse=True)
+    ]
     return sorted_table_schemas
 
 
@@ -515,7 +609,9 @@ def sort_tables_by_row_count(con, tables, reverse=True):
 
     # Sort tables by row_count
     # Python's sorted is stable, so equal row counts will retain their relative ordering
-    sorted_tables = [x[0] for x in sorted(table_row_counts, key=lambda x: x[1], reverse=reverse)]
+    sorted_tables = [
+        x[0] for x in sorted(table_row_counts, key=lambda x: x[1], reverse=reverse)
+    ]
     return sorted_tables
 
 
@@ -537,11 +633,15 @@ def generate_table_metadata_str(table_schemas, top_k_str_vals, low_card_col_thre
                 if top_k_str_col["cardinality"] > low_card_col_threshold
             ]
             if len(low_card_str_cols) > 0:
-                table_metadata_str += "Low cardinality columns and every possible value:\n"
+                table_metadata_str += (
+                    "Low cardinality columns and every possible value:\n"
+                )
                 for top_k_str_col in low_card_str_cols:
                     table_metadata_str += f"{top_k_str_col['column_name']}: {', '.join(top_k_str_col['top_k_vals'])}\n"
             if len(high_card_str_cols) > 0:
-                table_metadata_str += "High cardinality columns and most common values:\n"
+                table_metadata_str += (
+                    "High cardinality columns and most common values:\n"
+                )
                 for top_k_str_col in high_card_str_cols:
                     table_metadata_str += f"{top_k_str_col['column_name']}: {', '.join(top_k_str_col['top_k_vals'])}\n"
         table_metadata_str += "\n"
@@ -852,10 +952,17 @@ def fix_failed_query_gpt(con, query_id, failed_query, error):
         try:
             sql_completion = openai.ChatCompletion.create(
                 model=model,
-                messages=[{"role": "system", "content": modified_prompt}, {"role": "user", "content": sql}],
+                messages=[
+                    {"role": "system", "content": modified_prompt},
+                    {"role": "user", "content": sql},
+                ],
                 temperature=temperature,
             )
-            sql = sql_completion["choices"][0]["message"]["content"].replace("\n", " ").replace("\r", " ")
+            sql = (
+                sql_completion["choices"][0]["message"]["content"]
+                .replace("\n", " ")
+                .replace("\r", " ")
+            )
             sql = re.sub(".*(SELECT.*;).*", r"\1", sql, count=0, flags=0)
             # print("""SQL {sql_try_count}: {sql}""".format(sql_try_count=sql_try_count, sql=sql))
             sql_result = con.execute(sql)
@@ -878,7 +985,9 @@ def add_not_null_filters(sql_query):
     # Check if the query contains a GROUP BY clause
     # Look for SQL keywords following GROUP BY, so the regular expression will stop at them
     group_by_match = re.search(
-        r"GROUP BY\s+([\w_,\s]+)(?=\s+ORDER BY|\s+HAVING|\s+LIMIT|\s+OFFSET|\s+;|$)", sql_query, re.IGNORECASE
+        r"GROUP BY\s+([\w_,\s]+)(?=\s+ORDER BY|\s+HAVING|\s+LIMIT|\s+OFFSET|\s+;|$)",
+        sql_query,
+        re.IGNORECASE,
     )
     if not group_by_match:
         return sql_query
@@ -889,7 +998,9 @@ def add_not_null_filters(sql_query):
 
     # Check if the query contains a WHERE clause
     where_match = re.search(
-        r"WHERE\s+(.+?)(?=\s+GROUP BY|\s+ORDER BY|\s+HAVING|\s+LIMIT|\s+OFFSET|\s+;|$)", sql_query, re.IGNORECASE
+        r"WHERE\s+(.+?)(?=\s+GROUP BY|\s+ORDER BY|\s+HAVING|\s+LIMIT|\s+OFFSET|\s+;|$)",
+        sql_query,
+        re.IGNORECASE,
     )
 
     if where_match:
@@ -903,8 +1014,12 @@ def add_not_null_filters(sql_query):
         sql_query = sql_query.replace(where_clause, new_where_clause)
     else:
         # Add a WHERE clause if it does not exist
-        where_clause = " AND ".join([f"{column} IS NOT NULL" for column in group_by_columns])
-        sql_query = re.sub(r"(FROM\s+\w+)", r"\1 WHERE " + where_clause, sql_query, flags=re.IGNORECASE)
+        where_clause = " AND ".join(
+            [f"{column} IS NOT NULL" for column in group_by_columns]
+        )
+        sql_query = re.sub(
+            r"(FROM\s+\w+)", r"\1 WHERE " + where_clause, sql_query, flags=re.IGNORECASE
+        )
 
     return sql_query
 
@@ -948,12 +1063,16 @@ def extract_column_mappings(query_plan: str) -> Dict[str, Tuple[str, str, str]]:
     return result
 
 
-def get_unique_columns(col_mappings: Dict[str, Tuple[str, str, str]]) -> List[Tuple[str, str, str]]:
+def get_unique_columns(
+    col_mappings: Dict[str, Tuple[str, str, str]]
+) -> List[Tuple[str, str, str]]:
     unique_cols = set(col_mappings.values())
     return sorted(list(unique_cols))
 
 
-def schema_order_columns(table_cols: List[str], used_cols: List[Tuple[str, str, str]]) -> List[str]:
+def schema_order_columns(
+    table_cols: List[str], used_cols: List[Tuple[str, str, str]]
+) -> List[str]:
     used_col_strs = [used_col[1] + "." + used_col[2] for used_col in used_cols]
     sorted_used_cols = sorted(used_col_strs, key=table_cols.index)
     return sorted_used_cols
@@ -973,17 +1092,29 @@ def generate_error_prompts(error_queries_file, output_file, options):
     for index, row in errors_df.iterrows():
         db = row["db_id"]
         if db != last_db:
-            con = heavyai.connect(user=options.user, password=options.password, host=options.host, dbname=db)
+            con = heavyai.connect(
+                user=options.user,
+                password=options.password,
+                host=options.host,
+                dbname=db,
+            )
             db_tables = con.get_tables()
             for db_table in db_tables:
                 table_schema = get_table_schema(con, db_table)
                 table_schemas.append(table_schema)
                 table_schemas_map[db_table.lower()] = table_schema
-                if options.high_card_top_k_str_vals > 0 or options.low_card_top_k_str_vals > 0:
+                if (
+                    options.high_card_top_k_str_vals > 0
+                    or options.low_card_top_k_str_vals > 0
+                ):
                     table_str_cols = get_table_str_cols(con, db_table)
                     str_cols_top_k_vals = [
                         get_high_low_card_top_k_vals(
-                            con, db_table, str_col, options.low_card_top_k_str_vals, options.high_card_top_k_str_vals
+                            con,
+                            db_table,
+                            str_col,
+                            options.low_card_top_k_str_vals,
+                            options.high_card_top_k_str_vals,
                         )
                         for str_col in table_str_cols
                     ]
@@ -1006,7 +1137,9 @@ def generate_error_prompts(error_queries_file, output_file, options):
                 filtered_top_k_str_vals.append(top_k_str_vals_map[db_table])
         top_k_str_vals_str = ""
         filtered_table_metadata = generate_table_metadata_str(
-            filtered_table_schemas, filtered_top_k_str_vals, options.low_card_top_k_str_vals
+            filtered_table_schemas,
+            filtered_top_k_str_vals,
+            options.low_card_top_k_str_vals,
         )
 
         targeted_instruction = """You generated a SQL query that generated an exception when executed in the HeavyDB database.\n\nYou have access to the following relation tables, with schemas below.\n{table_metadata}\nIn attempting to answer the following user question:\n\n{question},\nyou generated the following SQL query:\n{error_sql_query}\n, which failed to run in the HeavyDB database, generating the following error:\n{error}\n\nPlease alter the query to run without error in HeavyDB:""".format(
@@ -1062,7 +1195,12 @@ def genChainedQueryPrompts(options):
     for db_id, chained_query_sets in chained_queries_by_db.items():
         db_successful_queries = 0
         db_failed_queries = 0
-        con = heavyai.connect(user=options.user, password=options.password, host=options.host, dbname=db_id)
+        con = heavyai.connect(
+            user=options.user,
+            password=options.password,
+            host=options.host,
+            dbname=db_id,
+        )
         for chained_query_set in chained_query_sets:
             for query in chained_query_set:
                 sql_query = query["sql_query"]
@@ -1073,7 +1211,12 @@ def genChainedQueryPrompts(options):
                     db_failed_queries += 1
                     failed_query_ids.append(query["query_id"])
                     failed_queries.append(
-                        {"query_id": query["query_id"], "db_id": db_id, "sql_query": sql_query, "error": e}
+                        {
+                            "query_id": query["query_id"],
+                            "db_id": db_id,
+                            "sql_query": sql_query,
+                            "error": e,
+                        }
                     )
                     # print(f"Error executing query for {db_id}: {sql_query}: {e}")
         total_queries = db_successful_queries + db_failed_queries
@@ -1093,7 +1236,9 @@ def genChainedQueryPrompts(options):
     failures_df.to_csv("chain_failed_queries.csv", index=False)
 
 
-def compute_prob_stats_alt(selected_tokens: list[str], token_logprobs: list[float]) -> dict[str, Any]:
+def compute_prob_stats_alt(
+    selected_tokens: list[str], token_logprobs: list[float]
+) -> dict[str, Any]:
     selected_tokens_and_probs = []
     sum_log_probs = 0.0
     min_prob = 1.0
@@ -1118,7 +1263,10 @@ def compute_prob_stats_alt(selected_tokens: list[str], token_logprobs: list[floa
         if select_seen:
             num_calc_tokens += 1
             sum_log_probs += selected_token_log_prob
-            prob_decile_histogram[int(selected_token_prob * 10)] += 1
+            histogram_bin = (
+                int(selected_token_prob * 10) if selected_token_prob < 1 else 9
+            )
+            prob_decile_histogram[histogram_bin] += 1
             if selected_token_prob < min_prob:
                 min_prob = selected_token_prob
                 min_prob_token = selected_token
@@ -1127,8 +1275,9 @@ def compute_prob_stats_alt(selected_tokens: list[str], token_logprobs: list[floa
                 select_seen = True
 
         # Append the result to the list
-        selected_tokens_and_probs.append({"token": selected_token, "probability": selected_token_prob})
-
+        selected_tokens_and_probs.append(
+            {"token": selected_token, "probability": selected_token_prob}
+        )
     prob_stats = {}
     prob_stats["num_tokens"] = len(selected_tokens)
     prob_stats["total_prob"] = math.exp(sum_log_probs)
@@ -1141,7 +1290,9 @@ def compute_prob_stats_alt(selected_tokens: list[str], token_logprobs: list[floa
     return prob_stats
 
 
-def compute_prob_stats(selected_tokens: list[str], top_log_probs: list[dict[str, float]]) -> dict[str, Any]:
+def compute_prob_stats(
+    selected_tokens: list[str], top_log_probs: list[dict[str, float]]
+) -> dict[str, Any]:
     selected_tokens_and_probs = []
     sum_log_probs = 0.0
     min_prob = 1.0
@@ -1179,7 +1330,9 @@ def compute_prob_stats(selected_tokens: list[str], top_log_probs: list[dict[str,
                 select_seen = True
 
         # Append the result to the list
-        selected_tokens_and_probs.append({"token": selected_token, "probability": selected_token_prob})
+        selected_tokens_and_probs.append(
+            {"token": selected_token, "probability": selected_token_prob}
+        )
 
     prob_stats = {}
     prob_stats["num_tokens"] = len(selected_tokens)
@@ -1197,7 +1350,8 @@ def main(argv):
     options = getOptions(argv)
     openai.api_key = options.openai_api_key
     llm = None
-    remote_model_name = None
+    models_urls = []
+    remote_model_names = []
     if options.rate_query_perplexity:
         if options.use_local_model:
             llm = Llama(
@@ -1208,10 +1362,25 @@ def main(argv):
                 logits_all=True,
             )
         else:
-            models_url = options.llm_remote_host + "/v1/models"
-            response = requests.get(models_url)
-            remote_model_name = response.json()["data"][0]["id"]
-            print(remote_model_name)
+            if (
+                options.llm_remote_start_port is not None
+                and options.num_perplexity_model_shards is not None
+            ):
+                for shard_idx in range(options.num_perplexity_model_shards):
+                    models_urls.append(
+                        options.llm_remote_host
+                        + ":"
+                        + str(options.llm_remote_start_port + shard_idx)
+                    )
+                    response = requests.get(models_urls[-1] + "/v1/models")
+                    remote_model_names.append(response.json()["data"][0]["id"])
+            else:
+                models_urls = [options.llm_remote_host]
+                response = requests.get(models_urls[0] + "/v1/models")
+                remote_model_names = [response.json()["data"][0]["id"]]
+
+            print(models_urls)
+            print(remote_model_names)
 
     if options.errors is not None:
         generate_error_prompts(options.errors, "sql_error_prompts.csv", options)
@@ -1246,12 +1415,23 @@ def main(argv):
                     db_num += 1
                     continue
                 try:
-                    con = heavyai.connect(user=options.user, password=options.password, host=options.host, dbname=db_id)
+                    con = heavyai.connect(
+                        user=options.user,
+                        password=options.password,
+                        host=options.host,
+                        dbname=db_id,
+                    )
                 except Exception as e:
                     print(f"Error connecting to database {db_id}: {e}")
                     db_num += 1
                     continue
-                db_query_cache = query_cache_by_db[db_id] if db_id in query_cache_by_db else set()
+                db_hash = con.execute(f"SELECT HASH('{db_id}')").fetchall()[0][0]
+                print(
+                    f"DB {db_id} DB Hash: {db_hash} Shard: {abs(db_hash) % options.num_perplexity_model_shards}"
+                )
+                db_query_cache = (
+                    query_cache_by_db[db_id] if db_id in query_cache_by_db else set()
+                )
                 num_queries = len(queries)
                 successful_queries = 0
                 db_tables = con.get_tables()
@@ -1289,7 +1469,11 @@ def main(argv):
                     modified_sql_query = query["modified_sql_query"]
                     data_split = query["data_split"]
                     english_explanation = query["english_explanation"]
-                    sql_query = modified_sql_query if len(str(modified_sql_query)) > 3 else original_sql_query
+                    sql_query = (
+                        modified_sql_query
+                        if len(str(modified_sql_query)) > 3
+                        else original_sql_query
+                    )
                     sql_query = re.sub(" +", " ", sql_query)
                     sql_query = re.sub(" ,", ",", sql_query)
                     sql_query = sql_query + ";" if sql_query[-1] != ";" else sql_query
@@ -1322,7 +1506,9 @@ def main(argv):
                         # sql_query = query_and_tables["query"]
                         # filtered_tables = query_and_tables["tables"]
                     except Exception as e:
-                        print(f"Exception Query ID: {query_id} DB: {db_id} Query: {sql_query}")
+                        print(
+                            f"Exception Query ID: {query_id} DB: {db_id} Query: {sql_query}"
+                        )
                         print(e)
                         continue
                     # print(f"Query ID: {query_id} DB: {db_id} Query: {sql_query}")
@@ -1344,38 +1530,67 @@ def main(argv):
                             filtered_table_schemas = []
                             for db_table in db_tables:
                                 if db_table in filtered_tables_set:
-                                    filtered_table_schemas.append(table_schemas_map[db_table.lower()])
+                                    filtered_table_schemas.append(
+                                        table_schemas_map[db_table.lower()]
+                                    )
                             # for db_table in filtered_tables:
                             #    filtered_table_schemas.append(table_schemas_map[db_table.lower()])
                             filtered_top_k_str_vals = []
                             if options.top_k_str_vals > 0:
                                 for filtered_table in filtered_tables:
-                                    filtered_top_k_str_vals.append(top_k_str_vals_map[filtered_table])
+                                    filtered_top_k_str_vals.append(
+                                        top_k_str_vals_map[filtered_table]
+                                    )
                             full_table_metadata = generate_table_metadata_str(
-                                table_schemas, top_k_str_vals, options.low_card_top_k_str_vals
+                                table_schemas,
+                                top_k_str_vals,
+                                options.low_card_top_k_str_vals,
                             )
                             filtered_table_metadata = generate_table_metadata_str(
-                                filtered_table_schemas, filtered_top_k_str_vals, options.low_card_top_k_str_vals
+                                filtered_table_schemas,
+                                filtered_top_k_str_vals,
+                                options.low_card_top_k_str_vals,
                             )
 
-                            instruction = generate_instruction(full_table_metadata, query["question"])
-                            targeted_instruction = generate_instruction(filtered_table_metadata, query["question"])
+                            instruction = generate_instruction(
+                                full_table_metadata, query["question"]
+                            )
+                            targeted_instruction = generate_instruction(
+                                filtered_table_metadata, query["question"]
+                            )
                             instruction_tokens = tokenizer.tokenize(instruction)
                             num_instruction_tokens = len(instruction_tokens)
-                            targeted_instruction_tokens = tokenizer.tokenize(targeted_instruction)
-                            num_targeted_instruction_tokens = len(targeted_instruction_tokens)
-                            if num_targeted_instruction_tokens > options.max_instruction_tokens:
+                            targeted_instruction_tokens = tokenizer.tokenize(
+                                targeted_instruction
+                            )
+                            num_targeted_instruction_tokens = len(
+                                targeted_instruction_tokens
+                            )
+                            if (
+                                num_targeted_instruction_tokens
+                                > options.max_instruction_tokens
+                            ):
                                 filtered_table_metadata = generate_table_metadata_str(
-                                    filtered_table_schemas, [], options.low_card_top_k_str_vals
+                                    filtered_table_schemas,
+                                    [],
+                                    options.low_card_top_k_str_vals,
                                 )
-                                targeted_instruction = generate_instruction(filtered_table_metadata, query["question"])
-                                targeted_instruction_tokens = tokenizer.tokenize(targeted_instruction)
-                                num_targeted_instruction_tokens = len(targeted_instruction_tokens)
+                                targeted_instruction = generate_instruction(
+                                    filtered_table_metadata, query["question"]
+                                )
+                                targeted_instruction_tokens = tokenizer.tokenize(
+                                    targeted_instruction
+                                )
+                                num_targeted_instruction_tokens = len(
+                                    targeted_instruction_tokens
+                                )
                             if options.add_columns_to_answers:
                                 query_plan = get_query_plan(con, sql_query)
                                 col_mapping = extract_column_mappings(query_plan)
                                 unique_used_columns = get_unique_columns(col_mapping)
-                                sorted_used_columns = schema_order_columns(table_cols, unique_used_columns)
+                                sorted_used_columns = schema_order_columns(
+                                    table_cols, unique_used_columns
+                                )
                                 output = "Columns used in the query:\n"
                                 for col in sorted_used_columns:
                                     output += col + "\n"
@@ -1387,13 +1602,32 @@ def main(argv):
                                 full_prompt = f"<|sql prompt|>\n{targeted_instruction}\n<|sql answer|>\n{output}"
                                 result = None
                                 if options.use_local_model:
-                                    result = llm(full_prompt, max_tokens=1, echo=True, logprobs=0)
+                                    result = llm(
+                                        full_prompt, max_tokens=1, echo=True, logprobs=0
+                                    )
                                 else:
-                                    request_headers = {"accept": "application/json", "Content-Type": "application/json"}
+                                    request_headers = {
+                                        "accept": "application/json",
+                                        "Content-Type": "application/json",
+                                    }
+                                    remote_host = models_urls[0]
+                                    remote_model_name = remote_model_names[0]
+                                    if options.num_perplexity_model_shards is not None:
+                                        shard_idx = (
+                                            abs(db_hash)
+                                            % options.num_perplexity_model_shards
+                                        )
+                                        remote_host = models_urls[shard_idx]
+                                        remote_model_name = remote_model_names[
+                                            shard_idx
+                                        ]
+                                        print(
+                                            f"Db_id: {db_id} query_id: {query_id} Shard idx: {shard_idx} Remote host: {remote_host} Remote model name: {remote_model_name}"
+                                        )
                                     request_data = {
                                         "model": remote_model_name,
                                         "prompt": full_prompt,
-                                        "max_tokens": 32,
+                                        "max_tokens": 8,
                                         "temperature": 0.0,
                                         "top_p": 1,
                                         "n": 1,
@@ -1410,14 +1644,17 @@ def main(argv):
                                         "use_beam_search": False,
                                     }
                                     result = requests.post(
-                                        options.llm_remote_host + "/v1/completions",
+                                        remote_host + "/v1/completions",
                                         headers=request_headers,
                                         data=json.dumps(request_data),
                                     ).json()
+                                    # print(result)
                                 try:
                                     prob_stats = compute_prob_stats_alt(
                                         result["choices"][0]["logprobs"]["tokens"],
-                                        result["choices"][0]["logprobs"]["token_logprobs"],
+                                        result["choices"][0]["logprobs"][
+                                            "token_logprobs"
+                                        ],
                                         # result["choices"][0]["logprobs"]["top_logprobs"],
                                     )
                                     print(f'{output}: {prob_stats["avg_prob"]}')
@@ -1439,9 +1676,15 @@ def main(argv):
                                     "instruction_tokens": num_instruction_tokens,
                                     "targeted_instruction_tokens": num_targeted_instruction_tokens,
                                     "output_tokens": num_sql_query_tokens,
-                                    "avg_prob": prob_stats["avg_prob"] if prob_stats else None,
-                                    "total_prob": prob_stats["total_prob"] if prob_stats else None,
-                                    "min_prob": prob_stats["min_prob"] if prob_stats else None,
+                                    "avg_prob": prob_stats["avg_prob"]
+                                    if prob_stats
+                                    else None,
+                                    "total_prob": prob_stats["total_prob"]
+                                    if prob_stats
+                                    else None,
+                                    "min_prob": prob_stats["min_prob"]
+                                    if prob_stats
+                                    else None,
                                 }
                             )
                         if options.write_english_prompts:
@@ -1462,28 +1705,43 @@ def main(argv):
                             filtered_tables = extract_tables_from_query(con, sql_query)
                             filtered_table_schemas = []
                             for db_table in filtered_tables:
-                                filtered_table_schemas.append(table_schemas_map[db_table.lower()])
+                                filtered_table_schemas.append(
+                                    table_schemas_map[db_table.lower()]
+                                )
                             filtered_top_k_str_vals = []
-                            if options.high_card_top_k_str_vals > 0 or options.low_card_top_k_str_vals > 0:
+                            if (
+                                options.high_card_top_k_str_vals > 0
+                                or options.low_card_top_k_str_vals > 0
+                            ):
                                 for db_table in filtered_tables:
-                                    filtered_top_k_str_vals.append(top_k_str_vals_map[db_table])
+                                    filtered_top_k_str_vals.append(
+                                        top_k_str_vals_map[db_table]
+                                    )
                             unique_columns = None
                             if options.add_columns_to_question_prompts:
                                 query_plan = get_query_plan(con, sql_query)
                                 col_mapping = extract_column_mappings(query_plan)
                                 unique_columns = get_unique_columns(col_mapping)
                             filtered_table_metadata = generate_table_metadata_str(
-                                filtered_table_schemas, filtered_top_k_str_vals, options.low_card_top_k_str_vals
+                                filtered_table_schemas,
+                                filtered_top_k_str_vals,
+                                options.low_card_top_k_str_vals,
                             )
-                            instruction = generate_question(filtered_table_metadata, unique_columns)
+                            instruction = generate_question(
+                                filtered_table_metadata, unique_columns
+                            )
                             instruction_tokens = tokenizer.tokenize(instruction)
                             num_instruction_tokens = len(instruction_tokens)
                             if num_instruction_tokens > options.max_instruction_tokens:
                                 print(f"Instruction too long: {num_instruction_tokens}")
                                 filtered_table_metadata = generate_table_metadata_str(
-                                    filtered_table_schemas, [], options.low_card_top_k_str_vals
+                                    filtered_table_schemas,
+                                    [],
+                                    options.low_card_top_k_str_vals,
                                 )
-                                instruction = generate_question(filtered_table_metadata, unique_columns)
+                                instruction = generate_question(
+                                    filtered_table_metadata, unique_columns
+                                )
                                 instruction_tokens = tokenizer.tokenize(instruction)
                                 num_instruction_tokens = len(instruction_tokens)
                             question_prompts.append(
@@ -1505,19 +1763,34 @@ def main(argv):
                                 or options.low_card_top_k_str_vals > 0
                             )
                             if add_top_k_metadata:
-                                table_metadata = generate_table_metadata_str(table_schemas, top_k_str_vals, 0)
+                                table_metadata = generate_table_metadata_str(
+                                    table_schemas, top_k_str_vals, 0
+                                )
                             else:
-                                table_metadata = generate_table_metadata_str(table_schemas, [], 0)
-                            instruction = generate_table_prompt(table_metadata, query["question"])
+                                table_metadata = generate_table_metadata_str(
+                                    table_schemas, [], 0
+                                )
+                            instruction = generate_table_prompt(
+                                table_metadata, query["question"]
+                            )
                             instruction_tokens = tokenizer.tokenize(instruction)
                             num_instruction_tokens = len(instruction_tokens)
-                            if num_instruction_tokens > options.max_instruction_tokens and add_top_k_metadata:
-                                table_metadata = generate_table_metadata_str(table_schemas, [], 0)
-                                instruction = generate_table_prompt(table_metadata, query["question"])
+                            if (
+                                num_instruction_tokens > options.max_instruction_tokens
+                                and add_top_k_metadata
+                            ):
+                                table_metadata = generate_table_metadata_str(
+                                    table_schemas, [], 0
+                                )
+                                instruction = generate_table_prompt(
+                                    table_metadata, query["question"]
+                                )
                                 instruction_tokens = tokenizer.tokenize(instruction)
                                 num_instruction_tokens = len(instruction_tokens)
 
-                            output = generate_table_prompt_output(db_tables, filtered_tables)
+                            output = generate_table_prompt_output(
+                                db_tables, filtered_tables
+                            )
                             table_prompts.append(
                                 {
                                     "db_id": db_id,
@@ -1530,29 +1803,59 @@ def main(argv):
                             )
 
                     except Exception as e:
-                        print(f"Exception Query ID: {query_id} DB: {db_id} Query: {sql_query}")
+                        print(
+                            f"Exception Query ID: {query_id} DB: {db_id} Query: {sql_query}"
+                        )
                         print(e)
                         query_fixed = False
                         if options.fix_queries:
-                            fixed_query = fix_failed_query_unquoted_keyword(con, query_id, sql_query, e)
+                            fixed_query = fix_failed_query_unquoted_keyword(
+                                con, query_id, sql_query, e
+                            )
                             if fixed_query is None:
-                                fixed_query = fix_failed_query_implicit_group_by(con, query_id, sql_query, e)
+                                fixed_query = fix_failed_query_implicit_group_by(
+                                    con, query_id, sql_query, e
+                                )
                             if fixed_query is not None:
-                                fixed_queries.append({"query_id": query_id, "db_id": db_id, "sql_query": fixed_query})
+                                fixed_queries.append(
+                                    {
+                                        "query_id": query_id,
+                                        "db_id": db_id,
+                                        "sql_query": fixed_query,
+                                    }
+                                )
                                 query_fixed = True
                         if options.fix_queries_gpt and not query_fixed:
-                            fixed_query = fix_failed_query_gpt(con, query_id, sql_query, e)
+                            fixed_query = fix_failed_query_gpt(
+                                con, query_id, sql_query, e
+                            )
                             if fixed_query is not None:
-                                # print(f"Fixed query: {fixed_query}")
-                                fixed_queries.append({"query_id": query_id, "db_id": db_id, "sql_query": fixed_query})
+                                fixed_queries.append(
+                                    {
+                                        "query_id": query_id,
+                                        "db_id": db_id,
+                                        "sql_query": fixed_query,
+                                    }
+                                )
                                 query_fixed = True
                         if not query_fixed:
-                            failed_queries.append({"query_id": query_id, "db_id": db_id, "sql_query": sql_query})
+                            failed_queries.append(
+                                {
+                                    "query_id": query_id,
+                                    "db_id": db_id,
+                                    "sql_query": sql_query,
+                                }
+                            )
                 total_queries += num_queries
                 total_successful_queries += successful_queries
-                print(f"{db_num}: {db_id} successful queries: {successful_queries}/{num_queries}")
+                print(
+                    f"{db_num}: {db_id} successful queries: {successful_queries}/{num_queries}"
+                )
                 db_num += 1
-                if options.num_dbs != None and db_num >= options.num_dbs + options.start_db:
+                if (
+                    options.num_dbs != None
+                    and db_num >= options.num_dbs + options.start_db
+                ):
                     break
             except Exception as e:
                 print(e)
@@ -1573,8 +1876,12 @@ def main(argv):
         if options.write_table_prompts:
             write_generic_prompts_to_csv(table_prompts, "sql_table_prompts.csv")
 
-        print(f"\n\nTotal NULL Rewrite SUCCESSES: {num_null_rewrite_successes}, FAILS: {num_null_rewrite_fails}")
-        print(f"\n\nTotal successful queries: {total_successful_queries}/{total_queries}")
+        print(
+            f"\n\nTotal NULL Rewrite SUCCESSES: {num_null_rewrite_successes}, FAILS: {num_null_rewrite_fails}"
+        )
+        print(
+            f"\n\nTotal successful queries: {total_successful_queries}/{total_queries}"
+        )
         print(f"Total successful fixed queries: {len(fixed_queries)}/{total_queries}")
         print(", ".join(str(id) for id in null_rewrite_fail_ids))
         # print(f"Total successful altered queries: {total_successful_altered_queries}/{total_queries}")
