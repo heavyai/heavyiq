@@ -1,20 +1,22 @@
 from typing import Any
 
+from asgi_correlation_id import CorrelationIdMiddleware
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from heavydb.exceptions import Error as HeavyDBError  # type: ignore
+from langserve import add_routes
 from starlette.exceptions import HTTPException
 
-from heavyiq.config import get_config
-from heavyiq.api.middlewares import AsyncLoggingMiddleware
-from asgi_correlation_id import CorrelationIdMiddleware
-from heavyiq.api.models.error import ErrorResponse
-from heavyiq.langchain.exceptions import NLtoSQLException
-from heavyiq.logging_utils import init_logs
-from heavyiq.langchain.utils import init_telemetrics
-from heavyiq.api.routes import defaultrouter, iqrouter
 from heavyiq.api.handlers import exception_handler as exh
+from heavyiq.api.middlewares import AsyncLoggingMiddleware
+from heavyiq.api.models.error import ErrorResponse
+from heavyiq.api.routes import defaultrouter, iqrouter
+from heavyiq.config import get_config
+from heavyiq.langchain.exceptions import NLtoSQLException
+from heavyiq.langchain.utils import init_telemetrics
+from heavyiq.lcel.chains.heavydb.sql_chain import chain as sql_chain_runnable
+from heavyiq.logging_utils import init_logs
 
 
 def stripped_down_api() -> FastAPI:
@@ -142,5 +144,8 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
 
     # custom openapi
     app.openapi = custom_openapi  # type: ignore
+
+    # add langserve apis
+    add_routes(app, sql_chain_runnable, path="/lcel/nl-to-sql")
 
     return app

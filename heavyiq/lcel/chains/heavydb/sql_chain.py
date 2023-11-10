@@ -10,6 +10,7 @@ from heavyiq.langchain.utils import aget_table_info_wrt_token_limit
 from heavyiq.lcel.chains.utils import get_value_from_runnable_binding
 from heavyiq.lcel.llms import llm_runnable
 from heavyiq.lcel.prompts import to_sql_prompt_runnable
+from heavyiq.lcel.types.sql_type import SqlChainInputType, SqlChainOutputType, SqlChainWithComplexityOutputType
 
 # var endswith `rbl` means it's an runnable
 nl_to_sql_llm_rbl = llm_runnable.with_config(
@@ -41,9 +42,22 @@ class SqlChainInputDict(TypedDict):
     tables: list[str]
 
 
+class SqlQueryDict(TypedDict):
+    query: str
+
+
 class SqlChainInputWithQueryDict(TypedDict):
+    query_dict: SqlQueryDict
+    inputs: SqlChainInputDict
+
+
+class ValidateQueryInputDict(TypedDict):
     query: str
     inputs: SqlChainInputDict
+
+
+class SqlChainOutputQueryDict(TypedDict):
+    query: str
 
 
 class SqlChainOutputDictWithComplexity(TypedDict):
@@ -60,6 +74,7 @@ class SqlRetryChainInputDict(TypedDict):
 
 
 async def get_table_info(sql_chain_inputs: SqlChainInputDict | SqlRetryChainInputDict, on_retry: bool = False) -> str:
+    print(sql_chain_inputs)
     prompt_rbl = nl_to_sql_retry_prompt_rbl if on_retry else nl_to_sql_prompt_rbl
     partial_inputs = {"input": sql_chain_inputs["question"]}
     if on_retry:
@@ -73,74 +88,78 @@ async def get_table_info(sql_chain_inputs: SqlChainInputDict | SqlRetryChainInpu
     return table_info
 
 
-async def validate_query(input_output: SqlChainInputWithQueryDict) -> str:
+async def validate_query(input_output: ValidateQueryInputDict) -> SqlChainOutputQueryDict:
     """
     Validate the generated SQL query against HeavyDB.
     """
     # raise ValueError("Just a small exception.")
-    query = input_output.get("query").strip()
+    query = input_output["query"].strip()
     heavydb = await get_db(input_output["inputs"]["session_id"])
     await heavydb.avalidate_query(query)
-    return query
+    return {"query": query}
 
 
-async def do_string_literal_correction(input_output: SqlChainInputWithQueryDict) -> str:
+async def do_string_literal_correction(input_output: SqlChainInputWithQueryDict) -> SqlChainOutputQueryDict:
     """
     Do string literal correction on the generated SQL query.
     """
+    query = input_output["query_dict"]["query"].strip()
     if get_config().enable_str_literal_correction:
-        query = input_output.get("query").strip()
         heavydb = await get_db(input_output["inputs"]["session_id"])
         corrected_query = await heavydb.acorrect_string_literals(query)
-        return corrected_query
-    return input_output["query"]
+        query = corrected_query
+    return {"query": query}
 
 
 async def calculate_sql_complexity(input_output: SqlChainInputWithQueryDict) -> SqlChainOutputDictWithComplexity:
     """
     Calculate SQL complexity for the generated SQL query.
     """
-    query = input_output.get("query").strip()
+    query = input_output["query_dict"]["query"].strip()
     heavydb = await get_db(input_output["inputs"]["session_id"])
     sql_complexity = await heavydb.acomplexity(query)
     return {"query": query, "sql_complexity": sql_complexity}
 
 
 # runnable which stores the user input (ie. str or dict passed to runnable_chain.invoke method)
-input_runnable = RunnablePassthrough().with_types(input_type=SqlChainInputDict)  # type: ignore
+input_runnable = RunnablePassthrough().with_types(input_type=SqlChainInputType)  # type: ignore
 # Supposed to return the SQL query predicted by the llm
 query_runnable = (
-    input_runnable
-    | RunnablePassthrough.assign(
-        table_info=RunnableLambda(get_table_info), input=lambda x: x["question"]  # type: ignore
+    (
+        input_runnable
+        | RunnablePassthrough.assign(
+            table_info=RunnableLambda(get_table_info), input=lambda x: x["question"]  # type: ignore
+        )
+        | nl_to_sql_prompt_rbl
+        | nl_to_sql_llm_rbl.bind(stop=["\nSQLResult:", "\n<|sql result|>"])
+        | StrOutputParser()
     )
-    | nl_to_sql_prompt_rbl
-    | nl_to_sql_llm_rbl.bind(stop=["\nSQLResult:", "\n<|sql result|>"])
-    | StrOutputParser()
-).with_config(
-    config={"tags": ["nl_to_sql_predict_query_runnable"], "run_name": "nl_to_sql_predict_query_runnable"}  # type: ignore
+    .with_config(
+        config={"tags": ["nl_to_sql_predict_query_runnable"], "run_name": "nl_to_sql_predict_query_runnable"}  # type: ignore
+    )
+    .with_types(input_type=SqlChainInputType)
 )
 
 # Chain which does the validation
 chain_with_validation = RunnableParallel(inputs=input_runnable, query=query_runnable) | RunnableLambda(validate_query)  # type: ignore
+chain = chain_with_validation.with_types(input_type=SqlChainInputType, output_type=SqlChainOutputType).with_config(  # type: ignore
+    config={"tags": ["nl_to_sql_chain_runnable"], "run_name": "nl_to_sql_chain_runnable"}  # type: ignore
+)
 
 # Chain with string literal correction
-# chain_with_string_literal_correction = RunnablePassthrough.assign(
-#     inputs=input_runnable, query=chain_with_validation
-# ) | RunnableLambda(
-#     do_string_literal_correction  # type: ignore
-# )
+chain_with_string_literal_correction = RunnablePassthrough.assign(
+    inputs=input_runnable, query_dict=chain
+) | RunnableLambda(
+    do_string_literal_correction  # type: ignore
+)
 
-# chain = chain_with_string_literal_correction.with_config(  # type: ignore
-#     config={"tags": ["nl_to_sql_chain_runnable"], "run_name": "nl_to_sql_chain_runnable"}  # type: ignore
-# )
-# chain_with_sql_complexity = (
-#     (RunnableParallel(inputs=input_runnable, query=chain) | RunnableLambda(calculate_sql_complexity))  # type: ignore
-#     .with_types(output_type=SqlChainOutputDictWithComplexity)  # type: ignore
-#     .with_config(  # type: ignore
-#         config={"tags": ["nl_to_sql_chain_with_sql_complexity_runnable"], "run_name": "nl_to_sql_chain_with_sql_complexity_runnable"}  # type: ignore
-#     )
-# )  # type: ignore
+chain_with_sql_complexity = (
+    (RunnableParallel(inputs=input_runnable, query_dict=chain_with_string_literal_correction) | RunnableLambda(calculate_sql_complexity))  # type: ignore
+    .with_types(input_type=SqlChainInputType, output_type=SqlChainWithComplexityOutputType)  # type: ignore
+    .with_config(  # type: ignore
+        config={"tags": ["nl_to_sql_chain_with_sql_complexity_runnable"], "run_name": "nl_to_sql_chain_with_sql_complexity_runnable"}  # type: ignore
+    )
+)  # type: ignore
 
 
 # SQL retry chains
@@ -159,29 +178,31 @@ retry_query_runnable = (
 ).with_config(
     config={"tags": ["nl_to_sql_retry_predict_query_runnable"], "run_name": "nl_to_sql_retry_predict_query_runnable"}  # type: ignore
 )
-retry_chain_with_validation = RunnableParallel(inputs=retry_input_runnable, query=retry_query_runnable) | RunnableLambda(validate_query)  # type: ignore
+retry_chain_with_validation = (
+    RunnableParallel(inputs=retry_input_runnable, query=retry_query_runnable) | RunnableLambda(validate_query)  # type: ignore
+).with_types(input_type=SqlRetryChainInputDict)
 
 
-chain = RunnableBranch(
-    (lambda x: "error" in x, retry_chain_with_validation), (lambda x: "error" not in x, chain_with_validation), lambda x: None  # type: ignore
-).with_config(
-    config={"tags": ["nl_to_sql_chain_runnable"], "run_name": "nl_to_sql_chain_runnable"}  # type: ignore
-)
+# chain = RunnableBranch(
+#     (lambda x: "error" in x, retry_chain_with_validation), (lambda x: "error" not in x, chain_with_validation), lambda x: None  # type: ignore
+# ).with_config(
+#     config={"tags": ["nl_to_sql_chain_runnable"], "run_name": "nl_to_sql_chain_runnable"}  # type: ignore
+# )
 
 
-input_branch = RunnableBranch(
-    (lambda x: "error" in x, retry_input_runnable), (lambda x: "error" not in x, input_runnable), lambda x: None  # type: ignore
-)
+# input_branch = RunnableBranch(
+#     (lambda x: "error" in x, retry_input_runnable), (lambda x: "error" not in x, input_runnable), lambda x: None  # type: ignore
+# )
 
 
-chain_with_literal_correction = RunnableParallel(inputs=input_branch, query=chain) | RunnableLambda(do_string_literal_correction)  # type: ignore
+# chain_with_literal_correction = RunnableParallel(inputs=input_branch, query=chain) | RunnableLambda(do_string_literal_correction)  # type: ignore
 
-chain_with_sql_complexity = (
-    (RunnableParallel(inputs=input_branch, query=chain_with_literal_correction) | RunnableLambda(calculate_sql_complexity))  # type: ignore
-    .with_types(output_type=SqlChainOutputDictWithComplexity)  # type: ignore
-    .with_config(
-        config={"tags": ["nl_to_sql_chain_with_sql_complexity_runnable"], "run_name": "nl_to_sql_chain_with_sql_complexity_runnable"}  # type: ignore
-    )
-)
+# chain_with_sql_complexity = (
+#     (RunnableParallel(inputs=input_branch, query=chain_with_literal_correction) | RunnableLambda(calculate_sql_complexity))  # type: ignore
+#     .with_types(output_type=SqlChainOutputDictWithComplexity)  # type: ignore
+#     .with_config(
+#         config={"tags": ["nl_to_sql_chain_with_sql_complexity_runnable"], "run_name": "nl_to_sql_chain_with_sql_complexity_runnable"}  # type: ignore
+#     )
+# )
 
-complete_chain = chain_with_sql_complexity
+# complete_chain = chain_with_sql_complexity
