@@ -87,6 +87,11 @@ def getOptions(argv=None):
         "--instruction-table", help="NL Answers file", default="databricks_dolly_15k"
     )
     parser.add_argument("--combo-label", help="Combo label", default=None)
+    parser.add_argument("--query-label", help="Query label", default=None)
+    parser.add_argument("--min-avg-prob", help="Min avg prob", default=None)
+    parser.add_argument(
+        "--avg-prob-order-noise", help="Order by avg prob noise", default=None
+    )
 
     return parser.parse_args(argv)
 
@@ -97,9 +102,12 @@ def load_queries(
     query_instruction_prompt,
     query_output_prompt,
     max_token_length,
+    export_label,
     version,
     output_dir,
     num_shards,
+    min_avg_prob,
+    order_by_avg_prob_noise,
 ):
     drop_table_sql = f"DROP TABLE IF EXISTS heavyiq_text_to_sql_v{version}_{max_token_length}_tokens;"
     create_table_sql = f"CREATE TABLE heavyiq_text_to_sql_v{version}_{max_token_length}_tokens (query_id INT, db_id TEXT, tables TEXT[], data_split TEXT, num_instruction_tokens INT, num_targeted_instruction_tokens INT, num_output_tokens INT, instruction TEXT, targeted_instruction TEXT, output TEXT, avg_prob DOUBLE, total_prob DOUBLE, min_prop DOUBLE);"
@@ -110,8 +118,22 @@ def load_queries(
     if query_instruction_prompt and query_output_prompt is not None:
         update_prompt_col_sql = f"UPDATE heavyiq_text_to_sql_v{version}_{max_token_length}_tokens SET prompt = '{query_instruction_prompt}\n' || targeted_instruction || '\n{query_output_prompt}\n';"
     update_answer_col_sql = f"UPDATE heavyiq_text_to_sql_v{version}_{max_token_length}_tokens SET answer = output;"
-    export_train_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_text_to_sql_v{version}_{max_token_length}_tokens WHERE data_split <> 'dev' AND num_targeted_instruction_tokens <= {max_token_length}) TO '{output_dir}/heavyiq_text_to_sql_v{version}_{max_token_length}_tokens_train.csv' WITH (header='t');"
-    export_eval_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_text_to_sql_v{version}_{max_token_length}_tokens WHERE data_split = 'dev' AND num_targeted_instruction_tokens <= {max_token_length}) TO '{output_dir}/heavyiq_text_to_sql_v{version}_{max_token_length}_tokens_eval.csv' WITH (header='t');"
+
+    export_prefix = f"heavyiq_text_to_sql_v{version}_{max_token_length}_tokens"
+    if export_label is not None:
+        export_prefix = (
+            f"heavyiq_text_to_sql_{export_label}_v{version}_{max_token_length}_tokens"
+        )
+    avg_prob_filter_clause = ""
+    if min_avg_prob is not None:
+        avg_prob_filter_clause = f"AND avg_prob >= {min_avg_prob}"
+    avg_prob_order_by_clause = ""
+    if order_by_avg_prob_noise is not None:
+        avg_prob_order_by_clause = f"ORDER BY avg_prob + mod(hash(prompt), 100) * 0.01 * {order_by_avg_prob_noise} DESC"
+
+    export_train_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_text_to_sql_v{version}_{max_token_length}_tokens WHERE data_split <> 'dev' AND num_targeted_instruction_tokens <= {max_token_length} {avg_prob_filter_clause} {avg_prob_order_by_clause}) TO '{output_dir}/{export_prefix}_train.csv' WITH (header='t');"
+    print(export_train_sql)
+    export_eval_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_text_to_sql_v{version}_{max_token_length}_tokens WHERE data_split = 'dev' AND num_targeted_instruction_tokens <= {max_token_length}) TO '{output_dir}/{export_prefix}_eval.csv' WITH (header='t');"
 
     con.execute(drop_table_sql)
     con.execute(create_table_sql)
@@ -369,9 +391,12 @@ def main(argv):
             options.query_instruction_prompt,
             options.query_output_prompt,
             options.max_token_length,
+            options.query_label,
             options.version,
             options.output_dir,
             options.num_query_shards,
+            options.min_avg_prob,
+            options.avg_prob_order_noise,
         )
         queries_table = (
             f"heavyiq_text_to_sql_v{options.version}_{options.max_token_length}_tokens",

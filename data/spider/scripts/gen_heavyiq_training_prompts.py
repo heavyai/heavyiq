@@ -123,6 +123,11 @@ def getOptions(argv=None):
         action="store_true",
     )
     parser.add_argument(
+        "--only-validate-queries",
+        help="Only validate and do not execute queries",
+        action="store_true",
+    )
+    parser.add_argument(
         "--rate-query-perplexity",
         help="Rate query perplexity and store in output CSV",
         action="store_true",
@@ -1400,6 +1405,7 @@ def main(argv):
         fixed_queries = []
         failed_queries = []
         prompts = []
+        llm_responses = []
         english_prompts = []
         question_prompts = []
         table_prompts = []
@@ -1426,9 +1432,13 @@ def main(argv):
                     db_num += 1
                     continue
                 db_hash = con.execute(f"SELECT HASH('{db_id}')").fetchall()[0][0]
-                print(
-                    f"DB {db_id} DB Hash: {db_hash} Shard: {abs(db_hash) % options.num_perplexity_model_shards}"
-                )
+                if (
+                    options.num_perplexity_model_shards is not None
+                    and options.num_perplexity_model_shards > 0
+                ):
+                    print(
+                        f"DB {db_id} DB Hash: {db_hash} Shard: {abs(db_hash) % options.num_perplexity_model_shards}"
+                    )
                 db_query_cache = (
                     query_cache_by_db[db_id] if db_id in query_cache_by_db else set()
                 )
@@ -1518,7 +1528,10 @@ def main(argv):
                     # print(f"SQL Query: {sql_query}")
                     try:
                         if sql_query not in db_query_cache:
-                            con.execute(sql_query)
+                            if options.only_validate_queries:
+                                con._client.sql_validate(con._session, sql_query)
+                            else:
+                                con.execute(sql_query)
 
                         successful_queries += 1
                         if options.write_sql_prompts:
@@ -1648,6 +1661,12 @@ def main(argv):
                                         headers=request_headers,
                                         data=json.dumps(request_data),
                                     ).json()
+                                    result["query_id"] = query_id
+                                    result["db_id"] = db_id
+                                    result["sql_query"] = sql_query
+                                    result["question"] = query["question"]
+                                    result["model_host"] = remote_host
+                                    llm_responses.append(result)
                                     # print(result)
                                 try:
                                     prob_stats = compute_prob_stats_alt(
@@ -1875,6 +1894,9 @@ def main(argv):
             write_generic_prompts_to_csv(question_prompts, "sql_question_prompts.csv")
         if options.write_table_prompts:
             write_generic_prompts_to_csv(table_prompts, "sql_table_prompts.csv")
+        if len(llm_responses) > 0:
+            with open("llm_responses.json", "w") as file:
+                json.dump(llm_responses, file, indent=4)
 
         print(
             f"\n\nTotal NULL Rewrite SUCCESSES: {num_null_rewrite_successes}, FAILS: {num_null_rewrite_fails}"
