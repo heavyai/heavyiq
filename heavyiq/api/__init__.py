@@ -11,11 +11,10 @@ from starlette.exceptions import HTTPException
 from heavyiq.api.handlers import exception_handler as exh
 from heavyiq.api.middlewares import AsyncLoggingMiddleware
 from heavyiq.api.models.error import ErrorResponse
-from heavyiq.api.routes import defaultrouter, iqrouter
+from heavyiq.api.routes import defaultrouter, iqrouter, lcelrouter
 from heavyiq.config import get_config
 from heavyiq.langchain.exceptions import NLtoSQLException
 from heavyiq.langchain.utils import init_telemetrics
-from heavyiq.lcel.chains.heavydb.sql_chain import chain as sql_chain_runnable
 from heavyiq.logging_utils import init_logs
 
 
@@ -81,8 +80,20 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
             }
         },
     )
+    app.include_router(
+        lcelrouter,
+        prefix="/api/v1/lcel",
+        tags=["api.v1.lcel"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "model": ErrorResponse,
+            }
+        },
+    )
     if config.enable_debug_endpoints:
         from heavyiq.api.routes.debug_router import debug_router
+        from heavyiq.api.routes.runnable_router import runnable_router
 
         app.include_router(
             debug_router,
@@ -95,6 +106,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
                 }
             },
         )
+        app.include_router(runnable_router, prefix="/runnable", tags=["runnable"])
 
     # check heavydb connection
     @app.on_event("startup")
@@ -144,8 +156,5 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
 
     # custom openapi
     app.openapi = custom_openapi  # type: ignore
-
-    # add langserve apis
-    add_routes(app, sql_chain_runnable, path="/lcel/nl-to-sql")
 
     return app

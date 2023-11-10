@@ -1140,16 +1140,18 @@ heavydb_var: ContextVar[HeavyDB | None] = ContextVar("heavydb_var", default=None
 
 
 @asynccontextmanager  # type: ignore
-async def heavydb_context(session_id: str) -> AsyncGenerator[HeavyDB, None]:
+async def heavydb_context(session_id_or_db: str | HeavyDB) -> AsyncGenerator[HeavyDB, None]:
     """
-    Async Context which helps to create HeavyDB instance on Setup, set context var and yields it, finally reset
+    Async Context which helps to optionally create HeavyDB instance on Setup, set context var and yields it, finally reset
     context var on teardown.
 
     Example:
         async with heavydb_context(session_id) as db:
             assert heavydb_var.get() == db
     """
-    db = await HeavyDB.from_session_async(session_id=session_id)
+    db = session_id_or_db
+    if not isinstance(db, HeavyDB):
+        db = await HeavyDB.from_session_async(session_id=session_id_or_db)  # type: ignore
     heavydb_var.set(db)
     yield db
     heavydb_var.set(None)

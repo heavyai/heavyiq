@@ -4,6 +4,7 @@ from langchain.pydantic_v1 import BaseModel
 from langchain.schema.output_parser import StrOutputParser
 from langchain.schema.runnable import RunnableBranch, RunnableLambda, RunnableParallel, RunnablePassthrough
 
+from heavyiq.langchain.exceptions import NLtoSQLException
 from heavyiq.langchain.heavydb import get_config, get_db
 from heavyiq.langchain.llms import is_using_custom_trained_llm
 from heavyiq.langchain.utils import aget_table_info_wrt_token_limit
@@ -56,8 +57,16 @@ class ValidateQueryInputDict(TypedDict):
     inputs: SqlChainInputDict
 
 
+DetachedComplexityChainInputDict = ValidateQueryInputDict
+
+
 class SqlChainOutputQueryDict(TypedDict):
     query: str
+
+
+class SqlChainOutputQueryWithErrorDict(TypedDict):
+    query: str
+    error: str
 
 
 class SqlChainOutputDictWithComplexity(TypedDict):
@@ -92,10 +101,12 @@ async def validate_query(input_output: ValidateQueryInputDict) -> SqlChainOutput
     """
     Validate the generated SQL query against HeavyDB.
     """
-    # raise ValueError("Just a small exception.")
     query = input_output["query"].strip()
     heavydb = await get_db(input_output["inputs"]["session_id"])
-    await heavydb.avalidate_query(query)
+    try:
+        await heavydb.avalidate_query(query)
+    except Exception as e:
+        raise NLtoSQLException(message=str(e), failed_sql=query)
     return {"query": query}
 
 
@@ -161,6 +172,23 @@ chain_with_sql_complexity = (
     )
 )  # type: ignore
 
+# chain which accepts query from user instead of predicting it using the above chain runnable
+detached_complexity_chain = (
+    (
+        RunnablePassthrough.assign(
+            query_dict=(
+                RunnablePassthrough.assign(inputs=lambda x: x["inputs"], query_dict=lambda x: x["query"])  # type: ignore
+                | RunnableLambda(do_string_literal_correction)  # type: ignore
+            ),
+            inputs=lambda x: x["inputs"],
+        )
+        | RunnableLambda(calculate_sql_complexity)  # type: ignore
+    )
+    .with_types(input_type=DetachedComplexityChainInputDict, output_type=SqlChainWithComplexityOutputType)  # type: ignore
+    .with_config(  # type: ignore
+        config={"tags": ["nl_to_sql_detached_complexity_chain"], "run_name": "nl_to_sql_detached_complexity_chain"}  # type: ignore
+    )
+)
 
 # SQL retry chains
 
@@ -180,8 +208,10 @@ retry_query_runnable = (
 )
 retry_chain_with_validation = (
     RunnableParallel(inputs=retry_input_runnable, query=retry_query_runnable) | RunnableLambda(validate_query)  # type: ignore
-).with_types(input_type=SqlRetryChainInputDict)
-
+).with_types(
+    input_type=SqlRetryChainInputDict, output_type=SqlQueryDict  # type: ignore
+)
+retry_chain = retry_chain_with_validation
 
 # chain = RunnableBranch(
 #     (lambda x: "error" in x, retry_chain_with_validation), (lambda x: "error" not in x, chain_with_validation), lambda x: None  # type: ignore

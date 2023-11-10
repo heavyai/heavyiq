@@ -1,11 +1,12 @@
+import datetime
 import sys
-from typing import Callable, Any
 from copy import deepcopy
-from starlette.requests import Request
-from starlette.responses import Response
+from typing import Any, Callable
+
 from loguru._defaults import LOGURU_FORMAT as DEFAULT_LOGURU_FORMAT
 from loguru._logger import Logger
-import datetime
+from starlette.requests import Request
+from starlette.responses import Response
 
 
 class Rotator:
@@ -45,7 +46,7 @@ def serialize(record: dict) -> dict:
 
     if response and isinstance(response, Response):
         response_dict["status_code"] = response.status_code or "-"
-        response_dict["response_size"] = response.headers["Content-Length"] if response else "-"
+        response_dict["response_size"] = response.headers.get("Content-Length", "-") if response else "-"
         request_id = request.headers.get("x-request-id")
 
     request_id = request_id or "-"
