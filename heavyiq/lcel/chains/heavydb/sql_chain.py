@@ -2,7 +2,7 @@ from typing import TypedDict
 
 from langchain.pydantic_v1 import BaseModel
 from langchain.schema.output_parser import StrOutputParser
-from langchain.schema.runnable import RunnableBranch, RunnableLambda, RunnableParallel, RunnablePassthrough
+from langchain.schema.runnable import RunnableLambda, RunnableParallel, RunnablePassthrough
 
 from heavyiq.langchain.exceptions import NLtoSQLException
 from heavyiq.langchain.heavydb import get_config, get_db
@@ -212,27 +212,3 @@ retry_chain_with_validation = (
     input_type=SqlRetryChainInputDict, output_type=SqlQueryDict  # type: ignore
 )
 retry_chain = retry_chain_with_validation
-
-# chain = RunnableBranch(
-#     (lambda x: "error" in x, retry_chain_with_validation), (lambda x: "error" not in x, chain_with_validation), lambda x: None  # type: ignore
-# ).with_config(
-#     config={"tags": ["nl_to_sql_chain_runnable"], "run_name": "nl_to_sql_chain_runnable"}  # type: ignore
-# )
-
-
-# input_branch = RunnableBranch(
-#     (lambda x: "error" in x, retry_input_runnable), (lambda x: "error" not in x, input_runnable), lambda x: None  # type: ignore
-# )
-
-
-# chain_with_literal_correction = RunnableParallel(inputs=input_branch, query=chain) | RunnableLambda(do_string_literal_correction)  # type: ignore
-
-# chain_with_sql_complexity = (
-#     (RunnableParallel(inputs=input_branch, query=chain_with_literal_correction) | RunnableLambda(calculate_sql_complexity))  # type: ignore
-#     .with_types(output_type=SqlChainOutputDictWithComplexity)  # type: ignore
-#     .with_config(
-#         config={"tags": ["nl_to_sql_chain_with_sql_complexity_runnable"], "run_name": "nl_to_sql_chain_with_sql_complexity_runnable"}  # type: ignore
-#     )
-# )
-
-# complete_chain = chain_with_sql_complexity

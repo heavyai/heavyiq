@@ -114,6 +114,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         """
         Code to be executed when application starts.
         """
+        import heavyiq.lcel.chains
         from heavyiq.logging_utils import heavyiq_logger as logger
 
         # TODO: Disabled for now, as no guarantee heavydb is running before heavyiq
