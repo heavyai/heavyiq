@@ -283,54 +283,46 @@ def adjust_identifier_case(table_statements: list[str], query: str) -> str:
             column_name = column.split()[0]
             column_map[column_name.lower()] = column_name
 
-    # used_tables = set()
-    # used_tables_list = []
+    print("Table map:", table_map)
+    print("Column map:", column_map)
+    print("Original query:", query)
 
-    # Split the query and replace column names with their original case
-    select_parts = query.split()
+    # select_parts = [token for token in re.split('(\W)|(\()|(\))|(;)', query) if token is not None and len(token) > 0]
+    draft_select_parts = [
+        token
+        for token in re.split("(\W)", query)
+        if token is not None and len(token) > 0
+    ]
+    select_parts = []
+    for idx, part in enumerate(draft_select_parts):
+        if idx > 0 and part == " " and draft_select_parts[idx - 1] == " ":
+            continue
+        select_parts.append(part)
+
+    in_literal_quote = False
     for i, part in enumerate(select_parts):
-        part_stripped = part.rstrip(",;")
-        # Only apply transformations if the part is not a string literal
-        if not (part_stripped.startswith("'") and part_stripped.endswith("'")):
-            # Strip trailing commas if they exist
-            # Check if the part is a function call
-            if "(" in part_stripped and ")" in part_stripped:
-                function_name, rest = part_stripped.split("(", 1)
-                column_name, rest = rest.rsplit(")", 1)
-                if column_name.lower() in column_map:
-                    select_parts[i] = (
-                        function_name
-                        + "("
-                        + column_map[column_name.lower()]
-                        + ")"
-                        + rest
-                        + ("," if part[-1] == "," else "")
-                        + (";" if part[-1] == ";" else "")
-                    )
-            elif "." in part_stripped:
-                table, column = part_stripped.split(".")
-                if column.lower() in column_map:
-                    # Preserve the trailing comma if it was present
-                    select_parts[i] = f"{table}.{column_map[column.lower()]}" + (
-                        "," if part[-1] == "," else ""
-                    )
-            elif part_stripped.lower() in column_map:
-                # Preserve the trailing comma if it was present
-                select_parts[i] = column_map[part_stripped.lower()] + (
-                    "," if part[-1] == "," else ""
-                )
-            elif part_stripped.lower() in table_map:
-                select_parts[i] = table_map[part_stripped.lower()] + (
-                    ";" if part[-1] == ";" else ""
-                )
-                # if part_stripped.lower() not in used_tables:
-                #    used_tables_list.append(table_map[part_stripped.lower()])
-                #    used_tables.add(table_map[part_stripped.lower()])
+        if part == "'":
+            in_literal_quote = not in_literal_quote
+        elif not in_literal_quote and (
+            part.lower() in column_map or part.lower() in table_map
+        ):
+            # Disambiguate whether this is a table or column name
+            if part.lower() in column_map and part.lower() in table_map:
+                if i > 0 and select_parts[i - 1] == ".":
+                    select_parts[i] = column_map[part.lower()]
+                elif i < len(select_parts) - 1 and select_parts[i + 1] == ".":
+                    select_parts[i] = table_map[part.lower()]
+                elif i > 1 and select_parts[i - 2].lower() == "from":
+                    select_parts[i] = table_map[part.lower()]
+                else:
+                    select_parts[i] = column_map[part.lower()]
+            elif part.lower() in column_map:
+                select_parts[i] = column_map[part.lower()]
+            else:
+                select_parts[i] = table_map[part.lower()]
 
-    # Combine the parts again
-    output_query = " ".join(select_parts)
+    output_query = "".join(select_parts)
     return output_query
-    # return {"query": output_query, "tables": used_tables_list}
 
 
 def adjust_alias_case(query: str) -> str:
