@@ -1,9 +1,11 @@
 import functools
 from typing import Awaitable, Callable, TypeVar
+from uuid import UUID
 
+from langchain import callbacks
 from langchain.pydantic_v1 import BaseModel
 
-from heavyiq.api.models import QueryRequest, QueryResponse, QuestionRequest, QuestionResponse
+from heavyiq.api.models import QueryResponse, QuestionResponse
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.heavydb import heavydb_context
@@ -28,7 +30,31 @@ def with_db(coro: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
     return wrapper
 
 
+def with_feedback_id(coro: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
+    """
+    Decorator which attaches the run_id to the response.
+    """
+
+    async def wrapper(*args, **kwargs) -> T:
+        from heavyiq.langchain.utils import is_langsmith_active
+
+        run_id: UUID | str = ""
+        if is_langsmith_active:
+            with callbacks.collect_runs() as cb:
+                out = await coro(*args, **kwargs)
+                run_id = str(cb.traced_runs[0].id)
+        else:
+            out = await coro(*args, **kwargs)
+        if isinstance(out, BaseModel) and hasattr(out, "feedback_id"):
+            setattr(out, "feedback_id", run_id)
+
+        return out
+
+    return wrapper
+
+
 @with_db
+@with_feedback_id
 async def handle_lcel_query_request(request_dict: dict, config: dict | None = None) -> QueryResponse:
     """
     Async LCEL handler for /query request.
@@ -40,6 +66,7 @@ async def handle_lcel_query_request(request_dict: dict, config: dict | None = No
 
 
 @with_db
+@with_feedback_id
 async def handle_lcel_question_request(request_dict: dict, config: dict | None = None) -> QuestionResponse:
     """
     Async LCEL handler for /question request.

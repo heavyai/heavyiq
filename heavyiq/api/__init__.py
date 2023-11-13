@@ -5,7 +5,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from heavydb.exceptions import Error as HeavyDBError  # type: ignore
-from langserve import add_routes
 from starlette.exceptions import HTTPException
 
 from heavyiq.api.handlers import exception_handler as exh
