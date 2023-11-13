@@ -87,17 +87,26 @@ branch = RunnablePassthrough().assign(
     ),
     inputs=lambda x: x,
 )
+# branch which checks for the existence of `query` and `sql_complexity` keys in input.
+# If yes, then it forms the input for the next runnable step by assigning the values to `sql_chain_output`
+# else it asks for nl_to_sql_chain_with_sql_complexity runnable to generate query and sql_complexity
+to_sql_chain_or_not_branch = RunnableBranch(
+    (
+        lambda x: "query" in x and "sql_complexity" in x,
+        RunnableLambda(lambda x: {"query": x["query"], "sql_complexity": x["sql_complexity"]}),  # type: ignore
+    ),
+    nl_to_sql_chain_with_sql_complexity,
+)
 # Chain of RunnablePassthrough merges all the intermediate results with the original input. For ex,
 # RunnablePassthrough() | RunnablePassthrough.assign(foo=RunnableLambda(fun_a)) | RunnablePassthrough.assign(bar=RunnableLambda(func_b))
 # here func_b function receives the original input as well as the intermediate results, ie. foo
 chain = (
     (
-        RunnablePassthrough.assign(sql_chain_output=nl_to_sql_chain_with_sql_complexity, input=lambda x: x["question"])
+        RunnablePassthrough.assign(sql_chain_output=to_sql_chain_or_not_branch, input=lambda x: x["question"])
         | RunnablePassthrough.assign(
             sql_cmd=lambda x: x["sql_chain_output"]["query"],
             sql_complexity=lambda x: x["sql_chain_output"]["sql_complexity"],
         )
-        | RunnablePassthrough.assign()
         | RunnablePassthrough.assign(
             sql_result=RunnableLambda(get_sql_result),  # type: ignore
         )

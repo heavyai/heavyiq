@@ -1,6 +1,7 @@
 from langchain.schema.runnable.config import RunnableConfig
 
 from heavyiq.langchain.exceptions import NLtoSQLException
+from heavyiq.lcel.chains.heavydb.answer_chain import chain as answer_chain
 from heavyiq.lcel.chains.heavydb.sql_chain import DetachedComplexityChainInputDict
 from heavyiq.lcel.chains.heavydb.sql_chain import SqlChainInputDict as PredictQueryInputDict
 from heavyiq.lcel.chains.heavydb.sql_chain import SqlChainOutputDictWithComplexity as DetachedComplexityChainOutputDict
@@ -69,3 +70,28 @@ async def predict_sql_query_and_complexity_with_retries(
     chain_inputs: DetachedComplexityChainInputDict = {"inputs": inputs, "query": query}
     out: DetachedComplexityChainOutputDict = await detached_complexity_chain.ainvoke(chain_inputs)  # type: ignore
     return out["query"], out["sql_complexity"]
+
+
+async def predict_sql_query_and_answer_with_retries(
+    inputs: PredictQueryInputDict, config: RunnableConfig | None = None, max_retries: int = 3
+) -> dict:
+    """
+    Predict a functioning SQL query after several specific retries and also find it's complexity.
+    Run the predicted query against HeavyDB in-order to produce SQL resultset.
+    Finally form valid NL answer by passing the SQL resultset to the NL llm.
+
+    Args:
+        inputs: Runnable inputs dict.
+        config: RunnableConfig. Defaults to None.
+        max_retries: max query retry count. Defaults to 3.
+
+    Returns:
+        AnswerChainOutputType.dict
+    """
+    query, sql_complexity = await predict_sql_query_and_complexity_with_retries(
+        inputs=inputs, config=config, max_retries=max_retries
+    )
+    answer_response = await answer_chain.ainvoke(
+        {**inputs, "query": query, "sql_complexity": sql_complexity}, config=config
+    )
+    return answer_response.dict()
