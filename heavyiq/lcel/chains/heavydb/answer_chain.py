@@ -1,11 +1,12 @@
 from typing import Any, TypedDict
 
 from langchain.schema.output_parser import StrOutputParser
-from langchain.schema.runnable import RunnableBranch, RunnableLambda, RunnablePassthrough
+from langchain.schema.runnable import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
 
 from heavyiq.config import get_config
 from heavyiq.langchain.heavydb import get_db
 from heavyiq.langchain.llms import is_using_custom_trained_llm
+from heavyiq.lcel.chains.heavydb.sql_chain import calculate_sql_complexity
 from heavyiq.lcel.chains.heavydb.sql_chain import chain as nl_to_sql_chain_with_sql_complexity
 from heavyiq.lcel.llms import llm_runnable
 from heavyiq.lcel.prompts import to_answer_prompt_runnable
@@ -78,6 +79,19 @@ def change_format(inputs: dict) -> Any:
     ).dict()
 
 
+def change_format_for_error(inputs: dict) -> Any:
+    """
+    Return this dict response for invalid query generation.
+    """
+    return AnswerChainOutputType(
+        sql=inputs["query"],
+        sql_complexity=inputs["sql_complexity"],
+        results="",
+        answer="",
+        fail_reason=inputs["sql_chain_output"]["error"],
+    ).dict()
+
+
 generate_sql_resultset_step = RunnablePassthrough.assign(
     sql_result=RunnableLambda(get_sql_result),  # type: ignore
 ).with_config(config={"run_name": "Generate SQL Resultset"})
@@ -110,10 +124,28 @@ to_sql_chain_or_not_branch = RunnableBranch(
         lambda x: "query" in x and "sql_complexity" in x,
         RunnableLambda(lambda x: {"query": x["query"], "sql_complexity": x["sql_complexity"]}),  # type: ignore
     ),
+    (
+        lambda x: "query" in x and "sql_complexity" not in x,
+        RunnableLambda(lambda x: {"query": x["query"], "sql_complexity": RunnableLambda(calculate_sql_complexity)}),  # type: ignore
+    ),
     nl_to_sql_chain_with_sql_complexity,
 ).with_config(config={"run_name": "Find Query or Passthrough Branch"})
 
 final_step = RunnableLambda(change_format)
+final_error_step = RunnableLambda(change_format_for_error)
+# Initial branch which will do the answer geenration only when the query
+# gets validated successfully.
+handle_query_error_branch: Runnable = RunnableBranch(
+    (lambda x: bool(x["sql_chain_output"].get("error")), RunnablePassthrough() | final_error_step),
+    RunnablePassthrough.assign(
+        sql_cmd=lambda x: x["sql_chain_output"]["query"],
+        sql_complexity=lambda x: x["sql_chain_output"]["sql_complexity"],
+    )
+    | generate_sql_resultset_step
+    | should_forward_resultset_to_llm_step
+    | answer_decider_branch
+    | final_step,
+)
 
 # Chain of RunnablePassthrough merges all the intermediate results with the original input. For ex,
 # RunnablePassthrough() | RunnablePassthrough.assign(foo=RunnableLambda(fun_a)) | RunnablePassthrough.assign(bar=RunnableLambda(func_b))
@@ -121,14 +153,7 @@ final_step = RunnableLambda(change_format)
 chain = (
     (
         RunnablePassthrough.assign(sql_chain_output=to_sql_chain_or_not_branch, input=lambda x: x["question"])
-        | RunnablePassthrough.assign(
-            sql_cmd=lambda x: x["sql_chain_output"]["query"],
-            sql_complexity=lambda x: x["sql_chain_output"]["sql_complexity"],
-        )
-        | generate_sql_resultset_step
-        | should_forward_resultset_to_llm_step
-        | answer_decider_branch
-        | final_step
+        | handle_query_error_branch
     )
     .with_types(input_type=SqlChainInputType, output_type=AnswerChainOutputType)  # type: ignore
     .with_config(

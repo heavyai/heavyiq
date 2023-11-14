@@ -16,6 +16,7 @@ from heavyiq.lcel.types.sql_type import (
     SqlChainIntermediateType,
     SqlChainOutputType,
 )
+from heavyiq.utils import strip_sql_comments
 
 # var endswith `rbl` means it's an runnable
 nl_to_sql_llm_rbl = llm_runnable.with_config(
@@ -158,7 +159,19 @@ calculate_sql_complexity_step = (
     .with_config(config={"run_name": "Calculate SQL Complexity"})
 )
 
-final_step = RunnableLambda(lambda x: {"query": x["query"], "sql_complexity": x["sql_complexity"]})
+final_step = RunnableLambda(
+    lambda x: {
+        "query": strip_sql_comments(x.get("query", x.get("sql_cmd"))),
+        "sql_complexity": x.get("sql_complexity", 0),
+        "error": x["error"],
+    }
+)
+
+# branch which passthrough the inputs upon error else do correct string literals and calculate complexity
+do_string_correction_and_calculate_complexity_or_passthrough_branch: Runnable = RunnableBranch(
+    (lambda x: x["error"] is None, string_literal_correction_step | calculate_sql_complexity_step),
+    RunnablePassthrough(),
+).with_types(input_type=SqlChainIntermediateType)
 
 chain: Runnable[Any, Any] = (
     (
@@ -171,8 +184,7 @@ chain: Runnable[Any, Any] = (
         | RunnablePassthrough().assign(sql_cmd=query_runnable)
         | validation_step
         | revise_lambda
-        | string_literal_correction_step
-        | calculate_sql_complexity_step
+        | do_string_correction_and_calculate_complexity_or_passthrough_branch
         | final_step
     )
     .with_config(  # type: ignore

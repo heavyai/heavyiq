@@ -17,6 +17,7 @@ class SqlChainOutputType(BaseModel):
 
     query: str = Field(..., description="Generated query.")
     sql_complexity: int = Field(..., description="sql complexity of the generated query.")
+    error: str = Field(..., description="description about the error which might occur during query validation.")
 
 
 class SqlChainIntermediateType(BaseModel):
