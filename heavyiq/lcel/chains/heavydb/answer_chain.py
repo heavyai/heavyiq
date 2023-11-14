@@ -75,17 +75,32 @@ def change_format(inputs: dict) -> Any:
         fail_reason=""
         if inputs["do_forward"]
         else output_fail_reasons["max_size_reached"],  # Fix this for more than 1 fail reasons
-    )
+    ).dict()
 
+
+generate_sql_resultset_step = RunnablePassthrough.assign(
+    sql_result=RunnableLambda(get_sql_result),  # type: ignore
+).with_config(config={"run_name": "Generate SQL Resultset"})
+should_forward_resultset_to_llm_step = RunnablePassthrough.assign(
+    do_forward=RunnableLambda(should_forward_sql_result_to_llm)
+).with_config(config={"run_name": "Should Forward Resultset to LLM?"})
+
+sql_to_answer_step = (sql_to_answer_prompt_rbl | sql_to_answer_llm_rbl | StrOutputParser()).with_config(
+    config={"run_name": "Predict Answer"}
+)
 
 # branch which either generates the answer or returns None
-branch = RunnablePassthrough().assign(
-    answer=RunnableBranch(
-        (lambda x: x["do_forward"], sql_to_answer_prompt_rbl | sql_to_answer_llm_rbl | StrOutputParser()),
-        (lambda x: not x["do_forward"], RunnableLambda(lambda x: "")),
-        lambda x: "",
-    ),
-    inputs=lambda x: x,
+answer_decider_branch = (
+    RunnablePassthrough()
+    .assign(
+        answer=RunnableBranch(
+            (lambda x: x["do_forward"], sql_to_answer_step),
+            (lambda x: not x["do_forward"], RunnableLambda(lambda x: "")),
+            lambda x: "",
+        ),
+        inputs=lambda x: x,
+    )
+    .with_config(config={"run_name": "Generate Answer or Return Empty Branch"})
 )
 # branch which checks for the existence of `query` and `sql_complexity` keys in input.
 # If yes, then it forms the input for the next runnable step by assigning the values to `sql_chain_output`
@@ -96,7 +111,10 @@ to_sql_chain_or_not_branch = RunnableBranch(
         RunnableLambda(lambda x: {"query": x["query"], "sql_complexity": x["sql_complexity"]}),  # type: ignore
     ),
     nl_to_sql_chain_with_sql_complexity,
-)
+).with_config(config={"run_name": "Find Query or Passthrough Branch"})
+
+final_step = RunnableLambda(change_format)
+
 # Chain of RunnablePassthrough merges all the intermediate results with the original input. For ex,
 # RunnablePassthrough() | RunnablePassthrough.assign(foo=RunnableLambda(fun_a)) | RunnablePassthrough.assign(bar=RunnableLambda(func_b))
 # here func_b function receives the original input as well as the intermediate results, ie. foo
@@ -107,15 +125,13 @@ chain = (
             sql_cmd=lambda x: x["sql_chain_output"]["query"],
             sql_complexity=lambda x: x["sql_chain_output"]["sql_complexity"],
         )
-        | RunnablePassthrough.assign(
-            sql_result=RunnableLambda(get_sql_result),  # type: ignore
-        )
-        | RunnablePassthrough.assign(do_forward=RunnableLambda(should_forward_sql_result_to_llm))
-        | branch
-        | RunnableLambda(change_format)
+        | generate_sql_resultset_step
+        | should_forward_resultset_to_llm_step
+        | answer_decider_branch
+        | final_step
     )
     .with_types(input_type=SqlChainInputType, output_type=AnswerChainOutputType)  # type: ignore
     .with_config(
-        config={"tags": ["nl_to_answer_chain_runnable"], "run_name": "nl_to_answer_chain_runnable"}  # type: ignore
+        config={"tags": ["NLtoAnswerChainRunnable"], "run_name": "NL to Answer Chain Runnable"}  # type: ignore
     )
 )

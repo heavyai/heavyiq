@@ -59,10 +59,11 @@ async def handle_lcel_query_request(request_dict: dict, config: dict | None = No
     """
     Async LCEL handler for /query request.
     """
-    from heavyiq.controller.langchain import predict_sql_query_and_complexity_with_retries
+    from heavyiq.lcel.chains import sql_chain
+    from heavyiq.lcel.types.sql_type import SqlChainOutputType
 
-    out = await predict_sql_query_and_complexity_with_retries(request_dict, config=config)  # type: ignore
-    return QueryResponse(sql=out[0], sql_complexity=out[1], feedback_id="", logprobs={})
+    out: SqlChainOutputType = await sql_chain.ainvoke(request_dict, config=config)  # type: ignore
+    return QueryResponse(sql=out["query"], sql_complexity=out["sql_complexity"], feedback_id="", logprobs={})
 
 
 @with_db
@@ -78,9 +79,9 @@ async def handle_lcel_question_request(request_dict: dict, config: dict | None =
     Returns:
         QuestionResponse
     """
-    from heavyiq.controller.langchain import predict_sql_query_and_answer_with_retries
+    from heavyiq.lcel.chains import answer_chain
 
-    result = await predict_sql_query_and_answer_with_retries(request_dict, config=config)  # type: ignore
+    result = await answer_chain.ainvoke(request_dict, config=config)  # type: ignore
     return QuestionResponse(
         sql=result["sql"],
         sql_result=result["results"],
