@@ -6,7 +6,7 @@ from langchain.schema.runnable import RunnableBranch, RunnableLambda, RunnablePa
 from heavyiq.config import get_config
 from heavyiq.langchain.heavydb import get_db
 from heavyiq.langchain.llms import is_using_custom_trained_llm
-from heavyiq.lcel.chains.heavydb.sql_chain import chain_with_sql_complexity as nl_to_sql_chain_with_sql_complexity
+from heavyiq.lcel.chains.heavydb.sql_chain import chain as nl_to_sql_chain_with_sql_complexity
 from heavyiq.lcel.llms import llm_runnable
 from heavyiq.lcel.prompts import to_answer_prompt_runnable
 from heavyiq.lcel.types.answer_type import AnswerChainOutputType
