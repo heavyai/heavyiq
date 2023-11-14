@@ -14,7 +14,7 @@ from heavyiq.langchain.logging import log_chain_runnable
 from heavyiq.langchain.utils import init_telemetrics
 from heavyiq.lcel.chains.heavydb.answer_chain import chain as nl_to_answer_chain
 from heavyiq.lcel.chains.heavydb.sql_chain import chain as nl_to_sql_chain
-from heavyiq.lcel.chains.heavydb.sql_chain import chain_with_validation, query_runnable
+from heavyiq.lcel.chains.heavydb.sql_chain import query_runnable
 
 # from heavyiq.lcel.chains.heavydb.sql_chain import complete_chain as nl_to_sql_complete_chain
 
@@ -143,6 +143,6 @@ if __name__ == "__main__":
             "session_id": session_id,
         }
     )
-    asyncio.run(nl_to_sql(session_id))
+    asyncio.run(nl_to_answer(session_id))
     end_time = time.perf_counter()
     print("Elapsed time during the whole program in seconds:", end_time - start_time)

@@ -18,7 +18,6 @@
     "mypy"
   ],
   "python.languageServer": "Pylance",
-  "python.analysis.typeCheckingMode": "basic",
   "files.exclude": {
     "**/.git": true,
     "**/.svn": true,
