@@ -14,7 +14,6 @@ from heavyiq.langchain.logging import log_chain_runnable
 from heavyiq.langchain.utils import init_telemetrics
 from heavyiq.lcel.chains.heavydb.answer_chain import chain as nl_to_answer_chain
 from heavyiq.lcel.chains.heavydb.sql_chain import chain as nl_to_sql_chain
-from heavyiq.lcel.chains.heavydb.sql_chain import query_runnable
 
 # from heavyiq.lcel.chains.heavydb.sql_chain import complete_chain as nl_to_sql_complete_chain
 
@@ -111,6 +110,27 @@ async def nl_to_answer(session_id: str):
         print(out)
 
 
+async def sql_to_answer_without_complexity(session_id: str):
+    async with heavydb_context(session_id):
+        inputs = {
+            **input_ctx_var.get(),
+            "query": "SELECT COUNT(DISTINCT STATE_NAME) AS count_states, STATE_NAME FROM usa_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;",
+        }
+        out = await nl_to_answer_chain.ainvoke(inputs)
+        print(out)
+
+
+async def sql_to_answer_with_complexity(session_id: str):
+    async with heavydb_context(session_id):
+        inputs = {
+            **input_ctx_var.get(),
+            "query": "SELECT COUNT(DISTINCT STATE_NAME) AS count_states, STATE_NAME FROM usa_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;",
+            "sql_complexity": 3,
+        }
+        out = await nl_to_answer_chain.ainvoke(inputs)
+        print(out)
+
+
 async def nl_to_answer_batch(session_id: str):
     """
     Runnable can operate on batches of input.
@@ -143,6 +163,6 @@ if __name__ == "__main__":
             "session_id": session_id,
         }
     )
-    asyncio.run(nl_to_answer(session_id))
+    asyncio.run(sql_to_answer_with_complexity(session_id))
     end_time = time.perf_counter()
     print("Elapsed time during the whole program in seconds:", end_time - start_time)

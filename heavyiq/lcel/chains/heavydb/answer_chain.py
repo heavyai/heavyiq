@@ -48,7 +48,7 @@ async def get_sql_result(inputs: AnswerChainInputDictWithQuery) -> list | str | 
     return sql_result
 
 
-def should_forward_sql_result_to_llm(inputs: dict) -> bool:
+async def should_forward_sql_result_to_llm(inputs: dict) -> bool:
     """
     Based on the sql_result, return a decision on whether to generate an answer using llm or not.
     """
@@ -64,7 +64,7 @@ def should_forward_sql_result_to_llm(inputs: dict) -> bool:
     return True
 
 
-def change_format(inputs: dict) -> Any:
+async def change_format(inputs: dict) -> Any:
     """
     Helps to change answer output to a desired format.
     """
@@ -79,7 +79,7 @@ def change_format(inputs: dict) -> Any:
     ).dict()
 
 
-def change_format_for_error(inputs: dict) -> Any:
+async def change_format_for_error(inputs: dict) -> Any:
     """
     Return this dict response for invalid query generation.
     """
@@ -126,13 +126,13 @@ to_sql_chain_or_not_branch = RunnableBranch(
     ),
     (
         lambda x: "query" in x and "sql_complexity" not in x,
-        RunnableLambda(lambda x: {"query": x["query"], "sql_complexity": RunnableLambda(calculate_sql_complexity)}),  # type: ignore
+        RunnablePassthrough().assign(sql_complexity=RunnableLambda(calculate_sql_complexity)) | RunnableLambda(lambda x: {"query": x["query"], "sql_complexity": x["sql_complexity"]}),  # type: ignore
     ),
     nl_to_sql_chain_with_sql_complexity,
 ).with_config(config={"run_name": "Find Query or Passthrough Branch"})
 
-final_step = RunnableLambda(change_format)
-final_error_step = RunnableLambda(change_format_for_error)
+final_step: Runnable = RunnableLambda(change_format)
+final_error_step: Runnable = RunnableLambda(change_format_for_error)
 # Initial branch which will do the answer geenration only when the query
 # gets validated successfully.
 handle_query_error_branch: Runnable = RunnableBranch(
