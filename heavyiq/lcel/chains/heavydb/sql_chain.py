@@ -165,7 +165,7 @@ final_step = RunnableLambda(
         "sql_complexity": x.get("sql_complexity", 0),
         "error": x["error"],
     }
-)
+).with_config(config={"run_name": "Format Output"})
 
 # branch which passthrough the inputs upon error else do correct string literals and calculate complexity
 do_string_correction_and_calculate_complexity_or_passthrough_branch: Runnable = RunnableBranch(
@@ -175,13 +175,7 @@ do_string_correction_and_calculate_complexity_or_passthrough_branch: Runnable = 
 
 chain: Runnable[Any, Any] = (
     (
-        {
-            "max_revisions": lambda x: 3,  # hardcoded retry count
-            "session_id": itemgetter("session_id"),
-            "question": itemgetter("question"),
-            "tables": itemgetter("tables"),
-        }
-        | RunnablePassthrough().assign(sql_cmd=query_runnable)
+        RunnablePassthrough().assign(sql_cmd=query_runnable, max_revisions=lambda x: 3)
         | validation_step
         | revise_lambda
         | do_string_correction_and_calculate_complexity_or_passthrough_branch
