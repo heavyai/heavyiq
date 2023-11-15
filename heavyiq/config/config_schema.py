@@ -52,7 +52,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     custom_llm_azure_openai_api_base: str = ""
     custom_llm_azure_deployment_name: str = ""
     # logprobs
-    enable_logprobs: bool = True
+    enable_logprobs: bool = False
     custom_llm_logprobs_limit: int = 5
 
 
