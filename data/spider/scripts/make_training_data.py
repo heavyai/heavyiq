@@ -110,7 +110,7 @@ def load_queries(
     order_by_avg_prob_noise,
 ):
     drop_table_sql = f"DROP TABLE IF EXISTS heavyiq_text_to_sql_v{version}_{max_token_length}_tokens;"
-    create_table_sql = f"CREATE TABLE heavyiq_text_to_sql_v{version}_{max_token_length}_tokens (query_id INT, db_id TEXT, tables TEXT[], data_split TEXT, num_instruction_tokens INT, num_targeted_instruction_tokens INT, num_output_tokens INT, instruction TEXT, targeted_instruction TEXT, output TEXT, avg_prob DOUBLE, total_prob DOUBLE, min_prop DOUBLE);"
+    create_table_sql = f"CREATE TABLE heavyiq_text_to_sql_v{version}_{max_token_length}_tokens (query_id INT, db_id TEXT, tables TEXT[], data_split TEXT, question TEXT, num_instruction_tokens INT, num_targeted_instruction_tokens INT, num_output_tokens INT, instruction TEXT, targeted_instruction TEXT, output TEXT, avg_prob DOUBLE, total_prob DOUBLE, min_prop DOUBLE);"
     load_sql = f"COPY heavyiq_text_to_sql_v{version}_{max_token_length}_tokens FROM '{queries_path}' WITH (header='t', array_marker='[]');"
     add_prompt_col_sql = f"ALTER TABLE heavyiq_text_to_sql_v{version}_{max_token_length}_tokens ADD COLUMN prompt TEXT;"
     add_answer_col_sql = f"ALTER TABLE heavyiq_text_to_sql_v{version}_{max_token_length}_tokens ADD COLUMN answer TEXT;"
@@ -131,9 +131,9 @@ def load_queries(
     if order_by_avg_prob_noise is not None:
         avg_prob_order_by_clause = f"ORDER BY avg_prob + mod(hash(prompt), 100) * 0.01 * {order_by_avg_prob_noise} DESC"
 
-    export_train_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_text_to_sql_v{version}_{max_token_length}_tokens WHERE data_split <> 'dev' AND num_targeted_instruction_tokens <= {max_token_length} {avg_prob_filter_clause} {avg_prob_order_by_clause}) TO '{output_dir}/{export_prefix}_train.csv' WITH (header='t');"
+    export_train_sql = f"COPY (SELECT query_id, db_id, question, prompt, answer FROM heavyiq_text_to_sql_v{version}_{max_token_length}_tokens WHERE data_split <> 'dev' AND num_targeted_instruction_tokens <= {max_token_length} {avg_prob_filter_clause} {avg_prob_order_by_clause}) TO '{output_dir}/{export_prefix}_train.csv' WITH (header='t');"
     print(export_train_sql)
-    export_eval_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_text_to_sql_v{version}_{max_token_length}_tokens WHERE data_split = 'dev' AND num_targeted_instruction_tokens <= {max_token_length}) TO '{output_dir}/{export_prefix}_eval.csv' WITH (header='t');"
+    export_eval_sql = f"COPY (SELECT query_id, db_id, question, prompt, answer FROM heavyiq_text_to_sql_v{version}_{max_token_length}_tokens WHERE data_split = 'dev' AND num_targeted_instruction_tokens <= {max_token_length}) TO '{output_dir}/{export_prefix}_eval.csv' WITH (header='t');"
 
     con.execute(drop_table_sql)
     con.execute(create_table_sql)

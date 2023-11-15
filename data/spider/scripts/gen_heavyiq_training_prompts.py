@@ -282,11 +282,6 @@ def adjust_identifier_case(table_statements: list[str], query: str) -> str:
         for column in columns:
             column_name = column.split()[0]
             column_map[column_name.lower()] = column_name
-
-    print("Table map:", table_map)
-    print("Column map:", column_map)
-    print("Original query:", query)
-
     # select_parts = [token for token in re.split('(\W)|(\()|(\))|(;)', query) if token is not None and len(token) > 0]
     draft_select_parts = [
         token
@@ -297,6 +292,15 @@ def adjust_identifier_case(table_statements: list[str], query: str) -> str:
     for idx, part in enumerate(draft_select_parts):
         if idx > 0 and part == " " and draft_select_parts[idx - 1] == " ":
             continue
+        if idx > 1:
+            if (
+                draft_select_parts[idx - 2] == '"'
+                and draft_select_parts[idx - 1] != '"'
+                and draft_select_parts[idx] == '"'
+            ):
+                select_parts = select_parts[:-2]
+                select_parts.append(f'"{draft_select_parts[idx - 1]}"')
+                continue
         select_parts.append(part)
 
     in_literal_quote = False
@@ -312,7 +316,10 @@ def adjust_identifier_case(table_statements: list[str], query: str) -> str:
                     select_parts[i] = column_map[part.lower()]
                 elif i < len(select_parts) - 1 and select_parts[i + 1] == ".":
                     select_parts[i] = table_map[part.lower()]
-                elif i > 1 and select_parts[i - 2].lower() == "from":
+                elif i > 1 and (
+                    select_parts[i - 2].lower() == "from"
+                    or select_parts[i - 2].lower() == "join"
+                ):
                     select_parts[i] = table_map[part.lower()]
                 else:
                     select_parts[i] = column_map[part.lower()]
@@ -433,9 +440,14 @@ def getQueriesByDB(queries_file):
     queries_df = pd.read_csv(queries_file)
     queries_df["modified_sql_query"] = queries_df["modified_sql_query"].astype(str)
     queries_df["english_explanation"] = queries_df["english_explanation"].astype(str)
+    queries_df["valid"] = queries_df["valid"].astype(str)
     queries_by_db = {}
     for index, row in queries_df.iterrows():
         query_id = row["query_id"]
+        query_valid = row["valid"]
+        if query_valid.lower() == "no" or query_valid.lower() == "false":
+            print(f"Skipping invalid query {query_id}")
+            continue
         db_id = row["db_id"]
         original_sql_query = row["original_sql_query"].strip()
         modified_sql_query = row["modified_sql_query"].strip()
@@ -546,7 +558,8 @@ def get_top_k_vals(con, table_name, column_name, top_k):
 def get_high_low_card_top_k_vals(
     con, table_name, column_name, low_card_top_k, high_card_top_k
 ):
-    count_distinct_sql = f"""SELECT COUNT(DISTINCT "{column_name}") FROM "{table_name}" WHERE "{column_name}" IS NOT NULL AND LENGTH("{column_name}") > 0"""
+    # count_distinct_sql = f"""SELECT APPROX_COUNT_DISTINCT("{column_name}") FROM "{table_name}" WHERE "{column_name}" IS NOT NULL AND LENGTH("{column_name}") > 0"""
+    count_distinct_sql = f"""SELECT APPROX_COUNT_DISTINCT("{column_name}") FROM "{table_name}" WHERE "{column_name}" IS NOT NULL"""
     cardinality = list(con.execute(count_distinct_sql))[0][0]
     top_k = high_card_top_k
     if cardinality <= low_card_top_k:
@@ -648,12 +661,12 @@ def generate_table_metadata_str(table_schemas, top_k_str_vals, low_card_col_thre
 
 def generate_instruction(table_metadata, user_question=None):
     if user_question is not None:
-        instruction = """You are a experienced data analyst adept at writing SQL queries to answer user questions.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nWrite a SQL query to answer the following question:\n\n{user_question}\n""".format(
+        instruction = """You are an experienced data analyst adept at writing SQL queries to answer user questions.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nWrite a SQL query to answer the following question:\n\n{user_question}\n""".format(
             table_metadata=table_metadata, user_question=user_question
         )
         return instruction
     else:
-        instruction = """You are a experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nWrite a compelling question to ask of the above data:\n""".format(
+        instruction = """You are an experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nWrite a compelling question to ask of the above data:\n""".format(
             table_metadata=table_metadata
         )
         return instruction
@@ -667,20 +680,20 @@ def generate_question(table_metadata, unique_columns=None):
                 unique_columns_str += unique_column[1] + "." + unique_column[2] + "\n"
         else:
             unique_columns_str += "COUNT(*)\n"
-        instruction = """You are a experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nUse the following columns to generate the question a compelling question of the data:\n\n{unique_columns_str}\n""".format(
+        instruction = """You are an experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nUse the following columns to generate the question a compelling question of the data:\n\n{unique_columns_str}\n""".format(
             table_metadata=table_metadata,
             unique_columns_str=unique_columns_str,
         )
         return instruction
     else:
-        instruction = """You are a experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nWrite a compelling question to ask of the above data:\n""".format(
+        instruction = """You are an experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nWrite a compelling question to ask of the above data:\n""".format(
             table_metadata=table_metadata
         )
         return instruction
 
 
 def generate_table_prompt(table_metadata, user_question):
-    instruction = """You are a experienced data analyst adept at analyzing user questions to determine the SQL tables required to generate an answer.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nEmit each table name along with a 1 if the table is required to answer the following user question, or a 0 if the table is not required.\n\nQuestion: {user_question}\n""".format(
+    instruction = """You are an experienced data analyst adept at analyzing user questions to determine the SQL tables required to generate an answer.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nEmit each table name along with a 1 if the table is required to answer the following user question, or a 0 if the table is not required.\n\nQuestion: {user_question}\n""".format(
         table_metadata=table_metadata, user_question=user_question
     )
     return instruction
@@ -715,6 +728,7 @@ def write_sql_prompts_to_csv(prompts, output_file):
         "db_id",
         "tables",
         "data_split",
+        "question",
         "instruction_tokens",
         "targeted_instruction_tokens",
         "output_tokens",
@@ -731,6 +745,7 @@ def write_sql_prompts_to_csv(prompts, output_file):
             obj["db_id"],
             obj["tables"],
             obj["data_split"],
+            obj["question"],
             obj["instruction_tokens"],
             obj["targeted_instruction_tokens"],
             obj["output_tokens"],
@@ -1681,6 +1696,7 @@ def main(argv):
                                     "query_id": query_id,
                                     "data_split": data_split,
                                     "tables": filtered_tables,
+                                    "question": query["question"],
                                     "instruction": instruction,
                                     "targeted_instruction": targeted_instruction,
                                     "output": output,
