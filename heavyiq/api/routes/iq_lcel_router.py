@@ -1,9 +1,16 @@
 # contain chain endpoints implemented using Langchain Expression Language (LCEL)
 from fastapi import APIRouter, Depends
 
-from heavyiq.api.dependencies import valid_query_db_session, valid_question_db_session
-from heavyiq.api.handlers import handle_lcel_query_request, handle_lcel_question_request
-from heavyiq.api.models import QueryRequest, QueryResponse, QuestionRequest, QuestionResponse
+from heavyiq.api.dependencies import valid_answer_db_session, valid_query_db_session, valid_question_db_session
+from heavyiq.api.handlers import handle_lcel_answer_request, handle_lcel_query_request, handle_lcel_question_request
+from heavyiq.api.models import (
+    AnswerRequest,
+    AnswerResponse,
+    QueryRequest,
+    QueryResponse,
+    QuestionRequest,
+    QuestionResponse,
+)
 from heavyiq.api.routes.log_route import LoggingRoute
 from heavyiq.langchain import HeavyDB
 
@@ -36,3 +43,17 @@ async def question(values: tuple[QuestionRequest, HeavyDB] = Depends(valid_quest
     :param QuestionRequest request: Request Body
     """
     return await handle_lcel_question_request(*values)
+
+
+@lcelrouter.post("/answer", response_model=AnswerResponse)
+async def answer(values: tuple[AnswerRequest, HeavyDB] = Depends(valid_answer_db_session)) -> AnswerResponse:
+    """
+    Request for answer with all the information:
+
+    - **query**: HeavyDB compatible SQL query.
+    - **tables**: List of tables to consider.
+    - **session_id**: HeavyDB session id.
+    \f
+    :param AnswerRequest request: Request Body
+    """
+    return await handle_lcel_answer_request(*values)

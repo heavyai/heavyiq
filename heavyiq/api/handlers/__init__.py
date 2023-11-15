@@ -5,4 +5,4 @@ from .iq_handler import (
     handle_question_request_async,
     handle_submit_feedback_request_async,
 )
-from .lcel_handler import handle_lcel_query_request, handle_lcel_question_request
+from .lcel_handler import handle_lcel_answer_request, handle_lcel_query_request, handle_lcel_question_request

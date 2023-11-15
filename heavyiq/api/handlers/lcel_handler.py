@@ -5,7 +5,7 @@ from uuid import UUID
 from langchain import callbacks
 from langchain.pydantic_v1 import BaseModel
 
-from heavyiq.api.models import QueryResponse, QuestionResponse
+from heavyiq.api.models import AnswerResponse, QueryResponse, QuestionResponse
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.heavydb import heavydb_context
@@ -60,9 +60,8 @@ async def handle_lcel_query_request(request_dict: dict, config: dict | None = No
     Async LCEL handler for /query request.
     """
     from heavyiq.lcel.chains import sql_chain
-    from heavyiq.lcel.types.sql_type import SqlChainOutputType
 
-    out: SqlChainOutputType = await sql_chain.ainvoke(request_dict, config=config)  # type: ignore
+    out = await sql_chain.ainvoke(request_dict, config=config)  # type: ignore
     return QueryResponse(sql=out["query"], sql_complexity=out["sql_complexity"], feedback_id="", logprobs={})
 
 
@@ -83,6 +82,31 @@ async def handle_lcel_question_request(request_dict: dict, config: dict | None =
 
     result = await answer_chain.ainvoke(request_dict, config=config)  # type: ignore
     return QuestionResponse(
+        sql=result["sql"],
+        sql_result=result["results"],
+        sql_complexity=result["sql_complexity"],
+        answer=result["answer"],
+        feedback_id="",
+    )
+
+
+@with_db
+@with_feedback_id
+async def handle_lcel_answer_request(request_dict: dict, config: dict | None = None) -> AnswerResponse:
+    """
+    Async LCEL handler for /answer request.
+
+    Args:
+        request_dict: Input dict
+        config: Runnable config dict. Defaults to None.
+
+    Returns:
+        AnswerResponse
+    """
+    from heavyiq.lcel.chains import answer_chain
+
+    result = await answer_chain.ainvoke(request_dict, config=config)  # type: ignore
+    return AnswerResponse(
         sql=result["sql"],
         sql_result=result["results"],
         sql_complexity=result["sql_complexity"],
