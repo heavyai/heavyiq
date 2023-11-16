@@ -1,19 +1,25 @@
 from __future__ import annotations
-import re
-import anyio
+
+import asyncio
 import functools
 import multiprocessing
+import re
+from collections.abc import AsyncGenerator
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
+from copy import deepcopy
 from multiprocessing.managers import SyncManager
 from threading import Lock
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
-from typing import Optional, Any, Iterable, TYPE_CHECKING, Callable, TypedDict, Coroutine
-from copy import deepcopy
-import asyncio
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Iterable, Optional, TypedDict
+
+import anyio
 from async_lru import alru_cache
+from heavyai import Connection, connect
 from starlette.concurrency import run_in_threadpool
-from heavyai import connect, Connection
+
 from heavyiq.config import get_config
-from heavyiq.utils import strip_sql_comments, is_destructive_sql, rate_sql_complexity, calc_query_stats, LRUCache
+from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
 
 if TYPE_CHECKING:
     from heavydb._parsers import ColumnDetails
@@ -464,9 +470,12 @@ class HeavyDB:
         return str(result[0])
 
     async def acomplexity(self, command: str) -> int:
+        self.logger.debug("Calculation SQL query complexity!")
         command = strip_sql_comments(command)
         plan = await self.aget_query_plan(command)
-        return rate_sql_complexity(plan)
+        out = rate_sql_complexity(plan)
+        self.logger.debug("Successfully calculated SQL query complexity!")
+        return out
 
     async def aquery_stats(self, command: str) -> dict[str, int]:
         command = strip_sql_comments(command)
@@ -476,13 +485,21 @@ class HeavyDB:
     async def avalidate_query(self, query: str) -> list:
         """Validate a query."""
         # Remove block comments
-        query = strip_sql_comments(query)
-        if is_destructive_sql(query):
-            raise ValueError("Destructive SQL is not allowed")
-        if "::" in query:
-            raise ValueError("Double colon cast syntax is not allowed. Use CAST() instead.")
-        async with self.alock:
-            return await run_in_threadpool(self._conn._client.sql_validate, self._conn._session, query)
+        self.logger.debug("Validating SQL query!")
+        try:
+            query = strip_sql_comments(query)
+            if is_destructive_sql(query):
+                raise ValueError("Destructive SQL is not allowed")
+            if "::" in query:
+                raise ValueError("Double colon cast syntax is not allowed. Use CAST() instead.")
+            async with self.alock:
+                out = await run_in_threadpool(self._conn._client.sql_validate, self._conn._session, query)
+        except Exception as e:
+            self.logger.exception("SQL query validation failed!")
+            raise e
+        else:
+            self.logger.debug("Successfully completed SQL query validation.")
+            return out
 
     async def aget_column_top_k(self, table: str, column: str, _k: int = 5) -> tuple[Optional[list[str]], bool]:
         config = get_config()
@@ -1117,3 +1134,40 @@ class HeavyDB:
         except Exception as e:
             """Format the error message"""
             return f"Error: {e}"
+
+
+heavydb_var: ContextVar[HeavyDB | None] = ContextVar("heavydb_var", default=None)
+
+
+@asynccontextmanager  # type: ignore
+async def heavydb_context(session_id_or_db: str | HeavyDB) -> AsyncGenerator[HeavyDB, None]:
+    """
+    Async Context which helps to optionally create HeavyDB instance on Setup, set context var and yields it, finally reset
+    context var on teardown.
+
+    Example:
+        async with heavydb_context(session_id) as db:
+            assert heavydb_var.get() == db
+    """
+    db = session_id_or_db
+    if not isinstance(db, HeavyDB):
+        db = await HeavyDB.from_session_async(session_id=session_id_or_db)  # type: ignore
+    heavydb_var.set(db)
+    yield db
+    heavydb_var.set(None)
+
+
+async def get_db(session_id: str) -> HeavyDB:
+    """
+    Gets heavydb instance from context var if there's any, else create it from session_id.
+    Always call this function within a heavydb_context ctx in-order to avoid redundant heavydb conntection calls.
+    """
+    from heavyiq.logging_utils import get_heavyiq_logger
+
+    db = heavydb_var.get()
+    if db:
+        return db
+
+    logger = get_heavyiq_logger()
+    logger.warning("Establishing HeavyDB connection outside of heavydb_context!")
+    return await HeavyDB.from_session_async(session_id=session_id)
