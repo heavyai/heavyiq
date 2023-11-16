@@ -8,12 +8,14 @@ import time
 from contextvars import ContextVar
 
 from langchain import callbacks
+from langchain.globals import set_debug
 
 from heavyiq.langchain.heavydb import heavydb_context
 from heavyiq.langchain.logging import log_chain_runnable
 from heavyiq.langchain.utils import init_telemetrics
 from heavyiq.lcel.chains.heavydb.answer_chain import chain as nl_to_answer_chain
 from heavyiq.lcel.chains.heavydb.sql_chain import chain as nl_to_sql_chain
+from heavyiq.lcel.chains.heavydb.sql_chain import custom_chain, retry_query_runnable
 
 # from heavyiq.lcel.chains.heavydb.sql_chain import complete_chain as nl_to_sql_complete_chain
 
@@ -51,6 +53,16 @@ async def nl_to_sql_stream_intermediate_steps(session_id: str):
     async for s in nl_to_sql_chain.astream_log(input_ctx_var.get()):
         print("-" * 40)
         print(s)
+
+
+async def nl_to_sql_retry(session_id: str):
+    set_debug(True)
+    inputs = {
+        **input_ctx_var.get(),
+        "sql_cmd": "SELECT COUNT(*), STATE_NAME FROM usa_states WHERE STATE_NAME LIKE 'A%';",
+        "error": "\nSQL Error: From line 1, column 18 to line 1, column 29: Expression 'STATE_NAME' is not being grouped",
+    }
+    print(await retry_query_runnable.ainvoke(inputs))
 
 
 async def nl_to_sql_logprobs(session_id: str):
@@ -163,6 +175,7 @@ if __name__ == "__main__":
             "session_id": session_id,
         }
     )
-    asyncio.run(sql_to_answer_with_complexity(session_id))
+    # you can call any of the above functions for testing purpose
+    asyncio.run(nl_to_sql_retry(session_id))
     end_time = time.perf_counter()
     print("Elapsed time during the whole program in seconds:", end_time - start_time)

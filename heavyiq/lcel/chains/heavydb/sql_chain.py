@@ -1,12 +1,20 @@
 from operator import itemgetter
-from typing import Any, TypedDict
+from typing import Any, Optional, TypedDict
 
 from langchain.schema.output_parser import StrOutputParser
-from langchain.schema.runnable import Runnable, RunnableBranch, RunnableLambda, RunnableParallel, RunnablePassthrough
+from langchain.schema.runnable import (
+    Runnable,
+    RunnableBranch,
+    RunnableLambda,
+    RunnableParallel,
+    RunnablePassthrough,
+    RunnableSequence,
+)
+from langchain.schema.runnable.config import RunnableConfig
 
 from heavyiq.langchain.heavydb import get_config, get_db
 from heavyiq.langchain.llms import is_using_custom_trained_llm
-from heavyiq.langchain.utils import aget_table_info_wrt_token_limit
+from heavyiq.langchain.utils import aget_table_info_wrt_token_limit, extract_error_message_from_exception
 from heavyiq.lcel.chains.utils import get_value_from_runnable_binding
 from heavyiq.lcel.llms import llm_runnable
 from heavyiq.lcel.prompts import to_sql_prompt_runnable
@@ -34,10 +42,13 @@ nl_to_sql_retry_prompt_rbl = (
 )
 
 
-async def get_table_info(sql_chain_inputs: dict, on_retry: bool = False) -> str:
+async def get_table_info(sql_chain_inputs: dict) -> str:
     """
     Helps to get the table info for the prompt based upon the allowed token limit.
     """
+    # if the inputs contain sql_cmd info then surely it's for retry prompt
+    on_retry = True if sql_chain_inputs.get("sql_cmd") else False
+
     prompt_rbl = nl_to_sql_retry_prompt_rbl if on_retry else nl_to_sql_prompt_rbl
     partial_inputs = {"input": sql_chain_inputs["question"]}
     if on_retry:
@@ -76,7 +87,7 @@ retry_input_runnable = RunnablePassthrough().with_types(input_type=SqlChainInter
 retry_query_runnable = (
     retry_input_runnable
     | RunnablePassthrough.assign(
-        table_info=RunnableLambda(get_table_info),  # type: ignore
+        table_info=RunnableLambda(get_table_info), input=lambda x: x["question"]  # type: ignore
     )
     | nl_to_sql_retry_prompt_rbl
     | nl_to_sql_llm_rbl.bind(stop=["\nSQLResult:", "\n<|sql result|>"])
@@ -93,7 +104,7 @@ async def sql_validator(input_output: dict) -> str | None:
     try:
         await heavydb.avalidate_query(query)
     except Exception as e:
-        return str(e)
+        return extract_error_message_from_exception(e)
 
     return None
 
@@ -105,7 +116,7 @@ validation_step = (
 )
 
 
-def revise_loop(input: SqlChainIntermediateDict) -> Runnable:
+async def revise_loop(input: SqlChainIntermediateDict) -> Runnable:
     revise_step = RunnablePassthrough().assign(sql_cmd=retry_query_runnable)
 
     else_step: Runnable[SqlChainIntermediateType, SqlChainIntermediateType] = RunnableBranch(
@@ -116,12 +127,12 @@ def revise_loop(input: SqlChainIntermediateDict) -> Runnable:
     for _ in range(max(0, input["max_revisions"] - 1)):
         else_step = RunnableBranch(
             (lambda x: x["error"] is None, RunnablePassthrough()),
-            revise_step | validation_step | else_step,
+            (revise_step | validation_step | else_step).with_config(config={"run_name": f"Retry Query Attempt {_}"}),
         )
     return else_step
 
 
-revise_lambda = RunnableLambda(revise_loop).with_config(config={"run_name": "Revice Steps"})
+revise_lambda: Runnable = RunnableLambda(revise_loop).with_config(config={"run_name": "Revice Steps"})
 
 
 async def do_string_literal_correction(inputs: dict) -> dict:
@@ -186,3 +197,27 @@ chain: Runnable[Any, Any] = (
     )
     .with_types(input_type=SqlChainInputType, output_type=SqlChainOutputType)  # type: ignore
 )
+
+
+class CustomRunnable(Runnable):
+    def __init__(self, chain: Runnable):
+        self.chain = chain
+
+    def invoke(self, input: Any, config: RunnableConfig | None = None) -> Any:
+        return super().invoke(input, config)
+
+    def stream(self, *args, **kwargs):
+        for output in self.chain.stream(*args, **kwargs):
+            # customize output here
+            yield output
+
+    async def astream(self, *args, **kwargs):
+        async for output in self.chain.astream(*args, **kwargs):
+            yield output
+
+    async def astream_log(self, *args, **kwargs):
+        async for step in super().astream_log(*args, **kwargs):
+            yield step
+
+
+custom_chain = CustomRunnable(chain=chain)
