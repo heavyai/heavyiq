@@ -336,7 +336,7 @@ def create_combo_dataset(
     load_sql_sql = f"INSERT INTO heavyiq_combo_{full_combo_label} SELECT query_id, db_id, CASE WHEN data_split <> 'dev' THEN 'train' ELSE 'eval' END, prompt, answer FROM {sql_table};"
     load_answers_sql = None
     if nl_answers_table is not None:
-        load_answers_sql = f"INSERT INTO heavyiq_combo_{full_combo_label} SELECT query_id + 1000000, db_id, 'train', prompt, answer FROM {nl_answers_table};"
+        load_answers_sql = f"INSERT INTO heavyiq_combo_{full_combo_label} SELECT query_id + 1000000, db_id, 'train', prompt, answer FROM {nl_answers_table} WHERE data_split <> 'dev';"
     load_questions_table_sql = None
     if questions_table_table is not None:
         load_questions_table_sql = f"INSERT INTO heavyiq_combo_{full_combo_label} SELECT query_id + 3000000, db_id, 'train', prompt, answer FROM {questions_table_table};"
