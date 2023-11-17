@@ -139,8 +139,8 @@ async def awrite_eval_results_header(
     async with aiofiles.open(f"./eval/results/{eval_str}_results.csv", "a", newline="") as wf:
         header = []
         if has_id:
-            header.append("id")
-        header.extend(["db_id", "gold_query", "pred_query", "success", "status", "error"])
+            header.append("query_id")
+        header.extend(["db_id", "question", "gold_query", "pred_query", "success", "status", "error"])
         if enable_logprobs:
             header.extend(["num_tokens", "total_prob", "avg_prob", "min_prob", "prob_decile_histogram"])
         if enable_query_stats:
@@ -153,6 +153,7 @@ async def awrite_eval_results_header(
 async def awrite_eval_results_row(
     eval_str: str,
     db_id: str,
+    question: str,
     gold_query: str,
     success: bool,
     status: str,
@@ -170,7 +171,7 @@ async def awrite_eval_results_row(
         row_data = []
         if query_id:
             row_data.append(query_id)
-        row_data.extend([db_id, gold_query, pred_query, success, status, error or ""])
+        row_data.extend([db_id, question, gold_query, pred_query, success, status, error or ""])
         if enable_logprobs and prob_stats:
             row_data.extend(
                 [
