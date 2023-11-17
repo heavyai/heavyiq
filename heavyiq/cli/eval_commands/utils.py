@@ -70,6 +70,9 @@ def sql_rate_reply(
         "error": None,
     }
     try:
+        if gold_query == pred_query:
+            query_metadata["success"] = True
+            return query_metadata
         if not db:
             db = HeavyDB.from_env(db_name=db_id)
         gold_df = pd.read_sql(gold_query, db._conn)
@@ -78,7 +81,6 @@ def sql_rate_reply(
         num_pred_rows = len(pred_df.axes[0])  # type: ignore
         num_gold_cols = len(gold_df.axes[1])  # type: ignore
         num_pred_cols = len(pred_df.axes[1])  # type: ignore
-
         if num_gold_rows != num_pred_rows:
             print("ROW COUNT MISMATCH")
             print(gold_query)
