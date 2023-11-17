@@ -785,7 +785,7 @@ class HeavyDB:
         if total_count > 0 and literal["operator"] != "ILIKE":
             if exact_match_count == 0 and num_case_match_rows == 1:
                 altered_literal["literal"] = str(case_match_rows[0][0])
-                return literal
+                return altered_literal
             elif exact_match_count / total_count < exact_match_threshold:
                 if literal["operator"] == "<>":
                     altered_literal["operator"] = "NOT ILIKE"
