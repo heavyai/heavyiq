@@ -25,7 +25,7 @@ log_to_stdout = false      # true is recommended for development
 custom_llm_type = "API" # API or API_VLLM or AZURE
 # Custom LLM API/API_VLLM
 custom_llm_api_base = ""             # base url of API
-custom_llm_api_context_window = 2048 # context window limit
+custom_llm_api_context_window = 8192 # context window limit
 # Custom LLM API_VLLM
 custom_llm_api_vllm_beam_width = 2 # beam search disabled if <2
 # Custom LLM AZURE
@@ -37,5 +37,5 @@ custom_llm_azure_deployment_name = ""              # name of deployment
 max_fields_limit_sql_to_answer = 20  # generate answer only when the fields of the resultset has not more than this flag's limit
 
 # logprobs
-enable_logprobs = true # show/hide logprobs on nl-to-sql response
-custom_llm_logprobs_limit = 5  # max probabilities of token to be generated next.
+enable_logprobs = false # show/hide logprobs on nl-to-sql response
+custom_llm_logprobs_limit = 1  # max probabilities of token to be generated next.
