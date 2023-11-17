@@ -95,6 +95,7 @@ async def process_eval_row(
             await awrite_eval_results_row(
                 eval_str,
                 db_id,
+                question,
                 gold_query,
                 eval_res["success"],
                 eval_res["status"],
@@ -111,6 +112,7 @@ async def process_eval_row(
             await awrite_eval_results_row(
                 eval_str,
                 db_id,
+                question,
                 gold_query,
                 False,
                 "failed_to_generate_sql",
