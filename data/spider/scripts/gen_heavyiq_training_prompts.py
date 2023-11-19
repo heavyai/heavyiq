@@ -60,6 +60,16 @@ def getOptions(argv=None):
         action="store_true",
     )
     parser.add_argument(
+        "--cardinality-split-top-k-str-vals",
+        help="Split top-k string values into low and high cardinality sections",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--show-top-k-str-vals-cardinality",
+        help="Show top-k string values ",
+        action="store_true",
+    )
+    parser.add_argument(
         "--low-card-top-k-str-vals",
         help="Low cardinality top K string values",
         type=int,
@@ -625,35 +635,55 @@ def sort_tables_by_row_count(con, tables, reverse=True):
     return sorted_tables
 
 
-def generate_table_metadata_str(table_schemas, top_k_str_vals, low_card_col_threshold):
+def generate_table_metadata_str(
+    table_schemas,
+    top_k_str_vals,
+    low_card_col_threshold,
+    split_by_cardinality=True,
+    show_cardinality=False,
+):
     assert len(table_schemas) == len(top_k_str_vals) or len(top_k_str_vals) == 0
     table_metadata_str = ""
     for idx, table_schema in enumerate(table_schemas):
         table_metadata_str += table_schema + "\n"
         if len(top_k_str_vals) > 0:
             table_top_k_str_vals = top_k_str_vals[idx]
-            low_card_str_cols = [
-                top_k_str_col
-                for top_k_str_col in table_top_k_str_vals
-                if top_k_str_col["cardinality"] <= low_card_col_threshold
-            ]
-            high_card_str_cols = [
-                top_k_str_col
-                for top_k_str_col in table_top_k_str_vals
-                if top_k_str_col["cardinality"] > low_card_col_threshold
-            ]
-            if len(low_card_str_cols) > 0:
-                table_metadata_str += (
-                    "Low cardinality columns and every possible value:\n"
-                )
-                for top_k_str_col in low_card_str_cols:
-                    table_metadata_str += f"{top_k_str_col['column_name']}: {', '.join(top_k_str_col['top_k_vals'])}\n"
-            if len(high_card_str_cols) > 0:
-                table_metadata_str += (
-                    "High cardinality columns and most common values:\n"
-                )
-                for top_k_str_col in high_card_str_cols:
-                    table_metadata_str += f"{top_k_str_col['column_name']}: {', '.join(top_k_str_col['top_k_vals'])}\n"
+            if split_by_cardinality:
+                low_card_str_cols = [
+                    top_k_str_col
+                    for top_k_str_col in table_top_k_str_vals
+                    if top_k_str_col["cardinality"] <= low_card_col_threshold
+                ]
+                high_card_str_cols = [
+                    top_k_str_col
+                    for top_k_str_col in table_top_k_str_vals
+                    if top_k_str_col["cardinality"] > low_card_col_threshold
+                ]
+                if len(low_card_str_cols) > 0:
+                    table_metadata_str += (
+                        "Low cardinality columns and every possible value:\n"
+                    )
+                    for top_k_str_col in low_card_str_cols:
+                        if show_cardinality:
+                            table_metadata_str += f"{top_k_str_col['column_name']} ({top_k_str_col['cardinality']} values): {', '.join(top_k_str_col['top_k_vals'])}\n"
+                        else:
+                            table_metadata_str += f"{top_k_str_col['column_name']}: {', '.join(top_k_str_col['top_k_vals'])}\n"
+                if len(high_card_str_cols) > 0:
+                    table_metadata_str += (
+                        "High cardinality columns and most common values:\n"
+                    )
+                    for top_k_str_col in high_card_str_cols:
+                        if show_cardinality:
+                            table_metadata_str += f"{top_k_str_col['column_name']} ({top_k_str_col['cardinality']} values): {', '.join(top_k_str_col['top_k_vals'])}\n"
+                        else:
+                            table_metadata_str += f"{top_k_str_col['column_name']}: {', '.join(top_k_str_col['top_k_vals'])}\n"
+            else:
+                for top_k_str_col in table_top_k_str_vals:
+                    if show_cardinality:
+                        table_metadata_str += f"{top_k_str_col['column_name']} ({top_k_str_col['cardinality']} values): {', '.join(top_k_str_col['top_k_vals'])}\n"
+                    else:
+                        table_metadata_str += f"{top_k_str_col['column_name']}: {', '.join(top_k_str_col['top_k_vals'])}\n"
+
         table_metadata_str += "\n"
 
     return table_metadata_str
@@ -661,12 +691,12 @@ def generate_table_metadata_str(table_schemas, top_k_str_vals, low_card_col_thre
 
 def generate_instruction(table_metadata, user_question=None):
     if user_question is not None:
-        instruction = """You are an experienced data analyst adept at writing SQL queries to answer user questions.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nWrite a SQL query to answer the following question:\n\n{user_question}\n""".format(
+        instruction = """You are an experienced data analyst adept at writing SQL queries to answer user questions.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}Write a SQL query to answer the following question:\n\n{user_question}\n""".format(
             table_metadata=table_metadata, user_question=user_question
         )
         return instruction
     else:
-        instruction = """You are an experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nWrite a compelling question to ask of the above data:\n""".format(
+        instruction = """You are an experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}Write a compelling question to ask of the above data:\n""".format(
             table_metadata=table_metadata
         )
         return instruction
@@ -680,20 +710,20 @@ def generate_question(table_metadata, unique_columns=None):
                 unique_columns_str += unique_column[1] + "." + unique_column[2] + "\n"
         else:
             unique_columns_str += "COUNT(*)\n"
-        instruction = """You are an experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nUse the following columns to generate the question a compelling question of the data:\n\n{unique_columns_str}\n""".format(
+        instruction = """You are an experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}Use the following columns to generate the question a compelling question of the data:\n\n{unique_columns_str}\n""".format(
             table_metadata=table_metadata,
             unique_columns_str=unique_columns_str,
         )
         return instruction
     else:
-        instruction = """You are an experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nWrite a compelling question to ask of the above data:\n""".format(
+        instruction = """You are an experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}Write a compelling question to ask of the above data:\n""".format(
             table_metadata=table_metadata
         )
         return instruction
 
 
 def generate_table_prompt(table_metadata, user_question):
-    instruction = """You are an experienced data analyst adept at analyzing user questions to determine the SQL tables required to generate an answer.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}\nEmit each table name along with a 1 if the table is required to answer the following user question, or a 0 if the table is not required.\n\nQuestion: {user_question}\n""".format(
+    instruction = """You are an experienced data analyst adept at analyzing user questions to determine the SQL tables required to generate an answer.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}Emit each table name along with a 1 if the table is required to answer the following user question, or a 0 if the table is not required.\n\nQuestion: {user_question}\n""".format(
         table_metadata=table_metadata, user_question=user_question
     )
     return instruction
@@ -1152,6 +1182,8 @@ def generate_error_prompts(error_queries_file, output_file, options):
             filtered_table_schemas,
             filtered_top_k_str_vals,
             options.low_card_top_k_str_vals,
+            options.cardinality_split_top_k_str_vals,
+            options.show_top_k_str_vals_cardinality,
         )
 
         targeted_instruction = """You generated a SQL query that generated an exception when executed in the HeavyDB database.\n\nYou have access to the following relation tables, with schemas below.\n{table_metadata}\nIn attempting to answer the following user question:\n\n{question},\nyou generated the following SQL query:\n{error_sql_query}\n, which failed to run in the HeavyDB database, generating the following error:\n{error}\n\nPlease alter the query to run without error in HeavyDB:""".format(
@@ -1565,11 +1597,15 @@ def main(argv):
                                 table_schemas,
                                 top_k_str_vals,
                                 options.low_card_top_k_str_vals,
+                                options.cardinality_split_top_k_str_vals,
+                                options.show_top_k_str_vals_cardinality,
                             )
                             filtered_table_metadata = generate_table_metadata_str(
                                 filtered_table_schemas,
                                 filtered_top_k_str_vals,
                                 options.low_card_top_k_str_vals,
+                                options.cardinality_split_top_k_str_vals,
+                                options.show_top_k_str_vals_cardinality,
                             )
 
                             instruction = generate_instruction(
@@ -1594,6 +1630,8 @@ def main(argv):
                                     filtered_table_schemas,
                                     [],
                                     options.low_card_top_k_str_vals,
+                                    options.cardinality_split_top_k_str_vals,
+                                    options.show_top_k_str_vals_cardinality,
                                 )
                                 targeted_instruction = generate_instruction(
                                     filtered_table_metadata, query["question"]
@@ -1753,6 +1791,8 @@ def main(argv):
                                 filtered_table_schemas,
                                 filtered_top_k_str_vals,
                                 options.low_card_top_k_str_vals,
+                                options.cardinality_split_top_k_str_vals,
+                                options.show_top_k_str_vals_cardinality,
                             )
                             instruction = generate_question(
                                 filtered_table_metadata, unique_columns
@@ -1765,6 +1805,8 @@ def main(argv):
                                     filtered_table_schemas,
                                     [],
                                     options.low_card_top_k_str_vals,
+                                    options.cardinality_split_top_k_str_vals,
+                                    options.show_top_k_str_vals_cardinality,
                                 )
                                 instruction = generate_question(
                                     filtered_table_metadata, unique_columns
@@ -1791,11 +1833,19 @@ def main(argv):
                             )
                             if add_top_k_metadata:
                                 table_metadata = generate_table_metadata_str(
-                                    table_schemas, top_k_str_vals, 0
+                                    table_schemas,
+                                    top_k_str_vals,
+                                    0,
+                                    options.cardinality_split_top_k_str_vals,
+                                    options.show_top_k_str_vals_cardinality,
                                 )
                             else:
                                 table_metadata = generate_table_metadata_str(
-                                    table_schemas, [], 0
+                                    table_schemas,
+                                    [],
+                                    0,
+                                    options.cardinality_split_top_k_str_vals,
+                                    options.show_top_k_str_vals_cardinality,
                                 )
                             instruction = generate_table_prompt(
                                 table_metadata, query["question"]
@@ -1807,7 +1857,11 @@ def main(argv):
                                 and add_top_k_metadata
                             ):
                                 table_metadata = generate_table_metadata_str(
-                                    table_schemas, [], 0
+                                    table_schemas,
+                                    [],
+                                    0,
+                                    options.cardinality_split_top_k_str_vals,
+                                    options.show_top_k_str_vals_cardinality,
                                 )
                                 instruction = generate_table_prompt(
                                     table_metadata, query["question"]
