@@ -36,7 +36,8 @@ def compute_prob_stats(selected_tokens: list[str], top_log_probs: list[dict[str,
         if select_seen:
             num_calc_tokens += 1
             sum_log_probs += selected_token_log_prob
-            prob_decile_histogram[int(selected_token_prob * 10)] += 1
+            hist_bin = 9 if selected_token_prob >= 1.0 else int(selected_token_prob * 10)
+            prob_decile_histogram[hist_bin] += 1
             if selected_token_prob < min_prob:
                 min_prob = selected_token_prob
                 min_prob_token = selected_token
