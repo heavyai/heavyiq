@@ -170,6 +170,21 @@ def getOptions(argv=None):
         type=int,
         default=None,
     )
+    parser.add_argument(
+        "--sql-prompt-prefix",
+        help="Top-level prefix instruction for SQL-generation prompts",
+        default="You are an experienced data analyst adept at writing SQL queries to answer user questions.\nYou have access to the following relational tables, with schemas below.\n",
+    )
+    parser.add_argument(
+        "--sql-prompt-suffix",
+        help="Top-level suffix instruction for SQL-generation prompts",
+        default="Write a SQL query to answer the following question:\n",
+    )
+    parser.add_argument(
+        "--sql-prepend-question",
+        help="Prepend question above schemas",
+        action="store_true",
+    )
     return parser.parse_args(argv)
 
 
@@ -705,17 +720,23 @@ def generate_table_metadata_str(
     return table_metadata_str
 
 
-def generate_instruction(table_metadata, user_question=None):
-    if user_question is not None:
-        instruction = """You are an experienced data analyst adept at writing SQL queries to answer user questions.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}Write a SQL query to answer the following question:\n\n{user_question}\n""".format(
-            table_metadata=table_metadata, user_question=user_question
-        )
-        return instruction
+def generate_instruction(
+    sql_prompt_prefix,
+    sql_prompt_suffix,
+    user_question,
+    table_metadata,
+    sql_prepend_question=False,
+):
+    if sql_prompt_prefix is None:
+        sql_prompt_prefix = ""
+    if sql_prompt_suffix is None:
+        sql_prompt_suffix = ""
+    instruction = None
+    if sql_prepend_question:
+        instruction = f"""{sql_prompt_prefix}{user_question}\n\n{table_metadata}{sql_prompt_suffix}{user_question}\n"""
     else:
-        instruction = """You are an experienced data analyst adept at asking compelling questions of your data.\nYou have access to the following relational tables, with schemas below.\n{table_metadata}Write a compelling question to ask of the above data:\n""".format(
-            table_metadata=table_metadata
-        )
-        return instruction
+        instruction = f"""{sql_prompt_prefix}{table_metadata}{sql_prompt_suffix}{user_question}\n"""
+    return instruction
 
 
 def generate_question(table_metadata, unique_columns=None):
@@ -1644,10 +1665,18 @@ def main(argv):
                             )
 
                             instruction = generate_instruction(
-                                full_table_metadata, query["question"]
+                                options.sql_prompt_prefix,
+                                options.sql_prompt_suffix,
+                                query["question"],
+                                full_table_metadata,
+                                options.sql_prepend_question,
                             )
                             targeted_instruction = generate_instruction(
-                                filtered_table_metadata, query["question"]
+                                options.sql_prompt_prefix,
+                                options.sql_prompt_suffix,
+                                query["question"],
+                                filtered_table_metadata,
+                                options.sql_prepend_question,
                             )
                             instruction_tokens = tokenizer.tokenize(instruction)
                             num_instruction_tokens = len(instruction_tokens)
@@ -1671,7 +1700,11 @@ def main(argv):
                                     options.show_table_row_counts,
                                 )
                                 targeted_instruction = generate_instruction(
-                                    filtered_table_metadata, query["question"]
+                                    options.sql_prompt_prefix,
+                                    options.sql_prompt_suffix,
+                                    query["question"],
+                                    filtered_table_metadata,
+                                    options.sql_prepend_question,
                                 )
                                 targeted_instruction_tokens = tokenizer.tokenize(
                                     targeted_instruction
