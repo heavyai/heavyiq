@@ -14,6 +14,7 @@ import math
 import itertools
 from llama_cpp import Llama
 import requests
+import traceback
 
 from collections.abc import Iterable
 
@@ -57,6 +58,11 @@ def getOptions(argv=None):
     parser.add_argument(
         "--fix-queries-gpt",
         help="Try to fix failed queries with ChatGPT API",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--show-table-row-counts",
+        help="Include table row count in metadata",
         action="store_true",
     )
     parser.add_argument(
@@ -528,7 +534,7 @@ def getChainedQueriesByDB(chained_queries_file):
 
 
 def get_table_schema(con, table_name):
-    res = con.execute(f"SHOW CREATE TABLE {table_name}")
+    res = con.execute(f"""SHOW CREATE TABLE "{table_name}" """)
     table_schema = list(res)[0][0]
     table_schema = re.sub(r" ENCODING .*\)([,\)])", r"\1", table_schema)
     table_schema = re.sub(
@@ -540,6 +546,12 @@ def get_table_schema(con, table_name):
     table_schema = re.sub(r"\s*WITH \(.*\);?", ";", table_schema)
 
     return table_schema
+
+
+def get_table_row_count(con, table_name):
+    res = con.execute(f"""SELECT COUNT(*) FROM "{table_name}" """)
+    row_count = list(res)[0][0]
+    return row_count
 
 
 def get_table_cols(con, table_name):
@@ -638,14 +650,18 @@ def sort_tables_by_row_count(con, tables, reverse=True):
 def generate_table_metadata_str(
     table_schemas,
     top_k_str_vals,
+    table_row_counts,
     low_card_col_threshold,
     split_by_cardinality=True,
     show_cardinality=False,
+    show_table_row_counts=False,
 ):
     assert len(table_schemas) == len(top_k_str_vals) or len(top_k_str_vals) == 0
     table_metadata_str = ""
     for idx, table_schema in enumerate(table_schemas):
         table_metadata_str += table_schema + "\n"
+        if show_table_row_counts:
+            table_metadata_str += f"Row count: {table_row_counts[idx]}\n"
         if len(top_k_str_vals) > 0:
             table_top_k_str_vals = top_k_str_vals[idx]
             if split_by_cardinality:
@@ -1181,9 +1197,11 @@ def generate_error_prompts(error_queries_file, output_file, options):
         filtered_table_metadata = generate_table_metadata_str(
             filtered_table_schemas,
             filtered_top_k_str_vals,
+            [],  # table row counts - don't show for errors
             options.low_card_top_k_str_vals,
             options.cardinality_split_top_k_str_vals,
             options.show_top_k_str_vals_cardinality,
+            False,  # Show table row counts
         )
 
         targeted_instruction = """You generated a SQL query that generated an exception when executed in the HeavyDB database.\n\nYou have access to the following relation tables, with schemas below.\n{table_metadata}\nIn attempting to answer the following user question:\n\n{question},\nyou generated the following SQL query:\n{error_sql_query}\n, which failed to run in the HeavyDB database, generating the following error:\n{error}\n\nPlease alter the query to run without error in HeavyDB:""".format(
@@ -1491,12 +1509,17 @@ def main(argv):
                 table_schemas_map = {}
                 top_k_str_vals_map = {}
                 top_k_str_vals = []
+                table_row_counts = []
+                table_row_counts_map = {}
                 for db_table in db_tables:
                     table_schema = get_table_schema(con, db_table)
                     if options.add_columns_to_answers:
                         table_cols.extend(get_table_cols(con, db_table))
                     table_schemas.append(table_schema)
                     table_schemas_map[db_table.lower()] = table_schema
+                    table_row_count = get_table_row_count(con, db_table)
+                    table_row_counts.append(table_row_count)
+                    table_row_counts_map[db_table] = table_row_count
                     if options.low_card_top_k_str_vals > 0:
                         table_str_cols = get_table_str_cols(con, db_table)
                         str_cols_top_k_vals = [
@@ -1555,10 +1578,12 @@ def main(argv):
                         # sql_query = query_and_tables["query"]
                         # filtered_tables = query_and_tables["tables"]
                     except Exception as e:
+                        print(traceback.format_exc())
                         print(
                             f"Exception Query ID: {query_id} DB: {db_id} Query: {sql_query}"
                         )
                         print(e)
+                        print(traceback.format_exc())
                         continue
                     # print(f"Query ID: {query_id} DB: {db_id} Query: {sql_query}")
                     sql_query = sql_query + ";" if sql_query[-1] != ";" else sql_query
@@ -1593,19 +1618,29 @@ def main(argv):
                                     filtered_top_k_str_vals.append(
                                         top_k_str_vals_map[filtered_table]
                                     )
+                            filtered_table_row_counts = []
+                            for filtered_table in filtered_tables:
+                                filtered_table_row_counts.append(
+                                    table_row_counts_map[filtered_table]
+                                )
+
                             full_table_metadata = generate_table_metadata_str(
                                 table_schemas,
                                 top_k_str_vals,
+                                table_row_counts,
                                 options.low_card_top_k_str_vals,
                                 options.cardinality_split_top_k_str_vals,
                                 options.show_top_k_str_vals_cardinality,
+                                options.show_table_row_counts,
                             )
                             filtered_table_metadata = generate_table_metadata_str(
                                 filtered_table_schemas,
                                 filtered_top_k_str_vals,
+                                filtered_table_row_counts,
                                 options.low_card_top_k_str_vals,
                                 options.cardinality_split_top_k_str_vals,
                                 options.show_top_k_str_vals_cardinality,
+                                options.show_table_row_counts,
                             )
 
                             instruction = generate_instruction(
@@ -1629,9 +1664,11 @@ def main(argv):
                                 filtered_table_metadata = generate_table_metadata_str(
                                     filtered_table_schemas,
                                     [],
+                                    filtered_table_row_counts,
                                     options.low_card_top_k_str_vals,
                                     options.cardinality_split_top_k_str_vals,
                                     options.show_top_k_str_vals_cardinality,
+                                    options.show_table_row_counts,
                                 )
                                 targeted_instruction = generate_instruction(
                                     filtered_table_metadata, query["question"]
@@ -1782,6 +1819,11 @@ def main(argv):
                                     filtered_top_k_str_vals.append(
                                         top_k_str_vals_map[db_table]
                                     )
+                            filtered_table_row_counts = []
+                            for filtered_table in filtered_tables:
+                                filtered_table_row_counts.append(
+                                    table_row_counts_map[filtered_table]
+                                )
                             unique_columns = None
                             if options.add_columns_to_question_prompts:
                                 query_plan = get_query_plan(con, sql_query)
@@ -1790,9 +1832,11 @@ def main(argv):
                             filtered_table_metadata = generate_table_metadata_str(
                                 filtered_table_schemas,
                                 filtered_top_k_str_vals,
+                                filtered_table_row_counts,
                                 options.low_card_top_k_str_vals,
                                 options.cardinality_split_top_k_str_vals,
                                 options.show_top_k_str_vals_cardinality,
+                                options.show_table_row_counts,
                             )
                             instruction = generate_question(
                                 filtered_table_metadata, unique_columns
@@ -1804,9 +1848,11 @@ def main(argv):
                                 filtered_table_metadata = generate_table_metadata_str(
                                     filtered_table_schemas,
                                     [],
+                                    filtered_table_row_counts,
                                     options.low_card_top_k_str_vals,
                                     options.cardinality_split_top_k_str_vals,
                                     options.show_top_k_str_vals_cardinality,
+                                    options.show_table_row_counts,
                                 )
                                 instruction = generate_question(
                                     filtered_table_metadata, unique_columns
@@ -1835,17 +1881,21 @@ def main(argv):
                                 table_metadata = generate_table_metadata_str(
                                     table_schemas,
                                     top_k_str_vals,
-                                    0,
+                                    table_row_counts,
+                                    options.low_card_col_threshold,
                                     options.cardinality_split_top_k_str_vals,
                                     options.show_top_k_str_vals_cardinality,
+                                    options.show_table_row_counts,
                                 )
                             else:
                                 table_metadata = generate_table_metadata_str(
                                     table_schemas,
                                     [],
+                                    table_row_counts,
                                     0,
                                     options.cardinality_split_top_k_str_vals,
                                     options.show_top_k_str_vals_cardinality,
+                                    options.show_table_row_counts,
                                 )
                             instruction = generate_table_prompt(
                                 table_metadata, query["question"]
@@ -1859,9 +1909,11 @@ def main(argv):
                                 table_metadata = generate_table_metadata_str(
                                     table_schemas,
                                     [],
+                                    table_row_counts,
                                     0,
                                     options.cardinality_split_top_k_str_vals,
                                     options.show_top_k_str_vals_cardinality,
+                                    options.show_table_row_counts,
                                 )
                                 instruction = generate_table_prompt(
                                     table_metadata, query["question"]
@@ -1888,6 +1940,7 @@ def main(argv):
                             f"Exception Query ID: {query_id} DB: {db_id} Query: {sql_query}"
                         )
                         print(e)
+                        print(traceback.format_exc())
                         query_fixed = False
                         if options.fix_queries:
                             fixed_query = fix_failed_query_unquoted_keyword(
