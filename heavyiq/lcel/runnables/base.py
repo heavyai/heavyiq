@@ -1,8 +1,8 @@
 import json
 from abc import ABCMeta, abstractmethod
-from typing import AsyncGenerator, AsyncIterable
+from typing import Any, AsyncIterator
 
-from langchain.schema.runnable import Runnable
+from langchain.schema.runnable import Runnable, RunnableConfig
 
 from heavyiq.lcel.types import StepDict
 
@@ -29,11 +29,11 @@ class StreamStepsRunnableWrapper(BaseRunnableWrapper):
     Runnable wrapper which helps to stream the steps involved.
     """
 
-    async def start(self, *args, **kwargs) -> AsyncGenerator[StepDict, None]:
+    async def start(self, input: Any, config: RunnableConfig | None = None, **kwargs) -> AsyncIterator[StepDict]:
         """
         Helps to stream intermediate steps.
         """
-        async for step in self.chain.astream_log(*args, **kwargs, include_tags=["intermediate-step"]):
+        async for step in self.chain.astream_log(input, config=config, **kwargs, include_tags=["intermediate-step"]):
             # yield intermediate-steps and final response
             op = step.ops[0]["op"]
             if op == "add":

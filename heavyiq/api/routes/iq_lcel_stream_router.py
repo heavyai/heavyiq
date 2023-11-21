@@ -15,4 +15,4 @@ async def streaming_query_endpoint(
 ) -> StreamingResponse:
     from heavyiq.api.handlers.lcel_stream_handler import streaming_query
 
-    return await ndjson_stream(streaming_query(*values, stream_llm_tokens=False))  # type: ignore
+    return await ndjson_stream(streaming_query(*values))  # type: ignore
