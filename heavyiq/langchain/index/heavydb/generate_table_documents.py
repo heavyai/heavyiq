@@ -1,19 +1,18 @@
-import os
 import asyncio
-from fastapi.concurrency import run_in_threadpool
+import os
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
-from langchain.docstore.document import Document
+from fastapi.concurrency import run_in_threadpool
 from langchain.chat_models.openai import ChatOpenAI
+from langchain.docstore.document import Document
 from langchain.schema import HumanMessage, SystemMessage
 
 from heavyiq.config import get_config
-from heavyiq.utils import awrite_to_file
 from heavyiq.langchain import HeavyDB
-from heavyiq.langchain.llms import get_llm
+from heavyiq.langchain.llms import get_llm, is_using_custom_trained_llm
 from heavyiq.logging_utils import get_heavyiq_logger
-
+from heavyiq.utils import awrite_to_file
 
 table_summary_prompt = """With respect to the SQL table schema and sample data provided,
 please create a comprehensive response encompassing the following aspects:
@@ -158,7 +157,10 @@ async def acreate_and_write_table_document(heavydb: HeavyDB, table: str) -> None
         aget_table_summary_document(heavydb, table),
         aget_table_column_description_document(heavydb, table),
     ]
-    docs = await asyncio.gather(*docs)
+    try:
+        docs = await asyncio.gather(*docs)
+    except Exception as e:
+        raise e
     file_content = "\n\n".join([doc.page_content for doc in docs])
     file_path = f"table_documents/{table}.txt"
     await awrite_to_file(file_path, file_content)
@@ -222,6 +224,9 @@ async def agenerate_table_documents() -> list[str]:
 
     heavydb = await run_in_threadpool(HeavyDB.from_env, ignore_tables=tables_with_documents_already)
     table_names_to_generate = heavydb.get_usable_table_names()
+
+    if table_names_to_generate and is_using_custom_trained_llm():
+        raise ValueError("Custom LLM doesnot support generating table column description.")
 
     tasks = []
     for table_name in table_names_to_generate:
