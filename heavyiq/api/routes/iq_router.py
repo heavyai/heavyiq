@@ -1,36 +1,37 @@
 from typing import Any
+
 from fastapi import APIRouter, Depends
-from heavyiq.langchain import HeavyDB
+
 from heavyiq.api.dependencies import (
-    valid_db_session,
     valid_query_db_session,
     valid_question_db_session,
-    validate_db_session_for_table_metadata,
     valid_tables_db_session,
+    validate_db_session_for_table_metadata,
+)
+from heavyiq.api.handlers import (
+    handle_ask_heavyai_docs_async,
+    handle_generate_table_metadata_async,
+    handle_query_request_async,
+    handle_question_request_async,
+    handle_submit_feedback_request_async,
+    handle_tables_request_async,
 )
 from heavyiq.api.models import (
-    QueryRequest,
-    QueryResponse,
-    QuestionResponse,
-    QuestionRequest,
+    AskHeavyAIDocsRequest,
+    AskHeavyAIDocsResponse,
     FeedbackRequest,
     FeedbackResponse,
     GenerateTableMetadataRequest,
     GenerateTableMetadataResponse,
-    AskHeavyAIDocsRequest,
-    AskHeavyAIDocsResponse,
+    QueryRequest,
+    QueryResponse,
+    QuestionRequest,
+    QuestionResponse,
     TablesRequest,
     TablesResponse,
 )
-from heavyiq.api.handlers import (
-    handle_query_request_async,
-    handle_question_request_async,
-    handle_submit_feedback_request_async,
-    handle_generate_table_metadata_async,
-    handle_ask_heavyai_docs_async,
-    handle_tables_request_async,
-)
 from heavyiq.api.routes.log_route import LoggingRoute
+from heavyiq.langchain import HeavyDB
 
 iqrouter = APIRouter(route_class=LoggingRoute)
 

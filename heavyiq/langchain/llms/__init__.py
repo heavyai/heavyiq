@@ -1,14 +1,15 @@
 from enum import Enum
-import requests
 from functools import lru_cache
 from typing import Any
 
+import requests
+from langchain.chat_models import AzureChatOpenAI, ChatOpenAI
+from langchain.chat_models.base import BaseChatModel
 from langchain.llms import AzureOpenAI
 from langchain.llms.base import BaseLLM
-from langchain.chat_models import ChatOpenAI, AzureChatOpenAI
-from langchain.chat_models.base import BaseChatModel
 
 from heavyiq.config import get_config
+
 from .overrides import OverrideOpenAI, OverrideVLLMOpenAI
 
 
@@ -24,7 +25,7 @@ def is_using_custom_trained_llm() -> bool:
 
 
 def get_vllm_model_name(api_base: str) -> str:
-    response = requests.get(f"{api_base}/models")
+    response = requests.get(f"{api_base}/models", timeout=10)
     response.raise_for_status()
     return response.json()["data"][0]["id"]
 
@@ -34,6 +35,8 @@ def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str
     config = get_config()
     kwargs: dict[str, Any] = {}
     model_kwargs: dict[str, Any] = {}
+    if config.enable_logprobs and model_type == LLMType.NL_TO_SQL:
+        model_kwargs["logprobs"] = config.custom_llm_logprobs_limit
     if config.custom_llm_api_vllm_beam_width >= 2 and model_type == LLMType.NL_TO_SQL:
         model_kwargs["use_beam_search"] = True
         kwargs["best_of"] = config.custom_llm_api_vllm_beam_width

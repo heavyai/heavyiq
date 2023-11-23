@@ -1,12 +1,14 @@
 import os
+import re
 from typing import Callable
+
+from heavydb.exceptions import TDBException
 from langchain.base_language import BaseLanguageModel
-from langchain.prompts import BasePromptTemplate, BaseChatPromptTemplate
+from langchain.prompts import BaseChatPromptTemplate, BasePromptTemplate
 from langchain.schema.prompt import PromptValue
 
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
-
 
 is_langsmith_active = False
 
@@ -22,6 +24,9 @@ def init_telemetrics() -> None:
         os.environ["LANGCHAIN_API_KEY"] = config.langsmith_api_key
         os.environ["LANGCHAIN_PROJECT"] = config.langsmith_project
         is_langsmith_active = True
+
+    # chromadb telemetry opt-out
+    os.environ["ANONYMIZED_TELEMETRY"] = "false"
 
 
 def get_token_limit(model_name: str, response_tokens: int = 256) -> int:
@@ -241,3 +246,13 @@ async def apopulate_table_info_into_nl_to_tables_prompt(
     table_info = await aget_table_info_for_nl_to_tables_prompt_wrt_token_limit(llm, heavydb, prompt, table_names_to_use)
 
     return prompt.format_prompt(table_info=table_info)
+
+
+def extract_error_message_from_exception(exc: Exception) -> str:
+    """
+    Helps to extract error message from a TDBException or from a Exception instance.
+    """
+    if isinstance(exc, TDBException):
+        return exc.error_msg
+
+    return str(exc)

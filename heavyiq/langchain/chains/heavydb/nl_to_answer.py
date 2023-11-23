@@ -39,7 +39,8 @@ The following results were returned:
 {sql_result}
 
 Now explain the results in English, referencing the question and the SQL query as needed.
-<|english answer|>"""
+<|english answer|>
+"""
 CUSTOM_LLM_ANSWER_PROMPT = PromptTemplate.from_template(CUSTOM_LLM_ANSWER_TEMPLATE)
 
 

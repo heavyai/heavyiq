@@ -9,26 +9,79 @@ import csv
 
 import pandas as pd
 import numpy as np
+import math
 
 from heavyiq.langchain import HeavyDB
 
 
-def sql_rate_reply(db_id: str, gold_query: str, pred_query: str) -> dict[str, Any]:
+def compute_prob_stats(selected_tokens: list[str], top_log_probs: list[dict[str, float]]) -> dict[str, Any]:
+    selected_tokens_and_probs = []
+    sum_log_probs = 0.0
+    min_prob = 1.0
+    min_prob_token = None
+    prob_decile_histogram = [0] * 10
+
+    num_calc_tokens = 0
+    select_seen = False
+    for selected_token, token_logprobs in zip(selected_tokens, top_log_probs):
+        selected_token_log_prob = token_logprobs[selected_token]
+        # Convert the log probability to actual probability
+        selected_token_prob = math.exp(selected_token_log_prob)
+        # We don't use the probabilities on any tokens up to and including the first SELECT, as depending on the
+        # prompt the LLM will sometimes want to put a newline token first, so using these first probabilities
+        # will artifically lower the avg, total, and min probabilities
+
+        # Todo (Todd): Consider the case where we have a query starting with a WITH (CTE)
+
+        if select_seen:
+            num_calc_tokens += 1
+            sum_log_probs += selected_token_log_prob
+            hist_bin = 9 if selected_token_prob >= 1.0 else int(selected_token_prob * 10)
+            prob_decile_histogram[hist_bin] += 1
+            if selected_token_prob < min_prob:
+                min_prob = selected_token_prob
+                min_prob_token = selected_token
+        else:
+            if selected_token == "▁SELECT" or selected_token == "SELECT":
+                select_seen = True
+
+        # Append the result to the list
+        selected_tokens_and_probs.append({"token": selected_token, "probability": selected_token_prob})
+
+    prob_stats = {}
+    prob_stats["num_tokens"] = len(selected_tokens)
+    prob_stats["total_prob"] = math.exp(sum_log_probs)
+    prob_stats["avg_prob"] = math.exp(sum_log_probs / num_calc_tokens)
+    prob_stats["min_prob"] = min_prob
+    prob_stats["min_prob_token"] = min_prob_token
+    prob_stats["prob_decile_histogram"] = prob_decile_histogram
+    prob_stats["selected_token_probs"] = selected_tokens_and_probs
+
+    return prob_stats
+
+
+def sql_rate_reply(
+    gold_query: str, pred_query: str, db_id: str | None = None, db: HeavyDB | None = None
+) -> dict[str, Any]:
     # motivated by https://github.com/lm-sys/FastChat/tree/main/fastchat/pred
+    assert db_id or db, "sql_rate_reply expects either database_name or HeavyDB instance."
     query_metadata = {
         "success": False,
         "status": "success",
         "error": None,
     }
     try:
-        db = HeavyDB.from_env(db_name=db_id)
+        if gold_query == pred_query:
+            query_metadata["success"] = True
+            return query_metadata
+        if not db:
+            db = HeavyDB.from_env(db_name=db_id)
         gold_df = pd.read_sql(gold_query, db._conn)
         pred_df = pd.read_sql(pred_query, db._conn)
         num_gold_rows = len(gold_df.axes[0])  # type: ignore
         num_pred_rows = len(pred_df.axes[0])  # type: ignore
         num_gold_cols = len(gold_df.axes[1])  # type: ignore
         num_pred_cols = len(pred_df.axes[1])  # type: ignore
-
         if num_gold_rows != num_pred_rows:
             print("ROW COUNT MISMATCH")
             print(gold_query)
@@ -81,12 +134,19 @@ def sql_rate_reply(db_id: str, gold_query: str, pred_query: str) -> dict[str, An
         return query_metadata
 
 
-async def awrite_eval_results_header(eval_str: str, has_id: bool):
+async def awrite_eval_results_header(
+    eval_str: str, has_id: bool, enable_logprobs: bool, enable_query_stats: bool = True
+):
     async with aiofiles.open(f"./eval/results/{eval_str}_results.csv", "a", newline="") as wf:
+        header = []
         if has_id:
-            header = ["id", "db_id", "gold_query", "pred_query", "success", "status", "error"]
-        else:
-            header = ["db_id", "gold_query", "pred_query", "success", "status", "error"]
+            header.append("query_id")
+        header.extend(["db_id", "question", "gold_query", "pred_query", "success", "status", "error"])
+        if enable_logprobs:
+            header.extend(["num_tokens", "total_prob", "avg_prob", "min_prob", "prob_decile_histogram"])
+        if enable_query_stats:
+            header.extend(["num_joins", "num_unions", "num_aggs", "num_filters", "num_sorts"])
+
         writer = AsyncWriter(wf, dialect="unix")
         await writer.writerow(header)
 
@@ -94,21 +154,51 @@ async def awrite_eval_results_header(eval_str: str, has_id: bool):
 async def awrite_eval_results_row(
     eval_str: str,
     db_id: str,
+    question: str,
     gold_query: str,
     success: bool,
     status: str,
     pred_query: str = "",
     error: Optional[str] = None,
     query_id: Optional[str] = None,
+    prob_stats: Optional[dict] = None,
+    query_stats: Optional[dict] = None,
+    enable_logprobs: bool = True,
+    enable_querystats: bool = True,
 ):
     async with aiofiles.open(f"./eval/results/{eval_str}_results.csv", "a", newline="") as wf:
         writer = AsyncWriter(wf, dialect="unix")
         # Clean the data
-        row_data = [db_id, gold_query, pred_query, success, status, error or ""]
-        row_data = [str(item).replace("\n", " ").replace("\r", " ") for item in row_data]
-
+        row_data = []
         if query_id:
-            row_data.insert(0, query_id)
+            row_data.append(query_id)
+        row_data.extend([db_id, question, gold_query, pred_query, success, status, error or ""])
+        if enable_logprobs and prob_stats:
+            row_data.extend(
+                [
+                    prob_stats["num_tokens"],
+                    prob_stats["total_prob"],
+                    prob_stats["avg_prob"],
+                    prob_stats["min_prob"],
+                    prob_stats["prob_decile_histogram"],
+                ]
+            )
+        elif enable_logprobs:
+            row_data.extend([None, None, None, None, None])
+        if enable_querystats and query_stats:
+            row_data.extend(
+                [
+                    query_stats["joins"],
+                    query_stats["unions"],
+                    query_stats["aggs"],
+                    query_stats["filters"],
+                    query_stats["sorts"],
+                ]
+            )
+        elif enable_querystats:
+            row_data.extend([None, None, None, None, None])
+
+        row_data = [str(item).replace("\n", " ").replace("\r", " ") for item in row_data]
 
         await writer.writerow(row_data)
 

@@ -11,7 +11,7 @@ from langchain.schema.language_model import BaseLanguageModel
 from langchain.schema import AIMessage, HumanMessage
 from langchain.prompts import HumanMessagePromptTemplate, SystemMessagePromptTemplate
 from langchain.prompts.chat import ChatPromptTemplate, BaseChatPromptTemplate
-from langchain.schema import BasePromptTemplate
+from langchain.schema import BasePromptTemplate, LLMResult
 from langchain.prompts.prompt import PromptTemplate
 from langchain.callbacks.manager import (
     AsyncCallbackManagerForChainRun,
@@ -43,13 +43,14 @@ SQLQuery:"""
 NL_TO_SQL_PROMPT = PromptTemplate.from_template(NL_TO_SQL_TEMPLATE)
 
 CUSTOM_LLM_NL_TO_SQL_TEMPLATE = """<|sql prompt|>
-You are a experienced data analyst adept at writing SQL queries to answer user questions.
+You are an experienced data analyst adept at writing SQL queries to answer user questions.
 
 You have access to the following relational tables, with schemas below.
 {table_info}
 Write a SQL query to answer the following question:
 {input}
-<|sql answer|>"""
+<|sql answer|>
+"""
 CUSTOM_LLM_NL_TO_SQL_PROMPT = PromptTemplate.from_template(CUSTOM_LLM_NL_TO_SQL_TEMPLATE)
 
 NL_TO_SQL_ERROR_TEMPLATE = """Correct the given SQL query:
@@ -84,7 +85,8 @@ you generated the following SQL query:
 {error}
 
 Please alter the query to run without error in HeavyDB:
-<|sql error answer|>"""
+<|sql error answer|>
+"""
 
 CUSTOM_NL_TO_SQL_ERROR_PROMPT = PromptTemplate.from_template(CUSTOM_NL_TO_SQL_ERROR_TEMPLATE)
 
@@ -134,6 +136,7 @@ class BaseNLtoSQLChain(BaseChain):
     input_key: str = "query"  #: :meta private:
     output_key: str = "sql"  #: :meta private:
     output_complexity_key: str = "sql_complexity"  #: :meta private:
+    output_logprobs_key: str = "logprobs"  #: :meta private:
     max_retries: int = 3
 
     class Config:
@@ -154,7 +157,18 @@ class BaseNLtoSQLChain(BaseChain):
         """Return the output keys.
         :meta private:
         """
-        return [self.output_key]
+        return [self.output_key, self.output_complexity_key, self.output_logprobs_key]
+
+    def get_sql_cmd_and_logprobs_from_llm_result(self, result: LLMResult) -> tuple[str, dict[str, Any]]:
+        """
+        Returns the generated sql and the lobprobs for each token.
+        """
+        first_generation = result.generations[0][0]  # type: ignore
+        sql_cmd = first_generation.text.strip()
+        if logprobs := first_generation.generation_info.get("logprobs", {}):
+            logprobs = logprobs.to_dict_recursive()
+
+        return sql_cmd, logprobs or {}
 
 
 class NLtoSQLChain(BaseNLtoSQLChain):
@@ -187,7 +201,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
         self,
         inputs: dict[str, Any],
         run_manager: Optional[CallbackManagerForChainRun] = None,
-    ) -> dict[str, str]:
+    ) -> dict[str, str | dict]:
         self.write_callback_message(inputs[self.input_key], run_manager=run_manager)
 
         # If not present, then defaults to None which is all tables available to HeavyDB wrapper instance
@@ -201,7 +215,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
         response = self.llm.generate_prompt(
             [gen_sql_prompt], callbacks=run_manager.get_child() if run_manager else None
         )
-        sql_cmd = response.generations[0][0].text.strip()  # type: ignore
+        sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
         verified = False
         retries = 0
 
@@ -228,7 +242,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                 response = self.llm.generate_prompt(
                     [correct_error_prompt], callbacks=run_manager.get_child() if run_manager else None
                 )
-                sql_cmd = response.generations[0][0].text.strip()  # type: ignore
+                sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
 
         if not verified:
             self.write_callback_message(
@@ -248,13 +262,17 @@ class NLtoSQLChain(BaseNLtoSQLChain):
 
         sql_complexity = self.database.complexity(sql_cmd)
 
-        return {self.output_key: strip_sql_comments(sql_cmd), self.output_complexity_key: str(sql_complexity)}
+        return {
+            self.output_key: strip_sql_comments(sql_cmd),
+            self.output_complexity_key: str(sql_complexity),
+            self.output_logprobs_key: logprobs,
+        }
 
     async def _acall(
         self,
         inputs: dict[str, Any],
         run_manager: Optional[AsyncCallbackManagerForChainRun] = None,
-    ) -> dict[str, str]:
+    ) -> dict[str, str | dict]:
         await self.write_callback_message_async(inputs[self.input_key], run_manager=run_manager)
 
         # If not present, then defaults to None which is all tables available to HeavyDB wrapper instance
@@ -268,7 +286,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
         response = await self.llm.agenerate_prompt(
             [gen_sql_prompt], callbacks=run_manager.get_child() if run_manager else None
         )
-        sql_cmd = response.generations[0][0].text.strip()  # type: ignore
+        sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
         verified = False
         retries = 0
 
@@ -316,7 +334,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                 response = await self.llm.agenerate_prompt(
                     [correct_error_prompt], callbacks=run_manager.get_child() if run_manager else None
                 )
-                sql_cmd = response.generations[0][0].text.strip()  # type: ignore
+                sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
 
         if not verified:
             await self.write_callback_message_async(
@@ -339,7 +357,11 @@ class NLtoSQLChain(BaseNLtoSQLChain):
 
         sql_complexity = await self.database.acomplexity(sql_cmd)
 
-        return {self.output_key: strip_sql_comments(sql_cmd), self.output_complexity_key: str(sql_complexity)}
+        return {
+            self.output_key: strip_sql_comments(sql_cmd),
+            self.output_complexity_key: str(sql_complexity),
+            self.output_logprobs_key: logprobs,
+        }
 
     @property
     def _chain_type(self) -> str:
@@ -368,7 +390,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
         self,
         inputs: dict[str, Any],
         run_manager: Optional[CallbackManagerForChainRun] = None,
-    ) -> dict[str, str]:
+    ) -> dict[str, str | dict]:
         self.write_callback_message(inputs[self.input_key], run_manager=run_manager)
 
         # If not present, then defaults to None which is all tables available to HeavyDB wrapper instance
@@ -381,7 +403,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
 
         messages = gen_sql_prompt.to_messages()
         response = self.llm.generate([messages], callbacks=run_manager.get_child() if run_manager else None)
-        sql_cmd = self.get_sql_query(response.generations[0][0].text)
+        sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
         verified = False
         retries = 0
 
@@ -399,7 +421,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
                 truncated_error = str(e)[0:150] if len(str(e)) > 150 else str(e)
                 messages.append(HumanMessage(content=NL_TO_SQL_CHAT_ERROR_TEMPLATE.format(exception=truncated_error)))
                 response = self.llm.generate([messages], callbacks=run_manager.get_child() if run_manager else None)
-                sql_cmd = self.get_sql_query(response.generations[0][0].text)
+                sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
 
         if not verified:
             self.write_callback_message(
@@ -420,13 +442,17 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
 
         sql_complexity = self.database.complexity(sql_cmd)
 
-        return {self.output_key: strip_sql_comments(sql_cmd), self.output_complexity_key: str(sql_complexity)}
+        return {
+            self.output_key: strip_sql_comments(sql_cmd),
+            self.output_complexity_key: str(sql_complexity),
+            self.output_logprobs_key: logprobs,
+        }
 
     async def _acall(
         self,
         inputs: dict[str, Any],
         run_manager: Optional[AsyncCallbackManagerForChainRun] = None,
-    ) -> dict[str, str]:
+    ) -> dict[str, str | dict]:
         await self.write_callback_message_async(inputs[self.input_key], run_manager=run_manager)
 
         # If not present, then defaults to None which is all tables available to HeavyDB wrapper instance
@@ -439,7 +465,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
 
         messages = gen_sql_prompt.to_messages()
         response = await self.llm.agenerate([messages], callbacks=run_manager.get_child() if run_manager else None)
-        sql_cmd = self.get_sql_query(response.generations[0][0].text)
+        sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
         verified = False
         retries = 0
 
@@ -463,7 +489,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
                 response = await self.llm.agenerate(
                     [messages], callbacks=run_manager.get_child() if run_manager else None
                 )
-                sql_cmd = self.get_sql_query(response.generations[0][0].text)  # type: ignore
+                sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
 
         if not verified:
             await self.write_callback_message_async(
@@ -486,7 +512,11 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
 
         sql_complexity = await self.database.acomplexity(sql_cmd)
 
-        return {self.output_key: strip_sql_comments(sql_cmd), self.output_complexity_key: str(sql_complexity)}
+        return {
+            self.output_key: strip_sql_comments(sql_cmd),
+            self.output_complexity_key: str(sql_complexity),
+            self.output_logprobs_key: logprobs,
+        }
 
     @property
     def _chain_type(self) -> str:
@@ -495,6 +525,6 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
 
 def get_nl_to_sql_chain_by_llm(llm: BaseLanguageModel) -> type[BaseNLtoSQLChain]:
     """
-    Gets the appropriate nt_to_sql chain class based upon the llm passed.
+    Gets the appropriate nl_to_sql chain class based upon the llm passed.
     """
     return NLtoSQLChatChain if isinstance(llm, BaseChatModel) else NLtoSQLChain  # type: ignore

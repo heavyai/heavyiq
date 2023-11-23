@@ -1,20 +1,20 @@
 from typing import Any
 
+from asgi_correlation_id import CorrelationIdMiddleware
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from heavydb.exceptions import Error as HeavyDBError  # type: ignore
 from starlette.exceptions import HTTPException
 
-from heavyiq.config import get_config
-from heavyiq.api.middlewares import AsyncLoggingMiddleware
-from asgi_correlation_id import CorrelationIdMiddleware
-from heavyiq.api.models.error import ErrorResponse
-from heavyiq.langchain.exceptions import NLtoSQLException
-from heavyiq.logging_utils import init_logs
-from heavyiq.langchain.utils import init_telemetrics
-from heavyiq.api.routes import defaultrouter, iqrouter
 from heavyiq.api.handlers import exception_handler as exh
+from heavyiq.api.middlewares import AsyncLoggingMiddleware
+from heavyiq.api.models.error import ErrorResponse
+from heavyiq.api.routes import defaultrouter, iqrouter, lcelrouter
+from heavyiq.config import get_config
+from heavyiq.langchain.exceptions import NLtoSQLException
+from heavyiq.langchain.utils import init_telemetrics
+from heavyiq.logging_utils import init_logs
 
 
 def stripped_down_api() -> FastAPI:
@@ -79,8 +79,20 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
             }
         },
     )
+    app.include_router(
+        lcelrouter,
+        prefix="/api/v1/lcel",
+        tags=["api.v1.lcel"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "model": ErrorResponse,
+            }
+        },
+    )
     if config.enable_debug_endpoints:
         from heavyiq.api.routes.debug_router import debug_router
+        from heavyiq.api.routes.runnable_router import runnable_router
 
         app.include_router(
             debug_router,
@@ -93,6 +105,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
                 }
             },
         )
+        app.include_router(runnable_router, prefix="/runnable", tags=["runnable"])
 
     # check heavydb connection
     @app.on_event("startup")
@@ -100,6 +113,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         """
         Code to be executed when application starts.
         """
+        import heavyiq.lcel.chains
         from heavyiq.logging_utils import heavyiq_logger as logger
 
         # TODO: Disabled for now, as no guarantee heavydb is running before heavyiq
