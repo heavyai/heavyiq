@@ -198,30 +198,47 @@ def custom_model_token_counter(text: str) -> int:
     return len(tokenizer.tokenize(text))
 
 
-async def aget_token_limit_and_token_counter_by_llm(llm: BaseLanguageModel) -> tuple[int, Callable[[str], int]]:
+async def aget_token_limit_and_token_counter_func_by_llm_with_table_options(
+    llm: BaseLanguageModel,
+) -> tuple[int, Callable[[str], int], list[dict[str, bool]]]:
     """
     Based on the llm type (openai or custom) and the model name, this function is
     supposed to return the token limit and the method for counting the tokens from text/prompt.
     """
     config = get_config()
+    table_info_options: list[dict[str, bool]]
+
     if config.custom_llm_type is None or config.custom_llm_type == "AZURE":
         token_limit = get_token_limit(llm.model_name)  # type: ignore
         token_counter = llm.get_num_tokens
+        table_info_options = [
+            {},
+            {"include_top_k": False},
+            {"include_samples": False},
+            {"include_samples": False, "include_top_k": False},
+        ]
     else:
         token_limit = llm.context_window - 306  # type: ignore # (256 response + 50 buffer)
         token_counter = custom_model_token_counter
+        table_info_options = [
+            {"include_samples": False},
+            {"include_samples": False, "include_top_k": False},
+        ]
 
-    return token_limit, token_counter
+    return token_limit, token_counter, table_info_options
 
 
+# this function exactly does the job of aget_table_info_wrt_token_limit function
+# but in modular form.
+# TODO: remove the old function and change this func name
 async def aget_table_info_for_nl_to_tables_prompt_wrt_token_limit(
     llm: BaseLanguageModel, heavydb: HeavyDB, prompt: BasePromptTemplate, table_names_to_use: list[str] | None
 ) -> str:
-    token_limit, token_counter = await aget_token_limit_and_token_counter_by_llm(llm)
-    table_info_options = [
-        {"include_samples": False},
-        {"include_samples": False, "include_top_k": False},
-    ]
+    (
+        token_limit,
+        token_counter,
+        table_info_options,
+    ) = await aget_token_limit_and_token_counter_func_by_llm_with_table_options(llm)
 
     for options in table_info_options:
         table_info = await heavydb.aget_table_info(table_names=table_names_to_use, **options)
