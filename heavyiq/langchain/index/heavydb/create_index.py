@@ -1,18 +1,20 @@
 from pathlib import Path
 
-from fastapi.concurrency import run_in_threadpool
 from chromadb.api import Where
-from langchain.vectorstores import Chroma
+from fastapi.concurrency import run_in_threadpool
 from langchain.indexes import VectorstoreIndexCreator
+from langchain.vectorstores import Chroma
 from langchain.vectorstores.base import VectorStore
 
-from heavyiq.utils import is_path_exists
-from heavyiq.logging_utils import get_heavyiq_logger
 from heavyiq.config import get_config
+from heavyiq.langchain.llms import is_using_custom_trained_llm
+from heavyiq.logging_utils import get_heavyiq_logger
+from heavyiq.utils import is_path_exists
+
 from ..utils import get_vectorstore_index_creator
-from .generate_table_documents import generate_table_documents, agenerate_table_documents
+from .generate_table_documents import agenerate_table_documents, generate_table_documents
 from .heavydb_metadata_index import HeavyDBMetadataIndex
-from .utils import read_table_documents, aread_table_documents
+from .utils import aread_table_documents, read_table_documents
 
 
 def update_tables_in_index(index_creator: VectorstoreIndexCreator, vectorstore: Chroma, tables_to_update: list[str]):
@@ -72,10 +74,17 @@ def create_index_if_nonexistent() -> HeavyDBMetadataIndex:
     :param persist_directory: Path to the directory where the vector store index should be persisted.
     :return: A HeavyDBMetadataIndex instance containing the vector store index.
     """
-    config = get_config()
+    config, logger = get_config(), get_heavyiq_logger()
     huggingface_model_name = config.huggingface_embed_model
     metadata_index_dir = config.metadata_index_dir
-    tables_with_new_summaries = generate_table_documents()
+
+    if is_using_custom_trained_llm():
+        logger.warning(
+            "Custom LLM doesn't support generating table documents, please use a non-local model. Skipping table document generation."
+        )
+        tables_with_new_summaries = []
+    else:
+        tables_with_new_summaries = generate_table_documents()
 
     index_creator = get_vectorstore_index_creator(metadata_index_dir)
 
@@ -112,7 +121,14 @@ async def acreate_index_if_nonexistent() -> HeavyDBMetadataIndex:
     config = get_config()
     huggingface_model_name = config.huggingface_embed_model
     metadata_index_dir = config.metadata_index_dir
-    tables_with_new_summaries = await agenerate_table_documents()
+
+    if is_using_custom_trained_llm():
+        logger.warning(
+            "Custom LLM doesn't support generating table documents, please use a non-local model. Skipping table document generation."
+        )
+        tables_with_new_summaries = []
+    else:
+        tables_with_new_summaries = await agenerate_table_documents()
 
     index_creator = get_vectorstore_index_creator(metadata_index_dir)
 

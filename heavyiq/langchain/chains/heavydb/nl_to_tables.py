@@ -1,14 +1,16 @@
 import re
 from typing import Any, Dict, Optional
-from pydantic import Extra
-from langchain.schema import BasePromptTemplate
-from heavyiq.langchain.heavydb import HeavyDB
-from langchain.schema.language_model import BaseLanguageModel
-from heavyiq.langchain.chains import BaseChain
-from heavyiq.langchain.utils import apopulate_table_info_into_nl_to_tables_prompt
-from langchain.prompts.prompt import PromptTemplate
-from langchain.callbacks.manager import AsyncCallbackManagerForChainRun, CallbackManagerForChainRun
 
+from langchain.callbacks.manager import AsyncCallbackManagerForChainRun, CallbackManagerForChainRun
+from langchain.prompts.prompt import PromptTemplate
+from langchain.schema import BasePromptTemplate
+from langchain.schema.language_model import BaseLanguageModel
+from pydantic import Extra
+
+from heavyiq.langchain.chains import BaseChain
+from heavyiq.langchain.heavydb import HeavyDB
+from heavyiq.langchain.llms import is_using_custom_trained_llm
+from heavyiq.langchain.utils import apopulate_table_info_into_nl_to_tables_prompt
 
 NL_TO_TABLES_TEMPLATE = """
 You are a experienced data analyst adept at analyzing user questions to determine the SQL tables required to generate an answer.
@@ -21,8 +23,20 @@ Emit each table name along with a 1 if the table is required to answer the follo
 Question: {input}
 Tables:"""
 
+NL_TO_TABLES_CUSTOM_TEMPLATE = """<|table prompt|>
+You are an experienced data analyst adept at analyzing user questions to determine the SQL tables required to generate an answer.
+You have access to the following relational tables, with schemas below.
+
+{table_info}
+
+Emit each table name along with a 1 if the table is required to answer the following user question, or a 0 if the table is not required.
+
+Question: {input}
+
+<|table answer|>"""
 
 NL_TO_TABLES_PROMPT = PromptTemplate.from_template(NL_TO_TABLES_TEMPLATE)
+NL_TO_TABLES_CUSTOM_PROMPT = PromptTemplate.from_template(NL_TO_TABLES_CUSTOM_TEMPLATE)
 
 
 class NLtoTablesChain(BaseChain):
@@ -40,13 +54,20 @@ class NLtoTablesChain(BaseChain):
     database: HeavyDB
     input_key: str = "question"  #: :meta private:
     output_key: str = "tables"  #: :meta private:
-    prompt: BasePromptTemplate = NL_TO_TABLES_PROMPT
+    prompt: BasePromptTemplate
 
     class Config:
         """Configuration for this pydantic object."""
 
         extra = Extra.forbid
         arbitrary_types_allowed = True
+
+    def __init__(self, *args, **kwargs):
+        if is_using_custom_trained_llm():
+            prompt = NL_TO_TABLES_CUSTOM_PROMPT
+        else:
+            prompt = NL_TO_TABLES_PROMPT
+        super().__init__(*args, prompt=prompt, **kwargs)  # type: ignore
 
     @property
     def _chain_type(self) -> str:
