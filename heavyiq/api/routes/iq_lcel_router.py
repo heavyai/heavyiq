@@ -1,8 +1,18 @@
 # contain chain endpoints implemented using Langchain Expression Language (LCEL)
 from fastapi import APIRouter, Depends
 
-from heavyiq.api.dependencies import valid_answer_db_session, valid_query_db_session, valid_question_db_session
-from heavyiq.api.handlers import handle_lcel_answer_request, handle_lcel_query_request, handle_lcel_question_request
+from heavyiq.api.dependencies import (
+    valid_answer_db_session,
+    valid_query_db_session,
+    valid_question_db_session,
+    valid_tables_db_session,
+)
+from heavyiq.api.handlers import (
+    handle_lcel_answer_request,
+    handle_lcel_query_request,
+    handle_lcel_question_request,
+    handle_lcel_tables_request,
+)
 from heavyiq.api.models import (
     AnswerRequest,
     AnswerResponse,
@@ -10,6 +20,8 @@ from heavyiq.api.models import (
     QueryResponse,
     QuestionRequest,
     QuestionResponse,
+    TablesRequest,
+    TablesResponse,
 )
 from heavyiq.api.routes.log_route import LoggingRoute
 from heavyiq.langchain import HeavyDB
@@ -57,3 +69,16 @@ async def answer(values: tuple[AnswerRequest, HeavyDB] = Depends(valid_answer_db
     :param AnswerRequest request: Request Body
     """
     return await handle_lcel_answer_request(*values)
+
+
+@lcelrouter.post("/tables", response_model=TablesResponse)
+async def tables(values: tuple[TablesRequest, HeavyDB] = Depends(valid_tables_db_session)) -> TablesResponse:
+    """
+    Request for tables with all the information:
+
+    - **question**: Actual NL question asked.
+    - **session_id**: HeavyDB session id.
+    \f
+    :param AnswerRequest request: Request Body
+    """
+    return await handle_lcel_tables_request(*values)

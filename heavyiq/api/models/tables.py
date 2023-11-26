@@ -26,12 +26,17 @@ class TablesResponse(BaseModel):
     """
 
     tables: dict[str, int] = Field(..., description="Dict of tables having table name as key and int (1, 0) as values")
+    feedback_id: str = Field(
+        default="",
+        description="A unique identifier for this request that can be used to submit feedback about the response",
+    )
 
     class Config:
         schema_extra = {
             "examples": [
                 {
                     "tables": {"usa_states": 1},
+                    "feedback_id": "(Optional) xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
                 }
             ]
         }
