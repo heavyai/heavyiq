@@ -25,18 +25,21 @@ nl_to_tables_prompt_rbl = (
 
 async def get_tables(inputs: dict) -> list[str]:
     """
-    Return a list of tables by doing similarity search on chroma db.
+    Return a list of allowed tables by doing similarity search on chroma db when tables length goes beyond certain limit.
     """
     db = await get_db(inputs["session_id"])
-    all_tables: set[str] = db.get_usable_table_names()
 
-    if len(all_tables) > 10:
+    allowed_tables: list[str] = inputs["allowed_tables"]
+    if not allowed_tables:
+        allowed_tables = list(db.get_usable_table_names())
+
+    found_tables: list[str] = []
+
+    if len(allowed_tables) > 10:
         heavydb_index = await aget_heavydb_index()
-        found_tables = set(
-            heavydb_index.simple_search_for_table_names(inputs["question"], allowable_tables=list(all_tables))
-        )
+        found_tables = heavydb_index.simple_search_for_table_names(inputs["question"], allowable_tables=allowed_tables)
 
-    return list(found_tables or all_tables)
+    return found_tables or allowed_tables
 
 
 async def get_table_info(inputs: dict) -> str:
