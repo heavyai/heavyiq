@@ -174,7 +174,7 @@ final_step = RunnableLambda(
     lambda x: {
         "query": strip_sql_comments(x.get("query", x.get("sql_cmd"))),
         "sql_complexity": x.get("sql_complexity", 0),
-        "error": x["error"],
+        "error": x["error"] or "",
     }
 ).with_config(config={"run_name": "Format Output"})
 
