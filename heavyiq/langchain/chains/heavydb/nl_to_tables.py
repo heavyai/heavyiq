@@ -13,7 +13,7 @@ from heavyiq.langchain.llms import is_using_custom_trained_llm
 from heavyiq.langchain.utils import apopulate_table_info_into_nl_to_tables_prompt
 
 NL_TO_TABLES_TEMPLATE = """
-You are a experienced data analyst adept at analyzing user questions to determine the SQL tables required to generate an answer.
+You are an experienced data analyst adept at analyzing user questions to determine the SQL tables required to generate an answer.
 You have access to the following relational tables, with schemas below.
 
 {table_info}
