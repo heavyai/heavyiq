@@ -33,7 +33,8 @@ Emit each table name along with a 1 if the table is required to answer the follo
 
 Question: {input}
 
-<|table answer|>"""
+<|table answer|>
+"""
 
 NL_TO_TABLES_PROMPT = PromptTemplate.from_template(NL_TO_TABLES_TEMPLATE)
 NL_TO_TABLES_CUSTOM_PROMPT = PromptTemplate.from_template(NL_TO_TABLES_CUSTOM_TEMPLATE)
