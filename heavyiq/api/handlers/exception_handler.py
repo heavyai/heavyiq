@@ -1,13 +1,14 @@
-from typing import Callable
 from functools import wraps
+from typing import Callable
 
 from fastapi.concurrency import run_in_threadpool
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import Response
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
+
 from heavyiq.api.models import ErrorResponse
 from heavyiq.langchain.exceptions import NLtoSQLException
 from heavyiq.logging_utils import get_heavyiq_logger

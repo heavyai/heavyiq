@@ -5,3 +5,4 @@ from .feedback import FeedbackRequest, FeedbackResponse
 from .query import QueryRequest, QueryResponse
 from .question import QuestionRequest, QuestionResponse
 from .table_metadata import GenerateTableMetadataRequest, GenerateTableMetadataResponse
+from .tables import TablesRequest, TablesResponse
