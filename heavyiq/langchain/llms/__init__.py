@@ -33,6 +33,7 @@ def get_vllm_model_name(api_base: str) -> str:
 @lru_cache
 def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str, Any]]:
     config = get_config()
+    # by default n was set to 1, so no need for passing n as llm kwargs otherwise if we need to
     kwargs: dict[str, Any] = {}
     model_kwargs: dict[str, Any] = {}
     if config.enable_logprobs and model_type == LLMType.NL_TO_SQL:
