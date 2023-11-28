@@ -3,7 +3,7 @@ import re
 from langchain.schema import StrOutputParser
 from langchain.schema.runnable import Runnable, RunnableLambda, RunnablePassthrough
 
-from heavyiq.langchain.heavydb import get_config, get_db
+from heavyiq.langchain.heavydb import get_db
 from heavyiq.langchain.index import aget_heavydb_index
 from heavyiq.langchain.llms import is_using_custom_trained_llm
 from heavyiq.langchain.utils import aget_table_info_wrt_token_limit

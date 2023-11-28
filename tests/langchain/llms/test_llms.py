@@ -1,9 +1,11 @@
-import pytest
 from unittest.mock import patch
-from heavyiq.config import HeavyIQConfig
+
+import pytest
+from langchain.chat_models import AzureChatOpenAI, ChatOpenAI
 from langchain.llms import AzureOpenAI
-from heavyiq.langchain.llms import is_using_custom_trained_llm, LLMType, get_vllm_model_kwargs, get_llm_by_type
-from langchain.chat_models import ChatOpenAI, AzureChatOpenAI
+
+from heavyiq.config import HeavyIQConfig
+from heavyiq.langchain.llms import LLMType, get_llm_by_type, get_vllm_model_kwargs, is_using_custom_trained_llm
 from heavyiq.langchain.llms.overrides import OverrideOpenAI, OverrideVLLMOpenAI
 
 
@@ -21,26 +23,29 @@ def test_should_check_whether_custom_llm_used_or_not():
 
 
 @pytest.mark.parametrize(
-    "model_type, beam_width, method_kwargs, expected",
+    "model_type, beam_width, expected",
     [
-        (LLMType.DEFAULT, 1, {"n": 1}, ({"n": 1}, {})),
-        (LLMType.NL_TO_SQL, 2, {"n": 2}, ({"n": 1, "best_of": 2}, {"use_beam_search": True, "logprobs": 5})),
-        (LLMType.SQL_TO_ANSWER, 2, {"n": 1}, ({"n": 1}, {})),
+        (LLMType.DEFAULT, 1, ({}, {})),
+        (LLMType.NL_TO_SQL, 2, ({"n": 1, "best_of": 2}, {"use_beam_search": True, "logprobs": 5})),
+        (LLMType.SQL_TO_ANSWER, 2, ({}, {})),
     ],
 )
 def test_get_vllm_model_kwargs_should_return_model_kwargs_for_valid_llm_type(
     model_type,
     beam_width,
-    method_kwargs,
     expected,
 ):
     with patch(
         "heavyiq.langchain.llms.get_config",
         return_value=HeavyIQConfig(
-            openai_api_key="", custom_llm_type="API_VLLM", custom_llm_api_vllm_beam_width=beam_width
+            openai_api_key="",
+            custom_llm_type="API_VLLM",
+            custom_llm_api_vllm_beam_width=beam_width,
+            enable_logprobs=True,
+            custom_llm_logprobs_limit=5,
         ),
     ):
-        kwargs, model_kwargs = get_vllm_model_kwargs(model_type, **method_kwargs)
+        kwargs, model_kwargs = get_vllm_model_kwargs(model_type)
         assert kwargs == expected[0]
         assert model_kwargs == expected[1]
 
