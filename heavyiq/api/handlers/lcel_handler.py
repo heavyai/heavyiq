@@ -1,5 +1,5 @@
 from heavyiq.api.handlers.decorators import with_db, with_feedback_id
-from heavyiq.api.models import AnswerResponse, QueryResponse, QuestionResponse
+from heavyiq.api.models import AnswerResponse, QueryResponse, QuestionResponse, TablesResponse
 
 
 @with_db
@@ -62,3 +62,21 @@ async def handle_lcel_answer_request(request_dict: dict, config: dict | None = N
         answer=result["answer"],
         feedback_id="",
     )
+
+
+@with_db
+@with_feedback_id
+async def handle_lcel_tables_request(request_dict: dict, config: dict | None = None) -> TablesResponse:
+    """
+    Async LCEL handler for /tables request (ie, NL to Tables).
+
+    Args:
+        request_dict: Input dict
+        config: Runnable config dict. Defaults to None.
+    Returns:
+        TablesResponse
+    """
+    from heavyiq.lcel.chains import table_chain
+
+    result = await table_chain.ainvoke(request_dict, config=config)  # type: ignore
+    return TablesResponse(tables=result)

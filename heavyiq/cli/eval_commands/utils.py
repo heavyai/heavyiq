@@ -36,7 +36,8 @@ def compute_prob_stats(selected_tokens: list[str], top_log_probs: list[dict[str,
         if select_seen:
             num_calc_tokens += 1
             sum_log_probs += selected_token_log_prob
-            prob_decile_histogram[int(selected_token_prob * 10)] += 1
+            hist_bin = 9 if selected_token_prob >= 1.0 else int(selected_token_prob * 10)
+            prob_decile_histogram[hist_bin] += 1
             if selected_token_prob < min_prob:
                 min_prob = selected_token_prob
                 min_prob_token = selected_token
@@ -70,6 +71,9 @@ def sql_rate_reply(
         "error": None,
     }
     try:
+        if gold_query == pred_query:
+            query_metadata["success"] = True
+            return query_metadata
         if not db:
             db = HeavyDB.from_env(db_name=db_id)
         gold_df = pd.read_sql(gold_query, db._conn)
@@ -78,7 +82,6 @@ def sql_rate_reply(
         num_pred_rows = len(pred_df.axes[0])  # type: ignore
         num_gold_cols = len(gold_df.axes[1])  # type: ignore
         num_pred_cols = len(pred_df.axes[1])  # type: ignore
-
         if num_gold_rows != num_pred_rows:
             print("ROW COUNT MISMATCH")
             print(gold_query)
@@ -137,8 +140,8 @@ async def awrite_eval_results_header(
     async with aiofiles.open(f"./eval/results/{eval_str}_results.csv", "a", newline="") as wf:
         header = []
         if has_id:
-            header.append("id")
-        header.extend(["db_id", "gold_query", "pred_query", "success", "status", "error"])
+            header.append("query_id")
+        header.extend(["db_id", "question", "gold_query", "pred_query", "success", "status", "error"])
         if enable_logprobs:
             header.extend(["num_tokens", "total_prob", "avg_prob", "min_prob", "prob_decile_histogram"])
         if enable_query_stats:
@@ -151,6 +154,7 @@ async def awrite_eval_results_header(
 async def awrite_eval_results_row(
     eval_str: str,
     db_id: str,
+    question: str,
     gold_query: str,
     success: bool,
     status: str,
@@ -168,7 +172,7 @@ async def awrite_eval_results_row(
         row_data = []
         if query_id:
             row_data.append(query_id)
-        row_data.extend([db_id, gold_query, pred_query, success, status, error or ""])
+        row_data.extend([db_id, question, gold_query, pred_query, success, status, error or ""])
         if enable_logprobs and prob_stats:
             row_data.extend(
                 [

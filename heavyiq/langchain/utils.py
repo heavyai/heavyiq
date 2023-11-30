@@ -1,5 +1,6 @@
 import os
 import re
+from typing import Callable
 
 from heavydb.exceptions import TDBException
 from langchain.base_language import BaseLanguageModel
@@ -183,6 +184,83 @@ async def apopulate_table_info_wrt_token_limit(
     table_names_to_use: list[str] | None,
 ) -> PromptValue:
     table_info = await aget_table_info_wrt_token_limit(llm, heavydb, prompt, table_names_to_use)
+
+    return prompt.format_prompt(table_info=table_info)
+
+
+def custom_model_token_counter(text: str) -> int:
+    """
+    Token counter method for custom models which helps to calculate tokens for the given text.
+    """
+    from transformers import LlamaTokenizer
+
+    tokenizer = LlamaTokenizer.from_pretrained("./heavyiq/langchain/llama_model", local_files_only=True, legacy=False)
+    return len(tokenizer.tokenize(text))
+
+
+async def aget_token_limit_and_token_counter_func_by_llm_with_table_options(
+    llm: BaseLanguageModel,
+) -> tuple[int, Callable[[str], int], list[dict[str, bool]]]:
+    """
+    Based on the llm type (openai or custom) and the model name, this function is
+    supposed to return the token limit and the method for counting the tokens from text/prompt.
+    """
+    config = get_config()
+    table_info_options: list[dict[str, bool]]
+
+    if config.custom_llm_type is None or config.custom_llm_type == "AZURE":
+        token_limit = get_token_limit(llm.model_name)  # type: ignore
+        token_counter = llm.get_num_tokens
+        table_info_options = [
+            {},
+            {"include_top_k": False},
+            {"include_samples": False},
+            {"include_samples": False, "include_top_k": False},
+        ]
+    else:
+        token_limit = llm.context_window - 306  # type: ignore # (256 response + 50 buffer)
+        token_counter = custom_model_token_counter
+        table_info_options = [
+            {"include_samples": False},
+            {"include_samples": False, "include_top_k": False},
+        ]
+
+    return token_limit, token_counter, table_info_options
+
+
+# this function exactly does the job of aget_table_info_wrt_token_limit function
+# but in modular form.
+# TODO: remove the old function and change this func name
+async def aget_table_info_for_nl_to_tables_prompt_wrt_token_limit(
+    llm: BaseLanguageModel, heavydb: HeavyDB, prompt: BasePromptTemplate, table_names_to_use: list[str] | None
+) -> str:
+    (
+        token_limit,
+        token_counter,
+        table_info_options,
+    ) = await aget_token_limit_and_token_counter_func_by_llm_with_table_options(llm)
+
+    for options in table_info_options:
+        table_info = await heavydb.aget_table_info(table_names=table_names_to_use, **options)
+        formatted_prompt = prompt.format(table_info=table_info)
+        if token_counter(formatted_prompt) <= token_limit:
+            break
+    else:  # executed if the loop finished normally (no break)
+        raise RuntimeError("Couldn't find suitable prompt provided token limit")
+
+    return table_info
+
+
+async def apopulate_table_info_into_nl_to_tables_prompt(
+    prompt: BasePromptTemplate | BaseChatPromptTemplate,
+    llm: BaseLanguageModel,
+    heavydb: HeavyDB,
+    table_names_to_use: list[str] | None,
+) -> PromptValue:
+    """
+    Generates table info and then injects it into the given prompt.
+    """
+    table_info = await aget_table_info_for_nl_to_tables_prompt_wrt_token_limit(llm, heavydb, prompt, table_names_to_use)
 
     return prompt.format_prompt(table_info=table_info)
 
