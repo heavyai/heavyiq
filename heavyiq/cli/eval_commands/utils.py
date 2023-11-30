@@ -1,15 +1,16 @@
-from typing import Any, Optional
-from itertools import permutations
-from collections import Counter
-import io
-import aiofiles
-import aiocsv
-from aiocsv.writers import AsyncWriter
 import csv
-
-import pandas as pd
-import numpy as np
+import io
 import math
+import re
+from collections import Counter
+from itertools import permutations
+from typing import Any, Optional
+
+import aiocsv
+import aiofiles
+import numpy as np
+import pandas as pd
+from aiocsv.writers import AsyncWriter
 
 from heavyiq.langchain import HeavyDB
 
@@ -229,3 +230,19 @@ def summarize_eval_results(eval_str: str) -> None:
 
     print(f"Total entries: {total_count}")
     print(f"Total success: {success_count} - Success Percentage: {success_percentage:.2f}%")
+
+
+def extract_tables_from_query(con, query) -> list[str]:
+    """
+    Extract tables names from SQL query.
+    """
+    explain_query = "EXPLAIN CALCITE " + query
+    query_plan = con.execute(explain_query)
+    query_plan = list(query_plan)[0][0]
+    pattern = r"LogicalTableScan\(table=\[\[(.*?)\]\]\)"
+    matches = re.findall(pattern, query_plan)
+    tables = []
+    for match in matches:
+        table = match.split(", ")[1]
+        tables.append(table)
+    return list(set(tables))  # remove duplicates

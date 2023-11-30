@@ -23,6 +23,7 @@ from .utils import (
     awrite_eval_results_header,
     awrite_eval_results_row,
     compute_prob_stats,
+    extract_tables_from_query,
     sql_rate_reply,
     summarize_eval_results,
 )
@@ -53,14 +54,14 @@ async def process_eval_row(
     logger = get_heavyiq_logger()
 
     if has_id:
-        query_id, db_id, tables, question, gold_query = row
+        query_id, db_id, question, gold_query = row
     else:
         query_id = None
-        db_id, tables, question, gold_query = row
+        db_id, question, gold_query = row
     async with semaphore:
-        tables = [table.strip("'") for table in str(tables).split(",")]
         logger.info(f"Processing Question: {question}")
-        db = await run_in_threadpool(HeavyDB.from_env, db_name=db_id, include_tables=tables)
+        db = await HeavyDB.from_env_async(db_name=db_id)
+        tables = extract_tables_from_query(db._conn, gold_query)
         chain = get_nl_to_sql_chain_by_llm(llm)(
             database=db, llm=llm, callbacks=None if verbose else [], verbose=verbose, tags=[eval_str, "cli"]
         )
@@ -68,7 +69,7 @@ async def process_eval_row(
         prob_stats = None
         query_stats = None
         try:
-            res = await chain.acall({chain.input_key: question}, include_run_info=is_langsmith_active)
+            res = await chain.acall({chain.input_key: question, "tables": tables}, include_run_info=is_langsmith_active)
             pred_query = res[chain.output_key]
             logger.info(f"Generated SQL: {pred_query}")
             logger.debug("Evaluating SQL")
@@ -189,7 +190,7 @@ async def run_config_model_on_questions(
 @coro
 @click.option("--temperature", default=0.0, help="Temperature for LLM (Defaults to 0.0)", type=float)
 @click.option("--verbose", default=False, help="Verbose output", type=bool)
-@click.option("--batch-size", default=5, help="How many questions to process parallelly?", type=int)
+@click.option("--batch-size", default=10, help="How many questions to process parallelly?", type=int)
 @click.argument("questions_csv", type=str)
 @click.pass_context  # type: ignore
 async def generate_eval_dataset_csv(
