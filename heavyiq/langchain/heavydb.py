@@ -309,6 +309,28 @@ class HeavyDB:
         )
         return conn._session
 
+    @classmethod
+    async def create_session_id_async(cls: type[HeavyDB], db_name: Optional[str] = None, **kwargs: Any) -> str:
+        """Creates a persistant database connection from environment variables and returns it's session id."""
+        config = get_config()
+        if not config.heavydb_username or not config.heavydb_password or not (db_name or config.heavydb_dbname):
+            raise ValueError("Please set the config variables heavydb_username, heavydb_password and heavydb_dbname")
+
+        async def aconnect_func() -> PersistantConnection:
+            func = functools.partial(
+                PersistantConnection,
+                user=config.heavydb_username,
+                password=config.heavydb_password,
+                host=config.heavydb_host,
+                port=config.heavydb_port,
+                dbname=db_name or config.heavydb_dbname,
+                protocol=config.heavydb_protocol,
+            )
+            return await anyio.to_thread.run_sync(func, cancellable=True)
+
+        conn = await cls._aconnect_with_timeout(aconnect_func(), kwargs.pop("timeout", 10))
+        return conn._session
+
     @property
     def table_info(self) -> str:
         """Information about all usable tables in the database."""

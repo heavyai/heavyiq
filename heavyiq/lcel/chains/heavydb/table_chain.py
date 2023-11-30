@@ -1,5 +1,6 @@
 import re
 
+from langchain.schema import StrOutputParser
 from langchain.schema.runnable import Runnable, RunnableLambda, RunnablePassthrough
 
 from heavyiq.langchain.heavydb import get_config, get_db
@@ -29,7 +30,7 @@ async def get_tables(inputs: dict) -> list[str]:
     """
     db = await get_db(inputs["session_id"])
 
-    allowed_tables: list[str] = inputs["allowed_tables"]
+    allowed_tables: list[str] = inputs.get("allowed_tables", [])
     if not allowed_tables:
         allowed_tables = list(db.get_usable_table_names())
 
@@ -101,6 +102,7 @@ chain: Runnable = (
         | RunnablePassthrough.assign(table_info=retrieve_tables_info_lambda, input=lambda x: x["question"])
         | prompt
         | model
+        | StrOutputParser()
         | parse_output_lambda
     )
     .with_config(config={"tags": ["NLtoTablesChainRunnable"], "run_name": "NL to Tables Chain Runnable"})
