@@ -83,12 +83,13 @@ async def change_format_for_error(inputs: dict) -> Any:
     """
     Return this dict response for invalid query generation.
     """
+    sql_chain_output = inputs["sql_chain_output"]
     return AnswerChainOutputType(
-        sql=inputs["query"],
-        sql_complexity=inputs["sql_complexity"],
+        sql=sql_chain_output["query"],
+        sql_complexity=sql_chain_output["sql_complexity"],
         results="",
         answer="",
-        fail_reason=inputs["sql_chain_output"]["error"],
+        fail_reason=sql_chain_output["error"],
     ).dict()
 
 

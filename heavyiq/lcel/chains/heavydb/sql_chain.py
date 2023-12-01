@@ -31,6 +31,7 @@ nl_to_sql_retry_prompt_rbl = (
     if is_using_custom_trained_llm()
     else to_sql_prompt_runnable.with_config(configurable={"prompt": "openai_error"})
 )
+max_retries = 3
 
 
 async def get_table_info(sql_chain_inputs: dict) -> str:
@@ -254,7 +255,7 @@ do_string_correction_and_calculate_complexity_or_passthrough_branch: Runnable = 
 
 chain: Runnable[Any, Any] = (
     (
-        RunnablePassthrough().assign(sql_cmd=query_runnable, max_revisions=lambda x: 3)
+        RunnablePassthrough().assign(sql_cmd=query_runnable, max_revisions=lambda x: max_retries)
         | validation_step
         | revise_lambda
         | do_string_correction_and_calculate_complexity_or_passthrough_branch
