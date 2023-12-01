@@ -94,13 +94,29 @@ async def change_format_for_error(inputs: dict) -> Any:
 
 generate_sql_resultset_step = RunnablePassthrough.assign(
     sql_result=RunnableLambda(get_sql_result),  # type: ignore
-).with_config(config={"run_name": "Generate SQL Resultset"})
+).with_config(
+    config={
+        "run_name": "Generate SQL Resultset",
+        "tags": ["intermediate-step"],
+        "metadata": {"step": "Generating SQL Query Resultset."},
+    }
+)
 should_forward_resultset_to_llm_step = RunnablePassthrough.assign(
     do_forward=RunnableLambda(should_forward_sql_result_to_llm)
-).with_config(config={"run_name": "Should Forward Resultset to LLM?"})
+).with_config(
+    config={
+        "run_name": "Should Forward Resultset to LLM?",
+        "tags": ["intermediate-step"],
+        "metadata": {"step": "Thinking about forwarding resultset to LLM."},
+    }
+)
 
 sql_to_answer_step = (sql_to_answer_prompt_rbl | sql_to_answer_llm_rbl | StrOutputParser()).with_config(
-    config={"run_name": "Predict Answer"}
+    config={
+        "run_name": "Predict Answer",
+        "tags": ["intermediate-step"],
+        "metadata": {"step": "Predicting answer."},
+    }
 )
 
 # branch which either generates the answer or returns None
@@ -131,8 +147,20 @@ to_sql_chain_or_not_branch = RunnableBranch(
     nl_to_sql_chain_with_sql_complexity,
 ).with_config(config={"run_name": "Find Query or Passthrough Branch"})
 
-final_step: Runnable = RunnableLambda(change_format)
-final_error_step: Runnable = RunnableLambda(change_format_for_error)
+final_step: Runnable = RunnableLambda(change_format).with_config(
+    config={
+        "run_name": "Final Output",
+        "tags": ["intermediate-step"],
+        "metadata": {"step": "Formatting final output."},
+    }
+)
+final_error_step: Runnable = RunnableLambda(change_format_for_error).with_config(
+    config={
+        "run_name": "Final Error Output",
+        "tags": ["intermediate-step"],
+        "metadata": {"step": "Formatting final error output."},
+    }
+)
 # Initial branch which will do the answer geenration only when the query
 # gets validated successfully.
 handle_query_error_branch: Runnable = RunnableBranch(
