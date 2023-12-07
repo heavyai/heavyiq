@@ -1,8 +1,9 @@
 import re
 
+from langchain.schema import StrOutputParser
 from langchain.schema.runnable import Runnable, RunnableLambda, RunnablePassthrough
 
-from heavyiq.langchain.heavydb import get_config, get_db
+from heavyiq.langchain.heavydb import get_db
 from heavyiq.langchain.index import aget_heavydb_index
 from heavyiq.langchain.llms import LLMType, is_using_custom_trained_llm
 from heavyiq.langchain.utils import aget_table_info_wrt_token_limit
@@ -101,6 +102,7 @@ chain: Runnable = (
         | RunnablePassthrough.assign(table_info=retrieve_tables_info_lambda, input=lambda x: x["question"])
         | prompt
         | model
+        | StrOutputParser()  # needed for chat models to efficiently convert chat message instance to str
         | parse_output_lambda
     )
     .with_config(config={"tags": ["NLtoTablesChainRunnable"], "run_name": "NL to Tables Chain Runnable"})
