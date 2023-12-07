@@ -614,7 +614,19 @@ class HeavyDB:
         self.logger.debug(f"Got sample rows for table {table_name}")
         return res
 
-    async def aget_top_k(self, table_name: str):
+    @alru_cache
+    async def aget_text_columns(self, table_name: str) -> list[str]:
+        """
+        Retrieve the list of text columns available in a table.
+        """
+        print("getting table columns")
+        return [
+            c.name
+            for c in await self.aget_table_columns(table_name)
+            if c.type == "STR" and c.encoding == "DICT" and c.is_array is False
+        ]
+
+    async def aget_top_k(self, table_name: str) -> str:
         """
         Get table top k rows from cache for db async.
         """
@@ -624,11 +636,7 @@ class HeavyDB:
         if cached_value is not None:
             self.logger.debug(f"Got top k values for table {table_name} from cache")
             return cached_value
-        text_columns = [
-            c.name
-            for c in await self.aget_table_columns(table_name)
-            if c.type == "STR" and c.encoding == "DICT" and c.is_array is False
-        ]
+        text_columns = await self.aget_text_columns(table_name)
         low_cardinality_columns = []
         high_cardinality_columns = []
         for col in text_columns:

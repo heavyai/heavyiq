@@ -1,5 +1,5 @@
+import asyncio
 import os
-import re
 from typing import Callable
 
 from heavydb.exceptions import TDBException
@@ -9,6 +9,7 @@ from langchain.schema.prompt import PromptValue
 
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
+from heavyiq.langchain.llms import LLMType
 
 is_langsmith_active = False
 
@@ -124,6 +125,7 @@ async def aget_table_info_wrt_token_limit(
     heavydb: HeavyDB,
     prompt: BasePromptTemplate | BaseChatPromptTemplate,
     table_names_to_use: list[str] | None,
+    caller: LLMType = LLMType.NL_TO_SQL,
 ) -> str:
     """
     Gets the info of all the tables with respect to the token limit async.
@@ -155,8 +157,24 @@ async def aget_table_info_wrt_token_limit(
             {"include_samples": False, "include_top_k": False},
         ]
 
+    top_k_max_str_column_count = (
+        config.top_k_max_str_col_count_nl_to_tables
+        if caller == LLMType.NL_TO_TABLES
+        else config.top_k_max_str_col_count_nl_to_sql
+    )
+
+    # decides whether to include top-k or not
+    disable_top_k = False
+    available_text_column_count = await get_all_text_column_count(heavydb, table_names_to_use)
+    if available_text_column_count > top_k_max_str_column_count:
+        disable_top_k = True
+
     for options in table_info_options:
-        table_info = await heavydb.aget_table_info(table_names=table_names_to_use, **options)
+        if disable_top_k:
+            updated_options = {**options, "include_top_k": False}
+        else:
+            updated_options = options
+        table_info = await heavydb.aget_table_info(table_names=table_names_to_use, **updated_options)
         formatted_prompt = prompt.format(table_info=table_info)
         if token_counter(formatted_prompt) <= token_limit:
             break
@@ -200,7 +218,7 @@ def custom_model_token_counter(text: str) -> int:
 
 async def aget_token_limit_and_token_counter_func_by_llm_with_table_options(
     llm: BaseLanguageModel,
-) -> tuple[int, Callable[[str], int], list[dict[str, bool]]]:
+) -> tuple[int, Callable[[str], int], int, list[dict[str, bool]]]:
     """
     Based on the llm type (openai or custom) and the model name, this function is
     supposed to return the token limit and the method for counting the tokens from text/prompt.
@@ -225,23 +243,47 @@ async def aget_token_limit_and_token_counter_func_by_llm_with_table_options(
             {"include_samples": False, "include_top_k": False},
         ]
 
-    return token_limit, token_counter, table_info_options
+    top_k_max_str_column_count = config.top_k_max_str_col_count_nl_to_tables
+
+    return token_limit, token_counter, top_k_max_str_column_count, table_info_options
+
+
+async def get_all_text_column_count(heavydb: HeavyDB, tables: list[str]) -> int:
+    """
+    Returns the count of all the text columns available in the tables.
+    """
+    tasks = []
+    for table in tables:
+        tasks.append(heavydb.aget_text_columns(table))
+
+    return sum([len(i) for i in await asyncio.gather(*tasks)])
 
 
 # this function exactly does the job of aget_table_info_wrt_token_limit function
 # but in modular form.
 # TODO: remove the old function and change this func name
 async def aget_table_info_for_nl_to_tables_prompt_wrt_token_limit(
-    llm: BaseLanguageModel, heavydb: HeavyDB, prompt: BasePromptTemplate, table_names_to_use: list[str] | None
+    llm: BaseLanguageModel, heavydb: HeavyDB, prompt: BasePromptTemplate, table_names_to_use: list[str]
 ) -> str:
     (
         token_limit,
         token_counter,
+        top_k_max_str_column_count,
         table_info_options,
     ) = await aget_token_limit_and_token_counter_func_by_llm_with_table_options(llm)
 
+    # decides whether to include top-k or not
+    disable_top_k = False
+    available_text_column_count = await get_all_text_column_count(heavydb, table_names_to_use)
+    if available_text_column_count > top_k_max_str_column_count:
+        disable_top_k = True
+
     for options in table_info_options:
-        table_info = await heavydb.aget_table_info(table_names=table_names_to_use, **options)
+        if disable_top_k:
+            updated_options = {**options, "include_top_k": False}
+        else:
+            updated_options = options
+        table_info = await heavydb.aget_table_info(table_names=table_names_to_use, **updated_options)
         formatted_prompt = prompt.format(table_info=table_info)
         if token_counter(formatted_prompt) <= token_limit:
             break
