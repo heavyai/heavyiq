@@ -4,7 +4,7 @@ from langchain.schema.runnable import Runnable, RunnableLambda, RunnablePassthro
 
 from heavyiq.langchain.heavydb import get_config, get_db
 from heavyiq.langchain.index import aget_heavydb_index
-from heavyiq.langchain.llms import is_using_custom_trained_llm
+from heavyiq.langchain.llms import LLMType, is_using_custom_trained_llm
 from heavyiq.langchain.utils import aget_table_info_wrt_token_limit
 from heavyiq.lcel.chains.utils import configure_step, get_value_from_runnable_binding
 from heavyiq.lcel.llms import llm_runnable
@@ -53,7 +53,7 @@ async def get_table_info(inputs: dict) -> str:
     heavydb = await get_db(inputs["session_id"])
     partial_gen_sql_prompt = get_value_from_runnable_binding(prompt_rbl).partial(**partial_inputs)  # type: ignore
     table_info = await aget_table_info_wrt_token_limit(
-        get_value_from_runnable_binding(nl_to_tables_llm_rbl), heavydb, partial_gen_sql_prompt, inputs["tables"]  # type: ignore
+        get_value_from_runnable_binding(nl_to_tables_llm_rbl), heavydb, partial_gen_sql_prompt, inputs["tables"], caller=LLMType.NL_TO_TABLES  # type: ignore
     )
     return table_info
 
