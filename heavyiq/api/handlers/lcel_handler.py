@@ -47,7 +47,9 @@ async def handle_lcel_auto_query_request(
             f"Language model failed to generate a valid SQL query after {max_retries} tries.", failed_sql=out["query"]
         )
 
-    return AutoQueryResponse(sql=out["query"], sql_complexity=out["sql_complexity"], feedback_id="", logprobs={})
+    return AutoQueryResponse(
+        sql=out["query"], sql_complexity=out["sql_complexity"], feedback_id="", tables=out["tables"], logprobs={}
+    )
 
 
 @with_db
@@ -125,6 +127,7 @@ async def handle_lcel_auto_question_request(
         sql_complexity=result["sql_complexity"],
         answer=result["answer"],
         feedback_id="",
+        tables=result["tables"],
     )
 
 

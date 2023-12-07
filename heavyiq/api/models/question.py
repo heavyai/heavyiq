@@ -87,4 +87,18 @@ class AutoQuestionResponse(QuestionResponse):
     /auto/question endpoint's request schema class.
     """
 
-    ...
+    tables: list[str] = Field(..., min_items=1, description="List of found table names.")
+
+    class Config:
+        schema_extra = {
+            "examples": [
+                {
+                    "answer": "4 states start with the letter A; Alaska, Arizona, Arkansas, and Alabama.",
+                    "sql": "SELECT COUNT(*) AS num_states, STATE_NAME FROM usa_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;",
+                    "sql_result": "[(1, 'Alaska'), (1, 'Arizona'), (1, 'Arkansas'), (1, 'Alabama')]",
+                    "sql_complexity": 3,
+                    "tables": ["usa_states"],
+                    "feedback_id": "(Optional) xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+                }
+            ]
+        }

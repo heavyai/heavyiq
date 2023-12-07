@@ -16,4 +16,4 @@ class AutoSQLChainInputType(BaseModel):
 
 
 class AutoSQLChainOutputType(SqlChainOutputType):
-    ...
+    tables: list[str] = Field(..., description="List of table names used.")

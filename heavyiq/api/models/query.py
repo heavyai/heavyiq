@@ -397,4 +397,16 @@ class AutoQueryResponse(QueryResponse):
     /auto/query endpoint's response schema class.
     """
 
-    ...
+    tables: list[str] = Field(..., min_items=1, description="List of found table names.")
+
+    class Config:
+        schema_extra = {
+            "examples": [
+                {
+                    "sql": "SELECT COUNT(*) AS num_states, STATE_NAME FROM usa_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;",
+                    "sql_complexity": 3,
+                    "tables": ["usa_states"],
+                    "feedback_id": "(Optional) xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+                }
+            ]
+        }
