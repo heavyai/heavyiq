@@ -254,9 +254,9 @@ async def get_all_text_column_count(heavydb: HeavyDB, tables: list[str]) -> int:
     """
     tasks = []
     for table in tables:
-        tasks.append(heavydb.aget_text_columns(table))
+        tasks.append(heavydb.aget_text_columns_count(table))
 
-    return sum([len(i) for i in await asyncio.gather(*tasks)])
+    return sum(await asyncio.gather(*tasks))
 
 
 # this function exactly does the job of aget_table_info_wrt_token_limit function
