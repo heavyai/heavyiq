@@ -619,7 +619,6 @@ class HeavyDB:
         """
         Retrieve the list of text columns available in a table.
         """
-        print("getting table columns")
         return [
             c.name
             for c in await self.aget_table_columns(table_name)
