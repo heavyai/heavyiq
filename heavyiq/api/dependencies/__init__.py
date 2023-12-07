@@ -1,15 +1,31 @@
 from fastapi import Body
 from fastapi.concurrency import run_in_threadpool
 
-from heavyiq.api.models import AnswerRequest, GenerateTableMetadataRequest, QueryRequest, QuestionRequest, TablesRequest
+from heavyiq.api.models import (
+    GenerateTableMetadataRequest,
+    NLtoAnswerRequest,
+    QueryRequest,
+    QuestionRequest,
+    SQLtoAnswerRequest,
+    TablesRequest,
+)
 from heavyiq.langchain import HeavyDB
 
 
-async def valid_answer_db_session(request: AnswerRequest = Body(...)) -> tuple[AnswerRequest, HeavyDB]:
+async def valid_nl_to_answer_db_session(request: NLtoAnswerRequest = Body(...)) -> tuple[NLtoAnswerRequest, HeavyDB]:
     """
     Common db dependency.
     """
     db = await HeavyDB.from_session_async(request.session_id, include_tables=request.tables)  # type: ignore
+
+    return request, db
+
+
+async def valid_sql_to_answer_db_session(request: SQLtoAnswerRequest = Body(...)) -> tuple[SQLtoAnswerRequest, HeavyDB]:
+    """
+    Common db dependency.
+    """
+    db = await HeavyDB.from_session_async(request.session_id)  # type: ignore
 
     return request, db
 

@@ -1,11 +1,12 @@
 import re
-import aiofiles
-from typing import Generator
-from aiofiles.os import scandir
-from pathlib import Path
-from fastapi.concurrency import run_in_threadpool
 from multiprocessing.managers import SyncManager
-from typing import Generic, TypeVar, Optional
+from pathlib import Path
+from typing import Generator, Generic, Optional, TypeVar
+
+import aiofiles
+from aiofiles.os import scandir
+from fastapi.concurrency import run_in_threadpool
+from heavydb.connection import Connection
 
 
 def strip_sql_comments(sql: str) -> str:
@@ -182,3 +183,19 @@ async def aread_file(file_path: str) -> str:
     """
     async with aiofiles.open(file_path, mode="r") as file:
         return await file.read()
+
+
+def extract_tables_from_query(con: Connection, query: str) -> list[str]:
+    """
+    Extract tables names from SQL query.
+    """
+    explain_query = "EXPLAIN CALCITE " + query
+    query_plan = con.execute(explain_query)
+    query_plan = list(query_plan)[0][0]
+    pattern = r"LogicalTableScan\(table=\[\[(.*?)\]\]\)"
+    matches = re.findall(pattern, query_plan)
+    tables = []
+    for match in matches:
+        table = match.split(", ")[1]
+        tables.append(table)
+    return list(set(tables))  # remove duplicates

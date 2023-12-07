@@ -1,13 +1,12 @@
 from langchain.pydantic_v1 import BaseModel, Field
 
 
-class AnswerRequest(BaseModel):
+class NLtoAnswerRequest(BaseModel):
     """
     /answer endpoint's request schema class.
     """
 
     question: str = Field(..., description="Natural language question (prompts accepted)")
-    query: str = Field(..., description="HeavyDB compatible SQL Query")
     tables: list[str] = Field(
         ..., min_items=1, description="Array of table names to limit the scope of the search/response"
     )
@@ -19,8 +18,28 @@ class AnswerRequest(BaseModel):
                 {
                     "session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
                     "question": "How many states begin with the letter A? What are they?",
-                    "query": "SELECT COUNT(DISTINCT STATE_NAME) AS Number_of_States, STATE_NAME FROM usa_states\nWHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;",
                     "tables": ["usa_states"],
+                }
+            ]
+        }
+
+
+class SQLtoAnswerRequest(BaseModel):
+    """
+    /answer endpoint's request schema class.
+    """
+
+    question: str = Field(..., description="Natural language question (prompts accepted)")
+    query: str = Field(..., description="HeavyDB compatible SQL Query")
+    session_id: str = Field(..., max_length=32, min_length=32, description="Valid HeavyDB Session ID")
+
+    class Config:
+        schema_extra = {
+            "examples": [
+                {
+                    "session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+                    "question": "How many states begin with the letter A? What are they?",
+                    "query": "SELECT COUNT(DISTINCT STATE_NAME) AS Number_of_States, STATE_NAME FROM usa_states\nWHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;",
                 }
             ]
         }

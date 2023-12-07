@@ -1,4 +1,4 @@
-from .answer import AnswerRequest, AnswerResponse
+from .answer import AnswerResponse, NLtoAnswerRequest, SQLtoAnswerRequest
 from .ask_heavyai_docs import AskHeavyAIDocsRequest, AskHeavyAIDocsResponse
 from .error import ErrorResponse
 from .feedback import FeedbackRequest, FeedbackResponse

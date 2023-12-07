@@ -7,8 +7,9 @@ from .iq_handler import (
     handle_tables_request_async,
 )
 from .lcel_handler import (
-    handle_lcel_answer_request,
+    handle_lcel_nl_to_answer_request,
     handle_lcel_query_request,
     handle_lcel_question_request,
+    handle_lcel_sql_to_answer_request,
     handle_lcel_tables_request,
 )

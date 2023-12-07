@@ -2,24 +2,27 @@
 from fastapi import APIRouter, Depends
 
 from heavyiq.api.dependencies import (
-    valid_answer_db_session,
+    valid_nl_to_answer_db_session,
     valid_query_db_session,
     valid_question_db_session,
+    valid_sql_to_answer_db_session,
     valid_tables_db_session,
 )
 from heavyiq.api.handlers import (
-    handle_lcel_answer_request,
+    handle_lcel_nl_to_answer_request,
     handle_lcel_query_request,
     handle_lcel_question_request,
+    handle_lcel_sql_to_answer_request,
     handle_lcel_tables_request,
 )
 from heavyiq.api.models import (
-    AnswerRequest,
     AnswerResponse,
+    NLtoAnswerRequest,
     QueryRequest,
     QueryResponse,
     QuestionRequest,
     QuestionResponse,
+    SQLtoAnswerRequest,
     TablesRequest,
     TablesResponse,
 )
@@ -57,18 +60,36 @@ async def question(values: tuple[QuestionRequest, HeavyDB] = Depends(valid_quest
     return await handle_lcel_question_request(*values)
 
 
-@lcelrouter.post("/answer", response_model=AnswerResponse)
-async def answer(values: tuple[AnswerRequest, HeavyDB] = Depends(valid_answer_db_session)) -> AnswerResponse:
+@lcelrouter.post("/nl-to-answer", response_model=AnswerResponse)
+async def nl_to_answer(
+    values: tuple[NLtoAnswerRequest, HeavyDB] = Depends(valid_nl_to_answer_db_session)
+) -> AnswerResponse:
     """
     Request for answer with all the information:
 
-    - **query**: HeavyDB compatible SQL query.
+    - **question**: NL question.
     - **tables**: List of tables to consider.
     - **session_id**: HeavyDB session id.
     \f
     :param AnswerRequest request: Request Body
     """
-    return await handle_lcel_answer_request(*values)
+    return await handle_lcel_nl_to_answer_request(*values)
+
+
+@lcelrouter.post("/sql-to-answer", response_model=AnswerResponse)
+async def sql_to_answer(
+    values: tuple[SQLtoAnswerRequest, HeavyDB] = Depends(valid_sql_to_answer_db_session)
+) -> AnswerResponse:
+    """
+    Request for answer with all the information:
+
+    - **query**: HeavyDB compatible SQL query.
+    - **question**: NL question.
+    - **session_id**: HeavyDB session id.
+    \f
+    :param AnswerRequest request: Request Body
+    """
+    return await handle_lcel_sql_to_answer_request(*values)
 
 
 @lcelrouter.post("/tables", response_model=TablesResponse)

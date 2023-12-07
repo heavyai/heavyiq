@@ -41,9 +41,9 @@ async def handle_lcel_question_request(request_dict: dict, config: dict | None =
 
 @with_db
 @with_feedback_id
-async def handle_lcel_answer_request(request_dict: dict, config: dict | None = None) -> AnswerResponse:
+async def handle_lcel_nl_to_answer_request(request_dict: dict, config: dict | None = None) -> AnswerResponse:
     """
-    Async LCEL handler for /answer request.
+    Async LCEL handler for /nl-to-answer request.
 
     Args:
         request_dict: Input dict
@@ -52,9 +52,34 @@ async def handle_lcel_answer_request(request_dict: dict, config: dict | None = N
     Returns:
         AnswerResponse
     """
-    from heavyiq.lcel.chains import answer_chain
+    from heavyiq.lcel.chains import nl_to_answer_chain
 
-    result = await answer_chain.ainvoke(request_dict, config=config)  # type: ignore
+    result = await nl_to_answer_chain.ainvoke(request_dict, config=config)  # type: ignore
+    return AnswerResponse(
+        sql=result["sql"],
+        sql_result=result["results"],
+        sql_complexity=result["sql_complexity"],
+        answer=result["answer"],
+        feedback_id="",
+    )
+
+
+@with_db
+@with_feedback_id
+async def handle_lcel_sql_to_answer_request(request_dict: dict, config: dict | None = None) -> AnswerResponse:
+    """
+    Async LCEL handler for /sql-to-answer request.
+
+    Args:
+        request_dict: Input dict
+        config: Runnable config dict. Defaults to None.
+
+    Returns:
+        AnswerResponse
+    """
+    from heavyiq.lcel.chains import sql_to_answer_chain
+
+    result = await sql_to_answer_chain.ainvoke(request_dict, config=config)  # type: ignore
     return AnswerResponse(
         sql=result["sql"],
         sql_result=result["results"],
