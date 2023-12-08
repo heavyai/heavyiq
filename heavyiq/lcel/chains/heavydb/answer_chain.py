@@ -103,7 +103,7 @@ async def change_format_for_error(inputs: dict) -> Any:
         sql_complexity=inputs["sql_complexity"],
         results="",
         answer="",
-        fail_reason=inputs["sql_chain_output"]["error"],
+        fail_reason=inputs["error"],
     ).dict()
 
 

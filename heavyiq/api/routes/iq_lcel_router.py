@@ -2,6 +2,8 @@
 from fastapi import APIRouter, Depends
 
 from heavyiq.api.dependencies import (
+    valid_auto_query_db_session,
+    valid_auto_question_db_session,
     valid_nl_to_answer_db_session,
     valid_query_db_session,
     valid_question_db_session,
@@ -9,6 +11,8 @@ from heavyiq.api.dependencies import (
     valid_tables_db_session,
 )
 from heavyiq.api.handlers import (
+    handle_lcel_auto_query_request,
+    handle_lcel_auto_question_request,
     handle_lcel_nl_to_answer_request,
     handle_lcel_query_request,
     handle_lcel_question_request,
@@ -17,6 +21,10 @@ from heavyiq.api.handlers import (
 )
 from heavyiq.api.models import (
     AnswerResponse,
+    AutoQueryRequest,
+    AutoQueryResponse,
+    AutoQuestionRequest,
+    AutoQuestionResponse,
     NLtoAnswerRequest,
     QueryRequest,
     QueryResponse,
@@ -46,6 +54,22 @@ async def query(values: tuple[QueryRequest, HeavyDB] = Depends(valid_query_db_se
     return await handle_lcel_query_request(*values)
 
 
+@lcelrouter.post("/auto/query", response_model=AutoQueryResponse)
+async def auto_query(
+    values: tuple[AutoQueryRequest, HeavyDB] = Depends(valid_auto_query_db_session)
+) -> AutoQueryResponse:
+    """
+    Request for sql query with all the information using LCEL:
+
+    - **question**: Actual NL question asked.
+    - **session_id**: HeavyDB session id.
+    - **allowed_tables**: Optional List of tables to consider.
+    \f
+    :param AutoQueryRequest request: Request Body
+    """
+    return await handle_lcel_auto_query_request(*values)
+
+
 @lcelrouter.post("/question", response_model=QuestionResponse)
 async def question(values: tuple[QuestionRequest, HeavyDB] = Depends(valid_question_db_session)) -> QuestionResponse:
     """
@@ -58,6 +82,22 @@ async def question(values: tuple[QuestionRequest, HeavyDB] = Depends(valid_quest
     :param QuestionRequest request: Request Body
     """
     return await handle_lcel_question_request(*values)
+
+
+@lcelrouter.post("/auto/question", response_model=AutoQuestionResponse)
+async def auto_question(
+    values: tuple[AutoQuestionRequest, HeavyDB] = Depends(valid_auto_question_db_session)
+) -> AutoQuestionResponse:
+    """
+    Request for answer and sql with all the information:
+
+    - **question**: Actual NL question asked.
+    - **session_id**: HeavyDB session id.
+    - **allowed_tables**: Optional List of tables to consider.
+    \f
+    :param AutoQuestionRequest request: Request Body
+    """
+    return await handle_lcel_auto_question_request(*values)
 
 
 @lcelrouter.post("/nl-to-answer", response_model=AnswerResponse)

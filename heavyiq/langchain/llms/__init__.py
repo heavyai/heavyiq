@@ -17,6 +17,7 @@ class LLMType(Enum):
     DEFAULT = "default"
     NL_TO_SQL = "nl_to_sql"
     SQL_TO_ANSWER = "sql_to_answer"
+    NL_TO_TABLES = "nl_to_tables"
 
 
 def is_using_custom_trained_llm() -> bool:

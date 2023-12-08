@@ -1,8 +1,10 @@
+# This package contain pydantic models for representing
+# endpoint's input/output schema.
 from .answer import AnswerResponse, NLtoAnswerRequest, SQLtoAnswerRequest
 from .ask_heavyai_docs import AskHeavyAIDocsRequest, AskHeavyAIDocsResponse
 from .error import ErrorResponse
 from .feedback import FeedbackRequest, FeedbackResponse
-from .query import QueryRequest, QueryResponse
-from .question import QuestionRequest, QuestionResponse
+from .query import AutoQueryRequest, AutoQueryResponse, QueryRequest, QueryResponse
+from .question import AutoQuestionRequest, AutoQuestionResponse, QuestionRequest, QuestionResponse
 from .table_metadata import GenerateTableMetadataRequest, GenerateTableMetadataResponse
 from .tables import TablesRequest, TablesResponse
