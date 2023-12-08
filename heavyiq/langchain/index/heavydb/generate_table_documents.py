@@ -153,18 +153,35 @@ async def acreate_and_write_table_document(heavydb: HeavyDB, table: str) -> None
     """
     logger = get_heavyiq_logger()
     logger.info(f"Summarizing {table}...")
-    docs = [
+    doc_tasks = [
         aget_table_summary_document(heavydb, table),
         aget_table_column_description_document(heavydb, table),
     ]
     try:
-        docs = await asyncio.gather(*docs)
+        docs: list[Document] = await asyncio.gather(*doc_tasks)
     except Exception as e:
         raise e
     file_content = "\n\n".join([doc.page_content for doc in docs])
     file_path = f"table_documents/{table}.txt"
     await awrite_to_file(file_path, file_content)
     logger.info(f"Done writing table document {file_path}")
+
+
+async def acreate_and_write_table_custom_document(heavydb: HeavyDB, table: str) -> None:
+    """
+    Creates and writes a document asynchronously that includes the table schema and column list for a specified table.
+    Since the document generation process doesn't involve any LLM calls, it fetches data solely from the database
+    and writes it as a separate text document.
+
+    Args:
+        heavydb (HeavyDB): An instance of HeavyDB containing the table information.
+        table (str): The name of the table for which the document is to be created and written.
+    """
+    logger = get_heavyiq_logger()
+    table_info = await heavydb.aget_table_info([table], include_samples=True, include_top_k=True)
+    file_path = f"table_documents/{table}.txt"
+    await awrite_to_file(file_path, table_info)
+    logger.info(f"Done writing table custom document {file_path}")
 
 
 def write_to_file(file_name: str, content: str):
@@ -225,17 +242,21 @@ async def agenerate_table_documents() -> list[str]:
     heavydb = await run_in_threadpool(HeavyDB.from_env, ignore_tables=tables_with_documents_already)
     table_names_to_generate = heavydb.get_usable_table_names()
 
-    if table_names_to_generate and is_using_custom_trained_llm():
-        raise ValueError("Custom LLM doesnot support generating table column description.")
-
     tasks = []
-    for table_name in table_names_to_generate:
-        tasks.append(asyncio.create_task(acreate_and_write_table_document(heavydb=heavydb, table=table_name)))
+    coro = (
+        acreate_and_write_table_custom_document if is_using_custom_trained_llm() else acreate_and_write_table_document
+    )
+
+    tasks.extend(
+        [asyncio.create_task(coro(heavydb=heavydb, table=table_name)) for table_name in table_names_to_generate]
+    )
 
     await asyncio.gather(*tasks)
 
     logger.info(
-        f"Finished generating summaries and column descriptions for {len(list(table_names_to_generate))} tables."
+        f"Finished generating table schema and column details for {len(list(table_names_to_generate))} tables."
+        if is_using_custom_trained_llm()
+        else f"Finished generating summaries and column descriptions for {len(list(table_names_to_generate))} tables."
     )
 
     return list(table_names_to_generate)
