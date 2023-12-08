@@ -122,13 +122,7 @@ async def acreate_index_if_nonexistent() -> HeavyDBMetadataIndex:
     huggingface_model_name = config.huggingface_embed_model
     metadata_index_dir = config.metadata_index_dir
 
-    if is_using_custom_trained_llm():
-        logger.warning(
-            "Custom LLM doesn't support generating table documents, please use a non-local model. Skipping table document generation."
-        )
-        tables_with_new_summaries = []
-    else:
-        tables_with_new_summaries = await agenerate_table_documents()
+    tables_with_new_summaries = await agenerate_table_documents()
 
     index_creator = get_vectorstore_index_creator(metadata_index_dir)
 
