@@ -13,9 +13,12 @@ from langchain.globals import set_debug
 from heavyiq.langchain.heavydb import heavydb_context
 from heavyiq.langchain.logging import log_chain_runnable
 from heavyiq.langchain.utils import init_telemetrics
+from heavyiq.lcel.callbacks.file_callback import LogFileCallbackHandler
+from heavyiq.lcel.chains import answer_chain, sql_chain
 from heavyiq.lcel.chains.heavydb.answer_chain import chain as nl_to_answer_chain
 from heavyiq.lcel.chains.heavydb.sql_chain import chain as nl_to_sql_chain
-from heavyiq.lcel.chains.heavydb.sql_chain import custom_chain, retry_query_runnable
+from heavyiq.lcel.chains.heavydb.sql_chain import retry_query_runnable
+from heavyiq.lcel.runnables import StreamStepsRunnableWrapper
 
 # from heavyiq.lcel.chains.heavydb.sql_chain import complete_chain as nl_to_sql_complete_chain
 
@@ -26,7 +29,13 @@ input_ctx_var: ContextVar[dict] = ContextVar("input_ctx_var", default={})
 
 async def nl_to_sql(session_id: str):
     async with heavydb_context(session_id):  # type: ignore
-        out = await nl_to_sql_chain.ainvoke(input_ctx_var.get())
+        out = await sql_chain.ainvoke(input_ctx_var.get())
+        print(out)
+
+
+async def nl_to_sql_with_logging(session_id: str):
+    async with heavydb_context(session_id):  # type: ignore
+        out = await nl_to_sql_chain.ainvoke(input_ctx_var.get(), config={"callbacks": [LogFileCallbackHandler()]})
         print(out)
 
 
@@ -50,9 +59,10 @@ async def nl_to_sql_stream(session_id: str):
 
 
 async def nl_to_sql_stream_intermediate_steps(session_id: str):
-    async for s in nl_to_sql_chain.astream_log(input_ctx_var.get()):
-        print("-" * 40)
-        print(s)
+    async with heavydb_context(session_id):
+        stream_chain = StreamStepsRunnableWrapper(nl_to_sql_chain)
+        async for step in stream_chain.start(input_ctx_var.get(), config={"callbacks": [LogFileCallbackHandler()]}):
+            print(step)
 
 
 async def nl_to_sql_retry(session_id: str):
@@ -118,8 +128,15 @@ async def nl_to_sql_batch(session_id: str):
 
 async def nl_to_answer(session_id: str):
     async with heavydb_context(session_id):
-        out = await nl_to_answer_chain.ainvoke(input_ctx_var.get())
+        out = await answer_chain.ainvoke(input_ctx_var.get())
         print(out)
+
+
+async def nl_to_answer_stream_intermediate_steps(session_id: str):
+    async with heavydb_context(session_id):
+        stream_chain = StreamStepsRunnableWrapper(answer_chain)
+        async for step in stream_chain.start(input_ctx_var.get(), config={"callbacks": [LogFileCallbackHandler()]}):
+            print(step)
 
 
 async def sql_to_answer_without_complexity(session_id: str):
@@ -161,7 +178,7 @@ async def nl_to_answer_batch(session_id: str):
         for q in questions
     ]
     async with heavydb_context(session_id):
-        out = await nl_to_answer_chain.abatch(inputs)
+        out = await nl_to_answer_chain.abatch(inputs, config={"callbacks": [LogFileCallbackHandler()]})
         print(out)
 
 
@@ -176,6 +193,6 @@ if __name__ == "__main__":
         }
     )
     # you can call any of the above functions for testing purpose
-    asyncio.run(nl_to_sql_retry(session_id))
+    asyncio.run(nl_to_answer(session_id))
     end_time = time.perf_counter()
     print("Elapsed time during the whole program in seconds:", end_time - start_time)

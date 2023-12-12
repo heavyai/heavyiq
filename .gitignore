@@ -26,3 +26,4 @@ config.test.toml
 
 eval/results/*.csv
 *.log
+testdb/

@@ -1,7 +1,14 @@
 from fastapi import Body
-from fastapi.concurrency import run_in_threadpool
 
-from heavyiq.api.models import AnswerRequest, GenerateTableMetadataRequest, QueryRequest, QuestionRequest, TablesRequest
+from heavyiq.api.models import (
+    AnswerRequest,
+    AutoQueryRequest,
+    AutoQuestionRequest,
+    GenerateTableMetadataRequest,
+    QueryRequest,
+    QuestionRequest,
+    TablesRequest,
+)
 from heavyiq.langchain import HeavyDB
 
 
@@ -18,7 +25,7 @@ async def valid_query_db_session(query_request: QueryRequest = Body(...)) -> tup
     """
     Dependency where the injected handler function gets a tuple of query request and db objects.
     """
-    db = await run_in_threadpool(HeavyDB.from_session, query_request.session_id, include_tables=query_request.tables)
+    db = await HeavyDB.from_session_async(query_request.session_id, include_tables=query_request.tables)
 
     return query_request, db
 
@@ -27,9 +34,7 @@ async def valid_question_db_session(question_request: QuestionRequest = Body(...
     """
     Dependency where the injected handler function gets a tuple of query request and db objects.
     """
-    db = await run_in_threadpool(
-        HeavyDB.from_session, question_request.session_id, include_tables=question_request.tables
-    )
+    db = await HeavyDB.from_session_async(question_request.session_id, include_tables=question_request.tables)
 
     return question_request, db
 
@@ -40,9 +45,7 @@ async def validate_db_session_for_table_metadata(
     """
     Dependency where the injected handler function gets a tuple of request and db objects.
     """
-    db = await run_in_threadpool(
-        HeavyDB.from_session, request_body.session_id, include_tables=[request_body.table_name]
-    )
+    db = await HeavyDB.from_session_async(request_body.session_id, include_tables=[request_body.table_name])
 
     return request_body, db
 
@@ -50,5 +53,21 @@ async def validate_db_session_for_table_metadata(
 async def valid_tables_db_session(request: TablesRequest = Body(...)) -> tuple[TablesRequest, HeavyDB]:
     """
     Dependency where the injected handler function gets a tuple of query request and db objects.
+    """
+    return request, await HeavyDB.from_session_async(request.session_id)
+
+
+async def valid_auto_query_db_session(request: AutoQueryRequest = Body(...)) -> tuple[AutoQueryRequest, HeavyDB]:
+    """
+    Dependency where the injected handler function gets a tuple of auto query (ie. auto detect tables) request and db objects.
+    """
+    return request, await HeavyDB.from_session_async(request.session_id)
+
+
+async def valid_auto_question_db_session(
+    request: AutoQuestionRequest = Body(...),
+) -> tuple[AutoQuestionRequest, HeavyDB]:
+    """
+    Dependency where the injected handler function gets a tuple of auto question request and db objects.
     """
     return request, await HeavyDB.from_session_async(request.session_id)

@@ -1,73 +1,60 @@
-import functools
-from typing import Awaitable, Callable, TypeVar
-from uuid import UUID
+from typing import NoReturn
 
-from langchain import callbacks
-from langchain.pydantic_v1 import BaseModel
-
-from heavyiq.api.models import AnswerResponse, QueryResponse, QuestionResponse, TablesResponse
-from heavyiq.config import get_config
-from heavyiq.langchain import HeavyDB
-from heavyiq.langchain.heavydb import heavydb_context
-from heavyiq.logging_utils import get_heavyiq_logger
-
-# Define a type variable for the wrapped coroutine function
-T = TypeVar("T")
-
-
-def with_db(coro: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
-    """
-    Decorator which wraps the coroutine function within heavydb_context context.
-    """
-
-    @functools.wraps(coro)
-    async def wrapper(request: BaseModel, db: HeavyDB) -> T:
-        config, logger = get_config(), get_heavyiq_logger()
-        file_callback_handler = logger.async_langchain_cb_handler(to_stdout=config.log_to_stdout)
-        async with heavydb_context(db):  # type: ignore
-            return await coro(request.dict(), config={"callbacks": [file_callback_handler]})
-
-    return wrapper
-
-
-def with_feedback_id(coro: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
-    """
-    Decorator which attaches the run_id to the response.
-    """
-
-    async def wrapper(*args, **kwargs) -> T:
-        from heavyiq.langchain.utils import is_langsmith_active
-
-        run_id: UUID | str = ""
-        if is_langsmith_active:
-            with callbacks.collect_runs() as cb:
-                out = await coro(*args, **kwargs)
-                run_id = str(cb.traced_runs[0].id)
-        else:
-            out = await coro(*args, **kwargs)
-        if isinstance(out, BaseModel) and hasattr(out, "feedback_id"):
-            setattr(out, "feedback_id", run_id)
-
-        return out
-
-    return wrapper
+from heavyiq.api.handlers.decorators import with_db, with_feedback_id
+from heavyiq.api.models import (
+    AnswerResponse,
+    AutoQueryResponse,
+    AutoQuestionResponse,
+    QueryResponse,
+    QuestionResponse,
+    TablesResponse,
+)
+from heavyiq.langchain.exceptions import NLtoAnswerException, NLtoSQLException
 
 
 @with_db
 @with_feedback_id
-async def handle_lcel_query_request(request_dict: dict, config: dict | None = None) -> QueryResponse:
+async def handle_lcel_query_request(request_dict: dict, config: dict | None = None) -> QueryResponse | NoReturn:
     """
     Async LCEL handler for /query request.
     """
     from heavyiq.lcel.chains import sql_chain
+    from heavyiq.lcel.chains.heavydb.sql_chain import max_retries
 
     out = await sql_chain.ainvoke(request_dict, config=config)  # type: ignore
+    if out["error"]:
+        raise NLtoSQLException(
+            f"Language model failed to generate a valid SQL query after {max_retries} tries.", failed_sql=out["query"]
+        )
+
     return QueryResponse(sql=out["query"], sql_complexity=out["sql_complexity"], feedback_id="", logprobs={})
 
 
 @with_db
 @with_feedback_id
-async def handle_lcel_question_request(request_dict: dict, config: dict | None = None) -> QuestionResponse:
+async def handle_lcel_auto_query_request(
+    request_dict: dict, config: dict | None = None
+) -> AutoQueryResponse | NoReturn:
+    """
+    Async LCEL handler for /auto/query request.
+    """
+    from heavyiq.lcel.chains import auto_sql_chain
+    from heavyiq.lcel.chains.heavydb.sql_chain import max_retries
+
+    out = await auto_sql_chain.ainvoke(request_dict, config=config)  # type: ignore
+    if out["error"]:
+        raise NLtoSQLException(
+            f"Language model failed to generate a valid SQL query after {max_retries} tries.", failed_sql=out["query"]
+        )
+
+    return AutoQueryResponse(
+        sql=out["query"], sql_complexity=out["sql_complexity"], feedback_id="", tables=out["tables"], logprobs={}
+    )
+
+
+@with_db
+@with_feedback_id
+async def handle_lcel_question_request(request_dict: dict, config: dict | None = None) -> QuestionResponse | NoReturn:
     """
     Async LCEL handler for /question request.
 
@@ -79,8 +66,21 @@ async def handle_lcel_question_request(request_dict: dict, config: dict | None =
         QuestionResponse
     """
     from heavyiq.lcel.chains import answer_chain
+    from heavyiq.lcel.chains.heavydb.sql_chain import max_retries
 
     result = await answer_chain.ainvoke(request_dict, config=config)  # type: ignore
+    fail_reason = result["fail_reason"]
+
+    if fail_reason:
+        is_sql_error = True if "SQL Error" in fail_reason else False
+        if is_sql_error:
+            raise NLtoSQLException(
+                f"Language model failed to generate a valid SQL query after {max_retries} tries.",
+                failed_sql=result["sql"],
+            )
+        else:
+            raise NLtoAnswerException(fail_reason)
+
     return QuestionResponse(
         sql=result["sql"],
         sql_result=result["results"],
@@ -92,12 +92,53 @@ async def handle_lcel_question_request(request_dict: dict, config: dict | None =
 
 @with_db
 @with_feedback_id
-async def handle_lcel_answer_request(request_dict: dict, config: dict | None = None) -> AnswerResponse:
+async def handle_lcel_auto_question_request(
+    request_dict: dict, config: dict | None = None
+) -> AutoQuestionResponse | NoReturn:
+    """
+    Async LCEL handler for /auto/question request.
+
+    Args:
+        request_dict: Input dict
+        config: Runnable config dict. Defaults to None.
+
+    Returns:
+        AutoQuestionResponse
+    """
+    from heavyiq.lcel.chains import auto_answer_chain
+    from heavyiq.lcel.chains.heavydb.sql_chain import max_retries
+
+    result = await auto_answer_chain.ainvoke(request_dict, config=config)  # type: ignore
+    fail_reason = result["fail_reason"]
+
+    if fail_reason:
+        is_sql_error = True if "SQL Error" in fail_reason else False
+        if is_sql_error:
+            raise NLtoSQLException(
+                f"Language model failed to generate a valid SQL query after {max_retries} tries.",
+                failed_sql=result["sql"],
+            )
+        else:
+            raise NLtoAnswerException(fail_reason)
+
+    return AutoQuestionResponse(
+        sql=result["sql"],
+        sql_result=result["results"],
+        sql_complexity=result["sql_complexity"],
+        answer=result["answer"],
+        feedback_id="",
+        tables=result["tables"],
+    )
+
+
+@with_db
+@with_feedback_id
+async def handle_lcel_answer_request(request_dict: dict, config: dict | None = None) -> AnswerResponse | NoReturn:
     """
     Async LCEL handler for /answer request.
 
     Args:
-        request_dict: Input dict
+        request_dict: Input dict with query info (note that the query passed as input should be validated beforehand)
         config: Runnable config dict. Defaults to None.
 
     Returns:
@@ -106,6 +147,9 @@ async def handle_lcel_answer_request(request_dict: dict, config: dict | None = N
     from heavyiq.lcel.chains import answer_chain
 
     result = await answer_chain.ainvoke(request_dict, config=config)  # type: ignore
+    if result["fail_reason"]:
+        raise NLtoAnswerException(result["fail_reason"])
+
     return AnswerResponse(
         sql=result["sql"],
         sql_result=result["results"],

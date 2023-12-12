@@ -54,6 +54,9 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     # logprobs
     enable_logprobs: bool = False
     custom_llm_logprobs_limit: int = 1
+    # top-k
+    top_k_max_str_col_count_nl_to_sql: int = 30
+    top_k_max_str_col_count_nl_to_tables: int = 30
 
 
 class AppConfig(OverrideBaseConfig):  # type: ignore

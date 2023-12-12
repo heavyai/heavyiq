@@ -11,7 +11,7 @@ from contextvars import ContextVar
 from copy import deepcopy
 from multiprocessing.managers import SyncManager
 from threading import Lock
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Iterable, Optional, TypedDict
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Optional, TypedDict
 
 import anyio
 from async_lru import alru_cache
@@ -61,6 +61,7 @@ class HeavyDB:
     _top_k_cache: Optional[LRUCache[str, str]] = None
     _sample_rows_cache: Optional[LRUCache[str, str]] = None
     _table_schema_cache: Optional[LRUCache[str, str]] = None
+    _table_text_columns_count_cache: Optional[LRUCache[str, int]] = None
 
     def __init__(
         self,
@@ -79,6 +80,7 @@ class HeavyDB:
         self._conn = conn
         self.lock = Lock()
         self.alock = asyncio.Lock()
+        self._dbname = self._conn._dbname
         """Async lock ensures exactly one coroutine was allowed to access a shared resource (db) at a time."""
 
         self._all_tables = set(self._conn.get_tables())
@@ -110,6 +112,11 @@ class HeavyDB:
                 (table, self._custom_table_info[table]) for table in self._custom_table_info if table in intersection
             )
 
+        # populate connection's _db_name attribute
+        if not self._dbname:
+            # connection established from session, so grab the session details
+            self._dbname = self._conn._client.get_session_info(self._conn._session).database
+
     def __del__(self):
         try:
             self._conn.close()
@@ -117,28 +124,34 @@ class HeavyDB:
             print(f"Error: {e}")
 
     @classmethod
-    def get_manager(cls) -> SyncManager:
+    def get_manager(cls: type[HeavyDB]) -> SyncManager:
         if cls._manager is None:
             cls._manager = multiprocessing.Manager()
         return cls._manager
 
     @classmethod
-    def get_top_k_cache(cls) -> LRUCache[str, str]:
+    def get_top_k_cache(cls: type[HeavyDB]) -> LRUCache[str, str]:
         if cls._top_k_cache is None:
             cls._top_k_cache = LRUCache[str, str](manager=cls.get_manager())
         return cls._top_k_cache
 
     @classmethod
-    def get_sample_rows_cache(cls) -> LRUCache[str, str]:
+    def get_sample_rows_cache(cls: type[HeavyDB]) -> LRUCache[str, str]:
         if cls._sample_rows_cache is None:
             cls._sample_rows_cache = LRUCache[str, str](manager=cls.get_manager())
         return cls._sample_rows_cache
 
     @classmethod
-    def get_table_schema_cache(cls) -> LRUCache[str, str]:
+    def get_table_schema_cache(cls: type[HeavyDB]) -> LRUCache[str, str]:
         if cls._table_schema_cache is None:
             cls._table_schema_cache = LRUCache[str, str](manager=cls.get_manager())
         return cls._table_schema_cache
+
+    @classmethod
+    def get_table_text_columns_count_cache(cls: type[HeavyDB]) -> LRUCache[str, int]:
+        if cls._table_text_columns_count_cache is None:
+            cls._table_text_columns_count_cache = LRUCache[str, int](manager=cls.get_manager())
+        return cls._table_text_columns_count_cache
 
     @property
     def top_k_cache(self) -> LRUCache[str, str]:
@@ -151,6 +164,10 @@ class HeavyDB:
     @property
     def table_schema_cache(self) -> LRUCache[str, str]:
         return self.get_table_schema_cache()
+
+    @property
+    def table_text_columns_count_cache(self) -> LRUCache[str, int]:
+        return self.get_table_text_columns_count_cache()
 
     @classmethod
     def _connect_with_timeout(
@@ -346,7 +363,7 @@ class HeavyDB:
 
     def get_table_schema(self, table: str) -> str:
         self.logger.debug(f"Getting schema for table {table}")
-        cache_key = f"{self._conn._dbname}.{table}"
+        cache_key = f"{self._dbname}.{table}"
         cached_value = self.table_schema_cache.get(cache_key)
         if cached_value is not None:
             self.logger.debug(f"Got schema for table {table} from cache")
@@ -422,7 +439,7 @@ class HeavyDB:
 
     def get_sample_rows(self, table_name: str) -> str:
         self.logger.debug(f"Getting sample rows for table {table_name}")
-        cache_key = f"{self._conn._dbname}.{table_name}"
+        cache_key = f"{self._dbname}.{table_name}"
         cached_value = self.sample_rows_cache.get(cache_key)
         if cached_value is not None:
             self.logger.debug(f"Got sample rows for table {table_name} from cache")
@@ -450,7 +467,7 @@ class HeavyDB:
 
     def get_top_k(self, table_name: str) -> str:
         self.logger.debug(f"Getting top k values for table {table_name}")
-        cache_key = f"{self._conn._dbname}.{table_name}"
+        cache_key = f"{self._dbname}.{table_name}"
         cached_value = self.top_k_cache.get(cache_key)
         if cached_value is not None:
             self.logger.debug(f"Got top k values for table {table_name} from cache")
@@ -578,12 +595,12 @@ class HeavyDB:
             except Exception as e:
                 raise e
 
-    async def aget_table_schema(self, table: str):
+    async def aget_table_schema(self, table: str) -> str:
         """
         Get table schema from cache for from db async.
         """
         self.logger.debug(f"Getting schema for table {table}")
-        cache_key = f"{self._conn._dbname}.{table}"
+        cache_key = f"{self._dbname}.{table}"
         cached_value = self.table_schema_cache.get(cache_key)
         if cached_value is not None:
             self.logger.debug(f"Got schema for table {table} from cache")
@@ -605,12 +622,12 @@ class HeavyDB:
 
         return table_schema
 
-    async def aget_sample_rows(self, table_name: str):
+    async def aget_sample_rows(self, table_name: str) -> str:
         """
         Get table sample rows from cache for db async.
         """
         self.logger.debug(f"Getting sample rows for table {table_name}")
-        cache_key = f"{self._conn._dbname}.{table_name}"
+        cache_key = f"{self._dbname}.{table_name}"
         cached_value = self.sample_rows_cache.get(cache_key)
         if cached_value is not None:
             self.logger.debug(f"Got sample rows for table {table_name} from cache")
@@ -636,21 +653,44 @@ class HeavyDB:
         self.logger.debug(f"Got sample rows for table {table_name}")
         return res
 
-    async def aget_top_k(self, table_name: str):
+    async def aget_text_columns(self, table_name: str) -> list[str]:
         """
-        Get table top k rows from cache for db async.
+        Retrieve the list of text columns available in a table.
         """
-        self.logger.debug(f"Getting top k values for table {table_name}")
-        cache_key = f"{self._conn._dbname}.{table_name}"
-        cached_value = self.top_k_cache.get(cache_key)
-        if cached_value is not None:
-            self.logger.debug(f"Got top k values for table {table_name} from cache")
-            return cached_value
-        text_columns = [
+        return [
             c.name
             for c in await self.aget_table_columns(table_name)
             if c.type == "STR" and c.encoding == "DICT" and c.is_array is False
         ]
+
+    async def aget_text_columns_count(self, table_name: str) -> int:
+        """
+        Returns the number of text columns available in a table.
+        """
+        self.logger.debug(f"Getting text columns count for table {table_name}")
+        cache_key = f"{self._dbname}.{table_name}"
+        cached_value = self.table_text_columns_count_cache.get(cache_key)
+        if cached_value is not None:
+            self.logger.debug(f"Got text columns count for table {table_name} from cache")
+            return cached_value
+
+        text_columns = await self.aget_text_columns(table_name)
+        text_columns_count = len(text_columns)
+        self.table_text_columns_count_cache.put(cache_key, text_columns_count)
+        self.logger.debug(f"Got text columns count for table {table_name}")
+        return text_columns_count
+
+    async def aget_top_k(self, table_name: str) -> str:
+        """
+        Get table top k rows from cache for db async.
+        """
+        self.logger.debug(f"Getting top k values for table {table_name}")
+        cache_key = f"{self._dbname}.{table_name}"
+        cached_value = self.top_k_cache.get(cache_key)
+        if cached_value is not None:
+            self.logger.debug(f"Got top k values for table {table_name} from cache")
+            return cached_value
+        text_columns = await self.aget_text_columns(table_name)
         low_cardinality_columns = []
         high_cardinality_columns = []
         for col in text_columns:
@@ -701,10 +741,11 @@ class HeavyDB:
         """
         all_table_names = self.get_usable_table_names()
         if table_names is not None:
-            missing_tables = set(table_names).difference(all_table_names)
+            table_names_set = set(table_names)
+            missing_tables = table_names_set.difference(all_table_names)
             if missing_tables:
                 raise ValueError(f"table_names {missing_tables} not found in database")
-            all_table_names = table_names
+            all_table_names = table_names_set
 
         tables = []
         for table in all_table_names:
@@ -1152,7 +1193,7 @@ class HeavyDB:
         If the statement throws an error, the error message is returned.
         """
         try:
-            return self.run(command, fetch)
+            return self.run(command, fetch)  # type: ignore
         except Exception as e:
             """Format the error message"""
             return f"Error: {e}"

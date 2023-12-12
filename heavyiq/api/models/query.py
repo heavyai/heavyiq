@@ -366,3 +366,47 @@ class QueryResponse(BaseModel):
                 }
             ]
         }
+
+
+class AutoQueryRequest(BaseModel):
+    """
+    /auto/query endpoint's request schema class.
+    """
+
+    question: str = Field(..., description="Natural language question (prompts accepted)")
+    session_id: str = Field(..., max_length=32, min_length=32, description="Valid HeavyDB Session ID")
+    allowed_tables: list[str] = Field(
+        default=[],
+        description="Optional field representing a list of tables to consider. If this list is empty, all the database tables will be included.",
+    )
+
+    class Config:
+        schema_extra = {
+            "examples": [
+                {
+                    "session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+                    "question": "How many states begin with the letter A? What are they?",
+                    "allowed_tables": ["usa_states", "countries"],
+                }
+            ]
+        }
+
+
+class AutoQueryResponse(QueryResponse):
+    """
+    /auto/query endpoint's response schema class.
+    """
+
+    tables: list[str] = Field(..., min_items=1, description="List of found table names.")
+
+    class Config:
+        schema_extra = {
+            "examples": [
+                {
+                    "sql": "SELECT COUNT(*) AS num_states, STATE_NAME FROM usa_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;",
+                    "sql_complexity": 3,
+                    "tables": ["usa_states"],
+                    "feedback_id": "(Optional) xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+                }
+            ]
+        }

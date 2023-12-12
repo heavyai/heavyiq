@@ -27,3 +27,7 @@ class NLtoSQLException(HeavyIQBaseException):
 
 class GenerateTableMetadataException(HeavyIQBaseException):
     pass
+
+
+class NLtoAnswerException(HeavyIQBaseException):
+    pass

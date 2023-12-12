@@ -1,16 +1,7 @@
-from operator import itemgetter
-from typing import Any, Optional, TypedDict
+from typing import Any
 
 from langchain.schema.output_parser import StrOutputParser
-from langchain.schema.runnable import (
-    Runnable,
-    RunnableBranch,
-    RunnableLambda,
-    RunnableParallel,
-    RunnablePassthrough,
-    RunnableSequence,
-)
-from langchain.schema.runnable.config import RunnableConfig
+from langchain.schema.runnable import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
 
 from heavyiq.langchain.heavydb import get_config, get_db
 from heavyiq.langchain.llms import is_using_custom_trained_llm
@@ -40,6 +31,7 @@ nl_to_sql_retry_prompt_rbl = (
     if is_using_custom_trained_llm()
     else to_sql_prompt_runnable.with_config(configurable={"prompt": "openai_error"})
 )
+max_retries = 3
 
 
 async def get_table_info(sql_chain_inputs: dict) -> str:
@@ -62,42 +54,93 @@ async def get_table_info(sql_chain_inputs: dict) -> str:
     return table_info
 
 
-# runnable which stores the user input (ie. str or dict passed to runnable_chain.invoke method)
-input_runnable = RunnablePassthrough().with_types(input_type=SqlChainInputType)  # type: ignore
+# Predicting Query
+# Step 1
+# calculating input variables for prompt formatting
+table_info_runnable_lambda: Runnable = RunnableLambda(get_table_info).with_config(  # type: ignore
+    config={
+        "tags": ["intermediate-step"],
+        "run_name": "Get Table Info",
+        "metadata": {"step": "Retrieving table information for prompt."},
+    }
+)
+query_variables = RunnablePassthrough.assign(table_info=table_info_runnable_lambda, input=lambda x: x["question"]).with_config(  # type: ignore
+    config={
+        "tags": ["intermediate-step"],
+        "run_name": "Calculate Input Variables",
+        "metadata": {"step": "Calculating input variables for Query prompt."},
+    }
+)
+
+# Step 2
+query_prompt: Runnable = nl_to_sql_prompt_rbl.with_config(  # type: ignore
+    config={
+        "tags": ["intermediate-step"],
+        "run_name": "Preparing NL-SQL Prompt",
+        "metadata": {"step": "Constructing prompt with input variables."},
+    }
+)
+# Step 3
+query_llm: Runnable = nl_to_sql_llm_rbl.bind(stop=["\nSQLResult:", "\n<|sql result|>"]).with_config(  # type: ignore
+    config={
+        "tags": ["intermediate-step"],
+        "run_name": "Calling LLM",
+        "metadata": {"step": "Invoking the LLM for SQL query prediction."},
+    }
+)
+
+
 # Supposed to return the SQL query predicted by the llm
 query_runnable = (
-    (
-        input_runnable
-        | RunnablePassthrough.assign(
-            table_info=RunnableLambda(get_table_info), input=lambda x: x["question"]  # type: ignore
-        )
-        | nl_to_sql_prompt_rbl
-        | nl_to_sql_llm_rbl.bind(stop=["\nSQLResult:", "\n<|sql result|>"])
-        | StrOutputParser()
-    )
+    (query_variables | query_prompt | query_llm | StrOutputParser())
     .with_config(config={"tags": ["nl_to_sql_predict_query_runnable"], "run_name": "Find Query"})  # type: ignore
     .with_types(input_type=SqlChainInputType)  # type: ignore
 )
 
+# Query retry runnable which accepts error and sql_cmd from previous query prediction chain
+# Retry Query Prediction
+# Step 1
+retry_query_variables = RunnablePassthrough.assign(table_info=table_info_runnable_lambda, input=lambda x: x["question"]).with_config(  # type: ignore
+    config={
+        "tags": ["intermediate-step"],
+        "run_name": "Calculate Input Variables",
+        "metadata": {"step": "Calculating input variables for Retry Query prompt."},
+    }
+)
+# Step 2
+retry_query_prompt: Runnable = nl_to_sql_retry_prompt_rbl.with_config(  # type: ignore
+    config={
+        "tags": ["intermediate-step"],
+        "run_name": "Preparing NL-SQL Error Prompt",
+        "metadata": {"step": "Constructing error prompt with input variables."},
+    }
+)
+
+# Step 3
+retry_query_llm: Runnable = nl_to_sql_llm_rbl.bind(stop=["\nSQLResult:", "\n<|sql result|>"]).with_config(  # type: ignore
+    config={
+        "tags": ["intermediate-step"],
+        "run_name": "ReCalling LLM",
+        "metadata": {"step": "Invoking the LLM for SQL query retry prediction."},
+    }
+)
 
 # SQL retry runnable
-
-retry_input_runnable = RunnablePassthrough().with_types(input_type=SqlChainIntermediateType)  # type: ignore
-
-retry_query_runnable = (
-    retry_input_runnable
-    | RunnablePassthrough.assign(
-        table_info=RunnableLambda(get_table_info), input=lambda x: x["question"]  # type: ignore
-    )
-    | nl_to_sql_retry_prompt_rbl
-    | nl_to_sql_llm_rbl.bind(stop=["\nSQLResult:", "\n<|sql result|>"])
-    | StrOutputParser()
-).with_config(
+retry_query_runnable = (retry_query_variables | retry_query_prompt | retry_query_llm | StrOutputParser()).with_config(
     config={"tags": ["nl_to_sql_retry_predict_query_runnable"], "run_name": "Query Retry"}  # type: ignore
 )
 
 
 async def sql_validator(input_output: dict) -> str | None:
+    """
+    Validates SQL query against HeavyDB database.
+
+    Args:
+        input_output: inputs dict
+
+    Returns:
+        None for successfull validation or error string
+    """
     query = input_output["sql_cmd"].strip()
     session_id = input_output["session_id"]
     heavydb = await get_db(session_id=session_id)
@@ -112,11 +155,20 @@ async def sql_validator(input_output: dict) -> str | None:
 validation_step = (
     RunnablePassthrough()
     .assign(error=RunnableLambda(sql_validator))
-    .with_config(config={"run_name": "SQL Query Validation"})
+    .with_config(
+        config={
+            "run_name": "SQL Query Validation",
+            "tags": ["intermediate-step"],
+            "metadata": {"step": "Validating SQL query."},
+        }
+    )
 )
 
 
 async def revise_loop(input: SqlChainIntermediateDict) -> Runnable:
+    """
+    Iterates over bunch of steps to find a valid HeavyDB compatible SQL query.
+    """
     revise_step = RunnablePassthrough().assign(sql_cmd=retry_query_runnable)
 
     else_step: Runnable[SqlChainIntermediateType, SqlChainIntermediateType] = RunnableBranch(
@@ -126,13 +178,12 @@ async def revise_loop(input: SqlChainIntermediateDict) -> Runnable:
 
     for _ in range(max(0, input["max_revisions"] - 1)):
         else_step = RunnableBranch(
-            (lambda x: x["error"] is None, RunnablePassthrough()),
-            (revise_step | validation_step | else_step).with_config(config={"run_name": f"Retry Query Attempt {_}"}),
+            (lambda x: x["error"] is None, RunnablePassthrough()), (revise_step | validation_step | else_step)
         )
     return else_step
 
 
-revise_lambda: Runnable = RunnableLambda(revise_loop).with_config(config={"run_name": "Revice Steps"})
+revise_lambda: Runnable = RunnableLambda(revise_loop)
 
 
 async def do_string_literal_correction(inputs: dict) -> dict:
@@ -161,22 +212,40 @@ async def calculate_sql_complexity(inputs: dict) -> int:
 string_literal_correction_step = (
     RunnablePassthrough()
     .assign(query=RunnableLambda(do_string_literal_correction))
-    .with_config(config={"run_name": "String Literal Correction"})
+    .with_config(
+        config={
+            "run_name": "String Literal Correction",
+            "tags": ["intermediate-step"],
+            "metadata": {"step": "Correcting string literals on SQL Query."},
+        }
+    )
 )
 
 calculate_sql_complexity_step = (
     RunnablePassthrough()
     .assign(sql_complexity=RunnableLambda(calculate_sql_complexity))
-    .with_config(config={"run_name": "Calculate SQL Complexity"})
+    .with_config(
+        config={
+            "run_name": "Calculate SQL Complexity",
+            "tags": ["intermediate-step"],
+            "metadata": {"step": "Calculating SQL complexity."},
+        }
+    )
 )
 
 final_step = RunnableLambda(
     lambda x: {
         "query": strip_sql_comments(x.get("query", x.get("sql_cmd"))),
         "sql_complexity": x.get("sql_complexity", 0),
-        "error": x["error"],
+        "error": x["error"] or "",
     }
-).with_config(config={"run_name": "Format Output"})
+).with_config(
+    config={
+        "run_name": "Format Output",
+        "tags": ["intermediate-step"],
+        "metadata": {"step": "Formatting output."},
+    }
+)
 
 # branch which passthrough the inputs upon error else do correct string literals and calculate complexity
 do_string_correction_and_calculate_complexity_or_passthrough_branch: Runnable = RunnableBranch(
@@ -186,7 +255,7 @@ do_string_correction_and_calculate_complexity_or_passthrough_branch: Runnable = 
 
 chain: Runnable[Any, Any] = (
     (
-        RunnablePassthrough().assign(sql_cmd=query_runnable, max_revisions=lambda x: 3)
+        RunnablePassthrough().assign(sql_cmd=query_runnable, max_revisions=lambda x: max_retries)
         | validation_step
         | revise_lambda
         | do_string_correction_and_calculate_complexity_or_passthrough_branch
@@ -197,27 +266,3 @@ chain: Runnable[Any, Any] = (
     )
     .with_types(input_type=SqlChainInputType, output_type=SqlChainOutputType)  # type: ignore
 )
-
-
-class CustomRunnable(Runnable):
-    def __init__(self, chain: Runnable):
-        self.chain = chain
-
-    def invoke(self, input: Any, config: RunnableConfig | None = None) -> Any:
-        return super().invoke(input, config)
-
-    def stream(self, *args, **kwargs):
-        for output in self.chain.stream(*args, **kwargs):
-            # customize output here
-            yield output
-
-    async def astream(self, *args, **kwargs):
-        async for output in self.chain.astream(*args, **kwargs):
-            yield output
-
-    async def astream_log(self, *args, **kwargs):
-        async for step in super().astream_log(*args, **kwargs):
-            yield step
-
-
-custom_chain = CustomRunnable(chain=chain)
