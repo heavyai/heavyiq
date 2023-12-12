@@ -62,6 +62,7 @@ class HeavyDB:
     _sample_rows_cache: Optional[LRUCache[str, str]] = None
     _table_schema_cache: Optional[LRUCache[str, str]] = None
     _table_text_columns_count_cache: Optional[LRUCache[str, int]] = None
+    _table_total_row_count_cache: Optional[LRUCache[str, int]] = None
 
     def __init__(
         self,
@@ -153,6 +154,12 @@ class HeavyDB:
             cls._table_text_columns_count_cache = LRUCache[str, int](manager=cls.get_manager())
         return cls._table_text_columns_count_cache
 
+    @classmethod
+    def get_table_total_row_count_cache(cls: type[HeavyDB]) -> LRUCache[str, int]:
+        if cls._table_total_row_count_cache is None:
+            cls._table_total_row_count_cache = LRUCache[str, int](manager=cls.get_manager())
+        return cls._table_total_row_count_cache
+
     @property
     def top_k_cache(self) -> LRUCache[str, str]:
         return self.get_top_k_cache()
@@ -168,6 +175,10 @@ class HeavyDB:
     @property
     def table_text_columns_count_cache(self) -> LRUCache[str, int]:
         return self.get_table_text_columns_count_cache()
+
+    @property
+    def table_total_row_count_cache(self) -> LRUCache[str, int]:
+        return self.get_table_total_row_count_cache()
 
     @classmethod
     def _connect_with_timeout(
@@ -653,6 +664,28 @@ class HeavyDB:
         self.logger.debug(f"Got sample rows for table {table_name}")
         return res
 
+    async def aget_total_row_count(self, table_name: str) -> int:
+        """
+        Get total row count of the given database table.
+        """
+        self.logger.debug(f"Getting total row count of table {table_name}")
+        cache_key = f"{self._dbname}.{table_name}"
+        cached_value = self.table_total_row_count_cache.get(cache_key)
+        if cached_value is not None:
+            self.logger.debug(f"Got total row count of table {table_name} from cache")
+            return cached_value
+        # build the select command
+        command = f"SELECT COUNT(*) FROM {table_name}"
+
+        # get the sample rows
+        async with self.alock:
+            sql_result = await run_in_threadpool(self._conn.execute, command)
+
+        row_count = sql_result.fetchone()[0]
+        self.table_total_row_count_cache.put(cache_key, row_count)
+        self.logger.debug(f"Got total row count of table {table_name}")
+        return row_count
+
     async def aget_text_columns(self, table_name: str) -> list[str]:
         """
         Retrieve the list of text columns available in a table.
@@ -739,6 +772,7 @@ class HeavyDB:
         """
         Get information about specified tables asyc.
         """
+        config = get_config()
         all_table_names = self.get_usable_table_names()
         if table_names is not None:
             table_names_set = set(table_names)
@@ -747,8 +781,17 @@ class HeavyDB:
                 raise ValueError(f"table_names {missing_tables} not found in database")
             all_table_names = table_names_set
 
+        if len(all_table_names) > 1 and config.sort_prompt_tables_desc:
+            # sort tables in desc order based on total row count
+            table_row_count = await asyncio.gather(*[self.aget_total_row_count(table) for table in all_table_names])
+            sorted_tables = [
+                k[0] for k in sorted(zip(all_table_names, table_row_count), key=lambda x: x[1], reverse=True)
+            ]
+        else:
+            sorted_tables = list(all_table_names)
+
         tables = []
-        for table in all_table_names:
+        for table in sorted_tables:
             tables.append(self.aget_single_table_info(table, **kwargs))
 
         tasks_output = await asyncio.gather(*tables)
