@@ -1,29 +1,23 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Optional
 
+from langchain.callbacks.manager import AsyncCallbackManagerForChainRun, CallbackManagerForChainRun
+from langchain.chat_models.base import BaseChatModel
+from langchain.prompts import HumanMessagePromptTemplate, SystemMessagePromptTemplate
+from langchain.prompts.chat import BaseChatPromptTemplate, ChatPromptTemplate
+from langchain.prompts.prompt import PromptTemplate
+from langchain.schema import AIMessage, BasePromptTemplate, HumanMessage, LLMResult
+from langchain.schema.language_model import BaseLanguageModel
 from pydantic import Extra
 
-import re
-
-from langchain.chat_models.base import BaseChatModel
-from langchain.schema.language_model import BaseLanguageModel
-from langchain.schema import AIMessage, HumanMessage
-from langchain.prompts import HumanMessagePromptTemplate, SystemMessagePromptTemplate
-from langchain.prompts.chat import ChatPromptTemplate, BaseChatPromptTemplate
-from langchain.schema import BasePromptTemplate, LLMResult
-from langchain.prompts.prompt import PromptTemplate
-from langchain.callbacks.manager import (
-    AsyncCallbackManagerForChainRun,
-    CallbackManagerForChainRun,
-)
-
 from heavyiq.config import get_config
-from heavyiq.langchain.llms import is_using_custom_trained_llm
-from heavyiq.langchain.heavydb import HeavyDB
 from heavyiq.langchain.chains import BaseChain
-from heavyiq.langchain.utils import populate_table_info_wrt_token_limit, apopulate_table_info_wrt_token_limit
 from heavyiq.langchain.exceptions import NLtoSQLException
+from heavyiq.langchain.heavydb import HeavyDB
+from heavyiq.langchain.llms import is_using_custom_trained_llm
+from heavyiq.langchain.utils import apopulate_table_info_wrt_token_limit, populate_table_info_wrt_token_limit
 from heavyiq.utils import strip_sql_comments
 
 NL_TO_SQL_TEMPLATE = """Create a syntactically correct SQL query to answer the input question.
@@ -46,7 +40,9 @@ CUSTOM_LLM_NL_TO_SQL_TEMPLATE = """<|sql prompt|>
 You are an experienced data analyst adept at writing SQL queries to answer user questions.
 
 You have access to the following relational tables, with schemas below.
+
 {table_info}
+
 Write a SQL query to answer the following question:
 {input}
 <|sql answer|>
@@ -74,8 +70,11 @@ NL_TO_SQL_ERROR_PROMPT = PromptTemplate.from_template(NL_TO_SQL_ERROR_TEMPLATE)
 
 CUSTOM_NL_TO_SQL_ERROR_TEMPLATE = """<|sql error prompt|>
 You generated a SQL query that generated an exception when executed in the HeavyDB database.
+
 You have access to the following relation tables, with schemas below.
+
 {table_info}
+
 In attempting to answer the following user question:
 
 {input},

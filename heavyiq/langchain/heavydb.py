@@ -796,7 +796,7 @@ class HeavyDB:
 
         tasks_output = await asyncio.gather(*tables)
 
-        final_str = "\n\n".join(tasks_output)
+        final_str = "\n\n".join([i.strip() for i in tasks_output])
         return final_str
 
     async def arun(self, command: str, fetch: str = "all", to_str: bool = True) -> str | tuple | list:
