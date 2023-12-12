@@ -57,6 +57,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     # top-k
     top_k_max_str_col_count_nl_to_sql: int = 30
     top_k_max_str_col_count_nl_to_tables: int = 30
+    # table order in prompt
+    sort_prompt_tables_desc = True
 
 
 class AppConfig(OverrideBaseConfig):  # type: ignore

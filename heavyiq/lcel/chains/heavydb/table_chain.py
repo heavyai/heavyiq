@@ -30,7 +30,7 @@ async def get_tables(inputs: dict) -> list[str]:
     """
     db = await get_db(inputs["session_id"])
 
-    allowed_tables: list[str] = inputs["allowed_tables"]
+    allowed_tables: list[str] = inputs.get("allowed_tables", [])
     if not allowed_tables:
         allowed_tables = list(db.get_usable_table_names())
 

@@ -1,28 +1,31 @@
-from uuid import uuid4
-import os
 import asyncio
-import aiofiles
-from aiocsv.readers import AsyncReader
-from langchain.llms.base import BaseLLM
-from langchain.chat_models.base import BaseChatModel
+import os
+from uuid import uuid4
 
+import aiofiles
 import click
-from langsmith import Client
-from heavyiq.config import get_config
+from aiocsv.readers import AsyncReader
+from aiocsv.writers import AsyncWriter
 from fastapi.concurrency import run_in_threadpool
+from langchain.chat_models.base import BaseChatModel
+from langchain.llms.base import BaseLLM
+from langsmith import Client
+
 from heavyiq.cli.decorators import coro
+from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
-from heavyiq.langchain.exceptions import NLtoSQLException
 from heavyiq.langchain.chains import get_nl_to_sql_chain_by_llm
-from heavyiq.langchain.llms import get_llm_by_type, LLMType
+from heavyiq.langchain.exceptions import NLtoSQLException
+from heavyiq.langchain.llms import LLMType, get_llm_by_type
 from heavyiq.logging_utils import get_heavyiq_logger
 
 from .utils import (
-    compute_prob_stats,
-    sql_rate_reply,
-    summarize_eval_results,
     awrite_eval_results_header,
     awrite_eval_results_row,
+    compute_prob_stats,
+    extract_tables_from_query,
+    sql_rate_reply,
+    summarize_eval_results,
 )
 
 
@@ -51,14 +54,14 @@ async def process_eval_row(
     logger = get_heavyiq_logger()
 
     if has_id:
-        query_id, db_id, tables, question, gold_query = row
+        query_id, db_id, question, gold_query = row
     else:
         query_id = None
-        db_id, tables, question, gold_query = row
+        db_id, question, gold_query = row
     async with semaphore:
-        tables = [table.strip("'") for table in str(tables).split(",")]
         logger.info(f"Processing Question: {question}")
-        db = await run_in_threadpool(HeavyDB.from_env, db_name=db_id, include_tables=tables)
+        db = await HeavyDB.from_env_async(db_name=db_id)
+        tables = extract_tables_from_query(db._conn, gold_query)
         chain = get_nl_to_sql_chain_by_llm(llm)(
             database=db, llm=llm, callbacks=None if verbose else [], verbose=verbose, tags=[eval_str, "cli"]
         )
@@ -66,7 +69,7 @@ async def process_eval_row(
         prob_stats = None
         query_stats = None
         try:
-            res = await chain.acall({chain.input_key: question}, include_run_info=is_langsmith_active)
+            res = await chain.acall({chain.input_key: question, "tables": tables}, include_run_info=is_langsmith_active)
             pred_query = res[chain.output_key]
             logger.info(f"Generated SQL: {pred_query}")
             logger.debug("Evaluating SQL")
@@ -179,5 +182,74 @@ async def run_config_model_on_questions(
             tasks.append(task)
 
     await asyncio.gather(*tasks, return_exceptions=True)
+
+    await run_in_threadpool(summarize_eval_results, eval_str)
+
+
+@eval.command()
+@coro
+@click.option("--temperature", default=0.0, help="Temperature for LLM (Defaults to 0.0)", type=float)
+@click.option("--verbose", default=False, help="Verbose output", type=bool)
+@click.option("--batch-size", default=10, help="How many questions to process parallelly?", type=int)
+@click.argument("eval_dataset_csv", type=str)
+@click.pass_context  # type: ignore
+async def run_config_model_on_tables(
+    ctx: click.Context, eval_dataset_csv: str, batch_size: int, temperature: float, verbose: bool
+) -> None:
+    from heavyiq.langchain.utils import is_langsmith_active
+    from heavyiq.lcel.chains.eval.eval_table_chain import chain
+
+    logger = get_heavyiq_logger()
+
+    if not await run_in_threadpool(os.path.exists, eval_dataset_csv):
+        raise Exception(f"eval_dataset_csv does not exist: {eval_dataset_csv}")
+
+    eval_id = uuid4().hex[:8]
+    eval_str = f"eval_{eval_id}"
+    logger.info(f"Dataset ID: {eval_id}")
+
+    rows_written: int = 0
+    eval_results_csv: str = f"./eval/results/{eval_str}_results.csv"
+
+    # csv must have columns: id (optional), db_id, tables, question, answer
+    async with aiofiles.open(eval_dataset_csv, mode="r") as f, aiofiles.open(eval_results_csv, "a", newline="") as wf:
+        csv_reader, writer = AsyncReader(f), AsyncWriter(wf, dialect="unix")
+        header = await anext(csv_reader)
+        has_id = "id" == header[0]  # type: ignore
+
+        # write header
+        header_data = ["db_id", "gold_tables", "pred_tables", "success", "status", "error"]
+        if has_id:
+            header_data = ["id"] + header_data
+        await writer.writerow(header_data)
+
+        while True:
+            rows = []
+            for _ in range(batch_size):
+                try:
+                    rows.append(await csv_reader.__anext__())
+                except StopAsyncIteration:
+                    pass
+            if not rows:
+                break
+            print(f"Processing {len(rows)} rows...")
+            batch_inputs = []
+            for row in rows:
+                if has_id:
+                    query_id, db_id, question, answer = row
+                else:
+                    query_id = None
+                    db_id, question, answer = row
+                batch_inputs.append({"query_id": query_id, "db_id": db_id, "question": question, "sql": answer})
+            if not batch_inputs:
+                break
+
+            chain_output = await chain.abatch(batch_inputs, config={"configurable": {"llm_temperature": temperature}})
+            row_datas = []
+            for data in chain_output:
+                row_datas.append(list(data.values()))
+            if row_datas:
+                await writer.writerows(row_datas)
+                rows_written += len(row_datas)
 
     await run_in_threadpool(summarize_eval_results, eval_str)
