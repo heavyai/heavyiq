@@ -12,7 +12,7 @@ from heavyiq.api.middlewares import AsyncLoggingMiddleware
 from heavyiq.api.models.error import ErrorResponse
 from heavyiq.api.routes import defaultrouter, iqrouter, lcelrouter, streamrouter
 from heavyiq.config import get_config
-from heavyiq.langchain.exceptions import NLtoSQLException
+from heavyiq.langchain.exceptions import GenerateTableMetadataException, NLtoAnswerException, NLtoSQLException
 from heavyiq.langchain.utils import init_telemetrics
 from heavyiq.logging_utils import init_logs
 
@@ -64,6 +64,8 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
     app.add_exception_handler(ValueError, exh.value_error_handler)
     app.add_exception_handler(TypeError, exh.type_error_handler)
     app.add_exception_handler(NLtoSQLException, exh.nl_to_sql_exception_handler)
+    app.add_exception_handler(NLtoAnswerException, exh.nl_to_answer_exception_handler)
+    app.add_exception_handler(GenerateTableMetadataException, exh.generate_table_metadata_exception_handler)
     app.add_exception_handler(Exception, exh.unhandled_exception_handler)
 
     # Include your API routes
