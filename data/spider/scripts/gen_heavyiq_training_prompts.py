@@ -56,6 +56,11 @@ def getOptions(argv=None):
         action="store_true",
     )
     parser.add_argument(
+        "--convert-count-operands-to-star",
+        help="Convert non DISTINCT COUNT operands to *",
+        action="store_true",
+    )
+    parser.add_argument(
         "--fix-queries-gpt",
         help="Try to fix failed queries with ChatGPT API",
         action="store_true",
@@ -131,6 +136,11 @@ def getOptions(argv=None):
     parser.add_argument(
         "--add-columns-to-answers",
         help="Add column specifications to answer",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--write-alias-prompts",
+        help="Write alias prompts to file for successful queries",
         action="store_true",
     )
     parser.add_argument(
@@ -285,9 +295,9 @@ def normalize_order_by(sql):
     # Technically we could have a keyword start with ASC OR DESC,
     # but that doesn't happen on the augmented Spider dataset so
     # we don't handle that case for now
-    if " ASC" in sql and "ASC NULLS LAST" not in sql:
+    if (" ASC" in sql or " ASC;" in sql) and "ASC NULLS LAST" not in sql:
         sql = sql.replace(" ASC", " ASC NULLS LAST")
-    if " DESC" in sql and "DESC NULLS LAST" not in sql:
+    if (" DESC " in sql or "DESC;" in sql) and "DESC NULLS LAST" not in sql:
         sql = sql.replace(" DESC", " DESC NULLS LAST")
 
     return sql
@@ -376,6 +386,17 @@ def adjust_alias_case(query: str) -> str:
         query = query.replace(table_alias2, upper_table_alias_2)
         query = query.replace(table_alias3, upper_table_alias_3)
     return query
+
+
+def convert_count_non_distinct_operands_to_star(sql_query):
+    # Regular expression pattern to match COUNT(...) but not COUNT(DISTINCT ...)
+    pattern = r"COUNT\((?!(DISTINCT|CASE))([^)]+)\)"
+    # pattern = r"COUNT\((?!DISTINCT)([^)]+)\)"
+
+    # Replace matched patterns with COUNT(*)
+    modified_query = re.sub(pattern, "COUNT(*)", sql_query)
+
+    return modified_query
 
 
 def add_as_before_table_aliases(query: str) -> str:
@@ -470,18 +491,24 @@ def remove_join_aliases(table_statements: list[str], query: str) -> str:
 def getQueriesByDB(queries_file):
     queries_df = pd.read_csv(queries_file)
     queries_df["modified_sql_query"] = queries_df["modified_sql_query"].astype(str)
+    queries_df["aliased_sql_query"] = queries_df["aliased_sql_query"].astype(str)
     queries_df["english_explanation"] = queries_df["english_explanation"].astype(str)
     queries_df["valid"] = queries_df["valid"].astype(str)
     queries_by_db = {}
     for index, row in queries_df.iterrows():
         query_id = row["query_id"]
         query_valid = row["valid"]
-        if query_valid.lower() == "no" or query_valid.lower() == "false":
+        if (
+            query_valid.lower() == "no"
+            or query_valid.lower() == "false"
+            or query_valid.lower() == "review"
+        ):
             print(f"Skipping invalid query {query_id}")
             continue
         db_id = row["db_id"]
         original_sql_query = row["original_sql_query"].strip()
         modified_sql_query = row["modified_sql_query"].strip()
+        aliased_sql_query = row["aliased_sql_query"].strip()
         english_explanation = row["english_explanation"].strip()
         question = row["question"]
         data_split = row["dataset"]
@@ -493,6 +520,7 @@ def getQueriesByDB(queries_file):
                     "question": question,
                     "original_sql_query": original_sql_query,
                     "modified_sql_query": modified_sql_query,
+                    "aliased_sql_query": aliased_sql_query,
                     "english_explanation": english_explanation,
                 }
             ]
@@ -504,6 +532,7 @@ def getQueriesByDB(queries_file):
                     "question": question,
                     "original_sql_query": original_sql_query,
                     "modified_sql_query": modified_sql_query,
+                    "aliased_sql_query": aliased_sql_query,
                     "english_explanation": english_explanation,
                 }
             )
@@ -832,6 +861,30 @@ def write_sql_prompts_to_csv(prompts, output_file):
 
 
 def write_english_prompts_to_csv(english_prompts, output_file):
+    fieldnames = [
+        "query_id",
+        "db_id",
+        "data_split",
+        "instruction",
+        "output",
+    ]
+    prompts_to_write = [
+        (
+            obj["query_id"],
+            obj["db_id"],
+            obj["data_split"],
+            obj["instruction"],
+            obj["output"],
+        )
+        for obj in english_prompts
+    ]
+    with open(output_file, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(fieldnames)
+        writer.writerows(prompts_to_write)
+
+
+def write_alias_prompts_to_csv(alias_prompts, output_file):
     fieldnames = [
         "query_id",
         "db_id",
@@ -1429,6 +1482,41 @@ def compute_prob_stats(
     return prob_stats
 
 
+def format_query(original_sql_query, table_schemas, options, query_id, db_id, con):
+    sql_query = copy.deepcopy(original_sql_query)
+    sql_query = re.sub(" +", " ", sql_query)
+    sql_query = re.sub(" ,", ",", sql_query)
+    sql_query = sql_query + ";" if sql_query[-1] != ";" else sql_query
+    sql_query = uppercase_sql_keywords(sql_query)
+    try:
+        sql_query = adjust_identifier_case(table_schemas, sql_query)
+        sql_query = normalize_order_by(sql_query)
+        # sql_query = add_spaces_around_parentheses(sql_query)
+        sql_query = remove_spaces_around_parentheses(sql_query)
+        sql_query = remove_spaces_around_commas(sql_query)
+        sql_query = adjust_alias_case(sql_query)
+        sql_query = add_as_before_table_aliases(sql_query)
+        if options.convert_count_operands_to_star:
+            sql_query = convert_count_non_distinct_operands_to_star(sql_query)
+        if options.filter_null_groups:
+            old_sql_query = copy.deepcopy(sql_query)
+            sql_query = add_not_null_filters(sql_query)
+            if sql_query != old_sql_query:
+                try:
+                    con.execute(sql_query)
+                except Exception as e:
+                    sql_query = old_sql_query
+        sql_query = sql_query + ";" if sql_query[-1] != ";" else sql_query
+        return sql_query
+    except Exception as e:
+        # print(traceback.format_exc())
+        print(
+            f"Formatting exception Query ID: {query_id} DB: {db_id} Query: {sql_query}"
+        )
+        print(e)
+        return None
+
+
 def main(argv):
     options = getOptions(argv)
     openai.api_key = options.openai_api_key
@@ -1488,6 +1576,7 @@ def main(argv):
         question_prompts = []
         table_prompts = []
         question_prompts_with_cols = []
+        alias_prompts = []
         con = None
         tokenizer = LlamaTokenizer.from_pretrained("test_model")
         num_null_rewrite_successes = 0
@@ -1580,13 +1669,17 @@ def main(argv):
                         sql_query = remove_spaces_around_commas(sql_query)
                         sql_query = adjust_alias_case(sql_query)
                         sql_query = add_as_before_table_aliases(sql_query)
+                        if options.convert_count_operands_to_star:
+                            sql_query = convert_count_non_distinct_operands_to_star(
+                                sql_query
+                            )
                         if options.filter_null_groups:
                             old_sql_query = copy.deepcopy(sql_query)
                             sql_query = add_not_null_filters(sql_query)
                             if sql_query != old_sql_query:
                                 try:
                                     con.execute(sql_query)
-                                    print(f"Rewrite SUCCESS: {query_id}")
+                                    # print(f"Rewrite SUCCESS: {query_id}")
                                     num_null_rewrite_successes += 1
                                 except Exception as e:
                                     print(f"Rewrite FAIL: {query_id}")
@@ -1599,12 +1692,11 @@ def main(argv):
                         # sql_query = query_and_tables["query"]
                         # filtered_tables = query_and_tables["tables"]
                     except Exception as e:
-                        print(traceback.format_exc())
+                        # print(traceback.format_exc())
                         print(
                             f"Exception Query ID: {query_id} DB: {db_id} Query: {sql_query}"
                         )
                         print(e)
-                        print(traceback.format_exc())
                         continue
                     # print(f"Query ID: {query_id} DB: {db_id} Query: {sql_query}")
                     sql_query = sql_query + ";" if sql_query[-1] != ";" else sql_query
@@ -1915,7 +2007,7 @@ def main(argv):
                                     table_schemas,
                                     top_k_str_vals,
                                     table_row_counts,
-                                    options.low_card_col_threshold,
+                                    options.low_card_top_k_str_vals,
                                     options.cardinality_split_top_k_str_vals,
                                     options.show_top_k_str_vals_cardinality,
                                     options.show_table_row_counts,
@@ -1967,13 +2059,37 @@ def main(argv):
                                     "num_instruction_tokens": num_instruction_tokens,
                                 }
                             )
+                        if options.write_alias_prompts:
+                            aliased_sql_query = query["aliased_sql_query"]
+                            if len(aliased_sql_query) > 4:
+                                aliased_sql_query = format_query(
+                                    aliased_sql_query,
+                                    table_schemas,
+                                    options,
+                                    query_id,
+                                    db_id,
+                                    con,
+                                )
+                                instruction = f"The user asked the following question:\n{query['question']}\n\nIn response, the following SQL query was generated:\n{sql_query}\n\nNow add aliases to projected expressions from the query as needed."
+                                instruction_tokens = tokenizer.tokenize(instruction)
+                                num_instruction_tokens = len(instruction_tokens)
+                                alias_prompts.append(
+                                    {
+                                        "db_id": db_id,
+                                        "query_id": query_id,
+                                        "data_split": data_split,
+                                        "instruction": instruction,
+                                        "output": aliased_sql_query,
+                                        "num_instruction_tokens": num_instruction_tokens,
+                                    }
+                                )
 
                     except Exception as e:
                         print(
                             f"Exception Query ID: {query_id} DB: {db_id} Query: {sql_query}"
                         )
                         print(e)
-                        print(traceback.format_exc())
+                        # print(traceback.format_exc())
                         query_fixed = False
                         if options.fix_queries:
                             fixed_query = fix_failed_query_unquoted_keyword(
@@ -2042,6 +2158,8 @@ def main(argv):
             write_generic_prompts_to_csv(question_prompts, "sql_question_prompts.csv")
         if options.write_table_prompts:
             write_generic_prompts_to_csv(table_prompts, "sql_table_prompts.csv")
+        if options.write_alias_prompts:
+            write_generic_prompts_to_csv(alias_prompts, "sql_alias_prompts.csv")
         if len(llm_responses) > 0:
             with open("llm_responses.json", "w") as file:
                 json.dump(llm_responses, file, indent=4)
