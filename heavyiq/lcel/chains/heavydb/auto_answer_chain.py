@@ -3,7 +3,7 @@ from langchain.schema.runnable import Runnable, RunnableLambda, RunnablePassthro
 
 from heavyiq.lcel.types import AutoAnswerChainInputType, AutoAnswerChainOutputType
 
-from .answer_chain import chain as answer_chain
+from .answer_chain import nl_to_answer_chain as answer_chain
 from .table_chain import tables_list_chain
 
 

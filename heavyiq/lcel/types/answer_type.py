@@ -1,7 +1,7 @@
 from langchain.pydantic_v1 import BaseModel, Field
 
 
-class AnswerChainInputType(BaseModel):
+class NLtoAnswerChainInputType(BaseModel):
     """NLtoAnswer chain input type."""
 
     question: str = Field(..., description="NL question.")
@@ -9,7 +9,15 @@ class AnswerChainInputType(BaseModel):
     tables: list[str] = Field(..., description="List of table names to consider for SQL generation.")
 
 
-class AnswerChainOutputType(BaseModel):
+class SQLtoAnswerChainInputType(BaseModel):
+    """SQL to Answer chain input type"""
+
+    question: str = Field(..., description="NL question.")
+    session_id: str = Field(..., description="HeavyDB session id.")
+    query: str = Field(..., description="SQL Query.")
+
+
+class NLtoAnswerChainOutputType(BaseModel):
     """NLtoAnswer chain output type."""
 
     sql: str = Field(..., description="Generated SQL query.")
@@ -17,3 +25,7 @@ class AnswerChainOutputType(BaseModel):
     results: str = Field(..., description="Result of the generated query.")
     answer: str = Field(..., description="Output produced by the llm using the HeavyDB result.")
     fail_reason: str = Field(..., description="Contain reason about why the SQLtoAnswer LLM failed to generate answer.")
+
+
+class SQLtoAnswerChainOutputType(NLtoAnswerChainOutputType):
+    ...

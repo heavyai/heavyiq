@@ -1,5 +1,6 @@
 from typing import Any, TypedDict
 
+from fastapi.concurrency import run_in_threadpool
 from langchain.schema.output_parser import StrOutputParser
 from langchain.schema.runnable import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
 
@@ -8,10 +9,16 @@ from heavyiq.langchain.heavydb import get_db
 from heavyiq.langchain.llms import is_using_custom_trained_llm
 from heavyiq.lcel.chains.heavydb.sql_chain import calculate_sql_complexity
 from heavyiq.lcel.chains.heavydb.sql_chain import chain as nl_to_sql_chain_with_sql_complexity
+from heavyiq.lcel.chains.heavydb.sql_chain import sql_validator
 from heavyiq.lcel.llms import llm_runnable
 from heavyiq.lcel.prompts import to_answer_prompt_runnable
-from heavyiq.lcel.types.answer_type import AnswerChainOutputType
-from heavyiq.lcel.types.sql_type import SqlChainInputType
+from heavyiq.lcel.types.answer_type import (
+    NLtoAnswerChainInputType,
+    NLtoAnswerChainOutputType,
+    SQLtoAnswerChainInputType,
+    SQLtoAnswerChainOutputType,
+)
+from heavyiq.utils import extract_tables_from_query
 
 sql_to_answer_llm_rbl = llm_runnable.with_config(configurable={"llm": "sql_to_answer"})
 sql_to_answer_prompt_rbl = (
@@ -48,6 +55,14 @@ async def get_sql_result(inputs: AnswerChainInputDictWithQuery) -> list | str | 
     return sql_result
 
 
+async def extract_tables_from_query_lambda(inputs: dict) -> list[str]:
+    """
+    Extracts tables from the passed sql query.
+    """
+    heavydb = await get_db(inputs["session_id"])
+    return await run_in_threadpool(extract_tables_from_query, heavydb._conn, inputs["query"])
+
+
 async def should_forward_sql_result_to_llm(inputs: dict) -> bool:
     """
     Based on the sql_result, return a decision on whether to generate an answer using llm or not.
@@ -68,7 +83,7 @@ async def change_format(inputs: dict) -> Any:
     """
     Helps to change answer output to a desired format.
     """
-    return AnswerChainOutputType(
+    return NLtoAnswerChainOutputType(
         sql=inputs["sql_cmd"],
         sql_complexity=inputs["sql_complexity"],
         results=str(inputs["sql_result"]),
@@ -83,13 +98,12 @@ async def change_format_for_error(inputs: dict) -> Any:
     """
     Return this dict response for invalid query generation.
     """
-    sql_chain_output = inputs["sql_chain_output"]
-    return AnswerChainOutputType(
-        sql=sql_chain_output["query"],
-        sql_complexity=sql_chain_output["sql_complexity"],
+    return NLtoAnswerChainOutputType(
+        sql=inputs["query"],
+        sql_complexity=inputs["sql_complexity"],
         results="",
         answer="",
-        fail_reason=sql_chain_output["error"],
+        fail_reason=inputs["error"],
     ).dict()
 
 
@@ -179,13 +193,35 @@ handle_query_error_branch: Runnable = RunnableBranch(
 # Chain of RunnablePassthrough merges all the intermediate results with the original input. For ex,
 # RunnablePassthrough() | RunnablePassthrough.assign(foo=RunnableLambda(fun_a)) | RunnablePassthrough.assign(bar=RunnableLambda(func_b))
 # here func_b function receives the original input as well as the intermediate results, ie. foo
-chain = (
+nl_to_answer_chain = (
     (
-        RunnablePassthrough.assign(sql_chain_output=to_sql_chain_or_not_branch, input=lambda x: x["question"])
+        RunnablePassthrough.assign(sql_chain_output=nl_to_sql_chain_with_sql_complexity, input=lambda x: x["question"])
         | handle_query_error_branch
     )
-    .with_types(input_type=SqlChainInputType, output_type=AnswerChainOutputType)  # type: ignore
+    .with_types(input_type=NLtoAnswerChainInputType, output_type=NLtoAnswerChainOutputType)  # type: ignore
     .with_config(
         config={"tags": ["NLtoAnswerChainRunnable"], "run_name": "NL to Answer Chain Runnable"}  # type: ignore
+    )
+)
+
+sql_to_answer_chain = (
+    (
+        RunnablePassthrough.assign(sql_cmd=lambda x: x["query"], input=lambda x: x["question"])
+        | RunnablePassthrough.assign(error=(RunnableLambda(sql_validator)))
+        | RunnableBranch(
+            (lambda x: bool(x["error"]), RunnablePassthrough() | final_error_step),
+            RunnablePassthrough.assign(
+                sql_complexity=RunnableLambda(calculate_sql_complexity),
+                tables=RunnableLambda(extract_tables_from_query_lambda),
+            )
+            | generate_sql_resultset_step
+            | should_forward_resultset_to_llm_step
+            | answer_decider_branch
+            | final_step,
+        )
+    )
+    .with_types(input_type=SQLtoAnswerChainInputType, output_type=SQLtoAnswerChainOutputType)  # type: ignore
+    .with_config(
+        config={"tags": ["SQLtoAnswerChainRunnable"], "run_name": "SQL to Answer Chain Runnable"}  # type: ignore
     )
 )
