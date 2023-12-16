@@ -253,3 +253,90 @@ async def run_config_model_on_tables(
                 rows_written += len(row_datas)
 
     await run_in_threadpool(summarize_eval_results, eval_str)
+
+
+@eval.command()
+@coro
+@click.option("--temperature", default=0.0, help="Temperature for LLM (Defaults to 0.0)", type=float)
+@click.option("--verbose", default=False, help="Verbose output", type=bool)
+@click.option("--enable-query-stats", default=True, help="Enable Query Stats?", type=bool)
+@click.option("--batch-size", default=10, help="How many questions to process parallelly?", type=int)
+@click.argument("eval_dataset_csv", type=str)
+@click.pass_context  # type: ignore
+async def run_config_model_on_auto_questions(
+    ctx: click.Context,
+    eval_dataset_csv: str,
+    batch_size: int,
+    temperature: float,
+    verbose: bool,
+    enable_query_stats: bool,
+) -> None:
+    from heavyiq.langchain.utils import is_langsmith_active
+    from heavyiq.lcel.chains.eval.eval_auto_table_question_chain import chain
+
+    logger = get_heavyiq_logger()
+
+    if not await run_in_threadpool(os.path.exists, eval_dataset_csv):
+        raise Exception(f"eval_dataset_csv does not exist: {eval_dataset_csv}")
+
+    eval_id = uuid4().hex[:8]
+    eval_str = f"eval_{eval_id}"
+    logger.info(f"Dataset ID: {eval_id}")
+
+    rows_written: int = 0
+    eval_results_csv: str = f"./eval/results/{eval_str}_results.csv"
+
+    # csv must have columns: id (optional), db_id, tables, question, answer
+    async with aiofiles.open(eval_dataset_csv, mode="r") as f, aiofiles.open(eval_results_csv, "a", newline="") as wf:
+        csv_reader, writer = AsyncReader(f), AsyncWriter(wf, dialect="unix")
+        header = await anext(csv_reader)
+        has_id = "id" == header[0]  # type: ignore
+
+        # write header
+        header_data = ["db_id", "gold_query", "pred_query", "success", "status", "error"]
+        if has_id:
+            header_data = ["id"] + header_data
+        if enable_query_stats:
+            header_data.extend(["num_joins", "num_unions", "num_aggs", "num_filters", "num_sorts"])
+        await writer.writerow(header_data)
+
+        while True:
+            rows = []
+            for _ in range(batch_size):
+                try:
+                    rows.append(await csv_reader.__anext__())
+                except StopAsyncIteration:
+                    pass
+            if not rows:
+                break
+            print(f"Processing {len(rows)} rows...")
+            batch_inputs = []
+            for row in rows:
+                if has_id:
+                    query_id, db_id, question, answer = row
+                else:
+                    query_id = None
+                    db_id, question, answer = row
+                batch_inputs.append(
+                    {
+                        "query_id": query_id,
+                        "db_id": db_id,
+                        "question": question,
+                        "sql": answer,
+                        "enable_query_stats": enable_query_stats,
+                    }
+                )
+            if not batch_inputs:
+                break
+
+            chain_output = await chain.abatch(batch_inputs, config={"configurable": {"llm_temperature": temperature}})
+            row_datas = []
+            for data in chain_output:
+                values_list = list(data.values())
+                query_stats = list(values_list[-1].values())
+                row_datas.append(values_list[:-1] + query_stats)
+            if row_datas:
+                await writer.writerows(row_datas)
+                rows_written += len(row_datas)
+
+    await run_in_threadpool(summarize_eval_results, eval_str)
