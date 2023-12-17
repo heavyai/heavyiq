@@ -78,7 +78,7 @@ async def compare_and_format_output(inputs: dict) -> dict:
     if gold_tables != pred_tables:
         error = "TABLES_MISMATCH"
 
-    db = HeavyDB.from_env(db_name=inputs["db_id"])
+    db = await HeavyDB.from_session_async(session_id=inputs["session_id"])
     tasks = [run_in_threadpool(sql_rate_reply, gold_query, pred_query, db=db)]
     if inputs["enable_query_stats"]:
         tasks.append(db.aquery_stats(pred_query))
