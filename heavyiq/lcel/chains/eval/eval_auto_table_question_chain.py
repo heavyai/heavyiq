@@ -1,4 +1,5 @@
 import asyncio
+from typing import Coroutine
 
 from fastapi.concurrency import run_in_threadpool
 from langchain.pydantic_v1 import BaseModel, Field
@@ -82,9 +83,15 @@ async def compare_and_format_output(inputs: dict) -> dict:
     if inputs["enable_query_stats"]:
         tasks.append(db.aquery_stats(pred_query))
     else:
-        async_lambda = asyncio.coroutine(lambda x: {})
+        async_lambda: Coroutine = asyncio.coroutine(lambda x: {})  # type: ignore
         tasks.append(async_lambda)
-    eval_res, query_stats = await asyncio.gather(*tasks)
+
+    exception, query_stats, eval_res = None, {}, {"success": False, "status": "", "error": ""}
+    try:
+        eval_res, query_stats = await asyncio.gather(*tasks)
+    except Exception as e:
+        eval_res["success"] = False
+        exception = str(e)
 
     return {
         "query_id": inputs["query_id"],
@@ -93,7 +100,7 @@ async def compare_and_format_output(inputs: dict) -> dict:
         "pred_query": pred_query,
         "success": eval_res["success"],
         "status": eval_res["status"],
-        "error": error or eval_res["error"],
+        "error": exception or error or eval_res["error"],
         "query_stats": query_stats,
     }
 
