@@ -3,7 +3,7 @@ import re
 from langchain.schema import StrOutputParser
 from langchain.schema.runnable import Runnable, RunnableLambda, RunnablePassthrough
 
-from heavyiq.langchain.heavydb import get_db
+from heavyiq.langchain.heavydb import get_config, get_db
 from heavyiq.langchain.index import aget_heavydb_index
 from heavyiq.langchain.llms import LLMType, is_using_custom_trained_llm
 from heavyiq.langchain.utils import aget_table_info_wrt_token_limit
@@ -28,7 +28,7 @@ async def get_tables(inputs: dict) -> list[str]:
     """
     Return a list of allowed tables by doing similarity search on chroma db when tables length goes beyond certain limit.
     """
-    db = await get_db(inputs["session_id"])
+    db, config = await get_db(inputs["session_id"]), get_config()
 
     allowed_tables: list[str] = inputs.get("allowed_tables", [])
     if not allowed_tables:
@@ -36,7 +36,7 @@ async def get_tables(inputs: dict) -> list[str]:
 
     found_tables: list[str] = []
 
-    if len(allowed_tables) > 20:
+    if len(allowed_tables) > config.allowed_tables_max_count_nl_to_tables:
         heavydb_index = await aget_heavydb_index(session=inputs["session_id"])
         found_tables = heavydb_index.simple_search_for_table_names(inputs["question"], allowable_tables=allowed_tables)
 

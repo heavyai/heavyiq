@@ -59,6 +59,9 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     top_k_max_str_col_count_nl_to_tables: int = 30
     # table order in prompt
     sort_prompt_tables_desc = True
+    # maximum count of allowed_tables on nl-to-tables endpoint. If the count exceeds, then
+    # index updation and search will happen in-order to find relevant tables
+    allowed_tables_max_count_nl_to_tables: int = 20
 
 
 class AppConfig(OverrideBaseConfig):  # type: ignore

@@ -165,13 +165,14 @@ async def handle_tables_request_async(request: TablesRequest, db: HeavyDB) -> Ta
     """
     Hanles /tables request.
     """
+    config = get_config()
     allowed_tables: list[str] = request.allowed_tables
     if not allowed_tables:
         allowed_tables = list(db.get_usable_table_names())
 
     found_tables: list[str] = []
 
-    if len(allowed_tables) > 10:
+    if len(allowed_tables) > config.allowed_tables_max_count_nl_to_tables:
         # db tables count is greater than 10, so do a doc serach for relevant table names
         heavydb_index = await aget_heavydb_index(session=request.session_id)
         # this table name search does not call any llm
