@@ -65,6 +65,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     # config options w.r.t table doc generation using custom model
     include_samples_in_custom_table_document_generation: bool = True
     include_top_k_in_custom_table_document_generation: bool = True
+    # nl to sql max query retries
+    max_retries_nl_to_sql: int = 3
 
 
 class AppConfig(OverrideBaseConfig):  # type: ignore

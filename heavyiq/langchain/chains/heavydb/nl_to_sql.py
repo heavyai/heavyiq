@@ -144,6 +144,11 @@ class BaseNLtoSQLChain(BaseChain):
         extra = Extra.forbid
         arbitrary_types_allowed = True
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        config = get_config()
+        self.max_retries = config.max_retries_nl_to_sql
+
     @property
     def input_keys(self) -> list[str]:
         """Return the input key(s).

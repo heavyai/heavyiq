@@ -9,6 +9,7 @@ from heavyiq.api.models import (
     QuestionResponse,
     TablesResponse,
 )
+from heavyiq.config import get_config
 from heavyiq.langchain.exceptions import NLtoAnswerException, NLtoSQLException
 
 
@@ -19,12 +20,14 @@ async def handle_lcel_query_request(request_dict: dict, config: dict | None = No
     Async LCEL handler for /query request.
     """
     from heavyiq.lcel.chains import sql_chain
-    from heavyiq.lcel.chains.heavydb.sql_chain import max_retries
+
+    max_retries = get_config().max_retries_nl_to_sql
 
     out = await sql_chain.ainvoke(request_dict, config=config)  # type: ignore
     if out["error"]:
         raise NLtoSQLException(
-            f"Language model failed to generate a valid SQL query after {max_retries} tries.", failed_sql=out["query"]
+            f"Language model failed to generate a valid SQL query after {max_retries} tries.",
+            failed_sql=out["query"],
         )
 
     return QueryResponse(sql=out["query"], sql_complexity=out["sql_complexity"], feedback_id="", logprobs={})
