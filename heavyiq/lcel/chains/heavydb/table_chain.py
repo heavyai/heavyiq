@@ -37,7 +37,7 @@ async def get_tables(inputs: dict) -> list[str]:
     found_tables: list[str] = []
 
     if len(allowed_tables) > 20:
-        heavydb_index = await aget_heavydb_index()
+        heavydb_index = await aget_heavydb_index(session=inputs["session_id"])
         found_tables = heavydb_index.simple_search_for_table_names(inputs["question"], allowable_tables=allowed_tables)
 
     return found_tables or allowed_tables

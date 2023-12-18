@@ -173,7 +173,7 @@ async def handle_tables_request_async(request: TablesRequest, db: HeavyDB) -> Ta
 
     if len(allowed_tables) > 10:
         # db tables count is greater than 10, so do a doc serach for relevant table names
-        heavydb_index = await aget_heavydb_index()
+        heavydb_index = await aget_heavydb_index(session=request.session_id)
         # this table name search does not call any llm
         # it just searches the docs and shows the relevant tables
         found_tables = heavydb_index.simple_search_for_table_names(request.question, allowable_tables=allowed_tables)

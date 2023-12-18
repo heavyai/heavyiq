@@ -271,7 +271,7 @@ class HeavyDB:
 
     @classmethod
     async def from_session_async(cls: type[HeavyDB], session_id: str, **kwargs: Any) -> HeavyDB:
-        """Create a database connection from environment variables."""
+        """Create a database connection from session."""
         config = get_config()
 
         async def aconnect_func() -> Connection:

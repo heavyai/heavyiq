@@ -227,7 +227,7 @@ def generate_table_documents() -> list[str]:
     return list(table_names_to_generate)
 
 
-async def agenerate_table_documents() -> list[str]:
+async def agenerate_table_documents(session: str | None = None) -> list[str]:
     """
     Generates and writes documents for all usable tables in the HeavyDB instance, containing table summaries and column descriptions async.
     Saves them to the table_documents directory.
@@ -239,7 +239,13 @@ async def agenerate_table_documents() -> list[str]:
     logger.info("Generating summaries and column descriptions.")
     logger.debug(f"Tables with documents already (skipping): {tables_with_documents_already}")
 
-    heavydb = await run_in_threadpool(HeavyDB.from_env, ignore_tables=tables_with_documents_already)
+    if session:
+        logger.debug("Establishing HeavyDB connection from session id to generate table documents.")
+        heavydb = await HeavyDB.from_session_async(session, ignore_tables=tables_with_documents_already)
+    else:
+        logger.debug("Establishing HeavyDB connection from env config to generate table documents.")
+        heavydb = await HeavyDB.from_env_async(ignore_tables=tables_with_documents_already)
+
     table_names_to_generate = heavydb.get_usable_table_names()
 
     tasks = []
