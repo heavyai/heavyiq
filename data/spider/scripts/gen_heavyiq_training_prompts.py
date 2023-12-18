@@ -71,6 +71,11 @@ def getOptions(argv=None):
         action="store_true",
     )
     parser.add_argument(
+        "--use-final-queries",
+        help="Use final queries",
+        action="store_true",
+    )
+    parser.add_argument(
         "--cardinality-split-top-k-str-vals",
         help="Split top-k string values into low and high cardinality sections",
         action="store_true",
@@ -179,6 +184,16 @@ def getOptions(argv=None):
         help="Perplexity model is sharded",
         type=int,
         default=None,
+    )
+    parser.add_argument(
+        "--llm-alias-remote-host",
+        help="LLM alias remote host URL",
+        default="http://209.20.156.243:5000",
+    )
+    parser.add_argument(
+        "--add-aliases",
+        help="Use LLM to generate aliases",
+        action="store_true",
     )
     parser.add_argument(
         "--sql-prompt-prefix",
@@ -492,6 +507,7 @@ def getQueriesByDB(queries_file):
     queries_df = pd.read_csv(queries_file)
     queries_df["modified_sql_query"] = queries_df["modified_sql_query"].astype(str)
     queries_df["aliased_sql_query"] = queries_df["aliased_sql_query"].astype(str)
+    queries_df["final_sql_query"] = queries_df["final_sql_query"].astype(str)
     queries_df["english_explanation"] = queries_df["english_explanation"].astype(str)
     queries_df["valid"] = queries_df["valid"].astype(str)
     queries_by_db = {}
@@ -509,6 +525,7 @@ def getQueriesByDB(queries_file):
         original_sql_query = row["original_sql_query"].strip()
         modified_sql_query = row["modified_sql_query"].strip()
         aliased_sql_query = row["aliased_sql_query"].strip()
+        final_sql_query = row["final_sql_query"].strip()
         english_explanation = row["english_explanation"].strip()
         question = row["question"]
         data_split = row["dataset"]
@@ -521,6 +538,7 @@ def getQueriesByDB(queries_file):
                     "original_sql_query": original_sql_query,
                     "modified_sql_query": modified_sql_query,
                     "aliased_sql_query": aliased_sql_query,
+                    "final_sql_query": final_sql_query,
                     "english_explanation": english_explanation,
                 }
             ]
@@ -533,6 +551,7 @@ def getQueriesByDB(queries_file):
                     "original_sql_query": original_sql_query,
                     "modified_sql_query": modified_sql_query,
                     "aliased_sql_query": aliased_sql_query,
+                    "final_sql_query": final_sql_query,
                     "english_explanation": english_explanation,
                 }
             )
@@ -861,30 +880,6 @@ def write_sql_prompts_to_csv(prompts, output_file):
 
 
 def write_english_prompts_to_csv(english_prompts, output_file):
-    fieldnames = [
-        "query_id",
-        "db_id",
-        "data_split",
-        "instruction",
-        "output",
-    ]
-    prompts_to_write = [
-        (
-            obj["query_id"],
-            obj["db_id"],
-            obj["data_split"],
-            obj["instruction"],
-            obj["output"],
-        )
-        for obj in english_prompts
-    ]
-    with open(output_file, mode="w", newline="") as file:
-        writer = csv.writer(file)
-        writer.writerow(fieldnames)
-        writer.writerows(prompts_to_write)
-
-
-def write_alias_prompts_to_csv(alias_prompts, output_file):
     fieldnames = [
         "query_id",
         "db_id",
@@ -1517,12 +1512,55 @@ def format_query(original_sql_query, table_schemas, options, query_id, db_id, co
         return None
 
 
+def add_aliases(question, sql_query, remote_host, model_name):
+    request_headers = {
+        "accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    full_prompt = f"<|prompt|>\nThe user asked the following question:\n{question}\n\nIn response, the following SQL query was generated:\n{sql_query}\n\nNow add aliases to projected expressions from the query as needed.\n<|answer|>\n"
+    request_data = {
+        "model": model_name,
+        "prompt": full_prompt,
+        "max_tokens": 512,
+        "temperature": 0.0,
+        "top_p": 1,
+        "n": 1,
+        "stream": False,
+        "prompt_logprobs": 0,
+        "logprobs": 0,
+        "echo": False,
+        "stop": ["string"],
+        "presence_penalty": 0,
+        "frequency_penalty": 0,
+        "best_of": 2,
+        "top_k": -1,
+        "ignore_eos": False,
+        "use_beam_search": True,
+    }
+    result = requests.post(
+        remote_host + "/v1/completions",
+        headers=request_headers,
+        data=json.dumps(request_data),
+    ).json()
+    alias_sql_query = result["choices"][0]["text"]
+    print(alias_sql_query)
+    return alias_sql_query
+
+
 def main(argv):
     options = getOptions(argv)
     openai.api_key = options.openai_api_key
     llm = None
     models_urls = []
+    alias_model_url = None
     remote_model_names = []
+    alias_remote_model_name = None
+    if options.add_aliases:
+        alias_model_url = options.llm_alias_remote_host
+        response = requests.get(alias_model_url + "/v1/models")
+        alias_remote_model_name = response.json()["data"][0]["id"]
+        print(alias_remote_model_name)
+
     if options.rate_query_perplexity:
         if options.use_local_model:
             llm = Llama(
@@ -1649,66 +1687,85 @@ def main(argv):
                     query_id = query["query_id"]
                     original_sql_query = query["original_sql_query"]
                     modified_sql_query = query["modified_sql_query"]
+                    final_sql_query = query["final_sql_query"]
+                    using_final_query = False
                     data_split = query["data_split"]
                     english_explanation = query["english_explanation"]
-                    sql_query = (
-                        modified_sql_query
-                        if len(str(modified_sql_query)) > 3
-                        else original_sql_query
-                    )
-                    sql_query = re.sub(" +", " ", sql_query)
-                    sql_query = re.sub(" ,", ",", sql_query)
-                    sql_query = sql_query + ";" if sql_query[-1] != ";" else sql_query
-                    sql_query = uppercase_sql_keywords(sql_query)
-                    filtered_tables = None
-                    try:
-                        sql_query = adjust_identifier_case(table_schemas, sql_query)
-                        sql_query = normalize_order_by(sql_query)
-                        # sql_query = add_spaces_around_parentheses(sql_query)
-                        sql_query = remove_spaces_around_parentheses(sql_query)
-                        sql_query = remove_spaces_around_commas(sql_query)
-                        sql_query = adjust_alias_case(sql_query)
-                        sql_query = add_as_before_table_aliases(sql_query)
-                        if options.convert_count_operands_to_star:
-                            sql_query = convert_count_non_distinct_operands_to_star(
-                                sql_query
+                    if options.use_final_queries and len(final_sql_query) >= 4:
+                        sql_query = final_sql_query
+                        using_final_query = True
+                    else:
+                        sql_query = (
+                            modified_sql_query
+                            if len(str(modified_sql_query)) >= 4
+                            else original_sql_query
+                        )
+                        sql_query = re.sub(" +", " ", sql_query)
+                        sql_query = re.sub(" ,", ",", sql_query)
+                        sql_query = (
+                            sql_query + ";" if sql_query[-1] != ";" else sql_query
+                        )
+                        sql_query = uppercase_sql_keywords(sql_query)
+                        filtered_tables = None
+                        try:
+                            sql_query = adjust_identifier_case(table_schemas, sql_query)
+                            sql_query = normalize_order_by(sql_query)
+                            # sql_query = add_spaces_around_parentheses(sql_query)
+                            sql_query = remove_spaces_around_parentheses(sql_query)
+                            sql_query = remove_spaces_around_commas(sql_query)
+                            sql_query = adjust_alias_case(sql_query)
+                            sql_query = add_as_before_table_aliases(sql_query)
+                            if options.convert_count_operands_to_star:
+                                sql_query = convert_count_non_distinct_operands_to_star(
+                                    sql_query
+                                )
+                            if options.filter_null_groups:
+                                old_sql_query = copy.deepcopy(sql_query)
+                                sql_query = add_not_null_filters(sql_query)
+                                if sql_query != old_sql_query:
+                                    try:
+                                        con.execute(sql_query)
+                                        # print(f"Rewrite SUCCESS: {query_id}")
+                                        num_null_rewrite_successes += 1
+                                    except Exception as e:
+                                        print(f"Rewrite FAIL: {query_id}")
+                                        num_null_rewrite_fails += 1
+                                        null_rewrite_fail_ids.append(query_id)
+                                        sql_query = old_sql_query
+                            sql_query = (
+                                sql_query + ";" if sql_query[-1] != ";" else sql_query
                             )
-                        if options.filter_null_groups:
-                            old_sql_query = copy.deepcopy(sql_query)
-                            sql_query = add_not_null_filters(sql_query)
-                            if sql_query != old_sql_query:
-                                try:
-                                    con.execute(sql_query)
-                                    # print(f"Rewrite SUCCESS: {query_id}")
-                                    num_null_rewrite_successes += 1
-                                except Exception as e:
-                                    print(f"Rewrite FAIL: {query_id}")
-                                    num_null_rewrite_fails += 1
-                                    null_rewrite_fail_ids.append(query_id)
-                                    sql_query = old_sql_query
+                            if options.add_aliases:
+                                sql_query = add_aliases(
+                                    query["question"],
+                                    sql_query,
+                                    alias_model_url,
+                                    alias_remote_model_name,
+                                )
+
                         # sql_query = remove_join_aliases(table_schemas, sql_query)
 
                         # query_and_tables = adjust_identifier_case(table_schemas, sql_query)
                         # sql_query = query_and_tables["query"]
                         # filtered_tables = query_and_tables["tables"]
-                    except Exception as e:
-                        # print(traceback.format_exc())
-                        print(
-                            f"Exception Query ID: {query_id} DB: {db_id} Query: {sql_query}"
-                        )
-                        print(e)
-                        continue
+                        except Exception as e:
+                            # print(traceback.format_exc())
+                            print(
+                                f"Exception Query ID: {query_id} DB: {db_id} Query: {sql_query}"
+                            )
+                            print(e)
+                            continue
                     # print(f"Query ID: {query_id} DB: {db_id} Query: {sql_query}")
-                    sql_query = sql_query + ";" if sql_query[-1] != ";" else sql_query
 
                     # print(f"Query ID: {query_id}")
                     # print(f"SQL Query: {sql_query}")
                     try:
-                        if sql_query not in db_query_cache:
-                            if options.only_validate_queries:
-                                con._client.sql_validate(con._session, sql_query)
-                            else:
-                                con.execute(sql_query)
+                        if not using_final_query:
+                            if sql_query not in db_query_cache:
+                                if options.only_validate_queries:
+                                    con._client.sql_validate(con._session, sql_query)
+                                else:
+                                    con.execute(sql_query)
 
                         successful_queries += 1
                         if options.write_sql_prompts:
@@ -2069,6 +2126,9 @@ def main(argv):
                                     query_id,
                                     db_id,
                                     con,
+                                )
+                                con._client.sql_validate(
+                                    con._session, aliased_sql_query
                                 )
                                 instruction = f"The user asked the following question:\n{query['question']}\n\nIn response, the following SQL query was generated:\n{sql_query}\n\nNow add aliases to projected expressions from the query as needed."
                                 instruction_tokens = tokenizer.tokenize(instruction)

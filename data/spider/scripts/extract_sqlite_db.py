@@ -28,7 +28,9 @@ def get_create_table_statement(cursor, table_name):
         col_statement = f"{col_name} {col_type}"
         column_statements.append(col_statement)
 
-    create_table_statement = f"""CREATE TABLE "{table_name}" ({', '.join(column_statements)});"""
+    create_table_statement = (
+        f"""CREATE TABLE "{table_name}" ({', '.join(column_statements)});"""
+    )
     return create_table_statement
 
 
@@ -64,7 +66,7 @@ def main(argv):
 
     # Create a directory to hold the output files
     # db_name = options.database.split(".")[0].split("/")[-1]
-    output_dir = f"output/{db_name}"
+    output_dir = f"data_exports/bird/{db_name}"
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -78,7 +80,7 @@ def main(argv):
             f.write(create_statement)
 
         # Export table data to CSV
-        # export_table_to_csv(cursor, table_name, f"{output_dir}/{table_name}.csv")
+        export_table_to_csv(cursor, table_name, f"{output_dir}/{table_name}.csv")
 
     # Close the connection
     conn.close()

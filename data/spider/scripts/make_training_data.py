@@ -205,6 +205,7 @@ def load_questions(
     questions_path,
     questions_instruction_prompt,
     questions_output_prompt,
+    max_token_length,
     version,
     is_col_level,
     output_dir,
@@ -213,7 +214,7 @@ def load_questions(
     drop_table_sql = (
         f"DROP TABLE IF EXISTS heavyiq_questions_{questions_type}_v{version}"
     )
-    create_table_sql = f"CREATE TABLE heavyiq_questions_{questions_type}_v{version} (query_id INT, db_id TEXT, data_split TEXT, instruction TEXT, output TEXT);"
+    create_table_sql = f"CREATE TABLE heavyiq_questions_{questions_type}_v{version} (query_id INT, db_id TEXT, data_split TEXT, instruction TEXT, output TEXT, num_instruction_tokens INT);"
     load_sql = f"COPY heavyiq_questions_{questions_type}_v{version} FROM '{questions_path}' WITH (header='t');"
     add_prompt_col_sql = f"ALTER TABLE heavyiq_questions_{questions_type}_v{version} ADD COLUMN prompt TEXT;"
     add_answer_col_sql = f"ALTER TABLE heavyiq_questions_{questions_type}_v{version} ADD COLUMN answer TEXT;"
@@ -223,8 +224,8 @@ def load_questions(
     update_answer_col_sql = (
         f"UPDATE heavyiq_questions_{questions_type}_v{version} SET answer = output;"
     )
-    export_train_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_questions_{questions_type}_v{version} WHERE SAMPLE_RATIO(0.9)) TO '{output_dir}/heavyiq_questions_{questions_type}_v{version}_train.csv' WITH (header='t');"
-    export_eval_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_questions_{questions_type}_v{version} WHERE NOT SAMPLE_RATIO(0.9)) TO '{output_dir}/heavyiq_questions_{questions_type}_v{version}_eval.csv' WITH (header='t');"
+    export_train_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_questions_{questions_type}_v{version} WHERE data_split <> 'dev' AND num_instruction_tokens <= {max_token_length}) TO '{output_dir}/heavyiq_questions_{questions_type}_v{version}_train.csv' WITH (header='t');"
+    export_eval_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_questions_{questions_type}_v{version} WHERE data_split = 'dev' AND num_instruction_tokens <= {max_token_length}) TO '{output_dir}/heavyiq_questions_{questions_type}_v{version}_eval.csv' WITH (header='t');"
 
     con.execute(drop_table_sql)
     con.execute(create_table_sql)
@@ -265,9 +266,8 @@ def load_used_tables(
         f"UPDATE heavyiq_used_tables_{table_suffix} SET answer = output;"
     )
     # Account for prompt tokens in max length
-    corrected_max_token_length = int(max_token_length) - 5
-    export_train_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_used_tables_{table_suffix} WHERE data_split <> 'dev' AND num_instruction_tokens <= {corrected_max_token_length}) TO '{output_dir}/heavyiq_used_tables_{table_suffix}_train.csv' WITH (header='t');"
-    export_eval_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_used_tables_{table_suffix} WHERE data_split = 'dev' AND num_instruction_tokens <= {corrected_max_token_length}) TO '{output_dir}/heavyiq_used_tables_{table_suffix}_eval.csv' WITH (header='t');"
+    export_train_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_used_tables_{table_suffix} WHERE data_split <> 'dev' AND num_instruction_tokens <= {max_token_length}) TO '{output_dir}/heavyiq_used_tables_{table_suffix}_train.csv' WITH (header='t');"
+    export_eval_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_used_tables_{table_suffix} WHERE data_split = 'dev' AND num_instruction_tokens <= {max_token_length}) TO '{output_dir}/heavyiq_used_tables_{table_suffix}_eval.csv' WITH (header='t');"
 
     con.execute(drop_table_sql)
     con.execute(create_table_sql)
@@ -343,19 +343,19 @@ def create_combo_dataset(
     drop_table_sql = f"DROP TABLE IF EXISTS heavyiq_combo_{full_combo_label}"
     create_table_sql = f"CREATE TABLE heavyiq_combo_{full_combo_label} (id INT, db_id TEXT, data_split TEXT, prompt TEXT, answer TEXT);"
     load_dolly_sql = f"INSERT INTO heavyiq_combo_{full_combo_label} SELECT id + 2000000, 'INVALID', 'train', prompt, answer FROM {instruction_table} WHERE length(prompt) < 1760 AND length(answer) < 640;"
-    load_sql_sql = f"INSERT INTO heavyiq_combo_{full_combo_label} SELECT query_id, db_id, CASE WHEN data_split <> 'dev' THEN 'train' ELSE 'eval' END, prompt, answer FROM {sql_table};"
+    load_sql_sql = f"INSERT INTO heavyiq_combo_{full_combo_label} SELECT query_id, db_id, CASE WHEN data_split <> 'dev' THEN 'train' ELSE 'eval' END, prompt, answer FROM {sql_table} WHERE num_targeted_instruction_tokens < {max_token_length};"
     load_answers_sql = None
     if nl_answers_table is not None:
         load_answers_sql = f"INSERT INTO heavyiq_combo_{full_combo_label} SELECT query_id + 1000000, db_id, 'train', prompt, answer FROM {nl_answers_table} WHERE data_split <> 'dev';"
     load_questions_table_sql = None
     if questions_table_table is not None:
-        load_questions_table_sql = f"INSERT INTO heavyiq_combo_{full_combo_label} SELECT query_id + 3000000, db_id, 'train', prompt, answer FROM {questions_table_table};"
+        load_questions_table_sql = f"INSERT INTO heavyiq_combo_{full_combo_label} SELECT query_id + 3000000, db_id, 'train', prompt, answer FROM {questions_table_table} WHERE data_split <> 'dev' AND num_instruction_tokens < {max_token_length};"
     load_questions_column_sql = None
     if questions_column_table is not None:
-        load_questions_column_sql = f"INSERT INTO heavyiq_combo_{full_combo_label} SELECT query_id + 4000000, db_id, 'train', prompt, answer FROM {questions_column_table};"
+        load_questions_column_sql = f"INSERT INTO heavyiq_combo_{full_combo_label} SELECT query_id + 4000000, db_id, 'train', prompt, answer FROM {questions_column_table} WHERE data_split <> 'dev' AND num_instruction_tokens < {max_token_length};"
     load_used_tables_table_sql = None
     if used_tables_table is not None:
-        load_used_tables_table_sql = f"INSERT INTO heavyiq_combo_{full_combo_label} SELECT query_id + 5000000, db_id, 'train', prompt, answer FROM {used_tables_table};"
+        load_used_tables_table_sql = f"INSERT INTO heavyiq_combo_{full_combo_label} SELECT query_id + 5000000, db_id, 'train', prompt, answer FROM {used_tables_table} WHERE data_split <> 'dev' AND num_instruction_tokens < {max_token_length};"
     load_errors_sql = None
     if errors_table is not None:
         load_errors_sql = f"INSERT INTO heavyiq_combo_{full_combo_label} SELECT query_id + 6000000, db_id, 'train', prompt, answer FROM {errors_table};"
@@ -425,6 +425,7 @@ def main(argv):
             options.questions_table_level,
             options.questions_table_level_instruction_prompt,
             options.questions_table_level_output_prompt,
+            options.max_token_length,
             options.version,
             False,
             options.output_dir,
@@ -437,6 +438,7 @@ def main(argv):
             options.questions_column_level,
             options.questions_column_level_instruction_prompt,
             options.questions_column_level_output_prompt,
+            options.max_token_length,
             options.version,
             True,
             options.output_dir,

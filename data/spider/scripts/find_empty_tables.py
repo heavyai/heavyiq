@@ -5,12 +5,20 @@ import sys
 
 
 def getOptions(argv=None):
-    parser = argparse.ArgumentParser(description="Find empty tables in HeavyDB test data")
-    parser.add_argument("-s", "--host", help="HeavyDB server address", default="localhost")
+    parser = argparse.ArgumentParser(
+        description="Find empty tables in HeavyDB test data"
+    )
+    parser.add_argument(
+        "-s", "--host", help="HeavyDB server address", default="localhost"
+    )
     parser.add_argument("-p", "--port", help="HeavyDB server port", default="6273")
     parser.add_argument("-u", "--user", help="HeavyDB user name", default="admin")
-    parser.add_argument("-w", "--password", help="HeavyDB password", default="HyperInteractive")
-    parser.add_argument("-q", "--queries", help="Queries CSV file", default="./spider_qa.csv")
+    parser.add_argument(
+        "-w", "--password", help="HeavyDB password", default="HyperInteractive"
+    )
+    parser.add_argument(
+        "-q", "--queries", help="Queries CSV file", default="./spider_qa.csv"
+    )
     return parser.parse_args(argv)
 
 
@@ -55,9 +63,15 @@ def main(argv):
     partially_empty_dbs = []
     populated_dbs = []
     for db_id, queries in queries_by_db.items():
+        print(db_id)
         con = None
         try:
-            con = heavyai.connect(user=options.user, password=options.password, host=options.host, dbname=db_id)
+            con = heavyai.connect(
+                user=options.user,
+                password=options.password,
+                host=options.host,
+                dbname=db_id,
+            )
         except Exception as e:
             print(f"Error connecting to database {db_id}: {e}")
             continue
@@ -65,7 +79,8 @@ def main(argv):
         all_empty_tables = True
         has_empty_table = False
         for db_table in db_tables:
-            res = con.execute(f"SELECT COUNT(*) FROM {db_table}")
+            print(db_table)
+            res = con.execute(f"""SELECT COUNT(*) FROM "{db_table}" """)
             num_rows = list(res)[0][0]
             if num_rows > 0:
                 all_empty_tables = False
