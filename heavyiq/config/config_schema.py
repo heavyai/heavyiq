@@ -60,8 +60,11 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     # table order in prompt
     sort_prompt_tables_desc = True
     # maximum count of allowed_tables on nl-to-tables endpoint. If the count exceeds, then
-    # index updation and search will happen in-order to find relevant tables
+    # index updation and search will happen in-order to find relevant tables.
     allowed_tables_max_count_nl_to_tables: int = 20
+    # config options w.r.t table doc generation using custom model
+    include_samples_in_custom_table_document_generation: bool = True
+    include_top_k_in_custom_table_document_generation: bool = True
 
 
 class AppConfig(OverrideBaseConfig):  # type: ignore
