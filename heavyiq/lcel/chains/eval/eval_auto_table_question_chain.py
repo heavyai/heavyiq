@@ -78,6 +78,21 @@ async def compare_and_format_output(inputs: dict) -> dict:
     if gold_tables != pred_tables:
         error = "TABLES_MISMATCH"
 
+    # has error then pred query failed to pass the validation step
+    # or the tables might get mismatched. In this case, don't calculate sql_rate_reply and query_stats
+    # just return the function with necessary error details
+    if error:
+        return {
+            "query_id": inputs["query_id"],
+            "db_id": inputs["db_id"],
+            "gold_query": gold_query,
+            "pred_query": pred_query,  # failed sql
+            "success": False,
+            "status": "tables_mismatch" if error == "TABLES_MISMATCH" else "failed_to_generate_sql",
+            "error": error,
+            "query_stats": {},
+        }
+
     db = await HeavyDB.from_session_async(session_id=inputs["session_id"])
     tasks = [run_in_threadpool(sql_rate_reply, gold_query, pred_query, db=db)]
     if inputs["enable_query_stats"]:
@@ -91,6 +106,7 @@ async def compare_and_format_output(inputs: dict) -> dict:
         eval_res, query_stats = await asyncio.gather(*tasks)
     except Exception as e:
         eval_res["success"] = False
+        eval_res["status"] = "failed_to_calculate_query_stats"
         exception = str(e)
 
     return {
@@ -100,7 +116,7 @@ async def compare_and_format_output(inputs: dict) -> dict:
         "pred_query": pred_query,
         "success": eval_res["success"],
         "status": eval_res["status"],
-        "error": exception or error or eval_res["error"],
+        "error": exception or eval_res["error"],
         "query_stats": query_stats,
     }
 
