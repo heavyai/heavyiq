@@ -111,7 +111,7 @@ def create_index_if_nonexistent() -> HeavyDBMetadataIndex:
     return HeavyDBMetadataIndex(vectorstore=vectorstore, text_splitter=index_creator.text_splitter)  # type: ignore
 
 
-async def acreate_index_if_nonexistent() -> HeavyDBMetadataIndex:
+async def acreate_index_if_nonexistent(session: str | None = None) -> HeavyDBMetadataIndex:
     """
     Create a new vector store index if it does not exist, otherwise return the existing index asynchronously.
 
@@ -122,7 +122,7 @@ async def acreate_index_if_nonexistent() -> HeavyDBMetadataIndex:
     huggingface_model_name = config.huggingface_embed_model
     metadata_index_dir = config.metadata_index_dir
 
-    tables_with_new_summaries = await agenerate_table_documents()
+    tables_with_new_summaries = await agenerate_table_documents(session=session)
 
     index_creator = get_vectorstore_index_creator(metadata_index_dir)
 
