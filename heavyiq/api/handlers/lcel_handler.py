@@ -42,7 +42,8 @@ async def handle_lcel_auto_query_request(
     Async LCEL handler for /auto/query request.
     """
     from heavyiq.lcel.chains import auto_sql_chain
-    from heavyiq.lcel.chains.heavydb.sql_chain import max_retries
+
+    max_retries = get_config().max_retries_nl_to_sql
 
     out = await auto_sql_chain.ainvoke(request_dict, config=config)  # type: ignore
     if out["error"]:
@@ -69,7 +70,8 @@ async def handle_lcel_question_request(request_dict: dict, config: dict | None =
         QuestionResponse
     """
     from heavyiq.lcel.chains import answer_chain
-    from heavyiq.lcel.chains.heavydb.sql_chain import max_retries
+
+    max_retries = get_config().max_retries_nl_to_sql
 
     result = await answer_chain.ainvoke(request_dict, config=config)  # type: ignore
     fail_reason = result["fail_reason"]
@@ -109,7 +111,8 @@ async def handle_lcel_auto_question_request(
         AutoQuestionResponse
     """
     from heavyiq.lcel.chains import auto_answer_chain
-    from heavyiq.lcel.chains.heavydb.sql_chain import max_retries
+
+    max_retries = get_config().max_retries_nl_to_sql
 
     result = await auto_answer_chain.ainvoke(request_dict, config=config)  # type: ignore
     fail_reason = result["fail_reason"]
