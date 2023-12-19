@@ -334,6 +334,8 @@ async def run_config_model_on_auto_questions(
             for data in chain_output:
                 values_list = list(data.values())
                 query_stats = list(values_list[-1].values())
+                if not query_stats:
+                    query_stats = [None, None, None, None, None]
                 row_datas.append(values_list[:-1] + query_stats)
             if row_datas:
                 await writer.writerows(row_datas)
