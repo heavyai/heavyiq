@@ -43,10 +43,6 @@ async def get_tables(inputs: dict) -> list[str]:
         found_tables = await heavydb_index.asimple_search_for_table_names(
             inputs["question"],
             allowable_tables=allowed_tables,
-            search_type=SearchType.MMR,
-            lambda_mult=1,
-            k=15,
-            fetch_k=50,
         )
 
     return found_tables or allowed_tables
