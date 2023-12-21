@@ -39,7 +39,6 @@ async def get_tables(inputs: dict) -> list[str]:
 
     if len(allowed_tables) > config.allowed_tables_max_count_nl_to_tables:
         heavydb_index = await aget_heavydb_index(session=inputs["session_id"])
-        # working with schema
         found_tables = await heavydb_index.asimple_search_for_table_names(
             inputs["question"],
             allowable_tables=allowed_tables,
