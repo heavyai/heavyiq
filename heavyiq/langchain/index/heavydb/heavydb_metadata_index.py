@@ -1,16 +1,14 @@
 from typing import Optional
 
 from chromadb.api.types import Where
-from langchain.schema import Document, BaseRetriever
+from langchain.schema import BaseRetriever, Document
 
-from heavyiq.langchain.chains import (
-    SQLMetadataQuestionTransformerChain,
-    AskHeavyDBMetadataIndexChain,
-)
+from heavyiq.langchain.chains import AskHeavyDBMetadataIndexChain, SQLMetadataQuestionTransformerChain
 from heavyiq.langchain.llms import get_llm
 from heavyiq.langchain.logging import log_chain_call
-from .utils import read_table_documents, apply_retriever_filter
+
 from ..utils import HeavyIQIndexWrapper, SearchType
+from .utils import apply_retriever_filter, read_table_documents
 
 
 class HeavyDBMetadataIndex(HeavyIQIndexWrapper):
@@ -44,6 +42,24 @@ class HeavyDBMetadataIndex(HeavyIQIndexWrapper):
             List of table names that MAY be relevant to the search string.
         """
         docs = self.simple_search_for_table_docs(search_string, allowable_tables, **kwargs)
+        return list(set([doc.metadata["source"] for doc in docs]))
+
+    async def asimple_search_for_table_docs(
+        self, search_string: str, allowable_tables: Optional[list[str]] = None, **kwargs
+    ) -> list[Document]:
+        """
+        Search for table docs on the index asynchornously.
+        """
+        retriever = self.as_retriever(allowable_tables=allowable_tables, **kwargs)
+        return await retriever.aget_relevant_documents(search_string)
+
+    async def asimple_search_for_table_names(
+        self, search_string: str, allowable_tables: Optional[list[str]] = None, **kwargs
+    ) -> list[str]:
+        """
+        Search for table names on the index asynchornously.
+        """
+        docs = await self.asimple_search_for_table_docs(search_string, allowable_tables, **kwargs)
         return list(set([doc.metadata["source"] for doc in docs]))
 
     def ask_about_database(
@@ -115,6 +131,8 @@ class HeavyDBMetadataIndex(HeavyIQIndexWrapper):
         search_type: SearchType = SearchType.SIMILARITY,
         k: int = 6,
         fetch_k: int = 20,
+        score_threshold: float = 0.8,
+        lambda_mult: float = 0.5,
         allowable_tables: Optional[list[str]] = None,
     ) -> BaseRetriever:
         """
@@ -131,4 +149,9 @@ class HeavyDBMetadataIndex(HeavyIQIndexWrapper):
         """
         search_kwargs = {"k": k, "fetch_k": fetch_k}
         search_kwargs = apply_retriever_filter(search_kwargs, allowable_tables)
+        if search_type == SearchType.SIMILARITY_SCORE_THRESHOLD:
+            search_kwargs["score_threshold"] = score_threshold  # type: ignore
+        elif search_type == SearchType.MMR:
+            search_kwargs["lambda_mult"] = lambda_mult  # type: ignore
+
         return self.vectorstore.as_retriever(search_type=search_type.value, search_kwargs=search_kwargs)

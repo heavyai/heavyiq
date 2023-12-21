@@ -1,11 +1,11 @@
 from enum import Enum
 
-from langchain.schema import BaseRetriever
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.indexes import VectorstoreIndexCreator
 from langchain.indexes.vectorstore import VectorStoreIndexWrapper
-from langchain.vectorstores import Chroma
+from langchain.schema import BaseRetriever
 from langchain.text_splitter import TextSplitter
+from langchain.vectorstores.chroma import Chroma
 
 from heavyiq.config import get_config
 
@@ -27,6 +27,7 @@ def get_vectorstore_index_creator(persist_directory: str) -> VectorstoreIndexCre
 class SearchType(Enum):
     SIMILARITY = "similarity"
     MMR = "mmr"
+    SIMILARITY_SCORE_THRESHOLD = "similarity_score_threshold"
 
 
 class HeavyIQIndexWrapper(VectorStoreIndexWrapper):
