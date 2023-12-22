@@ -107,28 +107,47 @@ def test_llm_by_type_should_return_corresponding_custom_azure_llm(model_type, mo
     [
         (
             LLMType.DEFAULT,
-            ("http://localhost:4000", 2048, None, 0, None, 0),
+            ("http://localhost:4000", 2048, None, 0, None, 0, None, 0),
             (OverrideOpenAI, "http://localhost:4000", "CUSTOM_LLM_default", 2048),
         ),
         (
             LLMType.NL_TO_SQL,
-            ("http://localhost:5000", 4096, "http://localhost:6000", 2048, None, 0),
+            ("http://localhost:5000", 4096, "http://localhost:6000", 2048, None, 0, None, 0),
             (OverrideOpenAI, "http://localhost:6000", "CUSTOM_LLM_nl_to_sql", 2048),
         ),
         (
             LLMType.NL_TO_SQL,
-            ("http://localhost:4000", 2048, None, 0, None, 0),
+            ("http://localhost:4000", 2048, None, 0, None, 0, None, 0),
             (OverrideOpenAI, "http://localhost:4000", "CUSTOM_LLM_nl_to_sql", 2048),
         ),
         (
             LLMType.SQL_TO_ANSWER,
-            ("http://localhost:4000", 2048, None, 0, "http://localhost:8000", 2048),
+            ("http://localhost:4000", 2048, None, 0, "http://localhost:8000", 2048, None, 0),
             (OverrideOpenAI, "http://localhost:8000", "CUSTOM_LLM_sql_to_answer", 2048),
         ),
         (
             LLMType.SQL_TO_ANSWER,
-            ("http://localhost:4000", 4096, None, 0, None, 0),
+            ("http://localhost:4000", 4096, None, 0, None, 0, None, 0),
             (OverrideOpenAI, "http://localhost:4000", "CUSTOM_LLM_sql_to_answer", 4096),
+        ),
+        (
+            LLMType.NL_TO_TABLES,
+            ("http://localhost:4000", 4096, None, 0, None, 0, "http://localhost:5000", 8192),
+            (OverrideOpenAI, "http://localhost:5000", "CUSTOM_LLM_nl_to_tables", 8192),
+        ),
+        (
+            LLMType.NL_TO_TABLES,
+            (
+                "http://localhost:4000",
+                4096,
+                None,
+                0,
+                None,
+                0,
+                None,
+                8192,
+            ),  # if without nl-ot-tables base, then it would take default base and default context window ir-respective of the appropriate context width
+            (OverrideOpenAI, "http://localhost:4000", "CUSTOM_LLM_nl_to_tables", 4096),
         ),
     ],
 )
@@ -140,6 +159,8 @@ def test_llm_by_type_should_return_overrided_openai_llm_for_api_custom_type(mode
         custom_llm_api_nl_to_sql_context_window,
         custom_llm_api_sql_to_answer_base,
         custom_llm_api_sql_to_answer_context_window,
+        custom_llm_api_nl_to_tables_base,
+        custom_llm_api_nl_to_tables_context_window,
     ) = custom_params
     expected_llm, expected_base, expected_model_name, expected_context = expected
     with patch(
@@ -153,6 +174,8 @@ def test_llm_by_type_should_return_overrided_openai_llm_for_api_custom_type(mode
             custom_llm_api_nl_to_sql_context_window=custom_llm_api_nl_to_sql_context_window,
             custom_llm_api_sql_to_answer_base=custom_llm_api_sql_to_answer_base,
             custom_llm_api_sql_to_answer_context_window=custom_llm_api_sql_to_answer_context_window,
+            custom_llm_api_nl_to_tables_base=custom_llm_api_nl_to_tables_base,
+            custom_llm_api_nl_to_tables_context_window=custom_llm_api_nl_to_tables_context_window,
         ),
     ):
         llm = get_llm_by_type(model_type=model_type)
