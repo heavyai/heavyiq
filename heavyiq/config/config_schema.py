@@ -19,6 +19,9 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     heavydb_port: int = 6278
     heavydb_protocol: str = "binary"
     huggingface_embed_model: str = "sentence-transformers/all-mpnet-base-v2"
+    huggingface_model_cache_folder: str = "hf_models"
+    huggingface_embed_documents_parallel: bool = False
+    """If True, then it uses multiple processes for embedding documents"""
     metadata_index_dir: str = "db"
     docs_index_dir: str = "heavyai_docs"
     table_documents_dir: str = "table_documents"

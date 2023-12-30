@@ -1,13 +1,39 @@
+import os
 from enum import Enum
 
-from langchain.schema import BaseRetriever
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.indexes import VectorstoreIndexCreator
 from langchain.indexes.vectorstore import VectorStoreIndexWrapper
-from langchain.vectorstores import Chroma
+from langchain.schema import BaseRetriever
 from langchain.text_splitter import TextSplitter
+from langchain.vectorstores import Chroma
 
 from heavyiq.config import get_config
+
+hf_model = None
+
+
+def get_or_download_hf_model() -> HuggingFaceEmbeddings:
+    """
+    Get or download hugging face embedding model.
+    """
+    from heavyiq.logging_utils import get_heavyiq_logger
+
+    global hf_model
+    if hf_model:
+        return hf_model
+
+    config, logger = get_config(), get_heavyiq_logger()
+    if os.path.exists(config.huggingface_model_cache_folder):
+        logger.info("Initializing HF model embeddings from cache...")
+    else:
+        logger.info("Downloading HF model embeddings...")
+    hf_model = HuggingFaceEmbeddings(
+        model_name=config.huggingface_embed_model,
+        cache_folder=config.huggingface_model_cache_folder,
+        multi_process=config.huggingface_embed_documents_parallel,
+    )
+    return hf_model
 
 
 def get_vectorstore_index_creator(persist_directory: str) -> VectorstoreIndexCreator:
@@ -16,11 +42,9 @@ def get_vectorstore_index_creator(persist_directory: str) -> VectorstoreIndexCre
     :param persist_directory: Path to the directory where the vector store index should be persisted.
     :return: A VectorstoreIndexCreator instance.
     """
-    config = get_config()
-    huggingface_model_name = config.huggingface_embed_model
     return VectorstoreIndexCreator(
         vectorstore_kwargs={"persist_directory": persist_directory},
-        embedding=HuggingFaceEmbeddings(model_name=huggingface_model_name),
+        embedding=get_or_download_hf_model(),
     )
 
 

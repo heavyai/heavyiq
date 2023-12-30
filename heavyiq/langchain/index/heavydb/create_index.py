@@ -1,10 +1,11 @@
+import asyncio
 from pathlib import Path
 
 from chromadb.api import Where
 from fastapi.concurrency import run_in_threadpool
 from langchain.indexes import VectorstoreIndexCreator
-from langchain.vectorstores import Chroma
 from langchain.vectorstores.base import VectorStore
+from langchain.vectorstores.chroma import Chroma
 
 from heavyiq.config import get_config
 from heavyiq.langchain.llms import is_using_custom_trained_llm

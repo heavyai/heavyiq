@@ -10,17 +10,33 @@ from starlette.exceptions import HTTPException
 from heavyiq.api.handlers import exception_handler as exh
 from heavyiq.api.middlewares import AsyncLoggingMiddleware
 from heavyiq.api.models.error import ErrorResponse
-from heavyiq.api.routes import defaultrouter, iqrouter, lcelrouter, streamrouter
+from heavyiq.api.routes import bgrouter, defaultrouter, iqrouter, lcelrouter, streamrouter
 from heavyiq.config import get_config
 from heavyiq.langchain.exceptions import GenerateTableMetadataException, NLtoAnswerException, NLtoSQLException
+from heavyiq.langchain.index.utils import get_or_download_hf_model
 from heavyiq.langchain.utils import init_telemetrics
 from heavyiq.logging_utils import init_logs
+from heavyiq.utils import SharedDictSingleton
 
 
 def stripped_down_api() -> FastAPI:
     app = FastAPI(title="HeavyIQ")
     app.include_router(defaultrouter)
     return app
+
+
+def app_initialize():
+    """
+    App initialization code which get excuted before gunicorn process fork upon using `--preload` option.
+    """
+    from heavyiq.logging_utils import get_heavyiq_logger
+
+    logger = get_heavyiq_logger()
+    logger.info("Allocating Shared Dict....")
+    # shared manager
+    SharedDictSingleton()
+    # download HF model embeddings
+    get_or_download_hf_model()
 
 
 def create_app(config_path: str = "./config.toml") -> FastAPI:
@@ -43,6 +59,8 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
     init_telemetrics()  # initializes langsmith
 
     app = FastAPI(title="HeavyIQ")
+
+    app_initialize()
 
     cors_origins = ["http://localhost"]
 
@@ -96,6 +114,17 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         streamrouter,
         prefix="/api/v1/lcel/stream",
         tags=["api.v1.lcel.stream"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "model": ErrorResponse,
+            }
+        },
+    )
+    app.include_router(
+        bgrouter,
+        prefix="/bgtask",
+        tags=["bgtask"],
         responses={
             500: {
                 "description": "Internal Server Error",
