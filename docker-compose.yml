@@ -27,6 +27,6 @@ services:
       - ./db:/app/db
       - ./storage:/app/storage
       - ./hf_models:/app/hf_models
-      - ./config.test.toml:/app/config.test.toml
+      - ./config.test.toml:/app/config.toml
     network_mode: "bridge"
     command: ['pytest', '/app/tests', '--disable-warnings', '-rs', '--config-path=./config.toml']

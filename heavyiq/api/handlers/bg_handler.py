@@ -2,10 +2,9 @@ import asyncio
 from enum import Enum, auto
 
 from fastapi import BackgroundTasks, Request
-from fastapi.concurrency import run_in_threadpool
 
 from heavyiq.api.models import UpdateIndexRequest, UpdateIndexResponse
-from heavyiq.langchain.index.heavydb import acreate_index_if_nonexistent, create_index_if_nonexistent
+from heavyiq.langchain.index.heavydb import acreate_index_if_nonexistent
 from heavyiq.logging_utils import _get_access_logger, get_heavyiq_logger
 from heavyiq.utils import SharedDictSingleton
 
@@ -15,20 +14,6 @@ class UpdateIndexStatus(Enum):
 
     started = auto()
     in_progress = auto()
-
-
-async def my_task(dict_: SharedDictSingleton, key: str):
-    print("on my task")
-    await dict_.put(key, True)
-    await asyncio.sleep(100)
-    await dict_.put(key, False)
-    print("finished my task")
-
-
-async def background_task():
-    print("I run on the background")
-    await asyncio.sleep(500)  # Use asyncio.sleep instead of time.sleep
-    print("Finished run on bg.")
 
 
 async def start_update_index_background_task(shared_dict: SharedDictSingleton, key: str, session: str | None = None):
