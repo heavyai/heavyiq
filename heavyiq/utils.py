@@ -192,6 +192,21 @@ async def is_path_exists(path: str) -> bool:
     return await run_in_threadpool(file_path.exists)
 
 
+async def is_path_exists_and_has_file(path: str) -> bool:
+    """
+    Check for the path exists or not asynchornously.
+    """
+    folder_path = Path(path)
+    path_exists = await run_in_threadpool(folder_path.exists)
+    if not path_exists:
+        return False
+
+    # Check if the folder contains at least one file asynchronously
+    files = list(await run_in_threadpool(folder_path.iterdir))
+
+    return bool(files)
+
+
 async def awrite_to_file(filename: str, content: str):
     async with aiofiles.open(filename, mode="w") as file:
         await file.write(content)

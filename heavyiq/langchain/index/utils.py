@@ -6,7 +6,7 @@ from langchain.indexes import VectorstoreIndexCreator
 from langchain.indexes.vectorstore import VectorStoreIndexWrapper
 from langchain.schema import BaseRetriever
 from langchain.text_splitter import TextSplitter
-from langchain.vectorstores import Chroma
+from langchain.vectorstores.chroma import Chroma
 
 from heavyiq.config import get_config
 
@@ -25,14 +25,15 @@ def get_or_download_hf_model() -> HuggingFaceEmbeddings:
 
     config, logger = get_config(), get_heavyiq_logger()
     if os.path.exists(config.huggingface_model_cache_folder):
-        logger.info("Initializing HF model embeddings from cache...")
+        logger.debug("Initializing HF model embeddings from cache...")
     else:
-        logger.info("Downloading HF model embeddings...")
+        logger.debug("Downloading HF model embeddings...")
     hf_model = HuggingFaceEmbeddings(
         model_name=config.huggingface_embed_model,
         cache_folder=config.huggingface_model_cache_folder,
         multi_process=config.huggingface_embed_documents_parallel,
     )
+    logger.debug("Initialized HuggingFace embeddings!")
     return hf_model
 
 
