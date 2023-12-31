@@ -29,7 +29,7 @@ async def start_update_index_background_task(shared_dict: SharedDictSingleton, k
     await shared_dict.put(key, True)
     try:
         # sleep is necessary here, which pauses the current task for specific time, allowing other task to run in the meantime
-        await asyncio.sleep(20)
+        await asyncio.sleep(1)
         await acreate_index_if_nonexistent(session=session)
         logger.debug("Background Index Update completed successfully.")
     except Exception as e:
