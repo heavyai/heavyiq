@@ -1,8 +1,7 @@
 import os
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import RedirectResponse, FileResponse
-
+from fastapi.responses import FileResponse, RedirectResponse
 
 defaultrouter = APIRouter()
 
@@ -15,7 +14,7 @@ async def redirect_to_docs() -> RedirectResponse:
 
 
 @defaultrouter.get("/version.txt")
-async def serve_version():
+async def serve_version() -> FileResponse:
     file_path = os.path.join(PUBLIC_PATH, "version.txt")
 
     if not os.path.exists(file_path):
