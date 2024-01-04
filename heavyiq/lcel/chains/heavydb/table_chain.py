@@ -5,6 +5,7 @@ from langchain.schema.runnable import Runnable, RunnableLambda, RunnablePassthro
 
 from heavyiq.langchain.heavydb import get_config, get_db
 from heavyiq.langchain.index import aget_heavydb_index
+from heavyiq.langchain.index.utils import SearchType
 from heavyiq.langchain.llms import LLMType, is_using_custom_trained_llm
 from heavyiq.langchain.utils import aget_table_info_wrt_token_limit
 from heavyiq.lcel.chains.utils import configure_step, get_value_from_runnable_binding
@@ -14,7 +15,7 @@ from heavyiq.lcel.types import TableChainInputType, TableChainOutputType
 
 # llm
 nl_to_tables_llm_rbl = llm_runnable.with_config(
-    configurable={"llm": "default_llm", "llm_temperature": 0}, config={"tags": ["nl_to_tables_llm"]}  # type: ignore
+    configurable={"llm": "nl_to_tables", "llm_temperature": 0}, config={"tags": ["nl_to_tables_llm"]}  # type: ignore
 )
 # prompt
 nl_to_tables_prompt_rbl = (
@@ -38,7 +39,10 @@ async def get_tables(inputs: dict) -> list[str]:
 
     if len(allowed_tables) > config.allowed_tables_max_count_nl_to_tables:
         heavydb_index = await aget_heavydb_index(session=inputs["session_id"])
-        found_tables = heavydb_index.simple_search_for_table_names(inputs["question"], allowable_tables=allowed_tables)
+        found_tables = await heavydb_index.asimple_search_for_table_names(
+            inputs["question"],
+            allowable_tables=allowed_tables,
+        )
 
     return found_tables or allowed_tables
 

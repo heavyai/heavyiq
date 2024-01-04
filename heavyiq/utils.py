@@ -1,11 +1,12 @@
+import asyncio
 import re
-import aiofiles
-from typing import Generator
-from aiofiles.os import scandir
-from pathlib import Path
-from fastapi.concurrency import run_in_threadpool
+from multiprocessing import Manager
 from multiprocessing.managers import SyncManager
-from typing import Generic, TypeVar, Optional
+from pathlib import Path
+from typing import Any, Generic, Optional, TypeVar
+
+import aiofiles
+from fastapi.concurrency import run_in_threadpool
 
 
 def strip_sql_comments(sql: str) -> str:
@@ -95,6 +96,27 @@ KT = TypeVar("KT")  # Key type
 VT = TypeVar("VT")  # Value type
 
 
+class SharedDictSingleton(Generic[KT, VT]):
+    _instance = None
+    _lock = asyncio.Lock()
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            manager = Manager()
+            cls._instance._manager = manager
+            cls._instance._shared_dict = manager.dict()
+        return cls._instance
+
+    async def get(self, key: KT) -> Any:
+        async with self._lock:
+            return self._shared_dict.get(key)  # type: ignore
+
+    async def put(self, key: KT, value: VT) -> None:
+        async with self._lock:
+            self._shared_dict[key] = value  # type: ignore
+
+
 class LRUCache(Generic[KT, VT]):
     """
     Implements Singleton/shared caching ie. shared cache which can be
@@ -169,6 +191,21 @@ async def is_path_exists(path: str) -> bool:
     """
     file_path = Path(path)
     return await run_in_threadpool(file_path.exists)
+
+
+async def is_path_exists_and_has_file(path: str) -> bool:
+    """
+    Check for the path exists or not asynchornously.
+    """
+    folder_path = Path(path)
+    path_exists = await run_in_threadpool(folder_path.exists)
+    if not path_exists:
+        return False
+
+    # Check if the folder contains at least one file asynchronously
+    files = list(await run_in_threadpool(folder_path.iterdir))
+
+    return bool(files)
 
 
 async def awrite_to_file(filename: str, content: str):

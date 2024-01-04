@@ -177,11 +177,13 @@ async def handle_tables_request_async(request: TablesRequest, db: HeavyDB) -> Ta
         heavydb_index = await aget_heavydb_index(session=request.session_id)
         # this table name search does not call any llm
         # it just searches the docs and shows the relevant tables
-        found_tables = heavydb_index.simple_search_for_table_names(request.question, allowable_tables=allowed_tables)
+        found_tables = await heavydb_index.asimple_search_for_table_names(
+            request.question, allowable_tables=allowed_tables
+        )
 
     config = get_config()
     logger = get_heavyiq_logger()
-    llm = await run_in_threadpool(get_llm_by_type, LLMType.NL_TO_SQL, temperature=0.0)
+    llm = await run_in_threadpool(get_llm_by_type, LLMType.NL_TO_TABLES, temperature=0.0)
     file_callback_handler = logger.async_langchain_cb_handler(to_stdout=config.log_to_stdout)
     chain = NLtoTablesChain(llm=llm, database=db, callbacks=[file_callback_handler], tags=["rest-api", "tables-endpoint"])  # type: ignore
     chain_input = {chain.input_key: request.question, "tables": found_tables or allowed_tables}
