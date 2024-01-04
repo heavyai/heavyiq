@@ -10,17 +10,34 @@ from starlette.exceptions import HTTPException
 from heavyiq.api.handlers import exception_handler as exh
 from heavyiq.api.middlewares import AsyncLoggingMiddleware
 from heavyiq.api.models.error import ErrorResponse
-from heavyiq.api.routes import defaultrouter, iqrouter, lcelrouter, llmrouter, streamrouter
+from heavyiq.api.routes import bgrouter, defaultrouter, iqrouter, lcelrouter, llmrouter, streamrouter
 from heavyiq.config import get_config
 from heavyiq.langchain.exceptions import GenerateTableMetadataException, NLtoAnswerException, NLtoSQLException
 from heavyiq.langchain.utils import init_telemetrics
-from heavyiq.logging_utils import init_logs
+from heavyiq.logging_utils import get_heavyiq_logger, init_logs
+from heavyiq.utils import SharedDictSingleton
 
 
 def stripped_down_api() -> FastAPI:
     app = FastAPI(title="HeavyIQ")
     app.include_router(defaultrouter)
     return app
+
+
+def app_initialize():
+    """
+    App initialization code which get excuted before gunicorn process fork upon using `--preload` option.
+    """
+
+    logger = get_heavyiq_logger()
+    logger.info("Allocating Shared Dict....")
+    # shared manager
+    instance = SharedDictSingleton()
+    logger.info(f"Shared Manager PID: {instance._manager._process.pid}")
+
+    # w.r.t memory into consideration, we don't need to initialize/download HF model embeddings at the first place(ie. before process fork).
+    # We could make it happen on the fork/child process since the models are going to be stored inside a cache dir.
+    # and for the next time, HF model should be loaded from then cache dir itself.
 
 
 def create_app(config_path: str = "./config.toml") -> FastAPI:
@@ -43,6 +60,8 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
     init_telemetrics()  # initializes langsmith
 
     app = FastAPI(title="HeavyIQ")
+
+    app_initialize()
 
     cors_origins = ["http://localhost"]
 
@@ -114,6 +133,17 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
             }
         },
     )
+    app.include_router(
+        bgrouter,
+        prefix="/bgtask",
+        tags=["bgtask"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "model": ErrorResponse,
+            }
+        },
+    )
     if config.enable_debug_endpoints:
         from heavyiq.api.routes.debug_router import debug_router
         from heavyiq.api.routes.runnable_router import runnable_router
@@ -151,6 +181,13 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         Code to be executed before FastAPI application ends.
         """
         from heavyiq.logging_utils import heavyiq_logger as logger
+
+        shared_dict_instance = SharedDictSingleton._instance
+        if shared_dict_instance:
+            shared_dict_manager = shared_dict_instance._manager
+            if shared_dict_manager._state.value == 1:  # terminate already started shared manager process
+                logger.info("Shutting down Shared Manager instance.")
+                shared_dict_manager.shutdown()
 
         logger.info("Shutting down FastAPI app.")
 

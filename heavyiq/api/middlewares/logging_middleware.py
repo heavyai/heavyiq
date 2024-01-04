@@ -1,12 +1,14 @@
-from pydantic import BaseModel
-from typing import Literal, Any
+from typing import Any, Literal, Sequence
+
 from fastapi.concurrency import run_in_threadpool
-from starlette.requests import Request
-from starlette.responses import Response
+from pydantic import BaseModel
 from starlette.background import BackgroundTask
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from heavyiq.logging_utils import _get_access_logger, get_heavyiq_logger, HeavyIQLogger, _AccessLogger
-from starlette.types import ASGIApp, Scope, Receive, Send, Message
+from starlette.requests import Request
+from starlette.responses import Response
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+from heavyiq.logging_utils import HeavyIQLogger, _AccessLogger, _get_access_logger, get_heavyiq_logger
 
 
 class Log(BaseModel):
@@ -30,6 +32,9 @@ class AsyncLoggingMiddleware(BaseHTTPMiddleware):
     running it as seperate Background Task.
     """
 
+    # paths where this middleware won't apply on
+    disallowed_paths: Sequence[str] = ("/bgtask",)
+
     @staticmethod  # type: ignore
     def write_log_data(logs: list[Log]):
         """
@@ -44,6 +49,15 @@ class AsyncLoggingMiddleware(BaseHTTPMiddleware):
             if log.values:
                 log_message = log_message % tuple(log.values)
             log_func(log_message, extra=log.extra)
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        path = scope.get("path")
+        if not path or any(i in path for i in self.disallowed_paths):
+            # disbales this middleware for bgtask endpoints
+            # otherwise we should endup in blocking future requests
+            await self.app(scope, receive, send)
+            return
+        return await super().__call__(scope=scope, receive=receive, send=send)
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         """
