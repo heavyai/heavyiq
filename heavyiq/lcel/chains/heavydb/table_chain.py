@@ -14,7 +14,7 @@ from heavyiq.lcel.types import TableChainInputType, TableChainOutputType
 
 # llm
 nl_to_tables_llm_rbl = llm_runnable.with_config(
-    configurable={"llm": "default_llm", "llm_temperature": 0}, config={"tags": ["nl_to_tables_llm"]}  # type: ignore
+    configurable={"llm": "nl_to_tables", "llm_temperature": 0}, config={"tags": ["nl_to_tables_llm"]}  # type: ignore
 )
 # prompt
 nl_to_tables_prompt_rbl = (

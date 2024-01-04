@@ -58,6 +58,7 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
             LLMType.DEFAULT: config.openai_gpt_model,
             LLMType.NL_TO_SQL: config.openai_gpt_model_nl_to_sql,
             LLMType.SQL_TO_ANSWER: config.openai_gpt_model_sql_to_answer,
+            LLMType.NL_TO_TABLES: config.openai_gpt_model_nl_to_tables,
         }
         model_name: str = openai_llm_mapping[LLMType.DEFAULT] if openai_llm_mapping[model_type] is None else openai_llm_mapping[model_type]  # type: ignore
         return get_openai_llm_by_model_name(model=model_name, **kwargs)
@@ -68,6 +69,10 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
             LLMType.SQL_TO_ANSWER: (
                 config.custom_llm_api_sql_to_answer_base,
                 config.custom_llm_api_sql_to_answer_context_window,
+            ),
+            LLMType.NL_TO_TABLES: (
+                config.custom_llm_api_nl_to_tables_base,
+                config.custom_llm_api_nl_to_tables_context_window,
             ),
         }
         api_base, context_window = (
