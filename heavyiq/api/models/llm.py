@@ -31,7 +31,7 @@ class CallLLMResponse(BaseModel):
         schema_extra = {
             "examples": [
                 {
-                    "response": "42",
+                    "response": "Denver",
                 }
             ]
         }
