@@ -3,6 +3,29 @@
 HeavyIQ is a python module that serves as a natural language interface to interact with HeavyDB. The application uses [LangChain](https://python.langchain.com/en/latest/index.html) and Large Language Models to process user’s natural language questions and provide corresponding answers based on the data in the database. The module provides a simple REST API for querying the database using natural language questions.
 The application also provides a CLI interface for quick interactions with the HeavyIQ agent.
 
+## Build and Run with Docker Compose
+
+Before buiding the HeavyIQ containers, please make sure to make necessay configurations on
+`config.toml` and `config.test.toml` files.
+
+1. Build the Docker image for HeavyIQ API and HeavyIQ test containers:
+
+    ```bash
+    docker-compose build
+    ```
+
+2. Run HeavyIQ API container:
+
+    ```bash
+    docker-compose up heavyiq-api
+    ```
+
+3. Run tests.
+   
+   ```bash
+   docker-compose up --abort-on-container-exit heavyiq-test
+   ```
+
 ## Setup
 
 1. If you don’t have Python >=3.10 installed, [install it from here](https://www.python.org/downloads/).
