@@ -52,6 +52,7 @@ def get_vectorstore_index_creator(persist_directory: str) -> VectorstoreIndexCre
 class SearchType(Enum):
     SIMILARITY = "similarity"
     MMR = "mmr"
+    SIMILARITY_SCORE_THRESHOLD = "similarity_score_threshold"
 
 
 class HeavyIQIndexWrapper(VectorStoreIndexWrapper):
