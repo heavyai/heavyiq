@@ -7,6 +7,21 @@
       "request": "launch",
       "module": "uvicorn",
       "args": ["app:app", "--reload"]
+    },
+    {
+      "name": "Run Script",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/cli.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "args": [
+        "gen",
+        "run-config-model-on-questions",
+        "./eval/results/new.csv"
+      ],
+      "env": {},
+      "justMyCode": false
     }
   ]
 }

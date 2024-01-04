@@ -14,6 +14,7 @@ from aiocsv.writers import AsyncWriter
 
 from heavyiq.langchain import HeavyDB
 
+
 def sql_rate_reply(
     gold_query: str, pred_query: str, db_id: str | None = None, db: HeavyDB | None = None
 ) -> dict[str, Any]:
@@ -88,9 +89,7 @@ def sql_rate_reply(
         return query_metadata
 
 
-async def awrite_gen_results_header(
-    gen_str: str, has_id: bool
-):
+async def awrite_gen_results_header(gen_str: str, has_id: bool):
     async with aiofiles.open(f"./gen/results/{gen_str}_queries.csv", "a", newline="") as wf:
         header = []
         if has_id:
@@ -117,6 +116,7 @@ async def awrite_gen_results_row(
         row_data.extend([query_sub_id, db_id, question, answer])
         row_data = [str(item).replace("\n", " ").replace("\r", " ") for item in row_data]
         await writer.writerow(row_data)
+
 
 def extract_tables_from_query(con, query) -> list[str]:
     """
