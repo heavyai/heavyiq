@@ -104,6 +104,7 @@ class SharedDictSingleton(Generic[KT, VT]):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             manager = Manager()
+            cls._instance._manager = manager
             cls._instance._shared_dict = manager.dict()
         return cls._instance
 
