@@ -1,3 +1,4 @@
+import time
 from enum import Enum
 from functools import lru_cache
 from typing import Any
@@ -9,6 +10,8 @@ from langchain.llms import AzureOpenAI
 from langchain.llms.base import BaseLLM
 
 from heavyiq.config import get_config
+from heavyiq.logging_utils import get_heavyiq_logger
+from heavyiq.utils import SharedDictSingleton
 
 from .overrides import OverrideOpenAI, OverrideVLLMOpenAI
 
@@ -26,9 +29,33 @@ def is_using_custom_trained_llm() -> bool:
 
 
 def get_vllm_model_name(api_base: str) -> str:
+    """
+    Get VLLM model name either from cache or from remote endpoint.
+    """
+    logger = get_heavyiq_logger()
+    shared_dict_instance: SharedDictSingleton | None = SharedDictSingleton._instance
+    model_name_key, expiry_key, ttl = "VLLM_MODEL_NAME", "VLLM_MODEL_NAME_EXPIRES_AT", 60
+    if (
+        shared_dict_instance
+        and (vllm_model_name_expires_at := shared_dict_instance.sget(expiry_key))
+        and (vllm_model_name := shared_dict_instance.sget(model_name_key))
+    ):
+        # check for the time expired or not
+        current_time = int(time.time())
+        if current_time < vllm_model_name_expires_at:
+            # return the model name from cache
+            logger.debug("Getting VLLM model name from cache.")
+            return vllm_model_name
+
+    logger.debug("Getting VLLM model name.")
     response = requests.get(f"{api_base}/models", timeout=10)
     response.raise_for_status()
-    return response.json()["data"][0]["id"]
+    model_name = response.json()["data"][0]["id"]
+    if shared_dict_instance:
+        shared_dict_instance.sput(expiry_key, int(time.time()) + ttl)
+        shared_dict_instance.sput(model_name_key, model_name)
+
+    return model_name
 
 
 @lru_cache
