@@ -28,3 +28,4 @@ eval/results/*.csv
 *.log
 testdb/
 hf_models/
+llm_servers/*/models

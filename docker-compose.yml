@@ -30,3 +30,16 @@ services:
       - ./config.test.toml:/app/config.toml
     network_mode: "bridge"
     command: ['pytest', '/app/tests', '--disable-warnings', '-rs', '--config-path=./config.toml']
+
+  whisper-cpp:
+    container_name: whisper-cpp
+    build:
+      context: ./custom_models/whisper
+      dockerfile: Dockerfile
+    volumes:
+      - ./custom_models/whisper/models:/app/models
+    entrypoint: /app/entrypoint.sh
+    environment:
+      - HOST=0.0.0.0
+    ports:
+      - "8001:8001"
