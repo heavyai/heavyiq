@@ -15,6 +15,7 @@ import itertools
 from llama_cpp import Llama
 import requests
 import traceback
+import random
 
 from collections.abc import Iterable
 
@@ -507,7 +508,7 @@ def getQueriesByDB(queries_file):
     queries_df = pd.read_csv(queries_file)
     queries_df["modified_sql_query"] = queries_df["modified_sql_query"].astype(str)
     queries_df["aliased_sql_query"] = queries_df["aliased_sql_query"].astype(str)
-    queries_df["final_sql_query"] = queries_df["final_sql_query"].astype(str)
+    queries_df["final_sql_query"] = queries_df["final_sql_query_v2"].astype(str)
     queries_df["english_explanation"] = queries_df["english_explanation"].astype(str)
     queries_df["valid"] = queries_df["valid"].astype(str)
     queries_by_db = {}
@@ -2052,6 +2053,7 @@ def main(argv):
                                 }
                             )
                         if options.write_table_prompts:
+                            print(sql_query)
                             filtered_tables = extract_tables_from_query(con, sql_query)
                             table_metadata = None
                             add_top_k_metadata = (
@@ -2102,9 +2104,64 @@ def main(argv):
                                 )
                                 instruction_tokens = tokenizer.tokenize(instruction)
                                 num_instruction_tokens = len(instruction_tokens)
+                            remaining_tables = copy.deepcopy(db_tables)
+                            if num_instruction_tokens > options.max_instruction_tokens:
+                                num_tables = len(db_tables)
+                                filtered_table_idxs = []
+                                for filtered_table in filtered_tables:
+                                    filtered_table_idxs.append(
+                                        db_tables.index(filtered_table)
+                                    )
+                                print(filtered_table_idxs)
+                                non_used_table_idxs = [
+                                    idx
+                                    for idx in range(num_tables)
+                                    if idx not in filtered_table_idxs
+                                ]
+                                print(non_used_table_idxs)
+                                while len(non_used_table_idxs) > 0:
+                                    evict_idx = random.randint(
+                                        0, len(non_used_table_idxs) - 1
+                                    )
+                                    non_used_table_idxs.pop(evict_idx)
+                                    print(non_used_table_idxs)
+                                    remaining_table_idxs = (
+                                        non_used_table_idxs + filtered_table_idxs
+                                    )
+                                    remaining_table_idxs = sorted(remaining_table_idxs)
+                                    remaining_table_schemas = []
+                                    remaining_table_row_counts = []
+                                    remaining_tables.clear()
+                                    for idx, table_schema in enumerate(table_schemas):
+                                        if idx in remaining_table_idxs:
+                                            remaining_table_schemas.append(table_schema)
+                                            remaining_tables.append(db_tables[idx])
+                                            remaining_table_row_counts.append(
+                                                table_row_counts[idx]
+                                            )
+
+                                    table_metadata = generate_table_metadata_str(
+                                        remaining_table_schemas,
+                                        [],
+                                        remaining_table_row_counts,
+                                        0,
+                                        options.cardinality_split_top_k_str_vals,
+                                        options.show_top_k_str_vals_cardinality,
+                                        options.show_table_row_counts,
+                                    )
+                                    instruction = generate_table_prompt(
+                                        table_metadata, query["question"]
+                                    )
+                                    instruction_tokens = tokenizer.tokenize(instruction)
+                                    num_instruction_tokens = len(instruction_tokens)
+                                    if (
+                                        num_instruction_tokens
+                                        <= options.max_instruction_tokens
+                                    ):
+                                        break
 
                             output = generate_table_prompt_output(
-                                db_tables, filtered_tables
+                                remaining_tables, filtered_tables
                             )
                             table_prompts.append(
                                 {

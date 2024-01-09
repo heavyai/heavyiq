@@ -86,6 +86,11 @@ def getOptions(argv=None):
     parser.add_argument(
         "--instruction-table", help="NL Answers file", default="databricks_dolly_15k"
     )
+    parser.add_argument(
+        "--custom-instruction-table",
+        help="NL Custom Answers file",
+        default="heavyiq_training.training_pairs",
+    )
     parser.add_argument("--label", help="Label", default=None)
     parser.add_argument("--combo-label", help="Combo label", default=None)
     parser.add_argument("--query-label", help="Query label", default=None)
@@ -322,7 +327,8 @@ def create_combo_dataset(
     version,
     max_token_length,
     combo_label,
-    instruction_table,
+    dolly_instruction_table,
+    custom_instruction_table,
     sql_table,
     nl_answers_table,
     questions_table_table,
@@ -342,7 +348,8 @@ def create_combo_dataset(
 
     drop_table_sql = f"DROP TABLE IF EXISTS heavyiq_combo_{full_combo_label}"
     create_table_sql = f"CREATE TABLE heavyiq_combo_{full_combo_label} (id INT, db_id TEXT, data_split TEXT, prompt TEXT, answer TEXT);"
-    load_dolly_sql = f"INSERT INTO heavyiq_combo_{full_combo_label} SELECT id + 2000000, 'INVALID', 'train', prompt, answer FROM {instruction_table} WHERE length(prompt) < 1760 AND length(answer) < 640;"
+    load_dolly_instruct_sql = f"INSERT INTO heavyiq_combo_{full_combo_label} SELECT id + 2000000, 'INVALID', 'train', prompt, answer FROM {dolly_instruction_table} WHERE length(prompt) < 3027 AND length(answer) < 768;"
+    load_custom_instruct_sql = f"INSERT INTO heavyiq_combo_{full_combo_label} SELECT rowid + 3000000, 'INVALID', 'train', '<|prompt|>\n' || prompt || '\n<|answer|>\n', answer FROM {custom_instruction_table};"
     load_sql_sql = f"INSERT INTO heavyiq_combo_{full_combo_label} SELECT query_id, db_id, CASE WHEN data_split <> 'dev' THEN 'train' ELSE 'eval' END, prompt, answer FROM {sql_table} WHERE num_targeted_instruction_tokens < {max_token_length};"
     load_answers_sql = None
     if nl_answers_table is not None:
@@ -364,7 +371,8 @@ def create_combo_dataset(
 
     con.execute(drop_table_sql)
     con.execute(create_table_sql)
-    con.execute(load_dolly_sql)
+    con.execute(load_dolly_instruct_sql)
+    con.execute(load_custom_instruct_sql)
     con.execute(load_sql_sql)
     if load_answers_sql is not None:
         print(load_answers_sql)
@@ -477,6 +485,7 @@ def main(argv):
             options.max_token_length,
             options.label,
             options.instruction_table,
+            options.custom_instruction_table,
             queries_table,
             nl_answers_table,
             questions_table_table,
