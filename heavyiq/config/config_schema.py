@@ -56,6 +56,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     custom_llm_api_nl_to_tables_context_window: int = 8192  # LLMType.NL_TO_TABLES
     custom_llm_api_instruct_base: Optional[str] = None  # LLMType.INSTRUCT
     custom_llm_api_instruct_context_window: int = 8192  # LLMType.INSTRUCT
+    custom_llm_api_instruct_prompt_start_token: str = "[INST]\n"
+    custom_llm_api_instruct_prompt_end_token: str = "\n[/INST]\n"
     custom_llm_api_vllm_beam_width: int = 2
     custom_llm_azure_openai_api_version: str = "2023-03-15-preview"
     custom_llm_azure_openai_api_base: str = ""
