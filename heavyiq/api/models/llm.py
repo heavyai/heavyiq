@@ -8,7 +8,7 @@ class CallLLMRequest(BaseModel):
     temperature: float = Field(0.0, description="Temperature to use for LLM")
     max_tokens: int = Field(256, description="Max tokens to use for LLM response")
     llm_type: LLMType = Field(
-        LLMType.INSTRUCT, description="LLM type to use (instruct, nl_to_sql, sql_to_answer, default)"
+        LLMType.DEFAULT, description="LLM type to use (default, instruct, nl_to_sql, sql_to_answer)"
     )
     stop: list[str] | None = Field(default=None, description="An optional list of stop words")
 
@@ -19,7 +19,7 @@ class CallLLMRequest(BaseModel):
                     "question": "Return only the name of the capital for the following state, Idaho",
                     "temperature": 0.0,
                     "max_tokens": 256,
-                    "llm_type": "instruct (default or nl_to_sql or sql_to_answer)",
+                    "llm_type": "default (instruct or nl_to_sql or sql_to_answer)",
                     "stop": ["is the capital"],
                 }
             ]
