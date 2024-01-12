@@ -151,6 +151,16 @@ class LRUCache(Generic[KT, VT]):
             return self.cache[key]
         return None
 
+    def delete(self, key: KT) -> None:
+        """
+        Deletes the key and it's associated value from the cache dict.
+        """
+        try:
+            del self.cache[key]
+            self.order.remove(key)
+        except KeyError:
+            pass
+
     def put(self, key: KT, value: VT) -> None:
         """
         Helps to put the given key, value pair on the manager.Dict.

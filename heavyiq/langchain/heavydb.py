@@ -606,17 +606,56 @@ class HeavyDB:
             except Exception as e:
                 raise e
 
-    async def aget_table_schema(self, table: str) -> str:
+    async def should_refresh_table_cache(self, table: str) -> bool:
         """
-        Get table schema from cache for from db async.
+        Determines whether the cache for a specified table should be refreshed.
+
+        Args:
+            table (str): The name of the table for which the cache status is checked.
+
+        Returns:
+            bool: True if the table cache should be refreshed, False otherwise.
         """
-        self.logger.debug(f"Getting schema for table {table}")
+        self.logger.debug(f"Checking for {table} table cache refresh...")
         cache_key = f"{self._dbname}.{table}"
-        cached_value = self.table_schema_cache.get(cache_key)
-        if cached_value is not None:
-            self.logger.debug(f"Got schema for table {table} from cache")
-            return cached_value
-        """Get the schema of a table."""
+        cached_schema = self.table_schema_cache.get(cache_key)
+        if cached_schema is None:
+            # no entry for the table on cache, so return False
+            return False
+
+        # check for any diff in current schema and cached schema
+        # if yes then return True else return False
+        current_schema = await self._aget_raw_table_schema(table)
+        if cached_schema == current_schema:
+            self.logger.debug(f"Table {table} schema unchanged.")
+            return False
+
+        self.logger.debug(f"Table {table} schema changed, invalidating table caches...")
+        return True
+
+    def delete_table_cache(self, table: str) -> None:
+        """
+        Deletes all the cache entries associated with a particular table which includes top-k, sample_rows, schema, etc.
+        """
+        self.logger.debug(f"Deleteing all caches for the table {table}")
+        cache_key = f"{self._dbname}.{table}"
+        self.table_schema_cache.delete(cache_key)
+        self.top_k_cache.delete(cache_key)
+        self.sample_rows_cache.delete(cache_key)
+        self.table_text_columns_count_cache.delete(cache_key)
+        self.table_total_row_count_cache.delete(cache_key)
+
+    async def check_and_invalidate_table_cache(self, table: str) -> None:
+        """
+        Checks for table schema changes and invalidates the table caches accordingly.
+        """
+        if await self.should_refresh_table_cache(table):
+            self.delete_table_cache(table)
+
+    async def _aget_raw_table_schema(self, table: str) -> str:
+        """
+        Gets the table schema from db only.
+        """
         create_command = f"SHOW CREATE TABLE {table};"
 
         async with self.alock:
@@ -628,6 +667,21 @@ class HeavyDB:
         table_schema = re.sub(r"\n", "", table_schema)
         if "WITH (" in table_schema:
             table_schema = table_schema[: table_schema.index("WITH (")]
+
+        return table_schema
+
+    async def aget_table_schema(self, table: str) -> str:
+        """
+        Get table schema from cache for from db async.
+        """
+        self.logger.debug(f"Getting schema for table {table}")
+        cache_key = f"{self._dbname}.{table}"
+        cached_value = self.table_schema_cache.get(cache_key)
+        if cached_value is not None:
+            self.logger.debug(f"Got schema for table {table} from cache")
+            return cached_value
+        # Get the schema of a table from db
+        table_schema = await self._aget_raw_table_schema(table)
         self.table_schema_cache.put(cache_key, table_schema)
         self.logger.debug(f"Got schema for table {table}")
 
@@ -757,6 +811,8 @@ class HeavyDB:
 
         if self._custom_table_info and table_name in self._custom_table_info:
             return self._custom_table_info[table_name]
+
+        await self.check_and_invalidate_table_cache(table_name)
 
         tasks = [self.aget_table_schema(table_name)]
         if include_samples and self._sample_rows_in_table_info:
