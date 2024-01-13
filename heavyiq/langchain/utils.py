@@ -10,6 +10,8 @@ from langchain.schema.prompt import PromptValue
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.llms import LLMType
+from heavyiq.logging_utils import get_heavyiq_logger
+from heavyiq.utils import SharedDictSingleton
 
 is_langsmith_active = False
 
@@ -120,6 +122,51 @@ def get_table_info_wrt_token_limit(
     return table_info
 
 
+async def update_table_index_on_schema_change_callback(heavydb: HeavyDB, table: str):
+    """
+    Callback coroutine which gets executed on table schema change.
+    This function helps re-genrate table document and then reindex it's metadata on chromadb vectorstore index.
+    """
+    from heavyiq.langchain.index.heavydb import aget_heavydb_index
+
+    logger, shared_dict = get_heavyiq_logger(), SharedDictSingleton()  # type: ignore
+    key = f"is_background_index_update_for_{table}_table_in_progress"
+    has_key = await shared_dict.get(key)
+
+    if has_key:
+        logger.debug(f"An index update is already in progress for {table} table, so skipping.")
+        return
+
+    try:
+        await shared_dict.put(key, True)
+        await asyncio.sleep(1)
+        index = await aget_heavydb_index()
+        logger.debug("Regenerating the table document and subsequently re-indexing it in ChromaDB VectorStore.")
+        await index.agenerate_and_reindex_table_document(heavydb, table)
+    except Exception as e:
+        logger.exception(f"Failed to update index for {table} table, {e}")
+    else:
+        logger.debug(f"Successfully re-indexed the document for the {table} table on ChormaDB VectorStore.")
+    finally:
+        await shared_dict.delete(key)
+
+
+async def refresh_cache_for_tables(heavydb: HeavyDB, tables: list[str]):
+    """
+    Check and refresh caches asscociated with the tables.
+    """
+    do_refresh_results = await asyncio.gather(*[heavydb.should_refresh_table_cache(table) for table in tables])
+    for table, refresh_status in zip(tables, do_refresh_results):
+        if True:
+            # schema change detected
+            await asyncio.gather(
+                heavydb.delete_table_cache(table),
+                heavydb.trigger_table_schema_change_callback(
+                    table, callback=update_table_index_on_schema_change_callback
+                ),
+            )
+
+
 async def aget_table_info_wrt_token_limit(
     llm: BaseLanguageModel,
     heavydb: HeavyDB,
@@ -162,6 +209,9 @@ async def aget_table_info_wrt_token_limit(
         if caller == LLMType.NL_TO_TABLES
         else config.top_k_max_str_col_count_nl_to_sql
     )
+
+    # refresh-cache
+    await refresh_cache_for_tables(heavydb, table_names_to_use)
 
     # decides whether to include top-k or not
     disable_top_k = False
@@ -271,6 +321,9 @@ async def aget_table_info_for_nl_to_tables_prompt_wrt_token_limit(
         top_k_max_str_column_count,
         table_info_options,
     ) = await aget_token_limit_and_token_counter_func_by_llm_with_table_options(llm)
+
+    # refresh-cache
+    await refresh_cache_for_tables(heavydb, table_names_to_use)
 
     # decides whether to include top-k or not
     disable_top_k = False
