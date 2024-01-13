@@ -15,11 +15,8 @@ async def call_llm(request: CallLLMRequest) -> CallLLMResponse:
     """
     config = get_config()
     llm = await run_in_threadpool(
-        get_llm_by_type, request.llm_type, temperature=request.temperature, max_tokens=request.max_tokens
+        get_llm_by_type, LLMType.INSTRUCT, temperature=request.temperature, max_tokens=request.max_tokens
     )
-    if request.llm_type == LLMType.INSTRUCT:
-        prompt = f"{config.custom_llm_api_instruct_prompt_start_token}{request.question}{config.custom_llm_api_instruct_prompt_end_token}"
-    else:
-        prompt = f"{config.custom_llm_api_default_prompt_start_token}{request.question}{config.custom_llm_api_default_prompt_end_token}"
+    prompt = f"{config.custom_llm_api_instruct_prompt_start_token}{request.question}{config.custom_llm_api_instruct_prompt_end_token}"
     response = await llm.apredict(prompt, stop=request.stop)
     return CallLLMResponse(response=response.strip())
