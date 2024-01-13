@@ -157,7 +157,7 @@ async def refresh_cache_for_tables(heavydb: HeavyDB, tables: list[str]):
     """
     do_refresh_results = await asyncio.gather(*[heavydb.should_refresh_table_cache(table) for table in tables])
     for table, refresh_status in zip(tables, do_refresh_results):
-        if True:
+        if refresh_status:
             # schema change detected
             await asyncio.gather(
                 heavydb.delete_table_cache(table),
