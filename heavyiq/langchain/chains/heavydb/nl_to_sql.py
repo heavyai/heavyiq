@@ -408,6 +408,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
         messages = gen_sql_prompt.to_messages()
         response = self.llm.generate([messages], callbacks=run_manager.get_child() if run_manager else None)
         sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
+        sql_cmd = self.get_sql_query(sql_cmd)
         verified = False
         retries = 0
 
@@ -426,6 +427,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
                 messages.append(HumanMessage(content=NL_TO_SQL_CHAT_ERROR_TEMPLATE.format(exception=truncated_error)))
                 response = self.llm.generate([messages], callbacks=run_manager.get_child() if run_manager else None)
                 sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
+                sql_cmd = self.get_sql_query(sql_cmd)
 
         if not verified:
             self.write_callback_message(
@@ -447,7 +449,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
         sql_complexity = self.database.complexity(sql_cmd)
 
         return {
-            self.output_key: strip_sql_comments(sql_cmd),
+            self.output_key: sql_cmd,
             self.output_complexity_key: str(sql_complexity),
             self.output_logprobs_key: logprobs,
         }
@@ -470,6 +472,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
         messages = gen_sql_prompt.to_messages()
         response = await self.llm.agenerate([messages], callbacks=run_manager.get_child() if run_manager else None)
         sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
+        sql_cmd = self.get_sql_query(sql_cmd)
         verified = False
         retries = 0
 
@@ -494,6 +497,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
                     [messages], callbacks=run_manager.get_child() if run_manager else None
                 )
                 sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
+                sql_cmd = self.get_sql_query(sql_cmd)
 
         if not verified:
             await self.write_callback_message_async(
@@ -517,7 +521,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
         sql_complexity = await self.database.acomplexity(sql_cmd)
 
         return {
-            self.output_key: strip_sql_comments(sql_cmd),
+            self.output_key: sql_cmd,
             self.output_complexity_key: str(sql_complexity),
             self.output_logprobs_key: logprobs,
         }
