@@ -382,12 +382,11 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
         Helps to parse out SQL query from the llm response message.
         """
         if "SQLQuery:" in message:
-            return message.split("SQLQuery:")[1].strip()
-        if "```sql" in message:
-            return message.split("```sql")[1].strip()
-
-        if ":\n" in message:
-            return message.split(":\n")[1].strip()
+            message = message.split("SQLQuery:")[1].strip()
+        elif "```sql" in message:
+            message = message.split("```sql")[1].strip()
+        elif ":\n" in message:
+            message = message.split(":\n")[1].strip()
         return strip_sql_comments(message)
 
     def _call(
