@@ -181,7 +181,7 @@ async def run_config_model_on_questions(
             )
             tasks.append(task)
 
-    await asyncio.gather(*tasks, return_exceptions=True)
+    await asyncio.gather(*tasks, return_exceptions=False)
 
     await run_in_threadpool(summarize_eval_results, eval_str)
 
