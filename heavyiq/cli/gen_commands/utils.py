@@ -1,3 +1,4 @@
+import asyncio
 import csv
 import io
 import math
@@ -10,7 +11,11 @@ import aiocsv
 import aiofiles
 import numpy as np
 import pandas as pd
+from aiocsv.readers import AsyncReader
 from aiocsv.writers import AsyncWriter
+from fastapi.concurrency import run_in_threadpool
+from langchain.schema.runnable import Runnable, RunnableConfig
+from typing_extensions import AsyncGenerator, Sequence
 
 from heavyiq.langchain import HeavyDB
 
@@ -89,12 +94,15 @@ def sql_rate_reply(
         return query_metadata
 
 
-async def awrite_gen_results_header(gen_str: str, has_id: bool):
+async def awrite_gen_results_header(gen_str: str, has_id: bool, fields: Sequence | None = None):
     async with aiofiles.open(f"./gen/results/{gen_str}_queries.csv", "a", newline="") as wf:
         header = []
         if has_id:
             header.append("query_id")
-        header.extend(["query_sub_id", "db_id", "question", "answer"])
+        if fields:
+            header.extend(fields)
+        else:
+            header.extend(["query_sub_id", "db_id", "question", "answer"])
         writer = AsyncWriter(wf, dialect="unix")
         await writer.writerow(header)
 
@@ -132,3 +140,139 @@ def extract_tables_from_query(con, query) -> list[str]:
         table = match.split(", ")[1]
         tables.append(table)
     return list(set(tables))  # remove duplicates
+
+
+async def aextract_tables_from_query(heavdb: HeavyDB, query: str) -> list[str]:
+    """
+    Extract table names from SQL query async.
+    """
+    explain_query = "EXPLAIN CALCITE " + query
+    query_plan = await run_in_threadpool(heavdb._conn.execute, explain_query)
+    query_plan = list(query_plan)[0][0]
+    pattern = r"LogicalTableScan\(table=\[\[(.*?)\]\]\)"
+    matches = re.findall(pattern, query_plan)
+    tables = []
+    for match in matches:
+        table = match.split(", ")[1]
+        tables.append(table)
+    return list(set(tables))  # remove duplicates
+
+
+# A dict-mapping of database_name and the corresponding heavydb connection
+DB_NAME_AND_CONNECTION_MAPPING: dict[str, HeavyDB] = {}
+
+
+async def get_connection(db_name: str) -> HeavyDB:
+    """
+    Get from or set connection to global dict and then return it.
+    """
+    global DB_NAME_AND_CONNECTION_MAPPING
+    if db_name in DB_NAME_AND_CONNECTION_MAPPING:
+        return DB_NAME_AND_CONNECTION_MAPPING[db_name]
+
+    db = await HeavyDB.from_env_async(db_name=db_name)
+    DB_NAME_AND_CONNECTION_MAPPING[db_name] = db
+    return db
+
+
+async def generate_record(input_csv_path: str, gen_str: str, write_output_csv_header: bool = True) -> AsyncGenerator:
+    """
+    Helps to read the input csv file asynchronously.
+    """
+    async with aiofiles.open(input_csv_path, mode="r") as f:
+        csv_reader = AsyncReader(f)
+        header = await anext(csv_reader)
+        has_id = "id" == header[0]
+        if write_output_csv_header:
+            await awrite_gen_results_header(gen_str, has_id, fields=["db_id", "question", "answer", "cot"])
+
+        async for row in csv_reader:
+            yield row
+
+
+async def generate_cot_chain_input(input_gen: AsyncGenerator):
+    """
+    Generate input for Chain Of Thoghts Chain.
+    """
+
+    async def generate_input(row: list | tuple) -> dict:
+        try:
+            query_id, db_id, question, gold_query = row
+        except ValueError:
+            query_id = None
+            db_id, question, gold_query = row
+
+        heavydb = await get_connection(db_id)
+        tables = await aextract_tables_from_query(heavdb=heavydb, query=gold_query)
+
+        return {
+            "question": question,
+            "query": gold_query,
+            "heavydb": heavydb,
+            "tables": tables,
+            "query_id": query_id,
+        }
+
+    async for row in input_gen:
+        record_inputs = []
+        if row and isinstance(row, list):
+            if isinstance(row[0], list):
+                for chain_input in row:
+                    record_inputs.append(chain_input)
+            else:
+                record_inputs.append(row)
+
+            yield await asyncio.gather(*[generate_input(record) for record in record_inputs])
+
+
+async def write_cot_output_to_csv(
+    generator: AsyncGenerator,
+    gen_str: str,
+):
+    file_path = f"./gen/results/{gen_str}_queries.csv"
+    async with aiofiles.open(file_path, "a", newline="") as wf:
+        writer = AsyncWriter(wf, dialect="unix")
+        async for batch_rows in generator:
+            rows = []
+            print(f"Writing {len(batch_rows)} records...")
+            for row in batch_rows:
+                if query_id := row.get("query_id"):
+                    rows.append((query_id, row["db_id"], row["question"], row["query"], row["cot"]))
+                else:
+                    rows.append((row["db_id"], row["question"], row["query"], row["cot"]))  # type: ignore
+
+            await writer.writerows(rows=rows)
+
+    print(f"Rows written successfully, {file_path}")
+
+
+async def batched_generator(existing_gen: AsyncGenerator, batch_size: int = 10):
+    """
+    Helps to yeild content from generator function in batches.
+
+    Args:
+        existing_gen: Async Generator Function.
+        batch_size: Batch Size. Defaults to 10.
+
+    Yields:
+        lines in batches
+    """
+    batch_lines = []
+    async for line in existing_gen:
+        batch_lines.append(line)
+        if len(batch_lines) == batch_size:
+            yield batch_lines
+            batch_lines = []
+
+    # Yield any remaining lines that didn't fill a complete batch
+    if batch_lines:
+        yield batch_lines
+
+
+async def generate_cot(generator: AsyncGenerator, chain: Runnable, config: RunnableConfig | None = None):
+    """
+    Generator for generating chain of thougts.
+    """
+    async for chain_inputs_batch in generator:
+        print(f"Processing {len(chain_inputs_batch)} records...")
+        yield await chain.abatch(chain_inputs_batch, config=config)

@@ -22,7 +22,17 @@ from heavyiq.langchain.heavydb import heavydb_context
 from heavyiq.langchain.llms import LLMType, get_llm_by_type
 from heavyiq.logging_utils import get_heavyiq_logger
 
-from .utils import awrite_gen_results_header, awrite_gen_results_row, extract_tables_from_query, sql_rate_reply
+from .utils import (
+    awrite_gen_results_header,
+    awrite_gen_results_row,
+    batched_generator,
+    extract_tables_from_query,
+    generate_cot,
+    generate_cot_chain_input,
+    generate_record,
+    sql_rate_reply,
+    write_cot_output_to_csv,
+)
 
 warnings.filterwarnings("ignore")
 
@@ -242,3 +252,30 @@ async def run_config_model_on_questions(
     await asyncio.gather(*tasks, return_exceptions=True)
     results_path = f"./gen/results/{gen_str}_queries.csv"
     print(f"Generated queries: {results_path}")
+
+
+@gen.command()
+@coro
+@click.option("--gpt_model", type=str, default="gpt-3.5-turbo-16k", help="OpenAI GPT model to be used.")
+@click.option("--batch_size", type=int, default=20, help="Batch size")
+@click.argument("gen_dataset_csv", type=str)
+@click.pass_context  # type: ignore
+async def generate_chain_of_thoughts(ctx: click.Context, gen_dataset_csv: str, batch_size: int, gpt_model: str):
+    """
+    gen cli command responsible for generating Chain of Thoughts reasoning based on the input question and golden query.
+    """
+    from .chain.cot_chain import chain
+
+    logger = get_heavyiq_logger()
+    if not await run_in_threadpool(os.path.exists, gen_dataset_csv):
+        raise Exception(f"gen_dataset_csv does not exist: {gen_dataset_csv}")
+
+    gen_id = uuid4().hex[:8]
+    gen_str = f"gen_{gen_id}"
+    logger.info(f"Invoking generate_chain_of_thoughts with gen_id: {gen_id}")
+
+    record_generator = batched_generator(generate_record(gen_dataset_csv, gen_str), batch_size=batch_size)
+    chain_input_generator = generate_cot_chain_input(record_generator)
+    llm_config = {"configurable": {"llm_model": gpt_model}}
+    cot_generator = generate_cot(chain_input_generator, chain=chain, config=llm_config)  # type: ignore
+    await write_cot_output_to_csv(cot_generator, gen_str=gen_str)
