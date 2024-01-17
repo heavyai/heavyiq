@@ -6,6 +6,7 @@ from langchain.schema.runnable import ConfigurableField, RunnableLambda, Runnabl
 from typing_extensions import Any
 
 from heavyiq.config import get_config
+from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.utils import aget_table_info_wrt_token_limit
 
 raw_prompt = """
@@ -34,7 +35,7 @@ async def get_prompt(inputs: dict[str, Any]) -> ChatPromptTemplate:
     Gets the prompt.
     """
     heavydb, tables, question, query = (
-        inputs.get("heavydb"),
+        await HeavyDB.from_session_async(inputs["session"]),
         inputs.get("tables"),
         inputs.get("question"),
         inputs.get("query"),
@@ -59,8 +60,7 @@ async def format_output(inputs: dict) -> dict:
     Formats the final output.
     """
     chain_inputs = inputs["inputs"].copy()
-    heavydb = chain_inputs.pop("heavydb")
-    return {**chain_inputs, "cot": inputs["cot"], "db_id": heavydb._dbname}
+    return {**chain_inputs, "cot": inputs["cot"]}
 
 
 chain = (
@@ -69,7 +69,7 @@ chain = (
             {
                 "question": lambda x: x["question"],
                 "query": lambda x: x["query"],
-                "heavydb": lambda x: x["heavydb"],
+                "session": lambda x: x["session"],
                 "tables": lambda x: x["tables"],
             }
             | RunnableLambda(get_prompt)  # type: ignore

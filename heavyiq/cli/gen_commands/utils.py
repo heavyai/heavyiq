@@ -1,13 +1,8 @@
 import asyncio
-import csv
-import io
-import math
 import re
-from collections import Counter
 from itertools import permutations
 from typing import Any, Optional
 
-import aiocsv
 import aiofiles
 import numpy as np
 import pandas as pd
@@ -158,20 +153,20 @@ async def aextract_tables_from_query(heavdb: HeavyDB, query: str) -> list[str]:
     return list(set(tables))  # remove duplicates
 
 
-# A dict-mapping of database_name and the corresponding heavydb connection
-DB_NAME_AND_CONNECTION_MAPPING: dict[str, HeavyDB] = {}
+# A dict-mapping of database_name and the corresponding heavydb session id
+DB_NAME_AND_SESSION_ID_MAPPING: dict[str, HeavyDB] = {}
 
 
 async def get_connection(db_name: str) -> HeavyDB:
     """
     Get from or set connection to global dict and then return it.
     """
-    global DB_NAME_AND_CONNECTION_MAPPING
-    if db_name in DB_NAME_AND_CONNECTION_MAPPING:
-        return DB_NAME_AND_CONNECTION_MAPPING[db_name]
+    global DB_NAME_AND_SESSION_ID_MAPPING
+    if db_name in DB_NAME_AND_SESSION_ID_MAPPING:
+        return DB_NAME_AND_SESSION_ID_MAPPING[db_name]
 
-    db = await HeavyDB.from_env_async(db_name=db_name)
-    DB_NAME_AND_CONNECTION_MAPPING[db_name] = db
+    db = await HeavyDB.create_with_persistant_connection_async(db_name=db_name)
+    DB_NAME_AND_SESSION_ID_MAPPING[db_name] = db
     return db
 
 
@@ -208,7 +203,8 @@ async def generate_cot_chain_input(input_gen: AsyncGenerator):
         return {
             "question": question,
             "query": gold_query,
-            "heavydb": heavydb,
+            "db_id": db_id,
+            "session": heavydb._conn._session,
             "tables": tables,
             "query_id": query_id,
         }
