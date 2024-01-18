@@ -34,8 +34,12 @@ async def get_prompt(inputs: dict[str, Any]) -> ChatPromptTemplate:
     """
     Gets the prompt.
     """
-    heavydb, tables, question, query = (
-        await HeavyDB.from_session_async(inputs["session"]),
+    heavydb = None
+    if db := inputs.get("heavydb"):
+        heavydb = db
+    else:
+        heavydb = await HeavyDB.from_session_async(inputs["session"])
+    tables, question, query = (
         inputs.get("tables"),
         inputs.get("question"),
         inputs.get("query"),
@@ -69,7 +73,8 @@ chain = (
             {
                 "question": lambda x: x["question"],
                 "query": lambda x: x["query"],
-                "session": lambda x: x["session"],
+                "session": lambda x: x.get("session"),
+                "heavydb": lambda x: x.get("heavydb"),
                 "tables": lambda x: x["tables"],
             }
             | RunnableLambda(get_prompt)  # type: ignore

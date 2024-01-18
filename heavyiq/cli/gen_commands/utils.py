@@ -137,13 +137,11 @@ def extract_tables_from_query(con, query) -> list[str]:
     return list(set(tables))  # remove duplicates
 
 
-async def aextract_tables_from_query(heavdb: HeavyDB, query: str) -> list[str]:
+async def aextract_tables_from_query(heavydb: HeavyDB, query: str) -> list[str]:
     """
     Extract table names from SQL query async.
     """
-    explain_query = "EXPLAIN CALCITE " + query
-    query_plan = await run_in_threadpool(heavdb._conn.execute, explain_query)
-    query_plan = list(query_plan)[0][0]
+    query_plan = await heavydb.aget_calcite_query_plan(query)
     pattern = r"LogicalTableScan\(table=\[\[(.*?)\]\]\)"
     matches = re.findall(pattern, query_plan)
     tables = []
@@ -165,7 +163,7 @@ async def get_connection(db_name: str) -> HeavyDB:
     if db_name in DB_NAME_AND_SESSION_ID_MAPPING:
         return DB_NAME_AND_SESSION_ID_MAPPING[db_name]
 
-    db = await HeavyDB.create_with_persistant_connection_async(db_name=db_name)
+    db = await HeavyDB.create_with_persistant_connection_async(db_name=db_name, timeout=10)
     DB_NAME_AND_SESSION_ID_MAPPING[db_name] = db
     return db
 
@@ -198,19 +196,21 @@ async def generate_cot_chain_input(input_gen: AsyncGenerator):
             db_id, question, gold_query = row
 
         heavydb = await get_connection(db_id)
-        tables = await aextract_tables_from_query(heavdb=heavydb, query=gold_query)
+        tables = await aextract_tables_from_query(heavydb=heavydb, query=gold_query)
 
         return {
             "question": question,
             "query": gold_query,
             "db_id": db_id,
             "session": heavydb._conn._session,
+            "heavydb": heavydb,
             "tables": tables,
             "query_id": query_id,
         }
 
     async for row in input_gen:
         record_inputs = []
+        print(f"Generating chain inputs for {len(row)} records...")
         if row and isinstance(row, list):
             if isinstance(row[0], list):
                 for chain_input in row:
@@ -226,11 +226,13 @@ async def write_cot_output_to_csv(
     gen_str: str,
 ):
     file_path = f"./gen/results/{gen_str}_queries.csv"
+    total_rows = 0
     async with aiofiles.open(file_path, "a", newline="") as wf:
         writer = AsyncWriter(wf, dialect="unix")
         async for batch_rows in generator:
             rows = []
-            print(f"Writing {len(batch_rows)} records...")
+            row_count = len(batch_rows)
+            print(f"Writing {row_count} records...")
             for row in batch_rows:
                 if query_id := row.get("query_id"):
                     rows.append((query_id, row["db_id"], row["question"], row["query"], row["cot"]))
@@ -239,8 +241,9 @@ async def write_cot_output_to_csv(
 
             await writer.writerows(rows=rows)
             await wf.flush()
+            total_rows += row_count
 
-    print(f"Rows written successfully, {file_path}")
+    print(f"{total_rows} rows written successfully, {file_path}")
 
 
 async def batched_generator(existing_gen: AsyncGenerator, batch_size: int = 10):
