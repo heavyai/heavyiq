@@ -218,7 +218,7 @@ async def generate_cot_chain_input(input_gen: AsyncGenerator):
             else:
                 record_inputs.append(row)
 
-            yield await asyncio.gather(*[generate_input(record) for record in record_inputs])
+        yield await asyncio.gather(*[generate_input(record) for record in record_inputs])
 
 
 async def write_cot_output_to_csv(
@@ -238,6 +238,7 @@ async def write_cot_output_to_csv(
                     rows.append((row["db_id"], row["question"], row["query"], row["cot"]))  # type: ignore
 
             await writer.writerows(rows=rows)
+            await wf.flush()
 
     print(f"Rows written successfully, {file_path}")
 
