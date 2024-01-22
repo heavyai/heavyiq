@@ -1,6 +1,7 @@
 import asyncio
 import os
-from typing import Callable
+from functools import lru_cache
+from typing import Any, Callable
 
 from heavydb.exceptions import TDBException
 from langchain.base_language import BaseLanguageModel
@@ -93,11 +94,7 @@ def get_table_info_wrt_token_limit(
             {"include_samples": False, "include_top_k": False},
         ]
     else:
-        from transformers import LlamaTokenizer
-
-        tokenizer = LlamaTokenizer.from_pretrained(
-            "./heavyiq/langchain/llama_model", local_files_only=True, legacy=False
-        )
+        tokenizer = get_tokenizer()
         token_limit = llm.context_window - 306  # type: ignore # (256 response + 50 buffer)
 
         def token_counter(text: str) -> int:
@@ -141,17 +138,8 @@ async def aget_table_info_wrt_token_limit(
             {"include_samples": False, "include_top_k": False},
         ]
     else:
-        from transformers import LlamaTokenizer
-
-        tokenizer = LlamaTokenizer.from_pretrained(
-            "./heavyiq/langchain/llama_model", local_files_only=True, legacy=False
-        )
         token_limit = llm.context_window - 306  # type: ignore # (256 response + 50 buffer)
-
-        def token_counter(text: str) -> int:
-            """Token counter for the Llama model."""
-            return len(tokenizer.tokenize(text))
-
+        token_counter = custom_model_token_counter
         table_info_options = [
             {"include_samples": False},
             {"include_samples": False, "include_top_k": False},
@@ -206,14 +194,36 @@ async def apopulate_table_info_wrt_token_limit(
     return prompt.format_prompt(table_info=table_info)
 
 
+@lru_cache(maxsize=None)  # Cache the tokenizer
+def get_tokenizer() -> Any:
+    """
+    Get tokenizer from pretrained local files.
+    """
+    from transformers import LlamaTokenizer
+
+    return LlamaTokenizer.from_pretrained("./heavyiq/langchain/llama_model", local_files_only=True, legacy=False)
+
+
 def custom_model_token_counter(text: str) -> int:
     """
     Token counter method for custom models which helps to calculate tokens for the given text.
     """
-    from transformers import LlamaTokenizer
+    return len(get_tokenizer().tokenize(text))
 
-    tokenizer = LlamaTokenizer.from_pretrained("./heavyiq/langchain/llama_model", local_files_only=True, legacy=False)
-    return len(tokenizer.tokenize(text))
+
+def custom_model_tokenizer_encode(text: str) -> list[int]:
+    """
+    Encode text str into list of input ids.
+    """
+    # adds 0 as the first element of input_ids , so always decode the input_ids with skip_special_tokens=True
+    return get_tokenizer().encode(text)
+
+
+def custom_model_tokenizer_decode(token_ids: list[int]) -> str:
+    """
+    Decode list of input ids back to the original text.
+    """
+    return get_tokenizer().decode(token_ids, skip_special_tokens=True)
 
 
 async def aget_token_limit_and_token_counter_func_by_llm_with_table_options(
