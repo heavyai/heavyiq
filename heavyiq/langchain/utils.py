@@ -1,8 +1,10 @@
 import asyncio
 import os
-from functools import lru_cache
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
+from async_lru import alru_cache
+from cachetools import LRUCache, TTLCache, cached
+from fastapi.concurrency import run_in_threadpool
 from heavydb.exceptions import TDBException
 from langchain.base_language import BaseLanguageModel
 from langchain.prompts import BaseChatPromptTemplate, BasePromptTemplate
@@ -10,6 +12,7 @@ from langchain.schema.prompt import PromptValue
 
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
+from heavyiq.langchain.heavydb import get_db
 from heavyiq.langchain.llms import LLMType, get_vllm_model_name
 
 is_langsmith_active = False
@@ -31,6 +34,7 @@ def init_telemetrics() -> None:
     os.environ["ANONYMIZED_TELEMETRY"] = "false"
 
 
+@cached(cache=TTLCache(maxsize=30, ttl=60 * 10))
 def get_token_limit(model_name: str, response_tokens: int = 256) -> int:
     """
     Calculate the token limit for a given model.
@@ -117,9 +121,29 @@ def get_table_info_wrt_token_limit(
     return table_info
 
 
+@alru_cache(maxsize=127, typed=True, ttl=10)
+async def aget_table_info_from_cache_or_calculate(
+    session: str, tables: Sequence[str], include_samples: bool = True, include_top_k: bool = True
+) -> str:
+    """
+    Get tables info from cache or calculate based on the passed KW args.
+
+    Args:
+        session: valid HeavyDB session id
+        table: list of tables to get info for
+        include_samples: Whether to include samples on the table info. Defaults to True.
+        include_top_k: Whether to include top-k on the table info. Defaults to True.
+    """
+    heavydb = await get_db(session)
+    table_info = await heavydb.aget_table_info(
+        table_names=list(tables), include_samples=include_samples, include_top_k=include_top_k
+    )
+    return table_info
+
+
 async def aget_table_info_wrt_token_limit(
     llm: BaseLanguageModel,
-    heavydb: HeavyDB,
+    session: str,
     prompt: BasePromptTemplate | BaseChatPromptTemplate,
     table_names_to_use: list[str] | None,
     caller: LLMType = LLMType.NL_TO_SQL,
@@ -153,7 +177,8 @@ async def aget_table_info_wrt_token_limit(
 
     # decides whether to include top-k or not
     disable_top_k = False
-    available_text_column_count = await get_all_text_column_count(heavydb, table_names_to_use)
+    table_names_tuple = tuple(table_names_to_use)
+    available_text_column_count = await get_all_text_column_count(session, table_names_tuple)
     if available_text_column_count > top_k_max_str_column_count:
         disable_top_k = True
 
@@ -162,9 +187,11 @@ async def aget_table_info_wrt_token_limit(
             updated_options = {**options, "include_top_k": False}
         else:
             updated_options = options
-        table_info = await heavydb.aget_table_info(table_names=table_names_to_use, **updated_options)
+
+        table_info = await aget_table_info_from_cache_or_calculate(session, table_names_tuple, **updated_options)
         formatted_prompt = prompt.format(table_info=table_info)
-        if token_counter(formatted_prompt) <= token_limit:
+        prompt_tokens = await run_in_threadpool(token_counter, formatted_prompt)
+        if prompt_tokens <= token_limit:
             break
     else:  # executed if the loop finished normally (no break)
         raise RuntimeError("Couldn't find suitable prompt provided token limit")
@@ -189,12 +216,12 @@ async def apopulate_table_info_wrt_token_limit(
     heavydb: HeavyDB,
     table_names_to_use: list[str] | None,
 ) -> PromptValue:
-    table_info = await aget_table_info_wrt_token_limit(llm, heavydb, prompt, table_names_to_use)
+    table_info = await aget_table_info_wrt_token_limit(llm, heavydb._conn._session, prompt, table_names_to_use)
 
     return prompt.format_prompt(table_info=table_info)
 
 
-@lru_cache(maxsize=None)  # Cache the tokenizer
+@cached(cache=LRUCache(maxsize=3))  # Cache the tokenizer
 def get_tokenizer() -> Any:
     """
     Get tokenizer from pretrained local files.
@@ -273,11 +300,13 @@ async def aget_token_limit_and_token_counter_func_by_llm_with_table_options(
     return token_limit, token_counter, top_k_max_str_column_count, table_info_options
 
 
-async def get_all_text_column_count(heavydb: HeavyDB, tables: list[str]) -> int:
+@alru_cache(maxsize=127, typed=True, ttl=10)
+async def get_all_text_column_count(session: str, tables: Sequence[str]) -> int:
     """
     Returns the count of all the text columns available in the tables.
     """
     tasks = []
+    heavydb = await get_db(session)
     for table in tables:
         tasks.append(heavydb.aget_text_columns_count(table))
 
@@ -288,7 +317,7 @@ async def get_all_text_column_count(heavydb: HeavyDB, tables: list[str]) -> int:
 # but in modular form.
 # TODO: remove the old function and change this func name
 async def aget_table_info_for_nl_to_tables_prompt_wrt_token_limit(
-    llm: BaseLanguageModel, heavydb: HeavyDB, prompt: BasePromptTemplate, table_names_to_use: list[str]
+    llm: BaseLanguageModel, session: str, prompt: BasePromptTemplate, table_names_to_use: list[str]
 ) -> str:
     (
         token_limit,
@@ -298,8 +327,8 @@ async def aget_table_info_for_nl_to_tables_prompt_wrt_token_limit(
     ) = await aget_token_limit_and_token_counter_func_by_llm_with_table_options(llm)
 
     # decides whether to include top-k or not
-    disable_top_k = False
-    available_text_column_count = await get_all_text_column_count(heavydb, table_names_to_use)
+    disable_top_k, table_names_tuple = False, tuple(table_names_to_use)
+    available_text_column_count = await get_all_text_column_count(session, table_names_tuple)
     if available_text_column_count > top_k_max_str_column_count:
         disable_top_k = True
 
@@ -308,7 +337,7 @@ async def aget_table_info_for_nl_to_tables_prompt_wrt_token_limit(
             updated_options = {**options, "include_top_k": False}
         else:
             updated_options = options
-        table_info = await heavydb.aget_table_info(table_names=table_names_to_use, **updated_options)
+        table_info = await aget_table_info_from_cache_or_calculate(session, table_names_tuple, **updated_options)
         formatted_prompt = prompt.format(table_info=table_info)
         if token_counter(formatted_prompt) <= token_limit:
             break
@@ -327,7 +356,9 @@ async def apopulate_table_info_into_nl_to_tables_prompt(
     """
     Generates table info and then injects it into the given prompt.
     """
-    table_info = await aget_table_info_for_nl_to_tables_prompt_wrt_token_limit(llm, heavydb, prompt, table_names_to_use)
+    table_info = await aget_table_info_for_nl_to_tables_prompt_wrt_token_limit(
+        llm, heavydb._conn._session, prompt, table_names_to_use
+    )
 
     return prompt.format_prompt(table_info=table_info)
 
