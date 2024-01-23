@@ -10,7 +10,7 @@ from langchain.schema.prompt import PromptValue
 
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
-from heavyiq.langchain.llms import LLMType
+from heavyiq.langchain.llms import LLMType, get_vllm_model_name
 
 is_langsmith_active = False
 
@@ -199,9 +199,24 @@ def get_tokenizer() -> Any:
     """
     Get tokenizer from pretrained local files.
     """
-    from transformers import LlamaTokenizer
+    from transformers import AutoTokenizer, LlamaTokenizer
 
-    return LlamaTokenizer.from_pretrained("./heavyiq/langchain/llama_model", local_files_only=True, legacy=False)
+    from heavyiq.config import get_config
+
+    config = get_config()
+
+    model_name = get_vllm_model_name(api_base=config.custom_llm_api_base)
+    model_local_path: str
+    if "llama" in model_name:
+        tokenizer_cls = LlamaTokenizer
+        model_local_path = "./heavyiq/langchain/tokenizer_models/llama_model"
+    elif "deepseek" in model_name:
+        tokenizer_cls = AutoTokenizer
+        model_local_path = "./heavyiq/langchain/tokenizer_models/deepseek_model"
+    else:
+        raise ValueError("Unsupported model found for tokenization. Aavailable models are 'llama' and 'deepseek'.")
+
+    return tokenizer_cls.from_pretrained(model_local_path, local_files_only=True, legacy=False)
 
 
 def custom_model_token_counter(text: str) -> int:
@@ -215,7 +230,6 @@ def custom_model_tokenizer_encode(text: str) -> list[int]:
     """
     Encode text str into list of input ids.
     """
-    # adds 0 as the first element of input_ids , so always decode the input_ids with skip_special_tokens=True
     return get_tokenizer().encode(text)
 
 
@@ -223,6 +237,7 @@ def custom_model_tokenizer_decode(token_ids: list[int]) -> str:
     """
     Decode list of input ids back to the original text.
     """
+    # skip_special_tokens=True, else <｜begin▁of▁sentence｜> gets prepended
     return get_tokenizer().decode(token_ids, skip_special_tokens=True)
 
 
