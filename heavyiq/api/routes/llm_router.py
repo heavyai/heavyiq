@@ -1,8 +1,13 @@
 from fastapi import APIRouter
 from fastapi.concurrency import run_in_threadpool
+from langchain.cache import InMemoryCache
+from langchain.globals import set_llm_cache
 
 from heavyiq.api.models import CallLLMRequest, CallLLMResponse
 from heavyiq.langchain.llms import get_llm_by_type
+
+cache_instance = InMemoryCache()
+set_llm_cache(cache_instance)
 
 llmrouter = APIRouter()
 
