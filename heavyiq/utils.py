@@ -97,8 +97,8 @@ VT = TypeVar("VT")  # Value type
 
 
 class SharedDictSingleton(Generic[KT, VT]):
-    _instance = None
-    _lock = asyncio.Lock()
+    _instance: "SharedDictSingleton[KT, VT]" = None
+    _lock: asyncio.Lock = asyncio.Lock()
 
     def __new__(cls):
         if cls._instance is None:

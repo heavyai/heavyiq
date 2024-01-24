@@ -1,10 +1,11 @@
 import asyncio
 import os
-from typing import Callable
+from typing import Any, Callable
 
 from heavydb.exceptions import TDBException
 from langchain.base_language import BaseLanguageModel
 from langchain.prompts import BaseChatPromptTemplate, BasePromptTemplate
+from langchain.schema.cache import RETURN_VAL_TYPE, BaseCache
 from langchain.schema.prompt import PromptValue
 
 from heavyiq.config import get_config
@@ -315,3 +316,25 @@ def extract_error_message_from_exception(exc: Exception) -> str:
         return exc.error_msg
 
     return str(exc)
+
+
+class InMemoryLLMCache(BaseCache):
+    """
+    Custom in-memory cache class used to store LLM results.
+    """
+
+    def __init__(self) -> None:
+        """Initialize with empty cache."""
+        self._cache: dict[tuple[str, str], RETURN_VAL_TYPE] = {}
+
+    def lookup(self, prompt: str, llm_string: str) -> RETURN_VAL_TYPE | None:
+        """Look up based on prompt and llm_string."""
+        return self._cache.get((prompt, llm_string), None)
+
+    def update(self, prompt: str, llm_string: str, return_val: RETURN_VAL_TYPE) -> None:
+        """Update cache based on prompt and llm_string."""
+        self._cache[(prompt, llm_string)] = return_val
+
+    def clear(self, **kwargs: Any) -> None:
+        """Clear cache."""
+        self._cache = {}
