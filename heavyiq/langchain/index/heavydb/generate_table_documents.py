@@ -188,6 +188,16 @@ async def acreate_and_write_table_custom_document(heavydb: HeavyDB, table: str) 
     logger.info(f"Done writing table custom document {file_path}")
 
 
+async def agenerate_table_document(heavydb: HeavyDB, table: str) -> None:
+    """
+    Responsible for generating table document in-respective of the llm model types (openai or custom).
+    """
+    coro = (
+        acreate_and_write_table_custom_document if is_using_custom_trained_llm() else acreate_and_write_table_document
+    )
+    await coro(heavydb, table)
+
+
 def write_to_file(file_name: str, content: str):
     """
     Writes the given content to a specified file.
@@ -253,12 +263,12 @@ async def agenerate_table_documents(session: str | None = None) -> list[str]:
     table_names_to_generate = heavydb.get_usable_table_names()
 
     tasks = []
-    coro = (
-        acreate_and_write_table_custom_document if is_using_custom_trained_llm() else acreate_and_write_table_document
-    )
 
     tasks.extend(
-        [asyncio.create_task(coro(heavydb=heavydb, table=table_name)) for table_name in table_names_to_generate]
+        [
+            asyncio.create_task(agenerate_table_document(heavydb=heavydb, table=table_name))
+            for table_name in table_names_to_generate
+        ]
     )
 
     await asyncio.gather(*tasks)

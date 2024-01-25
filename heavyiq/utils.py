@@ -116,11 +116,24 @@ class SharedDictSingleton(Generic[KT, VT]):
         async with self._lock:
             self._shared_dict[key] = value  # type: ignore
 
+    async def delete(self, key: KT) -> None:
+        async with self._lock:
+            try:
+                del self._shared_dict[key]  # type: ignore
+            except KeyError:
+                pass
+
     def sget(self, key: KT) -> Any:  # sync get where manager.Dict().get and put are atomic, thus avoids race-conditions
         return self._shared_dict.get(key)  # type: ignore
 
     def sput(self, key: KT, value: VT) -> None:
         self._shared_dict[key] = value  # type: ignore
+
+    def sdelete(self, key: KT) -> None:
+        try:
+            del self._shared_dict[key]  # type: ignore
+        except KeyError:
+            pass
 
 
 class LRUCache(Generic[KT, VT]):

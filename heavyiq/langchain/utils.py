@@ -14,6 +14,8 @@ from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.heavydb import get_db
 from heavyiq.langchain.llms import LLMType, get_vllm_model_name
+from heavyiq.logging_utils import get_heavyiq_logger
+from heavyiq.utils import SharedDictSingleton
 
 is_langsmith_active = False
 
@@ -121,9 +123,9 @@ def get_table_info_wrt_token_limit(
     return table_info
 
 
-@alru_cache(maxsize=127, typed=True, ttl=10)
+@alru_cache(maxsize=127, ttl=60 * 10)  # typed=True and passing kwargs seems buggy in async lru
 async def aget_table_info_from_cache_or_calculate(
-    session: str, tables: Sequence[str], include_samples: bool = True, include_top_k: bool = True
+    session: str, tables: Sequence[str], include_samples: bool, include_top_k: bool
 ) -> str:
     """
     Get tables info from cache or calculate based on the passed KW args.
@@ -139,6 +141,59 @@ async def aget_table_info_from_cache_or_calculate(
         table_names=list(tables), include_samples=include_samples, include_top_k=include_top_k
     )
     return table_info
+
+
+async def update_table_index_on_schema_change_callback(heavydb: HeavyDB, table: str):
+    """
+    Callback coroutine which gets executed on table schema change.
+    This function helps re-genrate table document and then reindex it's metadata on chromadb vectorstore index.
+    """
+    from heavyiq.langchain.index.heavydb import aget_heavydb_index
+
+    logger, shared_dict = get_heavyiq_logger(), SharedDictSingleton()  # type: ignore
+    key = f"is_background_index_update_for_{table}_table_in_progress"
+    has_key = await shared_dict.get(key)
+
+    if has_key:
+        logger.debug(f"An index update is already in progress for {table} table, so skipping.")
+        return
+
+    try:
+        await shared_dict.put(key, True)
+        await asyncio.sleep(1)
+        index = await aget_heavydb_index()
+        logger.debug("Regenerating the table document and subsequently re-indexing it in ChromaDB VectorStore.")
+        await index.agenerate_and_reindex_table_document(heavydb, table)
+    except Exception as e:
+        logger.exception(f"Failed to update index for {table} table, {e}")
+    else:
+        logger.debug(f"Successfully re-indexed the document for the {table} table on ChormaDB VectorStore.")
+    finally:
+        await shared_dict.delete(key)
+
+
+@alru_cache(maxsize=127, ttl=60 * 10)
+async def refresh_cache_for_tables(session: str, tables: Sequence[str]):
+    """
+    Check and refresh caches asscociated with the tables.
+    """
+    heavydb = await get_db(session)
+    do_refresh_results = await asyncio.gather(*[heavydb.should_refresh_table_cache(table) for table in tables])
+    for table, refresh_status in zip(tables, do_refresh_results):
+        if refresh_status:
+            # schema change detected
+            await asyncio.gather(
+                heavydb.delete_table_cache(table),
+                heavydb.trigger_table_schema_change_callback(
+                    table, callback=update_table_index_on_schema_change_callback
+                ),
+            )
+
+    # if any of the table schema gets changed, then clear it's table_info cache
+    if True in do_refresh_results:
+        options_list = [(True, True), (True, False), (False, True), (False, False)]
+        for x, y in options_list:
+            aget_table_info_from_cache_or_calculate.cache_invalidate(heavydb._conn._session, tables, x, y)
 
 
 async def aget_table_info_wrt_token_limit(
@@ -175,20 +230,25 @@ async def aget_table_info_wrt_token_limit(
         else config.top_k_max_str_col_count_nl_to_sql
     )
 
+    # refresh-cache
+    table_names_tuple = tuple(table_names_to_use)
+    await refresh_cache_for_tables(session, table_names_tuple)
+
     # decides whether to include top-k or not
     disable_top_k = False
-    table_names_tuple = tuple(table_names_to_use)
     available_text_column_count = await get_all_text_column_count(session, table_names_tuple)
     if available_text_column_count > top_k_max_str_column_count:
         disable_top_k = True
 
     for options in table_info_options:
+        include_samples = options.get("include_samples", True)
+        include_top_k = options.get("include_top_k", True)
         if disable_top_k:
-            updated_options = {**options, "include_top_k": False}
-        else:
-            updated_options = options
+            include_top_k = False
 
-        table_info = await aget_table_info_from_cache_or_calculate(session, table_names_tuple, **updated_options)
+        table_info = await aget_table_info_from_cache_or_calculate(
+            session, table_names_tuple, include_samples, include_top_k
+        )
         formatted_prompt = prompt.format(table_info=table_info)
         prompt_tokens = await run_in_threadpool(token_counter, formatted_prompt)
         if prompt_tokens <= token_limit:
@@ -300,7 +360,7 @@ async def aget_token_limit_and_token_counter_func_by_llm_with_table_options(
     return token_limit, token_counter, top_k_max_str_column_count, table_info_options
 
 
-@alru_cache(maxsize=127, typed=True, ttl=10)
+@alru_cache(maxsize=127, ttl=60 * 10)
 async def get_all_text_column_count(session: str, tables: Sequence[str]) -> int:
     """
     Returns the count of all the text columns available in the tables.
@@ -326,8 +386,12 @@ async def aget_table_info_for_nl_to_tables_prompt_wrt_token_limit(
         table_info_options,
     ) = await aget_token_limit_and_token_counter_func_by_llm_with_table_options(llm)
 
+    # refresh-cache
+    table_names_tuple = tuple(table_names_to_use)
+    await refresh_cache_for_tables(session, table_names_tuple)
+
     # decides whether to include top-k or not
-    disable_top_k, table_names_tuple = False, tuple(table_names_to_use)
+    disable_top_k = False
     available_text_column_count = await get_all_text_column_count(session, table_names_tuple)
     if available_text_column_count > top_k_max_str_column_count:
         disable_top_k = True
