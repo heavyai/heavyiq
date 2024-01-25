@@ -55,10 +55,9 @@ async def get_table_info(inputs: dict) -> str:
     prompt_rbl = nl_to_tables_prompt_rbl
     partial_inputs = {"input": inputs["question"]}
 
-    heavydb = await get_db(inputs["session_id"])
     partial_gen_sql_prompt = get_value_from_runnable_binding(prompt_rbl).partial(**partial_inputs)  # type: ignore
     table_info = await aget_table_info_wrt_token_limit(
-        get_value_from_runnable_binding(nl_to_tables_llm_rbl), heavydb, partial_gen_sql_prompt, inputs["tables"], caller=LLMType.NL_TO_TABLES  # type: ignore
+        get_value_from_runnable_binding(nl_to_tables_llm_rbl), inputs["session_id"], partial_gen_sql_prompt, inputs["tables"], caller=LLMType.NL_TO_TABLES  # type: ignore
     )
     return table_info
 

@@ -1,9 +1,9 @@
 import time
 from enum import Enum
-from functools import lru_cache
 from typing import Any
 
 import requests
+from cachetools import LRUCache, TTLCache, cached
 from langchain.chat_models import AzureChatOpenAI, ChatOpenAI
 from langchain.chat_models.base import BaseChatModel
 from langchain.llms import AzureOpenAI
@@ -21,6 +21,7 @@ class LLMType(Enum):
     NL_TO_SQL = "nl_to_sql"
     SQL_TO_ANSWER = "sql_to_answer"
     NL_TO_TABLES = "nl_to_tables"
+    INSTRUCT = "instruct"  # mainly used on /call-llm endpoint to resolve general instructions
 
 
 def is_using_custom_trained_llm() -> bool:
@@ -28,37 +29,24 @@ def is_using_custom_trained_llm() -> bool:
     return config.custom_llm_type in ["API", "API_VLLM"]
 
 
+@cached(
+    cache=TTLCache(maxsize=3, ttl=60 * 10)
+)  # a max of 3 unique calls can be cached at a time and each can live for 10 minutes
 def get_vllm_model_name(api_base: str) -> str:
     """
     Get VLLM model name either from cache or from remote endpoint.
     """
     logger = get_heavyiq_logger()
-    shared_dict_instance: SharedDictSingleton | None = SharedDictSingleton._instance
-    model_name_key, expiry_key, ttl = "VLLM_MODEL_NAME", "VLLM_MODEL_NAME_EXPIRES_AT", 60
-    if (
-        shared_dict_instance
-        and (vllm_model_name_expires_at := shared_dict_instance.sget(expiry_key))
-        and (vllm_model_name := shared_dict_instance.sget(model_name_key))
-    ):
-        # check for the time expired or not
-        current_time = int(time.time())
-        if current_time < vllm_model_name_expires_at:
-            # return the model name from cache
-            logger.debug("Getting VLLM model name from cache.")
-            return vllm_model_name
 
     logger.debug("Getting VLLM model name.")
     response = requests.get(f"{api_base}/models", timeout=10)
     response.raise_for_status()
     model_name = response.json()["data"][0]["id"]
-    if shared_dict_instance:
-        shared_dict_instance.sput(expiry_key, int(time.time()) + ttl)
-        shared_dict_instance.sput(model_name_key, model_name)
 
     return model_name
 
 
-@lru_cache
+@cached(cache=LRUCache(maxsize=5))  # only four options availabe for LLMType, so set it to 5
 def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str, Any]]:
     config = get_config()
     # by default n was set to 1, so no need for passing n as llm kwargs otherwise if we need to
@@ -75,6 +63,9 @@ def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str
     return kwargs, model_kwargs
 
 
+@cached(
+    cache=TTLCache(maxsize=20, ttl=60 * 10)
+)  # a max of 20 unique calls can be cached at a time and each can live for 10 minutes
 def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
     """
     Gets the relevant instantiated LLM class by llm type.
@@ -88,6 +79,7 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
             LLMType.NL_TO_SQL: config.openai_gpt_model_nl_to_sql,
             LLMType.SQL_TO_ANSWER: config.openai_gpt_model_sql_to_answer,
             LLMType.NL_TO_TABLES: config.openai_gpt_model_nl_to_tables,
+            LLMType.INSTRUCT: config.openai_gpt_model_instruct,
         }
         model_name: str = openai_llm_mapping[LLMType.DEFAULT] if openai_llm_mapping[model_type] is None else openai_llm_mapping[model_type]  # type: ignore
         return get_openai_llm_by_model_name(model=model_name, **kwargs)
@@ -103,6 +95,7 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
                 config.custom_llm_api_nl_to_tables_base,
                 config.custom_llm_api_nl_to_tables_context_window,
             ),
+            LLMType.INSTRUCT: (config.custom_llm_api_instruct_base, config.custom_llm_api_instruct_context_window),
         }
         api_base, context_window = (
             custom_llm_mapping[LLMType.DEFAULT]

@@ -11,6 +11,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     openai_gpt_model_nl_to_sql: Optional[str] = None  # LLMType.NL_TO_SQL
     openai_gpt_model_sql_to_answer: Optional[str] = None  # LLMType.SQL_TO_ANSWER
     openai_gpt_model_nl_to_tables: Optional[str] = None  # LLMType.NL_TO_TABLES
+    openai_gpt_model_instruct: Optional[str] = None  # LLMType.INSTRUCT
     max_fields_limit_sql_to_answer: int = 20  # LLMType.SQL_TO_ANSWER
     """Max number of fields (rows x columns) allowed to pass onto sql_to_answer llm"""
     heavydb_dbname: Optional[str] = None
@@ -54,6 +55,10 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     custom_llm_api_sql_to_answer_context_window: int = 8192  # LLMType.SQL_TO_ANSWER
     custom_llm_api_nl_to_tables_base: Optional[str] = None  # LLMType.NL_TO_TABLES
     custom_llm_api_nl_to_tables_context_window: int = 8192  # LLMType.NL_TO_TABLES
+    custom_llm_api_instruct_base: Optional[str] = None  # LLMType.INSTRUCT
+    custom_llm_api_instruct_context_window: int = 8192  # LLMType.INSTRUCT
+    custom_llm_api_instruct_prompt_start_token: str = "<|prompt|>\n"
+    custom_llm_api_instruct_prompt_end_token: str = "\n<|answer|>\n"
     custom_llm_api_vllm_beam_width: int = 2
     custom_llm_api_vllm_max_tokens: int = 512
     custom_llm_azure_openai_api_version: str = "2023-03-15-preview"

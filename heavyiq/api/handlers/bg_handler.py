@@ -4,7 +4,7 @@ from enum import Enum, auto
 from fastapi import BackgroundTasks, Request
 
 from heavyiq.api.models import UpdateIndexRequest, UpdateIndexResponse
-from heavyiq.langchain.index.heavydb import acreate_index_if_nonexistent
+from heavyiq.langchain.index.heavydb import aget_heavydb_index
 from heavyiq.logging_utils import _get_access_logger, get_heavyiq_logger
 from heavyiq.utils import SharedDictSingleton
 
@@ -30,7 +30,7 @@ async def start_update_index_background_task(shared_dict: SharedDictSingleton, k
     try:
         # sleep is necessary here, which pauses the current task for specific time, allowing other task to run in the meantime
         await asyncio.sleep(1)
-        await acreate_index_if_nonexistent(session)
+        await aget_heavydb_index(session)
         logger.debug("Background Index Update completed successfully.")
     except Exception as e:
         logger.exception(f"Failed to update index, {e}")
