@@ -1,14 +1,17 @@
 from typing import Optional
 
 from chromadb.api.types import Where
+from fastapi.concurrency import run_in_threadpool
 from langchain.schema import BaseRetriever, Document
 
 from heavyiq.langchain.chains import AskHeavyDBMetadataIndexChain, SQLMetadataQuestionTransformerChain
+from heavyiq.langchain.heavydb import HeavyDB
 from heavyiq.langchain.llms import get_llm
 from heavyiq.langchain.logging import log_chain_call
 
 from ..utils import HeavyIQIndexWrapper, SearchType
-from .utils import apply_retriever_filter, read_table_documents
+from .generate_table_documents import agenerate_table_document
+from .utils import apply_retriever_filter, aread_table_documents, read_table_documents
 
 
 class HeavyDBMetadataIndex(HeavyIQIndexWrapper):
@@ -125,6 +128,20 @@ class HeavyDBMetadataIndex(HeavyIQIndexWrapper):
         self.vectorstore._collection.delete(where=where)
         sub_docs = self.text_splitter.split_documents(docs)
         self.vectorstore.add_documents(sub_docs)
+
+    async def agenerate_and_reindex_table_document(self, heavydb: HeavyDB, table: str) -> None:
+        """
+        Coroutine responsible for generating a document for a table, regardless of its existence,
+        and subsequently reindexing the document on ChromaDB VectorStore.
+        """
+        await agenerate_table_document(heavydb=heavydb, table=table)
+        docs = [doc async for doc in aread_table_documents(include=[table])]
+        if len(docs) == 0:
+            raise Exception(f"No document found for table {table}")
+        where: Where = {"source": table}
+        await run_in_threadpool(self.vectorstore._collection.delete, where=where)
+        sub_docs = await self.text_splitter.atransform_documents(docs)
+        await self.vectorstore.aadd_documents(sub_docs)  # type: ignore
 
     def as_retriever(
         self,

@@ -82,6 +82,9 @@ class HeavyDB:
         self.lock = Lock()
         self.alock = asyncio.Lock()
         self._dbname = self._conn._dbname
+        self._table_schema_change_callback: Callable[
+            ["HeavyDB", str], None
+        ] | None = None  # callback which deals with the table schema change
         """Async lock ensures exactly one coroutine was allowed to access a shared resource (db) at a time."""
 
         self._all_tables = set(self._conn.get_tables())
@@ -117,6 +120,14 @@ class HeavyDB:
         if not self._dbname:
             # connection established from session, so grab the session details
             self._dbname = self._conn._client.get_session_info(self._conn._session).database
+
+    @property
+    def table_schema_change_callback(self) -> Callable:
+        return self._table_schema_change_callback
+
+    @table_schema_change_callback.setter
+    def table_schema_change_callback(self, callback: Callable | None):
+        self._table_schema_change_callback = callback
 
     def __del__(self):
         try:
@@ -633,7 +644,7 @@ class HeavyDB:
         self.logger.debug(f"Table {table} schema changed, invalidating table caches...")
         return True
 
-    def delete_table_cache(self, table: str) -> None:
+    async def delete_table_cache(self, table: str) -> None:
         """
         Deletes all the cache entries associated with a particular table which includes top-k, sample_rows, schema, etc.
         """
@@ -645,12 +656,21 @@ class HeavyDB:
         self.table_text_columns_count_cache.delete(cache_key)
         self.table_total_row_count_cache.delete(cache_key)
 
+    async def trigger_table_schema_change_callback(self, table: str, callback: Callable | None = None):
+        schema_change_callback = callback or self.table_schema_change_callback
+        if schema_change_callback:
+            # run the callback as background task
+            self.logger.debug(f"Schema change detected, callback initiated for {table} table.")
+            asyncio.create_task(schema_change_callback(self, table))
+
     async def check_and_invalidate_table_cache(self, table: str) -> None:
         """
         Checks for table schema changes and invalidates the table caches accordingly.
+        It also triggers the callback with the corresponding table name.
         """
         if await self.should_refresh_table_cache(table):
-            self.delete_table_cache(table)
+            await self.delete_table_cache(table)
+            await self.trigger_table_schema_change_callback(table)
 
     async def _aget_raw_table_schema(self, table: str) -> str:
         """
@@ -812,7 +832,10 @@ class HeavyDB:
         if self._custom_table_info and table_name in self._custom_table_info:
             return self._custom_table_info[table_name]
 
-        await self.check_and_invalidate_table_cache(table_name)
+        # It's not the right method to invoke table schema change callback through check_and_invalidate_table_cache method
+        # since aget_single_table_info can be called many times upon prompt generation in-order to get the desired table_info
+        # within the context length
+        # await self.check_and_invalidate_table_cache(table_name)
 
         tasks = [self.aget_table_schema(table_name)]
         if include_samples and self._sample_rows_in_table_info:
