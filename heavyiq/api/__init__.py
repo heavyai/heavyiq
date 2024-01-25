@@ -5,15 +5,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from heavydb.exceptions import Error as HeavyDBError  # type: ignore
+from langchain.globals import set_llm_cache
 from starlette.exceptions import HTTPException
 
 from heavyiq.api.handlers import exception_handler as exh
 from heavyiq.api.middlewares import AsyncLoggingMiddleware
 from heavyiq.api.models.error import ErrorResponse
 from heavyiq.api.routes import bgrouter, defaultrouter, iqrouter, lcelrouter, llmrouter, streamrouter
-from heavyiq.config import get_config
+from heavyiq.config import HeavyIQConfig, get_config
 from heavyiq.langchain.exceptions import GenerateTableMetadataException, NLtoAnswerException, NLtoSQLException
-from heavyiq.langchain.utils import init_telemetrics
+from heavyiq.langchain.utils import InMemoryLLMCache, init_telemetrics
 from heavyiq.logging_utils import get_heavyiq_logger, init_logs
 from heavyiq.utils import SharedDictSingleton
 
@@ -24,7 +25,7 @@ def stripped_down_api() -> FastAPI:
     return app
 
 
-def app_initialize():
+def app_initialize(config: HeavyIQConfig):
     """
     App initialization code which get excuted before gunicorn process fork upon using `--preload` option.
     """
@@ -37,7 +38,11 @@ def app_initialize():
 
     # w.r.t memory into consideration, we don't need to initialize/download HF model embeddings at the first place(ie. before process fork).
     # We could make it happen on the fork/child process since the models are going to be stored inside a cache dir.
-    # and for the next time, HF model should be loaded from then cache dir itself.
+    # and for the next time, HF model should be loaded from the cache dir itself.
+
+    # LLM Cache
+    if config.enable_llm_cache:
+        set_llm_cache(InMemoryLLMCache())
 
 
 def create_app(config_path: str = "./config.toml") -> FastAPI:
@@ -61,7 +66,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
 
     app = FastAPI(title="HeavyIQ")
 
-    app_initialize()
+    app_initialize(config)
 
     cors_origins = ["http://localhost"]
 

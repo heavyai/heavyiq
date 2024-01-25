@@ -8,9 +8,10 @@ from fastapi.concurrency import run_in_threadpool
 from heavydb.exceptions import TDBException
 from langchain.base_language import BaseLanguageModel
 from langchain.prompts import BaseChatPromptTemplate, BasePromptTemplate
+from langchain.schema.cache import RETURN_VAL_TYPE, BaseCache
 from langchain.schema.prompt import PromptValue
 
-from heavyiq.config import get_config
+from heavyiq.config import HeavyIQConfig, get_config
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.heavydb import get_db
 from heavyiq.langchain.llms import LLMType, get_vllm_model_name
@@ -397,11 +398,13 @@ async def aget_table_info_for_nl_to_tables_prompt_wrt_token_limit(
         disable_top_k = True
 
     for options in table_info_options:
+        include_samples = options.get("include_samples", True)
+        include_top_k = options.get("include_top_k", True)
         if disable_top_k:
-            updated_options = {**options, "include_top_k": False}
-        else:
-            updated_options = options
-        table_info = await aget_table_info_from_cache_or_calculate(session, table_names_tuple, **updated_options)
+            include_top_k = False
+        table_info = await aget_table_info_from_cache_or_calculate(
+            session, table_names_tuple, include_samples, include_top_k
+        )
         formatted_prompt = prompt.format(table_info=table_info)
         if token_counter(formatted_prompt) <= token_limit:
             break
@@ -435,3 +438,38 @@ def extract_error_message_from_exception(exc: Exception) -> str:
         return exc.error_msg
 
     return str(exc)
+
+
+class InMemoryLLMCache(BaseCache):
+    """
+    Custom in-memory cache class used to store LLM results.
+    """
+
+    def __init__(self) -> None:
+        """Initialize with empty cache."""
+        self._cache: dict[tuple[str, str], RETURN_VAL_TYPE] = {}
+        self._config: HeavyIQConfig = get_config()
+
+    def _is_instruct_prompt(self, prompt: str) -> bool:
+        """
+        Checks whether the prompt is built up for INSTRUCT model or not.
+        """
+        if prompt.startswith(self._config.custom_llm_api_instruct_prompt_start_token):
+            return True
+        return False
+
+    def lookup(self, prompt: str, llm_string: str) -> RETURN_VAL_TYPE | None:
+        """Look up based on prompt and llm_string."""
+        if self._is_instruct_prompt:
+            return self._cache.get((prompt, llm_string), None)
+        return None
+
+    def update(self, prompt: str, llm_string: str, return_val: RETURN_VAL_TYPE) -> None:
+        """Update cache based on prompt and llm_string."""
+        if self._is_instruct_prompt:
+            self._cache[(prompt, llm_string)] = return_val
+        return None
+
+    def clear(self, **kwargs: Any) -> None:
+        """Clear cache."""
+        self._cache = {}
