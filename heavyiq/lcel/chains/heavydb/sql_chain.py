@@ -45,10 +45,9 @@ async def get_table_info(sql_chain_inputs: dict) -> str:
     if on_retry:
         partial_inputs.update({"sql_cmd": sql_chain_inputs["sql_cmd"], "error": sql_chain_inputs["error"]})  # type: ignore
 
-    heavydb = await get_db(sql_chain_inputs["session_id"])
     partial_gen_sql_prompt = get_value_from_runnable_binding(prompt_rbl).partial(**partial_inputs)  # type: ignore
     table_info = await aget_table_info_wrt_token_limit(
-        get_value_from_runnable_binding(nl_to_sql_llm_rbl), heavydb, partial_gen_sql_prompt, sql_chain_inputs["tables"]  # type: ignore
+        get_value_from_runnable_binding(nl_to_sql_llm_rbl), sql_chain_inputs["session_id"], partial_gen_sql_prompt, sql_chain_inputs["tables"]  # type: ignore
     )
     return table_info
 

@@ -22,6 +22,6 @@ def get_heavydb_index() -> HeavyDBMetadataIndex:
     return create_index_if_nonexistent()
 
 
-@alru_cache(typed=True)
+@alru_cache()
 async def aget_heavydb_index(session: str | None = None) -> HeavyDBMetadataIndex:
     return await acreate_index_if_nonexistent(session=session)

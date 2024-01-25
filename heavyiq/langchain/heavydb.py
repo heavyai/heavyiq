@@ -14,12 +14,12 @@ from threading import Lock
 from typing import TYPE_CHECKING, Any, Callable, Coroutine, Optional, TypedDict
 
 import anyio
-from async_lru import alru_cache
 from heavyai import Connection, connect
 from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
-from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
+from heavyiq.utils import (LRUCache, calc_query_stats, is_destructive_sql,
+                           rate_sql_complexity, strip_sql_comments)
 
 if TYPE_CHECKING:
     from heavydb._parsers import ColumnDetails
@@ -820,7 +820,6 @@ class HeavyDB:
         self.logger.debug(f"Got top k values for table {table_name}")
         return top_k_strings
 
-    @alru_cache(typed=True)
     async def aget_single_table_info(
         self, table_name: str, include_samples: bool = True, include_top_k: bool = True
     ) -> str:
