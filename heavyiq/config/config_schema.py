@@ -79,7 +79,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     include_samples_in_custom_table_document_generation: bool = False
     include_top_k_in_custom_table_document_generation: bool = True
     # nl to sql max query retries
-    max_retries_nl_to_sql: int = 3
+    max_retries_nl_to_sql: int = 2
 
 
 class AppConfig(OverrideBaseConfig):  # type: ignore
