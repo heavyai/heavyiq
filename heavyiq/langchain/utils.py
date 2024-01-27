@@ -460,13 +460,13 @@ class InMemoryLLMCache(BaseCache):
 
     def lookup(self, prompt: str, llm_string: str) -> RETURN_VAL_TYPE | None:
         """Look up based on prompt and llm_string."""
-        if self._is_instruct_prompt:
+        if self._is_instruct_prompt(prompt):
             return self._cache.get((prompt, llm_string), None)
         return None
 
     def update(self, prompt: str, llm_string: str, return_val: RETURN_VAL_TYPE) -> None:
         """Update cache based on prompt and llm_string."""
-        if self._is_instruct_prompt:
+        if self._is_instruct_prompt(prompt):
             self._cache[(prompt, llm_string)] = return_val
         return None
 
