@@ -19,7 +19,7 @@ WORKDIR /usr/src/app
 COPY --from=obfuscator /usr/src/app/dist/ ./
 COPY --from=obfuscator /usr/src/app/requirements.txt ./requirements.txt
 COPY --from=obfuscator /usr/src/app/config.toml ./config.toml
-COPY --from=obfuscator /usr/src/app/heavyiq/langchain/llama_model/ ./heavyiq/langchain/llama_model/
+COPY --from=obfuscator /usr/src/app/heavyiq/langchain/tokenizer_models/ ./heavyiq/langchain/tokenizer_models/
 RUN pip install --no-cache-dir --upgrade -r ./requirements.txt
 
 EXPOSE 8000
