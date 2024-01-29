@@ -117,3 +117,21 @@ def test_should_pass_lcel_answer_endpoint(heavyiq_config, client, session_id):
     assert response_json["sql"]
     assert response_json["sql_result"]
     assert response_json["sql_complexity"] == 3
+
+
+@override_config
+def test_should_pass_call_llm_endpoint(heavyiq_config, client):
+    """
+    Test LCEL answer endpoint.
+    """
+
+    payload = {
+        "question": "Return only the name of the capital for the following state, Idaho",
+        "temperature": 0.0,
+        "max_tokens": 256,
+        "stop": ["is the capital"],
+    }
+    response = client.post("/llm/call-llm", json=payload)
+    assert response.status_code == 200
+    response_json = response.json()
+    assert response_json["response"] == "Boise"
