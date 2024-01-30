@@ -64,6 +64,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     custom_llm_azure_openai_api_version: str = "2023-03-15-preview"
     custom_llm_azure_openai_api_base: str = ""
     custom_llm_azure_deployment_name: str = ""
+    enable_vllm_prefix_cache: bool = True
+    """Enables VLLM's prefix caching feature."""
     # logprobs
     enable_logprobs: bool = False
     custom_llm_logprobs_limit: int = 1
