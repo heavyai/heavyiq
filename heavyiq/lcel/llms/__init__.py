@@ -40,15 +40,15 @@ class LLMRunnableBinding(RunnableBinding):
     async def ainvoke(self, input: StringPromptValue, config: RunnableConfig | None = None, **kwargs) -> Any:
         # check nl_to_sql llm call or not
         if (
-            self.config["configurable"]["llm"] == "nl_to_sql"
+            self.config["configurable"]["llm"] in ["nl_to_sql", "nl_to_tables"]
             and global_config.enable_vllm_prefix_cache
             and global_config.custom_llm_type == "API_VLLM"
         ):
             # check for prefix caching enabled or not
             text = input.to_string()
             # split input prompt value to prefix and question
-            prefix, completion = re.split(r"(?<=question:)\n", text)
-            return await super().ainvoke(StringPromptValue(text=completion), config=config, prefix=prefix)
+            prefix, delimiter, completion = re.split(r"(?i)(?<=question:)(\s)", text)
+            return await super().ainvoke(StringPromptValue(text=completion), config=config, prefix=prefix + delimiter)
 
         return await super().ainvoke(input, config=config, **kwargs)
 
