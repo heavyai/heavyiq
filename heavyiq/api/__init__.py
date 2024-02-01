@@ -80,6 +80,11 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    if config.enable_debug_endpoints:
+        # add profiling middleware when debugging enabled
+        from heavyiq.api.middlewares import ProfilingMiddleware
+
+        app.add_middleware(ProfilingMiddleware)
 
     # add exception handlers
     app.add_exception_handler(AttributeError, exh.attribute_error_handler)
