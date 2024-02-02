@@ -6,7 +6,7 @@ from .overrides import OverrideBaseConfig
 class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     port: int = 6275
     data: Optional[str] = None
-    openai_api_key: str
+    openai_api_key: Optional[str] = None
     openai_gpt_model: str = "gpt-3.5-turbo-16k"  # LLMType.DEFAULT
     openai_gpt_model_nl_to_sql: Optional[str] = None  # LLMType.NL_TO_SQL
     openai_gpt_model_sql_to_answer: Optional[str] = None  # LLMType.SQL_TO_ANSWER
