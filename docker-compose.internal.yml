@@ -5,7 +5,7 @@ services:
     container_name: heavyiq-api
     build:
       context: .
-      dockerfile: ./environment/heavyiq_api/Dockerfile  # Specify the custom Dockerfile name
+      dockerfile: ./environment/heavyiq_api/Dockerfile.internal  # Specify the custom Dockerfile name
     volumes:
       - ./table_documents:/app/table_documents
       - ./db:/app/db
