@@ -1,3 +1,3 @@
 # Run FastAPI application with Uvicorn
 run-fastapi:
-	uvicorn app:app --reload
+	gunicorn 'heavyiq.api:create_app("./config.toml")' --config gunicorn_conf.py -w 2

@@ -37,6 +37,17 @@ def init_telemetrics() -> None:
     os.environ["ANONYMIZED_TELEMETRY"] = "false"
 
 
+def enable_telemetrics_for_free_edition() -> None:
+    """
+    Enables telemetrics for free edition.
+    """
+    global is_langsmith_active
+    os.environ["LANGCHAIN_TRACING_V2"] = "true"
+    os.environ["LANGCHAIN_API_KEY"] = "free-edition-api-key"  # TODO: change_me
+    os.environ["LANGCHAIN_PROJECT"] = "free-edition-8.0"
+    is_langsmith_active = True
+
+
 @cached(cache=TTLCache(maxsize=30, ttl=60 * 10))
 def get_token_limit(model_name: str, response_tokens: int = 256) -> int:
     """

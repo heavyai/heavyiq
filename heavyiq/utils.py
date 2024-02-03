@@ -1,5 +1,6 @@
 import asyncio
 import re
+from enum import Enum
 from multiprocessing import Manager
 from multiprocessing.managers import SyncManager
 from pathlib import Path
@@ -99,6 +100,9 @@ VT = TypeVar("VT")  # Value type
 class SharedDictSingleton(Generic[KT, VT]):
     _instance: "SharedDictSingleton[KT, VT]" = None
     _lock: asyncio.Lock = asyncio.Lock()
+
+    class Keys(Enum):
+        HeavyDBLicenseEdition = "heavydb_license_edition"
 
     def __new__(cls):
         if cls._instance is None:

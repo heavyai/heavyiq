@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 
 from asgi_correlation_id import CorrelationIdMiddleware
@@ -14,7 +15,7 @@ from heavyiq.api.models.error import ErrorResponse
 from heavyiq.api.routes import bgrouter, defaultrouter, iqrouter, lcelrouter, llmrouter, streamrouter
 from heavyiq.config import HeavyIQConfig, get_config
 from heavyiq.langchain.exceptions import GenerateTableMetadataException, NLtoAnswerException, NLtoSQLException
-from heavyiq.langchain.utils import InMemoryLLMCache, init_telemetrics
+from heavyiq.langchain.utils import InMemoryLLMCache, enable_telemetrics_for_free_edition, init_telemetrics
 from heavyiq.logging_utils import get_heavyiq_logger, init_logs
 from heavyiq.utils import SharedDictSingleton
 
@@ -175,10 +176,28 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         import heavyiq.lcel.chains
         from heavyiq.logging_utils import heavyiq_logger as logger
 
-        # TODO: Disabled for now, as no guarantee heavydb is running before heavyiq
-        # logger.info("Connecting to heavydb...")
-        # await run_in_threadpool(get_heavydb_license_claims, config)
-        # logger.info("Successfully connected to heavydb...")
+        async def enable_telemetrics_for_free_license_daemon():
+            """
+            This enables langsmith telemetrics for the free license by polling a shared multiprocessing dict.
+            """
+            shared_dict, max_retries, retry_count = SharedDictSingleton(), 20, 0
+            while retry_count < max_retries:
+                retry_count += 1
+                await asyncio.sleep(2)
+                license_edition = await shared_dict.get(SharedDictSingleton.Keys.HeavyDBLicenseEdition.name)
+                if not license_edition:
+                    continue
+                logger.debug(f"Found HeavyAI license edition, license_type: {license_edition}")
+                if license_edition == "free":
+                    logger.info("Enabling langsmith telemetrics for free edition.")
+                    enable_telemetrics_for_free_edition()
+                break
+            else:
+                logger.error(f"Failed to check HeavyAI license edition after {max_retries*2} seconds.")
+
+        # run a background task to check license_edition got cached or not
+        # if yes, and it's a free edition then enable langsmith telemetry
+        asyncio.create_task(enable_telemetrics_for_free_license_daemon())
 
     @app.on_event("shutdown")
     async def shutdown():
@@ -187,14 +206,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         """
         from heavyiq.logging_utils import heavyiq_logger as logger
 
-        shared_dict_instance = SharedDictSingleton._instance
-        if shared_dict_instance:
-            shared_dict_manager = shared_dict_instance._manager
-            if shared_dict_manager._state.value == 1:  # terminate already started shared manager process
-                logger.info("Shutting down Shared Manager instance.")
-                shared_dict_manager.shutdown()
-
-        logger.info("Shutting down FastAPI app.")
+        logger.info("Shutting down FastAPI worker.")
 
     def custom_openapi() -> dict[str, Any]:
         if app.openapi_schema:

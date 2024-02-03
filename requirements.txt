@@ -20,3 +20,4 @@ asgi-correlation-id==4.2.0
 loguru==0.7.2
 aiocsv==1.2.4
 async-lru==2.0.4
+PyJWT==2.8.0
