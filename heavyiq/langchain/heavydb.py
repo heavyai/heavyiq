@@ -14,12 +14,12 @@ from threading import Lock
 from typing import TYPE_CHECKING, Any, Callable, Coroutine, Optional, TypedDict
 
 import anyio
+from async_lru import alru_cache
 from heavyai import Connection, connect
 from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
-from heavyiq.utils import (LRUCache, calc_query_stats, is_destructive_sql,
-                           rate_sql_complexity, strip_sql_comments)
+from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
 
 if TYPE_CHECKING:
     from heavydb._parsers import ColumnDetails
@@ -63,6 +63,7 @@ class HeavyDB:
     _table_schema_cache: Optional[LRUCache[str, str]] = None
     _table_text_columns_count_cache: Optional[LRUCache[str, int]] = None
     _table_total_row_count_cache: Optional[LRUCache[str, int]] = None
+    _timestamp_cache: Optional[LRUCache[str, str]] = None
 
     def __init__(
         self,
@@ -82,9 +83,9 @@ class HeavyDB:
         self.lock = Lock()
         self.alock = asyncio.Lock()
         self._dbname = self._conn._dbname
-        self._table_schema_change_callback: Callable[
-            ["HeavyDB", str], None
-        ] | None = None  # callback which deals with the table schema change
+        self._table_schema_change_callback: Callable[["HeavyDB", str], None] | None = (
+            None  # callback which deals with the table schema change
+        )
         """Async lock ensures exactly one coroutine was allowed to access a shared resource (db) at a time."""
 
         self._all_tables = set(self._conn.get_tables())
@@ -171,6 +172,12 @@ class HeavyDB:
             cls._table_total_row_count_cache = LRUCache[str, int](manager=cls.get_manager())
         return cls._table_total_row_count_cache
 
+    @classmethod
+    def get_timestamp_cache(cls: type[HeavyDB]) -> LRUCache[str, str]:
+        if cls._timestamp_cache is None:
+            cls._timestamp_cache = LRUCache[str, str](manager=cls.get_manager())
+        return cls._timestamp_cache
+
     @property
     def top_k_cache(self) -> LRUCache[str, str]:
         return self.get_top_k_cache()
@@ -190,6 +197,10 @@ class HeavyDB:
     @property
     def table_total_row_count_cache(self) -> LRUCache[str, int]:
         return self.get_table_total_row_count_cache()
+
+    @property
+    def timestamp_cache(self) -> LRUCache[str, str]:
+        return self.get_timestamp_cache()
 
     @classmethod
     def _connect_with_timeout(
@@ -547,6 +558,49 @@ class HeavyDB:
         self.logger.debug(f"Got top k values for table {table_name}")
         return top_k_strings
 
+    async def aget_column_timestamp(self, table_name: str, column: str) -> tuple[str, str]:
+        """
+        Get min/max values for a particular timestamp column.
+        """
+        self.logger.debug(f"Getting timestamp values for column {column} in table {table_name}")
+        min_max_statement = f"SELECT min({column}) as min_time, max({column}) as max_time FROM {table_name};"
+        async with self.alock:
+            cursor = await run_in_threadpool(self._conn.execute, min_max_statement)
+        min_value, max_value = [str(v) for v in cursor.fetchone()]
+        self.logger.debug(f"Got timestamp values for column {column} in table {table_name}")
+        return min_value, max_value
+
+    async def aget_timestamp(self, table_name: str) -> str:
+        """
+        Get min/max values for all the timestamp, data columns exists on a table.
+        """
+        self.logger.debug(f"Getting min/max timestamp values for table {table_name}")
+        cache_key = f"{self._dbname}.{table_name}"
+        cached_value = self.timestamp_cache.get(cache_key)
+        if cached_value is not None:
+            self.logger.debug(f"Got timestamp values for table {table_name} from cache")
+            return cached_value
+
+        timestamp_columns = [
+            c.name
+            for c in self.get_table_columns(table_name)
+            if c.type in ["TIMESTAMP", "DATE", "TIME"] and c.is_array is False
+        ]
+        timestamp_col_str = ""
+
+        if timestamp_columns:
+            tasks = [self.aget_column_timestamp(table_name, col) for col in timestamp_columns]
+            timestamp_values = await asyncio.gather(*tasks)
+
+            timestamp_col_str += "Timestamp and date columns with min and max values:\n"
+            for col, (min_value, max_value) in zip(timestamp_columns, timestamp_values):
+                timestamp_col_str += f"{col}: ({min_value},{max_value})\n"
+
+        self.timestamp_cache.put(cache_key, timestamp_col_str)
+        self.logger.debug(f"Got min/max timestamp values for table {table_name}")
+
+        return timestamp_col_str
+
     async def aget_query_plan(self, query: str) -> str:
         query = strip_sql_comments(query)
         if is_destructive_sql(query):
@@ -632,6 +686,7 @@ class HeavyDB:
             return top_k_res, is_high_cardinality
         return None, is_high_cardinality
 
+    @alru_cache(maxsize=32, ttl=10)
     async def aget_table_columns(self, table: str) -> list[ColumnDetails]:
         """Get details about the columns in a table."""
         self.logger.debug(f"Getting columns for table {table}")
@@ -681,6 +736,7 @@ class HeavyDB:
         self.sample_rows_cache.delete(cache_key)
         self.table_text_columns_count_cache.delete(cache_key)
         self.table_total_row_count_cache.delete(cache_key)
+        self.timestamp_cache.delete(cache_key)
 
     async def trigger_table_schema_change_callback(self, table: str, callback: Callable | None = None):
         schema_change_callback = callback or self.table_schema_change_callback
@@ -698,6 +754,9 @@ class HeavyDB:
             await self.delete_table_cache(table)
             await self.trigger_table_schema_change_callback(table)
 
+    @alru_cache(
+        maxsize=32, ttl=10
+    )  # internal caches are used since this method gets called atleast 2 times in a single request
     async def _aget_raw_table_schema(self, table: str) -> str:
         """
         Gets the table schema from db only.
@@ -786,6 +845,7 @@ class HeavyDB:
         self.logger.debug(f"Got total row count of table {table_name}")
         return row_count
 
+    @alru_cache(maxsize=32, ttl=10)  # internal cache used to cache the text columns for 10 secs
     async def aget_text_columns(self, table_name: str) -> list[str]:
         """
         Retrieve the list of text columns available in a table.
@@ -826,8 +886,8 @@ class HeavyDB:
         text_columns = await self.aget_text_columns(table_name)
         low_cardinality_columns = []
         high_cardinality_columns = []
-        for col in text_columns:
-            top_k_res, is_high_cardinality = await self.aget_column_top_k(table_name, col)
+        columns_top_k = await asyncio.gather(*[self.aget_column_top_k(table_name, col) for col in text_columns])
+        for col, (top_k_res, is_high_cardinality) in zip(text_columns, columns_top_k):
             if top_k_res:
                 if is_high_cardinality:
                     high_cardinality_columns.append((col, top_k_res))
@@ -847,7 +907,7 @@ class HeavyDB:
         return top_k_strings
 
     async def aget_single_table_info(
-        self, table_name: str, include_samples: bool = True, include_top_k: bool = True
+        self, table_name: str, include_samples: bool = True, include_top_k: bool = True, include_timestamp: bool = True
     ) -> str:
         """Get information about a single table asynchronously."""
         all_table_names = self.get_usable_table_names()
@@ -868,6 +928,10 @@ class HeavyDB:
 
         if include_top_k:
             tasks.append(self.aget_top_k(table_name))
+
+        if include_timestamp:
+            # include timestamp,date columns with min/max values
+            tasks.append(self.aget_timestamp(table_name))
 
         results = await asyncio.gather(*tasks)
         return "\n".join(results)
