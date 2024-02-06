@@ -563,7 +563,7 @@ class HeavyDB:
         Get min/max values for a particular timestamp column.
         """
         self.logger.debug(f"Getting timestamp values for column {column} in table {table_name}")
-        min_max_statement = f"SELECT min({column}) as min_time, max({column}) as max_time FROM {table_name};"
+        min_max_statement = f"SELECT min({column}), max({column}) FROM {table_name};"
         async with self.alock:
             cursor = await run_in_threadpool(self._conn.execute, min_max_statement)
         min_value, max_value = [str(v) for v in cursor.fetchone()]
@@ -584,7 +584,7 @@ class HeavyDB:
         timestamp_columns = [
             c.name
             for c in self.get_table_columns(table_name)
-            if c.type in ["TIMESTAMP", "DATE", "TIME"] and c.is_array is False
+            if c.type in ["TIMESTAMP", "DATE"] and c.is_array is False
         ]
         timestamp_col_str = ""
 
