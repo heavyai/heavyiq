@@ -213,15 +213,23 @@ all_databases = [
 ]
 
 # local_import_base_dir = "/home/paperspace/heavyai/heavyiq_eval"
-local_import_base_dir = "/bigDisk/data/heavyai_dumps/heavyiq/eval/heavyiq_training_dumps"
-heavyai_con = heavyai.connect(user="admin", password="HyperInteractive", host="localhost", dbname="heavyai")
-for db in all_databases:
+
+databases_to_restore = eval_databases
+local_import_base_dir = (
+    "/bigDisk/data/heavyai_dumps/heavyiq/eval/heavyiq_training_dumps"
+)
+heavyai_con = heavyai.connect(
+    user="admin", password="HyperInteractive", host="localhost", dbname="heavyai"
+)
+for db in eval_databases:
     create_db_sql = f"CREATE DATABASE IF NOT EXISTS {db}"
     heavyai_con.execute(create_db_sql)
 
-for db in all_databases:
+for db in eval_databases:
     print(f"Database: {db}")
-    con = heavyai.connect(user="admin", password="HyperInteractive", host="localhost", dbname=db)
+    con = heavyai.connect(
+        user="admin", password="HyperInteractive", host="localhost", dbname=db
+    )
     local_import_dir = f"{local_import_base_dir}/{db}"
     dump_files = pathlib.Path(local_import_dir).glob("*.dump.lz4")
     print(dump_files)

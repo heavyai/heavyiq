@@ -38,7 +38,7 @@ def getDBs(queries_file):
     return unique_db_ids.tolist()
 
 
-queries_file = "heavyiq_training_v34.csv"
+queries_file = "heavyiq_training_v51_custom.csv"
 local_export_base_dir = "/Users/todd//data/heavyai_dumps/heavyiq/all"
 export_base_dir = "/media/psf/Home/data/heavyai_dumps/heavyiq/all"
 
@@ -47,7 +47,9 @@ print(training_dbs)
 
 for db in training_dbs:
     print(f"Database: {db}")
-    con = heavyai.connect(user="admin", password="HyperInteractive", host="10.211.55.4", dbname=db)
+    con = heavyai.connect(
+        user="admin", password="HyperInteractive", host="10.211.55.4", dbname=db
+    )
     tables = con.get_tables()
     local_export_db_path = f"{local_export_base_dir}/{db}"
     export_db_path = f"{export_base_dir}/{db}"
@@ -55,7 +57,9 @@ for db in training_dbs:
     for table in tables:
         print(f"Table: {table}")
         export_path = f"{export_db_path}/{table}.dump.lz4"
-        dump_table_sql = f"DUMP TABLE {table} TO '{export_path}' WITH (COMPRESSION = 'LZ4');"
+        dump_table_sql = (
+            f"DUMP TABLE {table} TO '{export_path}' WITH (COMPRESSION = 'LZ4');"
+        )
         print(dump_table_sql)
         con.execute(dump_table_sql)
 
