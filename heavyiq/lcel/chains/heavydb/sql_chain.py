@@ -15,7 +15,7 @@ from heavyiq.lcel.types.sql_type import (
     SqlChainIntermediateType,
     SqlChainOutputType,
 )
-from heavyiq.utils import strip_sql_comments
+from heavyiq.utils import is_predefined_llm_error, strip_sql_comments
 
 # var endswith `rbl` means it's an runnable
 nl_to_sql_llm_rbl = llm_runnable.with_config(
@@ -129,6 +129,16 @@ retry_query_runnable = (retry_query_variables | retry_query_prompt | retry_query
 )
 
 
+async def is_predefined_llm_error_lambda(input_output: dict) -> str | None:
+    """
+    Checks whether the given input contain predefined error or not.
+    """
+    query = input_output["sql_cmd"]
+    if is_predefined_llm_error(query):
+        return query
+    return None
+
+
 async def sql_validator(input_output: dict) -> str | None:
     """
     Validates SQL query against HeavyDB database.
@@ -168,15 +178,23 @@ async def revise_loop(input: SqlChainIntermediateDict) -> Runnable:
     Iterates over bunch of steps to find a valid HeavyDB compatible SQL query.
     """
     revise_step = RunnablePassthrough().assign(sql_cmd=retry_query_runnable)
+    check_predefined_error_step = RunnablePassthrough().assign(error=RunnableLambda(is_predefined_llm_error_lambda))
+    predefined_error_branch = RunnableBranch(  # type: ignore
+        (lambda x: x["error"] is not None, RunnablePassthrough()),  # has predefined error so don't do query validation
+        validation_step,  # no predined error so just pass the query to validation step
+    )
 
     else_step: Runnable[SqlChainIntermediateType, SqlChainIntermediateType] = RunnableBranch(
         (lambda x: x["error"] is None, RunnablePassthrough()),
-        revise_step | validation_step,
+        revise_step | check_predefined_error_step | predefined_error_branch,
     ).with_types(input_type=SqlChainIntermediateType)
 
     for _ in range(max(0, input["max_revisions"] - 1)):
         else_step = RunnableBranch(
-            (lambda x: x["error"] is None, RunnablePassthrough()), (revise_step | validation_step | else_step)
+            (lambda x: x["error"] is None, RunnablePassthrough()),
+            revise_step
+            | check_predefined_error_step
+            | RunnableBranch((lambda x: x["error"] is not None, RunnablePassthrough()), validation_step | else_step),
         )
     return else_step
 
@@ -254,9 +272,11 @@ do_string_correction_and_calculate_complexity_or_passthrough_branch: Runnable = 
 chain: Runnable[Any, Any] = (
     (
         RunnablePassthrough().assign(sql_cmd=query_runnable, max_revisions=lambda x: get_config().max_retries_nl_to_sql)
-        | validation_step
-        | revise_lambda
-        | do_string_correction_and_calculate_complexity_or_passthrough_branch
+        | RunnablePassthrough().assign(error=RunnableLambda(is_predefined_llm_error_lambda))
+        | RunnableBranch(
+            (lambda x: x["error"] is not None, RunnablePassthrough()),
+            validation_step | revise_lambda | do_string_correction_and_calculate_complexity_or_passthrough_branch,
+        )
         | final_step
     )
     .with_config(  # type: ignore
