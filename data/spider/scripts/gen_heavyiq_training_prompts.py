@@ -1544,8 +1544,16 @@ def add_aliases(question, sql_query, remote_host, model_name):
         data=json.dumps(request_data),
     ).json()
     alias_sql_query = result["choices"][0]["text"]
-    print(alias_sql_query)
     return alias_sql_query
+
+
+def is_query_meta(sql_query):
+    sql_query_stripped = sql_query.strip()
+    if sql_query_stripped.startswith("MISSING_DATA") or sql_query_stripped.startswith(
+        "AMBIGUOUS_QUESTION"
+    ):
+        return True
+    return False
 
 
 def main(argv):
@@ -1622,6 +1630,7 @@ def main(argv):
         num_null_rewrite_fails = 0
         null_rewrite_fail_ids = []
         for db_id, queries in queries_by_db.items():
+            print(db_id)
             try:
                 if db_num < options.start_db:
                     db_num += 1
@@ -1761,7 +1770,8 @@ def main(argv):
                     # print(f"Query ID: {query_id}")
                     # print(f"SQL Query: {sql_query}")
                     try:
-                        if not using_final_query:
+                        query_is_meta = is_query_meta(sql_query)
+                        if not using_final_query and not query_is_meta:
                             if sql_query not in db_query_cache:
                                 if options.only_validate_queries:
                                     con._client.sql_validate(con._session, sql_query)
@@ -1769,8 +1779,15 @@ def main(argv):
                                     con.execute(sql_query)
 
                         successful_queries += 1
+                        print(query_id)
                         if options.write_sql_prompts:
-                            filtered_tables = extract_tables_from_query(con, sql_query)
+                            filtered_tables = None
+                            if query_is_meta:
+                                filtered_tables = db_tables
+                            else:
+                                filtered_tables = extract_tables_from_query(
+                                    con, sql_query
+                                )
                             filtered_tables_set = set(filtered_tables)
                             # print(f"Query ID: {query_id} Tables: {filtered_tables} Query: {sql_query}")
                             sql_query_tokens = tokenizer.tokenize(sql_query)
@@ -1972,7 +1989,7 @@ def main(argv):
                                     else None,
                                 }
                             )
-                        if options.write_english_prompts:
+                        if options.write_english_prompts and not query_is_meta:
                             if len(english_explanation) > 4:
                                 cursor = con.execute(sql_query)
                                 results = str(cursor.fetchall())
@@ -1986,7 +2003,7 @@ def main(argv):
                                         "output": english_explanation,
                                     }
                                 )
-                        if options.write_question_prompts:
+                        if options.write_question_prompts and not query_is_meta:
                             filtered_tables = extract_tables_from_query(con, sql_query)
                             filtered_table_schemas = []
                             for db_table in filtered_tables:
@@ -2052,8 +2069,8 @@ def main(argv):
                                     "num_instruction_tokens": num_instruction_tokens,
                                 }
                             )
-                        if options.write_table_prompts:
-                            print(sql_query)
+                        if options.write_table_prompts and not query_is_meta:
+                            # print(sql_query)
                             filtered_tables = extract_tables_from_query(con, sql_query)
                             table_metadata = None
                             add_top_k_metadata = (
