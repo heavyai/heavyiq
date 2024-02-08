@@ -8,6 +8,7 @@ from aiocsv.readers import AsyncReader
 from aiocsv.writers import AsyncWriter
 from fastapi.concurrency import run_in_threadpool
 from langchain.chat_models.base import BaseChatModel
+from langchain.globals import set_verbose
 from langchain.llms.base import BaseLLM
 from langchain.pydantic_v1 import BaseModel
 from langsmith import Client
@@ -193,7 +194,7 @@ async def run_config_model_on_questions(
     eval_str = f"eval_{eval_id}"
     logger.info(f"Eval ID: {eval_id}")
 
-    tasks, semaphore = [], asyncio.Semaphore(20)  # Limit to 10 concurrent tasks
+    tasks, semaphore = [], asyncio.Semaphore(30)  # Limit to 10 concurrent tasks
 
     llm = await run_in_threadpool(get_llm_by_type, LLMType.NL_TO_SQL, temperature=temperature)
 
@@ -384,4 +385,196 @@ async def run_config_model_on_auto_questions(
                 await writer.writerows(row_datas)
                 rows_written += len(row_datas)
 
+    await run_in_threadpool(summarize_eval_results, eval_str)
+
+
+@eval.command()
+@coro
+@click.option("--temperature", default=0.0, help="Temperature for LLM (Defaults to 0.0)", type=float)
+@click.option("--verbose", default=False, help="Verbose output", type=bool)
+@click.argument("eval_dataset_csv", type=str)
+@click.pass_context  # type: ignore
+async def run_config_model_on_questions_lcel(
+    ctx: click.Context, eval_dataset_csv: str, temperature: float, verbose: bool
+):
+    """
+    Run config model on questions using lcel approach.
+    """
+    from heavyiq.lcel.chains import sql_chain
+
+    set_verbose(verbose)
+    logger = get_heavyiq_logger()
+    if not await run_in_threadpool(os.path.exists, eval_dataset_csv):
+        raise Exception(f"eval_dataset_csv does not exist: {eval_dataset_csv}")
+
+    eval_id = uuid4().hex[:8]
+    eval_str = f"eval_{eval_id}"
+    logger.info(f"Dataset ID: {eval_id}")
+    has_id: bool = True
+    processor_count = 30
+
+    async def producer(queue: asyncio.Queue, input_file_path: str):
+        """
+        producer responsible for extracting the records from csv and put it in the queue.
+        """
+        nonlocal has_id
+        async with aiofiles.open(input_file_path, mode="r") as f:
+            csv_reader = AsyncReader(f)
+            header = await anext(csv_reader)
+            has_id = "id" == header[0]
+            async for row in csv_reader:
+                await queue.put(row)
+                await asyncio.sleep(0.1)
+
+        print("Successfully filled the queue.")
+        # await queue.put(None)  # Sentinel value to signal the end of input
+        # Signal consumers to stop
+        for _ in range(processor_count):
+            await queue.put(None)
+
+    async def predict_query(question: str, gold_query: str, db: HeavyDB) -> tuple[str, str]:
+        """
+        Predicts the target query.
+
+        Args:
+            db: HeavyDB instance
+            gold_query: golden query
+
+        Returns:
+            predicted_query and error
+        """
+        out: dict = {"query": None, "error": None}
+        async with heavydb_context(db):
+            tables = await aextract_tables_from_query(db, gold_query)
+            out = await sql_chain.ainvoke({"question": question, "tables": tables, "session_id": db._conn._session})
+        return out["query"], out["error"]
+
+    async def processor(input_queue: asyncio.Queue, output_queue: asyncio.Queue, processor_id: int):
+        """
+        processing each record takes place here.
+        """
+        while True:
+            prob_stats, query_stats = None, None
+            item = await input_queue.get()
+
+            if item is None:
+                print(f"Processor {processor_id} stopped!")
+                print("putting None to output queue")
+                await output_queue.put(None)
+                await asyncio.sleep(0.1)
+                input_queue.task_done()
+                break
+
+            if has_id:
+                query_id, db_id, question, gold_query = item
+            else:
+                query_id = None
+                db_id, question, gold_query = item
+
+            db = await HeavyDB.from_env_async(db_id)
+            pred_query, query_error = await predict_query(question, gold_query, db)
+
+            if not query_error:
+                try:
+                    eval_res, query_stats = await asyncio.gather(
+                        sql_rate_reply(gold_query, pred_query, db=db), db.aquery_stats(pred_query)
+                    )
+                except Exception as e:
+                    eval_res_success = False
+                    eval_res_status = "failed_to_generate_sql"
+                    error = f"Failed to calculate query stats, {e}"
+                    eval_res_error = error
+                    logger.error(error)
+                else:
+                    eval_res_success = eval_res["success"]
+                    eval_res_status = eval_res["status"]
+                    eval_res_error = eval_res["error"]
+                    logger.info(f"Evaluation Success: {eval_res['success']}")
+            else:
+                eval_res_success = False
+                eval_res_status = "failed_to_generate_sql"
+                eval_res_error = query_error
+                logger.error("Error occurs while predicting the query.")
+
+            output_item = (
+                query_id,
+                db_id,
+                question,
+                gold_query,
+                pred_query,
+                eval_res_success,
+                eval_res_status,
+                eval_res_error,
+                prob_stats,
+                query_stats,
+            )
+
+            await output_queue.put(output_item)
+            await asyncio.sleep(0.1)
+            input_queue.task_done()
+
+    async def build_row_data(item: tuple) -> list:
+        """
+        Builds output csv record from the item we got from the output queue.
+        """
+        (
+            query_id,
+            db_id,
+            question,
+            gold_query,
+            pred_query,
+            eval_res_success,
+            eval_res_status,
+            eval_res_error,
+            prob_stats,
+            query_stats,
+        ) = item
+        row_data = []
+        if query_id:
+            row_data.append(query_id)
+
+        row_data.extend([db_id, gold_query, pred_query, eval_res_success, eval_res_status, eval_res_error or ""])
+        row_data = [str(item).replace("\n", " ").replace("\r", " ") for item in row_data]
+        return row_data
+
+    async def consumer(output_queue: asyncio.Queue, output_file_path: str, enable_query_stats: bool = False):
+        """
+        consumer
+        """
+        await asyncio.sleep(1)  # initial sleep to identify wherher the eval dataset contain header or not
+        async with aiofiles.open(output_file_path, "a", newline="") as wf:
+            writer = AsyncWriter(wf, dialect="unix")
+
+            # write header
+            header_data = ["db_id", "gold_query", "pred_query", "success", "status", "error"]
+            if has_id:
+                header_data = ["id"] + header_data
+            if enable_query_stats:
+                header_data.extend(["num_joins", "num_unions", "num_aggs", "num_filters", "num_sorts"])
+            await writer.writerow(header_data)
+            while True:
+                item = await output_queue.get()
+                if item is None:
+                    print("Consumer stopped!")
+                    output_queue.task_done()
+                    break
+                row = await build_row_data(item)
+                await writer.writerow(row)
+                output_queue.task_done()
+
+    eval_results_csv: str = f"./eval/results/{eval_str}_results.csv"
+    input_queue: asyncio.Queue = asyncio.Queue()  # contain csv record
+    output_queue: asyncio.Queue = asyncio.Queue()  # contain data to be written on output csv
+
+    producer_task = asyncio.create_task(producer(input_queue, eval_dataset_csv))
+    processors = [
+        asyncio.create_task(processor(input_queue, output_queue, processor_id))
+        for processor_id in range(processor_count)
+    ]
+    consumer_task = asyncio.create_task(consumer(output_queue, eval_results_csv, enable_query_stats=False))
+
+    await input_queue.join()
+    await output_queue.join()
+
+    await asyncio.gather(producer_task, *processors, consumer_task)
     await run_in_threadpool(summarize_eval_results, eval_str)
