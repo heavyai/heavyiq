@@ -80,6 +80,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     include_top_k_in_custom_table_document_generation: bool = True
     # nl to sql max query retries
     max_retries_nl_to_sql: int = 2
+    # llm api-key
+    heavylm_api_key: Optional[str] = None
 
 
 class AppConfig(OverrideBaseConfig):  # type: ignore
