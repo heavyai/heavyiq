@@ -18,8 +18,7 @@ from heavyai import Connection, connect
 from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
-from heavyiq.utils import (LRUCache, calc_query_stats, is_destructive_sql,
-                           rate_sql_complexity, strip_sql_comments)
+from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
 
 if TYPE_CHECKING:
     from heavydb._parsers import ColumnDetails
@@ -82,9 +81,9 @@ class HeavyDB:
         self.lock = Lock()
         self.alock = asyncio.Lock()
         self._dbname = self._conn._dbname
-        self._table_schema_change_callback: Callable[
-            ["HeavyDB", str], None
-        ] | None = None  # callback which deals with the table schema change
+        self._table_schema_change_callback: Callable[["HeavyDB", str], None] | None = (
+            None  # callback which deals with the table schema change
+        )
         """Async lock ensures exactly one coroutine was allowed to access a shared resource (db) at a time."""
 
         self._all_tables = set(self._conn.get_tables())
@@ -928,7 +927,7 @@ class HeavyDB:
             raise ValueError("Destructive SQL is not allowed")
         sql_stmt = f"EXPLAIN CALCITE DETAILED {query}" if detailed else f"EXPLAIN CALCITE {query}"
         async with self.alock:
-            cursor = self._conn.execute(sql_stmt)
+            cursor = await run_in_threadpool(self._conn.execute, sql_stmt)
         query_plan: tuple[str] = cursor.fetchone()  # type: ignore
         return str(query_plan[0])
 

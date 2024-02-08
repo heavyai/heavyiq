@@ -9,21 +9,24 @@ from aiocsv.writers import AsyncWriter
 from fastapi.concurrency import run_in_threadpool
 from langchain.chat_models.base import BaseChatModel
 from langchain.llms.base import BaseLLM
+from langchain.pydantic_v1 import BaseModel
 from langsmith import Client
+from thrift.transport.TTransport import TTransportException
 
 from heavyiq.cli.decorators import coro
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.chains import get_nl_to_sql_chain_by_llm
 from heavyiq.langchain.exceptions import NLtoSQLException
+from heavyiq.langchain.heavydb import heavydb_context
 from heavyiq.langchain.llms import LLMType, get_llm_by_type
 from heavyiq.logging_utils import get_heavyiq_logger
 
 from .utils import (
+    aextract_tables_from_query,
     awrite_eval_results_header,
     awrite_eval_results_row,
     compute_prob_stats,
-    extract_tables_from_query,
     sql_rate_reply,
     summarize_eval_results,
 )
@@ -33,6 +36,91 @@ from .utils import (
 def eval():
     """Evaluate models."""
     pass
+
+
+async def process_question(
+    question,
+    is_langsmith_active,
+    chain,
+    db,
+    gold_query,
+    logger,
+    eval_str,
+    db_id,
+    query_id,
+    enable_logprobs: bool = True,
+    enable_querystats: bool = True,
+    langsmith_client: Client | None = None,
+):
+    prob_stats, query_stats = None, None
+    try:
+        tables = await aextract_tables_from_query(db, gold_query)
+        res = await chain.acall({chain.input_key: question, "tables": tables}, include_run_info=is_langsmith_active)
+        pred_query = res[chain.output_key]
+        logger.info(f"Generated SQL: {pred_query}")
+        logger.debug("Evaluating SQL")
+
+        if "logprobs" in res and len(res["logprobs"]) > 0:
+            prob_stats = await run_in_threadpool(
+                compute_prob_stats, res["logprobs"]["tokens"], res["logprobs"]["top_logprobs"]
+            )
+
+        eval_res, query_stats = await asyncio.gather(
+            sql_rate_reply(gold_query, pred_query, db=db), db.aquery_stats(pred_query)
+        )
+        logger.info(f"Evaluation Success: {eval_res['success']}")
+        logger.debug(f"Evaluation Status: {eval_res['status']}")
+        if langsmith_client:
+            feedback_id = str(res["__run"].run_id)
+            logger.debug(f"Langsmith Run ID: {feedback_id}")
+            await run_in_threadpool(
+                langsmith_client.create_feedback,
+                feedback_id,
+                "eval_status",
+                score=eval_res["success"],
+                comment=eval_res["status"],
+            )
+        logger.debug("=====================================")
+        await awrite_eval_results_row(
+            eval_str,
+            db_id,
+            question,
+            gold_query,
+            eval_res["success"],
+            eval_res["status"],
+            pred_query,
+            query_id=query_id,
+            error=eval_res["error"],
+            prob_stats=prob_stats,
+            query_stats=query_stats,
+            enable_logprobs=enable_logprobs,
+            enable_querystats=enable_querystats,
+        )
+    except NLtoSQLException as e:
+        logger.exception(f"Failed to generate SQL: {e}")
+        await awrite_eval_results_row(
+            eval_str,
+            db_id,
+            question,
+            gold_query,
+            False,
+            "failed_to_generate_sql",
+            e.failed_sql,  # type: ignore
+            query_id=query_id,
+            prob_stats=prob_stats,
+            query_stats=query_stats,
+            enable_logprobs=enable_logprobs,
+            enable_querystats=enable_querystats,
+        )
+
+
+async def get_db(dbname: str) -> HeavyDB:
+    try:
+        db = await HeavyDB.from_env_async(dbname)
+    except Exception:
+        await asyncio.sleep(1)
+        db = await HeavyDB.from_env_async(dbname)
+    return db
 
 
 async def process_eval_row(
@@ -60,74 +148,29 @@ async def process_eval_row(
         db_id, question, gold_query = row
     async with semaphore:
         logger.info(f"Processing Question: {question}")
-        db = await HeavyDB.from_env_async(db_name=db_id)
-        tables = extract_tables_from_query(db._conn, gold_query)
-        chain = get_nl_to_sql_chain_by_llm(llm)(
-            database=db, llm=llm, callbacks=None if verbose else [], verbose=verbose, tags=[eval_str, "cli"]
-        )
+        db = await get_db(db_id)
+        async with heavydb_context(db):
+            chain = get_nl_to_sql_chain_by_llm(llm)(
+                database=db, llm=llm, callbacks=None if verbose else [], verbose=verbose, tags=[eval_str, "cli"]
+            )
 
-        prob_stats = None
-        query_stats = None
-        try:
-            res = await chain.acall({chain.input_key: question, "tables": tables}, include_run_info=is_langsmith_active)
-            pred_query = res[chain.output_key]
-            logger.info(f"Generated SQL: {pred_query}")
-            logger.debug("Evaluating SQL")
-
-            if "logprobs" in res and len(res["logprobs"]) > 0:
-                prob_stats = await run_in_threadpool(
-                    compute_prob_stats, res["logprobs"]["tokens"], res["logprobs"]["top_logprobs"]
+            try:
+                await process_question(
+                    question,
+                    is_langsmith_active,
+                    chain,
+                    db,
+                    gold_query,
+                    logger,
+                    eval_str,
+                    db_id,
+                    query_id,
+                    enable_logprobs=enable_logprobs,
+                    enable_querystats=enable_querystats,
+                    langsmith_client=langsmith_client,
                 )
-
-            eval_res, query_stats = await asyncio.gather(
-                run_in_threadpool(sql_rate_reply, gold_query, pred_query, db=db), db.aquery_stats(pred_query)
-            )
-            logger.info(f"Evaluation Success: {eval_res['success']}")
-            logger.debug(f"Evaluation Status: {eval_res['status']}")
-            if langsmith_client:
-                feedback_id = str(res["__run"].run_id)
-                logger.debug(f"Langsmith Run ID: {feedback_id}")
-                await run_in_threadpool(
-                    langsmith_client.create_feedback,
-                    feedback_id,
-                    "eval_status",
-                    score=eval_res["success"],
-                    comment=eval_res["status"],
-                )
-            logger.debug("=====================================")
-            await awrite_eval_results_row(
-                eval_str,
-                db_id,
-                question,
-                gold_query,
-                eval_res["success"],
-                eval_res["status"],
-                pred_query,
-                query_id=query_id,
-                error=eval_res["error"],
-                prob_stats=prob_stats,
-                query_stats=query_stats,
-                enable_logprobs=enable_logprobs,
-                enable_querystats=enable_querystats,
-            )
-        except NLtoSQLException as e:
-            logger.exception(f"Failed to generate SQL: {e}")
-            await awrite_eval_results_row(
-                eval_str,
-                db_id,
-                question,
-                gold_query,
-                False,
-                "failed_to_generate_sql",
-                e.failed_sql,  # type: ignore
-                query_id=query_id,
-                prob_stats=prob_stats,
-                query_stats=query_stats,
-                enable_logprobs=enable_logprobs,
-                enable_querystats=enable_querystats,
-            )
-        except Exception as e:
-            logger.exception(f"Failed to generate SQL: {e}")
+            except Exception as e:
+                logger.exception(f"Failed to generate SQL: {e}")
 
 
 @eval.command()
@@ -150,7 +193,7 @@ async def run_config_model_on_questions(
     eval_str = f"eval_{eval_id}"
     logger.info(f"Eval ID: {eval_id}")
 
-    tasks, semaphore = [], asyncio.Semaphore(10)  # Limit to 10 concurrent tasks
+    tasks, semaphore = [], asyncio.Semaphore(20)  # Limit to 10 concurrent tasks
 
     llm = await run_in_threadpool(get_llm_by_type, LLMType.NL_TO_SQL, temperature=temperature)
 

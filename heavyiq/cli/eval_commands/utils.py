@@ -1,3 +1,4 @@
+import asyncio
 import csv
 import io
 import math
@@ -11,6 +12,7 @@ import aiofiles
 import numpy as np
 import pandas as pd
 from aiocsv.writers import AsyncWriter
+from fastapi.concurrency import run_in_threadpool
 
 from heavyiq.langchain import HeavyDB
 
@@ -61,7 +63,7 @@ def compute_prob_stats(selected_tokens: list[str], top_log_probs: list[dict[str,
     return prob_stats
 
 
-def sql_rate_reply(
+async def sql_rate_reply(
     gold_query: str, pred_query: str, db_id: str | None = None, db: HeavyDB | None = None
 ) -> dict[str, Any]:
     # motivated by https://github.com/lm-sys/FastChat/tree/main/fastchat/pred
@@ -76,9 +78,10 @@ def sql_rate_reply(
             query_metadata["success"] = True
             return query_metadata
         if not db:
-            db = HeavyDB.from_env(db_name=db_id)
-        gold_df = pd.read_sql(gold_query, db._conn)
-        pred_df = pd.read_sql(pred_query, db._conn)
+            db = await HeavyDB.from_env_async(db_name=db_id)
+        gold_df_awaitable = run_in_threadpool(pd.read_sql, gold_query, db._conn)
+        pred_df_awaitable = run_in_threadpool(pd.read_sql, pred_query, db._conn)
+        gold_df, pred_df = await gold_df_awaitable, await pred_df_awaitable
         num_gold_rows = len(gold_df.axes[0])  # type: ignore
         num_pred_rows = len(pred_df.axes[0])  # type: ignore
         num_gold_cols = len(gold_df.axes[1])  # type: ignore
@@ -98,7 +101,7 @@ def sql_rate_reply(
         gold_query_has_order_by = gold_query.lower().find("order by") >= 0
         dfs_are_equal = None
         if gold_query_has_order_by:
-            dfs_are_equal = np.array_equal(gold_df.values, pred_df.values)
+            dfs_are_equal = await run_in_threadpool(np.array_equal, gold_df.values, pred_df.values)
         else:
             gold_df_sorted = gold_df.sort_values(by=list(gold_df.columns)).reset_index(drop=True)
             pred_df_sorted = pred_df.sort_values(by=list(pred_df.columns)).reset_index(drop=True)
@@ -111,11 +114,13 @@ def sql_rate_reply(
             for cols in permutations(pred_df.columns):
                 pred_df_perm = pred_df[list(cols)]
                 if gold_query_has_order_by:
-                    dfs_are_equal = np.array_equal(gold_df.values, pred_df_perm.values)
+                    dfs_are_equal = await run_in_threadpool(np.array_equal, gold_df.values, pred_df_perm.values)
                 else:
                     gold_df_sorted = gold_df.sort_values(by=list(gold_df.columns)).reset_index(drop=True)
                     pred_df_perm_sorted = pred_df_perm.sort_values(by=list(pred_df_perm.columns)).reset_index(drop=True)
-                    dfs_are_equal = np.array_equal(gold_df_sorted.values, pred_df_perm_sorted.values)
+                    dfs_are_equal = await run_in_threadpool(
+                        np.array_equal, gold_df_sorted.values, pred_df_perm_sorted.values
+                    )
                 if dfs_are_equal:
                     print("COLUMN ORDER DIFF")
                     query_metadata["success"] = True
@@ -132,6 +137,7 @@ def sql_rate_reply(
         query_metadata["error"] = e
         print(gold_query)
         print(pred_query)
+        print(e)
         return query_metadata
 
 
@@ -239,6 +245,20 @@ def extract_tables_from_query(con, query) -> list[str]:
     explain_query = "EXPLAIN CALCITE " + query
     query_plan = con.execute(explain_query)
     query_plan = list(query_plan)[0][0]
+    pattern = r"LogicalTableScan\(table=\[\[(.*?)\]\]\)"
+    matches = re.findall(pattern, query_plan)
+    tables = []
+    for match in matches:
+        table = match.split(", ")[1]
+        tables.append(table)
+    return list(set(tables))  # remove duplicates
+
+
+async def aextract_tables_from_query(db: HeavyDB, query: str) -> list[str]:
+    """
+    Extract table names from SQL query async.
+    """
+    query_plan = await db.aget_calcite_query_plan(query)
     pattern = r"LogicalTableScan\(table=\[\[(.*?)\]\]\)"
     matches = re.findall(pattern, query_plan)
     tables = []
