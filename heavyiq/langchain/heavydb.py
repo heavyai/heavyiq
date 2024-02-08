@@ -594,7 +594,7 @@ class HeavyDB:
 
             timestamp_col_str += "Timestamp and date columns with min and max values:\n"
             for col, (min_value, max_value) in zip(timestamp_columns, timestamp_values):
-                timestamp_col_str += f"{col}: ({min_value},{max_value})\n"
+                timestamp_col_str += f"{col}: ({min_value}, {max_value})\n"
 
         self.timestamp_cache.put(cache_key, timestamp_col_str)
         self.logger.debug(f"Got min/max timestamp values for table {table_name}")
