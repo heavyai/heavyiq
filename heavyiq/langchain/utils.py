@@ -10,6 +10,7 @@ from langchain.base_language import BaseLanguageModel
 from langchain.prompts import BaseChatPromptTemplate, BasePromptTemplate
 from langchain.schema.cache import RETURN_VAL_TYPE, BaseCache
 from langchain.schema.prompt import PromptValue
+from transformers import AutoTokenizer, LlamaTokenizer
 
 from heavyiq.config import HeavyIQConfig, get_config
 from heavyiq.langchain import HeavyDB
@@ -287,8 +288,6 @@ def get_tokenizer() -> Any:
     """
     Get tokenizer from pretrained local files.
     """
-    from transformers import AutoTokenizer, LlamaTokenizer
-
     from heavyiq.config import get_config
 
     config = get_config()

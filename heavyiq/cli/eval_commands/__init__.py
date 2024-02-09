@@ -53,7 +53,7 @@ async def process_question(
     enable_querystats: bool = True,
     langsmith_client: Client | None = None,
 ):
-    prob_stats, query_stats = None, None
+    prob_stats, query_stats, pred_query = None, None, ""
     try:
         tables = await aextract_tables_from_query(db, gold_query)
         res = await chain.acall({chain.input_key: question, "tables": tables}, include_run_info=is_langsmith_active)
@@ -66,9 +66,11 @@ async def process_question(
                 compute_prob_stats, res["logprobs"]["tokens"], res["logprobs"]["top_logprobs"]
             )
 
-        eval_res, query_stats = await asyncio.gather(
-            sql_rate_reply(gold_query, pred_query, db=db), db.aquery_stats(pred_query)
-        )
+        eval_res = await sql_rate_reply(gold_query, pred_query, db=db)
+        if eval_res.get("error"):
+            del db
+            db = await HeavyDB.from_env_async(db_id)
+        query_stats = await db.aquery_stats(pred_query)
         logger.info(f"Evaluation Success: {eval_res['success']}")
         logger.debug(f"Evaluation Status: {eval_res['status']}")
         if langsmith_client:
@@ -107,6 +109,22 @@ async def process_question(
             False,
             "failed_to_generate_sql",
             e.failed_sql,  # type: ignore
+            query_id=query_id,
+            prob_stats=prob_stats,
+            query_stats=query_stats,
+            enable_logprobs=enable_logprobs,
+            enable_querystats=enable_querystats,
+        )
+    except Exception as e:
+        logger.exception(f"Failed to generate SQL: {e}")
+        await awrite_eval_results_row(
+            eval_str,
+            db_id,
+            question,
+            gold_query,
+            False,
+            str(e),
+            pred_query,  # type: ignore
             query_id=query_id,
             prob_stats=prob_stats,
             query_stats=query_stats,
@@ -155,23 +173,20 @@ async def process_eval_row(
                 database=db, llm=llm, callbacks=None if verbose else [], verbose=verbose, tags=[eval_str, "cli"]
             )
 
-            try:
-                await process_question(
-                    question,
-                    is_langsmith_active,
-                    chain,
-                    db,
-                    gold_query,
-                    logger,
-                    eval_str,
-                    db_id,
-                    query_id,
-                    enable_logprobs=enable_logprobs,
-                    enable_querystats=enable_querystats,
-                    langsmith_client=langsmith_client,
-                )
-            except Exception as e:
-                logger.exception(f"Failed to generate SQL: {e}")
+            await process_question(
+                question,
+                is_langsmith_active,
+                chain,
+                db,
+                gold_query,
+                logger,
+                eval_str,
+                db_id,
+                query_id,
+                enable_logprobs=enable_logprobs,
+                enable_querystats=enable_querystats,
+                langsmith_client=langsmith_client,
+            )
 
 
 @eval.command()
