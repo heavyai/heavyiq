@@ -992,7 +992,7 @@ class HeavyDB:
             raise ValueError("Destructive SQL is not allowed")
         sql_stmt = f"EXPLAIN CALCITE DETAILED {query}" if detailed else f"EXPLAIN CALCITE {query}"
         async with self.alock:
-            cursor = self._conn.execute(sql_stmt)
+            cursor = await run_in_threadpool(self._conn.execute, sql_stmt)
         query_plan: tuple[str] = cursor.fetchone()  # type: ignore
         return str(query_plan[0])
 
