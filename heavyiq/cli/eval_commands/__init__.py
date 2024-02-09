@@ -426,7 +426,7 @@ async def run_config_model_on_questions_lcel(
                 await queue.put(row)
                 await asyncio.sleep(0.1)
 
-        print("Successfully filled the queue.")
+        print("Successfully filled the input queue.")
         # await queue.put(None)  # Sentinel value to signal the end of input
         # Signal consumers to stop
         for _ in range(processor_count):
@@ -459,7 +459,6 @@ async def run_config_model_on_questions_lcel(
 
             if item is None:
                 print(f"Processor {processor_id} stopped!")
-                print("putting None to output queue")
                 await output_queue.put(None)
                 await asyncio.sleep(0.1)
                 input_queue.task_done()
@@ -552,12 +551,17 @@ async def run_config_model_on_questions_lcel(
             if enable_query_stats:
                 header_data.extend(["num_joins", "num_unions", "num_aggs", "num_filters", "num_sorts"])
             await writer.writerow(header_data)
+            len_nones = 0
             while True:
                 item = await output_queue.get()
                 if item is None:
-                    print("Consumer stopped!")
+                    len_nones += 1
+                    if len_nones >= processor_count:
+                        output_queue.task_done()
+                        print("consumer stopped")
+                        break
                     output_queue.task_done()
-                    break
+                    continue
                 row = await build_row_data(item)
                 await writer.writerow(row)
                 output_queue.task_done()
