@@ -36,10 +36,10 @@ def get_vllm_model_name(api_base: str) -> str:
     """
     Get VLLM model name either from cache or from remote endpoint.
     """
-    logger = get_heavyiq_logger()
-
+    logger, config = get_heavyiq_logger(), get_config()
+    headers = {"Authorization": f"Bearer {config.heavylm_api_key}"} if config.heavylm_api_key else None
     logger.debug("Getting VLLM model name.")
-    response = requests.get(f"{api_base}/models", timeout=10)
+    response = requests.get(f"{api_base}/models", headers=headers, timeout=10)
     response.raise_for_status()
     model_name = response.json()["data"][0]["id"]
 
