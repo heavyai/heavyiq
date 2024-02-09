@@ -475,9 +475,12 @@ async def run_config_model_on_questions_lcel(
 
             if not query_error:
                 try:
-                    eval_res, query_stats = await asyncio.gather(
-                        sql_rate_reply(gold_query, pred_query, db=db), db.aquery_stats(pred_query)
-                    )
+                    eval_res = await sql_rate_reply(gold_query, pred_query, db=db)
+                    if eval_res.get("error"):
+                        del db
+                        db = await HeavyDB.from_env_async(db_id)
+                    query_stats = await db.aquery_stats(pred_query)
+
                 except Exception as e:
                     eval_res_success = False
                     eval_res_status = "failed_to_generate_sql"
