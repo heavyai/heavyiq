@@ -7,6 +7,8 @@ from cachetools import LRUCache, TTLCache, cached
 from fastapi.concurrency import run_in_threadpool
 from heavydb.exceptions import TDBException
 from langchain.base_language import BaseLanguageModel
+from langchain.callbacks.tracers.langchain import LangChainTracer
+from langchain.callbacks.tracers.schemas import Run
 from langchain.prompts import BaseChatPromptTemplate, BasePromptTemplate
 from langchain.schema.cache import RETURN_VAL_TYPE, BaseCache
 from langchain.schema.prompt import PromptValue
@@ -473,3 +475,13 @@ class InMemoryLLMCache(BaseCache):
     def clear(self, **kwargs: Any) -> None:
         """Clear cache."""
         self._cache = {}
+
+
+class NoopLangChainTracer(LangChainTracer):
+    """
+    Helps to disable langsmith tracing when this instance is being passed as callbacks while invoking a runnable.
+    """
+
+    def _submit(self, function: Callable[[Run], None], run: Run) -> None:
+        """Submit a function to the executor."""
+        pass
