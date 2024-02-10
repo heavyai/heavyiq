@@ -1012,14 +1012,18 @@ class HeavyDB:
     async def aextract_string_literal_ops(self, detailed_query_plan: str) -> dict[str, tuple[str, str]]:
         self.logger.debug(f"Extracting string literal operations from query plan: {detailed_query_plan}")
         result = {}
-        pattern1 = r"(LIKE|PG_ILIKE|>=|<=|<>|=)\(\$(\d+), '([\w\- ]+)'"
-        pattern2 = r"(LIKE|PG_ILIKE|>=|<=|<>|=)\('([\w\- ]+)', \$(\d+)\)"
+        pattern1 = r"(NOT\()?(LIKE|PG_ILIKE|>=|<=|<>|=)\(\$(\d+), '([\w\- ]+)'"
+        pattern2 = r"(NOT\()?(LIKE|PG_ILIKE|>=|<=|<>|=)\('([\w\- ]+)', \$(\d+)\)"
 
         matches1 = re.findall(pattern1, detailed_query_plan)
         matches2 = re.findall(pattern2, detailed_query_plan)
-        for op, id, literal in matches1:
+        for negation, op, id, literal in matches1:
+            if negation == "NOT(":
+                op = f"NOT {op}"
             result[id] = (op, literal)
-        for op, literal, id in matches2:
+        for negation, op, literal, id in matches2:
+            if negation == "NOT(":
+                op = f"NOT {op}"
             result[id] = (op, literal)
 
         self.logger.debug("Finished extracting string literal operations")
@@ -1056,19 +1060,19 @@ class HeavyDB:
                 exact_match_count += row[1]  # type: ignore
             total_count += row[1]  # type: ignore
 
-        if total_count > 0 and literal["operator"] != "ILIKE":
+        if total_count > 0:  # and literal["operator"] != "ILIKE":
             if exact_match_count == 0 and num_case_match_rows == 1:
                 altered_literal["literal"] = str(case_match_rows[0][0])
                 return altered_literal
             elif exact_match_count / total_count < exact_match_threshold:
-                if literal["operator"] == "<>":
+                if literal["operator"] in ("<>", "!=", "NOT LIKE", "NOT PG_ILIKE", "NOT ILIKE", "NOT PG_ILIKE"):
                     altered_literal["operator"] = "NOT ILIKE"
                 else:
                     altered_literal["operator"] = "ILIKE"
                 return altered_literal
         elif total_count == 0:
             lower_literal = literal["literal"].lower()
-            similarity_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) FROM distinct_values WHERE LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) < 5 ORDER BY LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) ASC, num_str_values DESC LIMIT 2;"
+            similarity_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) FROM distinct_values WHERE LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) < 5 ORDER BY LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) ASC, ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) ASC, num_str_values DESC LIMIT 2;"
 
             async with self.alock:
                 cursor = await run_in_threadpool(self._conn.execute, similarity_query)
@@ -1091,10 +1095,10 @@ class HeavyDB:
                     # top returned value (we've sorted in ascending order by score and descending order by number
                     # of string matches)
                     altered_literal["literal"] = str(similarity_rows[0][0])
-                if literal["operator"] == "<>":
-                    altered_literal["operator"] = "NOT ILIKE"
-                else:
-                    altered_literal["operator"] = "ILIKE"
+            if literal["operator"] in ("<>", "!=", "NOT LIKE", "NOT PG_ILIKE", "NOT ILIKE", "NOT PG_ILIKE"):
+                altered_literal["operator"] = "NOT ILIKE"
+            else:
+                altered_literal["operator"] = "ILIKE"
             return altered_literal
 
         return altered_literal
@@ -1114,18 +1118,27 @@ class HeavyDB:
             for str_literal_op in str_literal_ops_list:
                 altered_str_literal_op = await self.acorrect_string_literal(str_literal_op, exact_match_threshold)
                 if altered_str_literal_op != str_literal_op:
-                    if altered_str_literal_op["operator"] != str_literal_op["operator"]:
-                        altered_query = altered_query.replace(
-                            f"{str_literal_op['column']} {str_literal_op['operator']} '{str_literal_op['literal']}'",
-                            f"{str_literal_op['column']} {altered_str_literal_op['operator']} '{altered_str_literal_op['literal']}'",
-                        )
+                    if (
+                        altered_str_literal_op["operator"] != str_literal_op["operator"]
+                        or altered_str_literal_op["literal"] != str_literal_op["literal"]
+                    ):
+                        search_literal_op = str_literal_op["operator"]
+                        if search_literal_op == "<>" or search_literal_op == "!=":
+                            # Handle case where AST shows <> but string is !=
+                            search_literal_op = "(<>|!=)"
+                        elif search_literal_op == "ILIKE" or search_literal_op == "PG_ILIKE":
+                            search_literal_op = "(ILIKE|PG_ILIKE)"
+                        elif search_literal_op == "NOT ILIKE" or search_literal_op == "NOT PG_ILIKE":
+                            search_literal_op = "(NOT ILIKE|NOT PG_ILIKE)"
+                        escaped_column = re.escape(str_literal_op["column"])
+                        escaped_literal = re.escape(str_literal_op["literal"])
+                        search_string = f"{escaped_column} {search_literal_op} '{escaped_literal}'"
+                        target_string = f"{str_literal_op['column']} {altered_str_literal_op['operator']} '{altered_str_literal_op['literal']}'"
+                        compiled_re = re.compile(search_string, re.IGNORECASE)
+                        altered_query = compiled_re.sub(target_string, altered_query)
+
                         self.logger.debug(
                             f"Operator changed from {str_literal_op['operator']} to {altered_str_literal_op['operator']}"
-                        )
-                    if altered_str_literal_op["literal"] != str_literal_op["literal"]:
-                        altered_query = altered_query.replace(
-                            f"{str_literal_op['column']} {altered_str_literal_op['operator']} '{str_literal_op['literal']}'",
-                            f"{str_literal_op['column']} {altered_str_literal_op['operator']} '{altered_str_literal_op['literal']}'",
                         )
                         self.logger.debug(
                             f"Literal changed from {str_literal_op['literal']} to {altered_str_literal_op['literal']}"
