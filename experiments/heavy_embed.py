@@ -1,10 +1,11 @@
+import argparse
+
 import heavyai
 import pandas as pd
-import argparse
 
 
 class SentenceTransformerEmbeddingFunction:
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
+    def __init__(self, model_name: str = "all-MiniLM-L12-v2"):
         try:
             from sentence_transformers import SentenceTransformer
         except ImportError:
@@ -23,7 +24,7 @@ parser.add_argument("--user", type=str, default="admin")
 parser.add_argument("--dbname", type=str, default="heavyai")
 parser.add_argument("--host", type=str, default="127.0.0.1")
 parser.add_argument("--password", type=str, default="HyperInteractive")
-parser.add_argument("--model_name", type=str, default="gtr-t5-large")
+parser.add_argument("--model", type=str, default="all-MiniLM-L12-v2")
 parser.add_argument("--source_table", type=str, required=True)
 parser.add_argument("--id_column", type=str, required=True)
 parser.add_argument("--text_column", type=str, required=True)
@@ -36,7 +37,7 @@ args = parser.parse_args()
 con = heavyai.connect(user=args.user, dbname=args.dbname, host=args.host, password=args.password)
 
 # Initialize the SentenceTransformer model
-model = SentenceTransformerEmbeddingFunction(args.model_name)
+model = SentenceTransformerEmbeddingFunction(args.model)
 
 # Fetch data from the source table
 query = f"SELECT {args.id_column}, {args.text_column} FROM {args.source_table} WHERE {args.id_filter}"
