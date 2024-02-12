@@ -1,42 +1,29 @@
 import argparse
-import heavyai
 import sys
+
+import heavyai
 
 
 def getOptions(argv=None):
     parser = argparse.ArgumentParser(description="Build HeavyIQ training dataset")
-    parser.add_argument(
-        "-s", "--host", help="HeavyDB server address", default="localhost"
-    )
+    parser.add_argument("-s", "--host", help="HeavyDB server address", default="localhost")
     parser.add_argument("-p", "--port", help="HeavyDB server port", default="6273")
     parser.add_argument("-u", "--user", help="HeavyDB user name", default="admin")
-    parser.add_argument(
-        "-w", "--password", help="HeavyDB password", default="HyperInteractive"
-    )
+    parser.add_argument("-w", "--password", help="HeavyDB password", default="HyperInteractive")
     parser.add_argument("-d", "--database", help="HeavyDB database", default="heavyai")
     parser.add_argument("-v", "--version", help="Dataset Version Num", default=None)
     parser.add_argument("-q", "--queries", help="Queries file", default=None)
-    parser.add_argument(
-        "--num-query-shards", help="Number of query shards", default=None, type=int
-    )
-    parser.add_argument(
-        "--query-instruction-prompt", help="Query instruction prompt", default=None
-    )
-    parser.add_argument(
-        "--query-output-prompt", help="Query output prompt", default=None
-    )
+    parser.add_argument("--num-query-shards", help="Number of query shards", default=None, type=int)
+    parser.add_argument("--query-instruction-prompt", help="Query instruction prompt", default=None)
+    parser.add_argument("--query-output-prompt", help="Query output prompt", default=None)
     parser.add_argument("--nl-answers", help="NL Answers file", default=None)
     parser.add_argument(
         "--nl-answers-instruction-prompt",
         help="NL Answers instruction prompt",
         default=None,
     )
-    parser.add_argument(
-        "--nl-answers-output-prompt", help="NL Answers output prompt", default=None
-    )
-    parser.add_argument(
-        "--questions-table-level", help="Table questions file", default=None
-    )
+    parser.add_argument("--nl-answers-output-prompt", help="NL Answers output prompt", default=None)
+    parser.add_argument("--questions-table-level", help="Table questions file", default=None)
     parser.add_argument(
         "--questions-table-level-instruction-prompt",
         help="Table questions instruction prompt",
@@ -47,9 +34,7 @@ def getOptions(argv=None):
         help="Table questions output prompt",
         default=None,
     )
-    parser.add_argument(
-        "--questions-column-level", help="Column questions file", default=None
-    )
+    parser.add_argument("--questions-column-level", help="Column questions file", default=None)
     parser.add_argument(
         "--questions-column-level-instruction-prompt",
         help="Column questions instruction prompt",
@@ -66,26 +51,14 @@ def getOptions(argv=None):
         help="Used tables instruction prompt",
         default=None,
     )
-    parser.add_argument(
-        "--used-tables-output-prompt", help="Used tables output prompt", default=None
-    )
+    parser.add_argument("--used-tables-output-prompt", help="Used tables output prompt", default=None)
     parser.add_argument("-e", "--errors", help="Errors file", default=None)
-    parser.add_argument(
-        "--errors-instruction-prompt", help="Errors instruction prompt", default=None
-    )
-    parser.add_argument(
-        "--errors-output-prompt", help="Errors output prompt", default=None
-    )
-    parser.add_argument(
-        "-t", "--max-token-length", help="Max token length", default=768
-    )
+    parser.add_argument("--errors-instruction-prompt", help="Errors instruction prompt", default=None)
+    parser.add_argument("--errors-output-prompt", help="Errors output prompt", default=None)
+    parser.add_argument("-t", "--max-token-length", help="Max token length", default=768)
     parser.add_argument("-o", "--output-dir", help="Output directory", default=None)
-    parser.add_argument(
-        "--create-combo-dataset", help="Create combo dataset", action="store_true"
-    )
-    parser.add_argument(
-        "--instruction-table", help="NL Answers file", default="databricks_dolly_15k"
-    )
+    parser.add_argument("--create-combo-dataset", help="Create combo dataset", action="store_true")
+    parser.add_argument("--instruction-table", help="NL Answers file", default="databricks_dolly_15k")
     parser.add_argument(
         "--custom-instruction-table",
         help="NL Custom Answers file",
@@ -95,9 +68,7 @@ def getOptions(argv=None):
     parser.add_argument("--combo-label", help="Combo label", default=None)
     parser.add_argument("--query-label", help="Query label", default=None)
     parser.add_argument("--min-avg-prob", help="Min avg prob", default=None)
-    parser.add_argument(
-        "--avg-prob-order-noise", help="Order by avg prob noise", default=None
-    )
+    parser.add_argument("--avg-prob-order-noise", help="Order by avg prob noise", default=None)
 
     return parser.parse_args(argv)
 
@@ -123,19 +94,15 @@ def load_queries(
 
     drop_table_sql = f"DROP TABLE IF EXISTS heavyiq_text_to_sql_{query_table_label};"
     create_table_sql = f"CREATE TABLE heavyiq_text_to_sql_{query_table_label} (query_id INT, db_id TEXT, tables TEXT[], data_split TEXT, question TEXT, num_instruction_tokens INT, num_targeted_instruction_tokens INT, num_output_tokens INT, instruction TEXT, targeted_instruction TEXT, output TEXT, avg_prob DOUBLE, total_prob DOUBLE, min_prop DOUBLE);"
-    load_sql = f"COPY heavyiq_text_to_sql_{query_table_label} FROM '{queries_path}' WITH (header='t', array_marker='[]');"
-    add_prompt_col_sql = (
-        f"ALTER TABLE heavyiq_text_to_sql_{query_table_label} ADD COLUMN prompt TEXT;"
+    load_sql = (
+        f"COPY heavyiq_text_to_sql_{query_table_label} FROM '{queries_path}' WITH (header='t', array_marker='[]');"
     )
-    add_answer_col_sql = (
-        f"ALTER TABLE heavyiq_text_to_sql_{query_table_label} ADD COLUMN answer TEXT;"
-    )
+    add_prompt_col_sql = f"ALTER TABLE heavyiq_text_to_sql_{query_table_label} ADD COLUMN prompt TEXT;"
+    add_answer_col_sql = f"ALTER TABLE heavyiq_text_to_sql_{query_table_label} ADD COLUMN answer TEXT;"
     update_prompt_col_sql = f"UPDATE heavyiq_text_to_sql_{query_table_label} SET prompt = targeted_instruction;"
     if query_instruction_prompt and query_output_prompt is not None:
         update_prompt_col_sql = f"UPDATE heavyiq_text_to_sql_{query_table_label} SET prompt = '{query_instruction_prompt}\n' || targeted_instruction || '\n{query_output_prompt}\n';"
-    update_answer_col_sql = (
-        f"UPDATE heavyiq_text_to_sql_{query_table_label} SET answer = output;"
-    )
+    update_answer_col_sql = f"UPDATE heavyiq_text_to_sql_{query_table_label} SET answer = output;"
 
     export_prefix = f"heavyiq_text_to_sql_{query_table_label}"
     avg_prob_filter_clause = ""
@@ -179,15 +146,9 @@ def load_nl_answers(
     drop_table_sql = f"DROP TABLE IF EXISTS heavyiq_nl_answers_v{version}"
     create_table_sql = f"CREATE TABLE heavyiq_nl_answers_v{version} (query_id INT, db_id TEXT, data_split TEXT, instruction TEXT, output TEXT);"
     load_sql = f"COPY heavyiq_nl_answers_v{version} FROM '{nl_answers_path}' WITH (header='t');"
-    add_prompt_col_sql = (
-        f"ALTER TABLE heavyiq_nl_answers_v{version} ADD COLUMN prompt TEXT;"
-    )
-    add_answer_col_sql = (
-        f"ALTER TABLE heavyiq_nl_answers_v{version} ADD COLUMN answer TEXT;"
-    )
-    update_prompt_col_sql = (
-        f"UPDATE heavyiq_nl_answers_v{version} SET prompt = instruction;"
-    )
+    add_prompt_col_sql = f"ALTER TABLE heavyiq_nl_answers_v{version} ADD COLUMN prompt TEXT;"
+    add_answer_col_sql = f"ALTER TABLE heavyiq_nl_answers_v{version} ADD COLUMN answer TEXT;"
+    update_prompt_col_sql = f"UPDATE heavyiq_nl_answers_v{version} SET prompt = instruction;"
     if nl_answers_instruction_prompt and nl_answers_output_prompt is not None:
         update_prompt_col_sql = f"UPDATE heavyiq_nl_answers_v{version} SET prompt = '{nl_answers_instruction_prompt}\n' || instruction || '\n{nl_answers_output_prompt}\n';"
     update_answer_col_sql = f"UPDATE heavyiq_nl_answers_v{version} SET answer = output;"
@@ -216,9 +177,7 @@ def load_questions(
     output_dir,
 ):
     questions_type = "column" if is_col_level else "table"
-    drop_table_sql = (
-        f"DROP TABLE IF EXISTS heavyiq_questions_{questions_type}_v{version}"
-    )
+    drop_table_sql = f"DROP TABLE IF EXISTS heavyiq_questions_{questions_type}_v{version}"
     create_table_sql = f"CREATE TABLE heavyiq_questions_{questions_type}_v{version} (query_id INT, db_id TEXT, data_split TEXT, instruction TEXT, output TEXT, num_instruction_tokens INT);"
     load_sql = f"COPY heavyiq_questions_{questions_type}_v{version} FROM '{questions_path}' WITH (header='t');"
     add_prompt_col_sql = f"ALTER TABLE heavyiq_questions_{questions_type}_v{version} ADD COLUMN prompt TEXT;"
@@ -226,9 +185,7 @@ def load_questions(
     update_prompt_col_sql = f"UPDATE heavyiq_questions_{questions_type}_v{version} SET prompt = instruction;"
     if questions_instruction_prompt and questions_output_prompt is not None:
         update_prompt_col_sql = f"UPDATE heavyiq_questions_{questions_type}_v{version} SET prompt = '{questions_instruction_prompt}\n' || instruction || '\n{questions_output_prompt}\n';"
-    update_answer_col_sql = (
-        f"UPDATE heavyiq_questions_{questions_type}_v{version} SET answer = output;"
-    )
+    update_answer_col_sql = f"UPDATE heavyiq_questions_{questions_type}_v{version} SET answer = output;"
     export_train_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_questions_{questions_type}_v{version} WHERE data_split <> 'dev' AND num_instruction_tokens <= {max_token_length}) TO '{output_dir}/heavyiq_questions_{questions_type}_v{version}_train.csv' WITH (header='t');"
     export_eval_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_questions_{questions_type}_v{version} WHERE data_split = 'dev' AND num_instruction_tokens <= {max_token_length}) TO '{output_dir}/heavyiq_questions_{questions_type}_v{version}_eval.csv' WITH (header='t');"
 
@@ -256,20 +213,12 @@ def load_used_tables(
     drop_table_sql = f"DROP TABLE IF EXISTS heavyiq_used_tables_{table_suffix}"
     create_table_sql = f"CREATE TABLE heavyiq_used_tables_{table_suffix} (query_id INT, db_id TEXT, data_split TEXT, instruction TEXT, output TEXT, num_instruction_tokens INT);"
     load_sql = f"COPY heavyiq_used_tables_{table_suffix} FROM '{used_tables_path}' WITH (header='t');"
-    add_prompt_col_sql = (
-        f"ALTER TABLE heavyiq_used_tables_{table_suffix} ADD COLUMN prompt TEXT;"
-    )
-    add_answer_col_sql = (
-        f"ALTER TABLE heavyiq_used_tables_{table_suffix} ADD COLUMN answer TEXT;"
-    )
-    update_prompt_col_sql = (
-        f"UPDATE heavyiq_used_tables_{table_suffix} SET prompt = instruction;"
-    )
+    add_prompt_col_sql = f"ALTER TABLE heavyiq_used_tables_{table_suffix} ADD COLUMN prompt TEXT;"
+    add_answer_col_sql = f"ALTER TABLE heavyiq_used_tables_{table_suffix} ADD COLUMN answer TEXT;"
+    update_prompt_col_sql = f"UPDATE heavyiq_used_tables_{table_suffix} SET prompt = instruction;"
     if used_tables_instruction_prompt and used_tables_output_prompt is not None:
         update_prompt_col_sql = f"UPDATE heavyiq_used_tables_{table_suffix} SET prompt = '{used_tables_instruction_prompt}\n' || instruction || '\n{used_tables_output_prompt}\n';"
-    update_answer_col_sql = (
-        f"UPDATE heavyiq_used_tables_{table_suffix} SET answer = output;"
-    )
+    update_answer_col_sql = f"UPDATE heavyiq_used_tables_{table_suffix} SET answer = output;"
     # Account for prompt tokens in max length
     export_train_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_used_tables_{table_suffix} WHERE data_split <> 'dev' AND num_instruction_tokens <= {max_token_length}) TO '{output_dir}/heavyiq_used_tables_{table_suffix}_train.csv' WITH (header='t');"
     export_eval_sql = f"COPY (SELECT query_id, db_id, prompt, answer FROM heavyiq_used_tables_{table_suffix} WHERE data_split = 'dev' AND num_instruction_tokens <= {max_token_length}) TO '{output_dir}/heavyiq_used_tables_{table_suffix}_eval.csv' WITH (header='t');"
@@ -296,15 +245,9 @@ def load_errors(
     drop_table_sql = f"DROP TABLE IF EXISTS heavyiq_errors_v{version}"
     create_table_sql = f"CREATE TABLE heavyiq_errors_v{version} (query_id INT, db_id TEXT, tables TEXT[], data_split TEXT, instruction TEXT, output TEXT);"
     load_sql = f"COPY heavyiq_errors_v{version} FROM '{errors_path}' WITH (header='t', array_marker='[]');"
-    add_prompt_col_sql = (
-        f"ALTER TABLE heavyiq_errors_v{version} ADD COLUMN prompt TEXT;"
-    )
-    add_answer_col_sql = (
-        f"ALTER TABLE heavyiq_errors_v{version} ADD COLUMN answer TEXT;"
-    )
-    update_prompt_col_sql = (
-        f"UPDATE heavyiq_errors_v{version} SET prompt = instruction;"
-    )
+    add_prompt_col_sql = f"ALTER TABLE heavyiq_errors_v{version} ADD COLUMN prompt TEXT;"
+    add_answer_col_sql = f"ALTER TABLE heavyiq_errors_v{version} ADD COLUMN answer TEXT;"
+    update_prompt_col_sql = f"UPDATE heavyiq_errors_v{version} SET prompt = instruction;"
     if errors_instruction_prompt and errors_output_prompt is not None:
         update_prompt_col_sql = f"UPDATE heavyiq_errors_v{version} SET prompt = '{errors_instruction_prompt}\n' || instruction || '\n{errors_output_prompt}\n';"
     update_answer_col_sql = f"UPDATE heavyiq_errors_v{version} SET answer = output;"
@@ -463,9 +406,7 @@ def main(argv):
             options.version,
             options.output_dir,
         )
-        used_tables_table = (
-            f"heavyiq_used_tables_v{options.version}_{options.max_token_length}_tokens"
-        )
+        used_tables_table = f"heavyiq_used_tables_v{options.version}_{options.max_token_length}_tokens"
 
     if options.errors is not None:
         load_errors(
