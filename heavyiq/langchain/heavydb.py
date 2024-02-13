@@ -435,6 +435,8 @@ class HeavyDB:
         table_schema = re.sub(r" ENCODING .*\)([,\)])", r"\1", table_schema)  # type: ignore
         table_schema = re.sub(r",\n.*SHARED DICTIONARY.*REFERENCES.*\([A-Za-z0-9_]*\)", "", table_schema)
         table_schema = re.sub(r"\n", "", table_schema)
+        table_schema = re.sub(r"\(  ", "(", table_schema)
+        table_schema = re.sub(r",  ", ", ", table_schema)
         if "WITH (" in table_schema:
             table_schema = table_schema[: table_schema.index("WITH (")]
         self.table_schema_cache.put(cache_key, table_schema)
@@ -770,6 +772,8 @@ class HeavyDB:
         table_schema = re.sub(r" ENCODING .*\)([,\)])", r"\1", table_schema)  # type: ignore
         table_schema = re.sub(r",\n.*SHARED DICTIONARY.*REFERENCES.*\([A-Za-z0-9_]*\)", "", table_schema)
         table_schema = re.sub(r"\n", "", table_schema)
+        table_schema = re.sub(r"\(  ", "(", table_schema)
+        table_schema = re.sub(r",  ", ", ", table_schema)
         if "WITH (" in table_schema:
             table_schema = table_schema[: table_schema.index("WITH (")]
 
