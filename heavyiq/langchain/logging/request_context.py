@@ -1,11 +1,12 @@
-from collections.abc import Generator, AsyncGenerator
-from contextlib import contextmanager, asynccontextmanager
+from collections.abc import AsyncGenerator, Generator
+from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime
-from typing import Optional, Any
+from typing import Any, Optional
 
 from langchain.agents.agent import AgentExecutor
-from langchain.callbacks import OpenAICallbackHandler, get_openai_callback
+from langchain.callbacks import OpenAICallbackHandler, collect_runs, get_openai_callback
 from langchain.chains.base import Chain
+from langchain.schema.runnable import Runnable, RunnableConfig, RunnableSerializable
 
 from heavyiq import VERSION_TAG
 from heavyiq.config import get_config
@@ -159,6 +160,14 @@ async def chain_log_request_ctx_async(
     yield ctx
 
 
+@asynccontextmanager
+async def runnable_log_request_ctx(
+    runnable_name: str, model: str = "", input: Optional[dict] = None
+) -> AsyncGenerator[RequestContext, None]:
+    ctx = RequestContext(LangChainType.RunnableChain, runnable_name, model, input)
+    yield ctx
+
+
 @contextmanager
 def agent_log_request_ctx(
     langchain_name: str, model: str = "", input: Optional[dict] = None
@@ -199,6 +208,34 @@ async def log_chain_call_async(
             except Exception as e:
                 log_ctx.error(str(e), cb)
                 raise e
+
+
+async def log_chain_runnable(
+    runnable: RunnableSerializable | Runnable,
+    input: dict | str,
+    config: RunnableConfig | None = None,
+    model: str = "",
+) -> str:
+    """
+    Helps to invoke and log tokens used by the runnable.
+    """
+    config = config or {}
+    async with runnable_log_request_ctx("", model, input) as log_ctx:  # type: ignore
+        with get_openai_callback() as cb:
+            with collect_runs() as clrs:  # context manager which helps to grab the runs list
+                try:
+                    tags = config.get("tags", [])
+                    tags.append(VERSION_TAG)
+                    config["tags"] = tags
+                    output = await runnable.ainvoke(input, config=config)
+                    # helps to grab the last run
+                    last_run = clrs.traced_runs[0]
+                    log_ctx.langchain_name = last_run.name
+                    log_ctx.success(output, cb)
+                    return output
+                except Exception as e:
+                    log_ctx.error(str(e), cb)
+                    raise e
 
 
 def log_agent_call(agent: AgentExecutor, input: str, model: str = "") -> dict:

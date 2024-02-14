@@ -1,7 +1,34 @@
+import multiprocessing
 import time
 import unittest
-import multiprocessing
-from heavyiq.utils import LRUCache
+from unittest import IsolatedAsyncioTestCase
+
+from heavyiq.utils import LRUCache, SharedDictSingleton
+
+
+class TestSharedDictSingleton(IsolatedAsyncioTestCase):
+    async def test_singleton_instance(self):
+        instance1 = SharedDictSingleton()
+        instance2 = SharedDictSingleton()
+        self.assertIs(instance1, instance2)
+
+    async def test_put_get_operations(self):
+        instance = SharedDictSingleton()
+
+        # Test put and get operations
+        key = "test_key"
+        value = "test_value"
+
+        # Ensure the key is not present initially
+        result_before_put = await instance.get(key)
+        self.assertIsNone(result_before_put)
+
+        # Perform put operation
+        await instance.put(key, value)
+
+        # Perform get operation
+        result_after_put = await instance.get(key)
+        self.assertEqual(result_after_put, value)
 
 
 class TestLRUCache(unittest.TestCase):

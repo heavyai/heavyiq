@@ -26,3 +26,5 @@ config.test.toml
 
 eval/results/*.csv
 *.log
+testdb/
+hf_models/

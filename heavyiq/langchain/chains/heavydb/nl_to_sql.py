@@ -1,29 +1,23 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Optional
 
+from langchain.callbacks.manager import AsyncCallbackManagerForChainRun, CallbackManagerForChainRun
+from langchain.chat_models.base import BaseChatModel
+from langchain.prompts import HumanMessagePromptTemplate, SystemMessagePromptTemplate
+from langchain.prompts.chat import BaseChatPromptTemplate, ChatPromptTemplate
+from langchain.prompts.prompt import PromptTemplate
+from langchain.schema import AIMessage, BasePromptTemplate, HumanMessage, LLMResult
+from langchain.schema.language_model import BaseLanguageModel
 from pydantic import Extra
 
-import re
-
-from langchain.chat_models.base import BaseChatModel
-from langchain.schema.language_model import BaseLanguageModel
-from langchain.schema import AIMessage, HumanMessage
-from langchain.prompts import HumanMessagePromptTemplate, SystemMessagePromptTemplate
-from langchain.prompts.chat import ChatPromptTemplate, BaseChatPromptTemplate
-from langchain.schema import BasePromptTemplate, LLMResult
-from langchain.prompts.prompt import PromptTemplate
-from langchain.callbacks.manager import (
-    AsyncCallbackManagerForChainRun,
-    CallbackManagerForChainRun,
-)
-
 from heavyiq.config import get_config
-from heavyiq.langchain.llms import is_using_custom_trained_llm
-from heavyiq.langchain.heavydb import HeavyDB
 from heavyiq.langchain.chains import BaseChain
-from heavyiq.langchain.utils import populate_table_info_wrt_token_limit, apopulate_table_info_wrt_token_limit
 from heavyiq.langchain.exceptions import NLtoSQLException
+from heavyiq.langchain.heavydb import HeavyDB
+from heavyiq.langchain.llms import is_using_custom_trained_llm
+from heavyiq.langchain.utils import apopulate_table_info_wrt_token_limit, populate_table_info_wrt_token_limit
 from heavyiq.utils import strip_sql_comments
 
 NL_TO_SQL_TEMPLATE = """Create a syntactically correct SQL query to answer the input question.
@@ -43,13 +37,16 @@ SQLQuery:"""
 NL_TO_SQL_PROMPT = PromptTemplate.from_template(NL_TO_SQL_TEMPLATE)
 
 CUSTOM_LLM_NL_TO_SQL_TEMPLATE = """<|sql prompt|>
-You are a experienced data analyst adept at writing SQL queries to answer user questions.
+You are an experienced data analyst adept at writing SQL queries to answer user questions.
 
 You have access to the following relational tables, with schemas below.
+
 {table_info}
+
 Write a SQL query to answer the following question:
 {input}
-<|sql answer|>"""
+<|sql answer|>
+"""
 CUSTOM_LLM_NL_TO_SQL_PROMPT = PromptTemplate.from_template(CUSTOM_LLM_NL_TO_SQL_TEMPLATE)
 
 NL_TO_SQL_ERROR_TEMPLATE = """Correct the given SQL query:
@@ -73,8 +70,11 @@ NL_TO_SQL_ERROR_PROMPT = PromptTemplate.from_template(NL_TO_SQL_ERROR_TEMPLATE)
 
 CUSTOM_NL_TO_SQL_ERROR_TEMPLATE = """<|sql error prompt|>
 You generated a SQL query that generated an exception when executed in the HeavyDB database.
+
 You have access to the following relation tables, with schemas below.
+
 {table_info}
+
 In attempting to answer the following user question:
 
 {input},
@@ -84,7 +84,8 @@ you generated the following SQL query:
 {error}
 
 Please alter the query to run without error in HeavyDB:
-<|sql error answer|>"""
+<|sql error answer|>
+"""
 
 CUSTOM_NL_TO_SQL_ERROR_PROMPT = PromptTemplate.from_template(CUSTOM_NL_TO_SQL_ERROR_TEMPLATE)
 
@@ -142,6 +143,11 @@ class BaseNLtoSQLChain(BaseChain):
 
         extra = Extra.forbid
         arbitrary_types_allowed = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        config = get_config()
+        self.max_retries = config.max_retries_nl_to_sql
 
     @property
     def input_keys(self) -> list[str]:
@@ -376,12 +382,11 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
         Helps to parse out SQL query from the llm response message.
         """
         if "SQLQuery:" in message:
-            return message.split("SQLQuery:")[1].strip()
-        if "```sql" in message:
-            return message.split("```sql")[1].strip()
-
-        if ":\n" in message:
-            return message.split(":\n")[1].strip()
+            message = message.split("SQLQuery:")[1].strip()
+        elif "```sql" in message:
+            message = message.split("```sql")[1].strip()
+        elif ":\n" in message:
+            message = message.split(":\n")[1].strip()
         return strip_sql_comments(message)
 
     def _call(
@@ -402,6 +407,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
         messages = gen_sql_prompt.to_messages()
         response = self.llm.generate([messages], callbacks=run_manager.get_child() if run_manager else None)
         sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
+        sql_cmd = self.get_sql_query(sql_cmd)
         verified = False
         retries = 0
 
@@ -420,6 +426,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
                 messages.append(HumanMessage(content=NL_TO_SQL_CHAT_ERROR_TEMPLATE.format(exception=truncated_error)))
                 response = self.llm.generate([messages], callbacks=run_manager.get_child() if run_manager else None)
                 sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
+                sql_cmd = self.get_sql_query(sql_cmd)
 
         if not verified:
             self.write_callback_message(
@@ -441,7 +448,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
         sql_complexity = self.database.complexity(sql_cmd)
 
         return {
-            self.output_key: strip_sql_comments(sql_cmd),
+            self.output_key: sql_cmd,
             self.output_complexity_key: str(sql_complexity),
             self.output_logprobs_key: logprobs,
         }
@@ -464,6 +471,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
         messages = gen_sql_prompt.to_messages()
         response = await self.llm.agenerate([messages], callbacks=run_manager.get_child() if run_manager else None)
         sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
+        sql_cmd = self.get_sql_query(sql_cmd)
         verified = False
         retries = 0
 
@@ -488,6 +496,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
                     [messages], callbacks=run_manager.get_child() if run_manager else None
                 )
                 sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
+                sql_cmd = self.get_sql_query(sql_cmd)
 
         if not verified:
             await self.write_callback_message_async(
@@ -511,7 +520,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
         sql_complexity = await self.database.acomplexity(sql_cmd)
 
         return {
-            self.output_key: strip_sql_comments(sql_cmd),
+            self.output_key: sql_cmd,
             self.output_complexity_key: str(sql_complexity),
             self.output_logprobs_key: logprobs,
         }

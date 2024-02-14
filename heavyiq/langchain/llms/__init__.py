@@ -1,14 +1,18 @@
+import time
 from enum import Enum
-import requests
-from functools import lru_cache
 from typing import Any
 
+import requests
+from cachetools import LRUCache, TTLCache, cached
+from langchain.chat_models import AzureChatOpenAI, ChatOpenAI
+from langchain.chat_models.base import BaseChatModel
 from langchain.llms import AzureOpenAI
 from langchain.llms.base import BaseLLM
-from langchain.chat_models import ChatOpenAI, AzureChatOpenAI
-from langchain.chat_models.base import BaseChatModel
 
 from heavyiq.config import get_config
+from heavyiq.logging_utils import get_heavyiq_logger
+from heavyiq.utils import SharedDictSingleton
+
 from .overrides import OverrideOpenAI, OverrideVLLMOpenAI
 
 
@@ -16,6 +20,8 @@ class LLMType(Enum):
     DEFAULT = "default"
     NL_TO_SQL = "nl_to_sql"
     SQL_TO_ANSWER = "sql_to_answer"
+    NL_TO_TABLES = "nl_to_tables"
+    INSTRUCT = "instruct"  # mainly used on /call-llm endpoint to resolve general instructions
 
 
 def is_using_custom_trained_llm() -> bool:
@@ -23,15 +29,28 @@ def is_using_custom_trained_llm() -> bool:
     return config.custom_llm_type in ["API", "API_VLLM"]
 
 
+@cached(
+    cache=TTLCache(maxsize=3, ttl=60 * 10)
+)  # a max of 3 unique calls can be cached at a time and each can live for 10 minutes
 def get_vllm_model_name(api_base: str) -> str:
-    response = requests.get(f"{api_base}/models")
+    """
+    Get VLLM model name either from cache or from remote endpoint.
+    """
+    logger, config = get_heavyiq_logger(), get_config()
+    headers = {"Authorization": f"Bearer {config.heavylm_api_key}"} if config.heavylm_api_key else None
+    logger.debug("Getting VLLM model name.")
+    response = requests.get(f"{api_base}/models", headers=headers, timeout=10)
     response.raise_for_status()
-    return response.json()["data"][0]["id"]
+    model_name = response.json()["data"][0]["id"]
+
+    return model_name
 
 
-@lru_cache
-def get_vllm_model_kwargs(model_type: LLMType, **kwargs) -> tuple[dict[str, Any], dict[str, Any]]:
+@cached(cache=LRUCache(maxsize=5))  # only four options availabe for LLMType, so set it to 5
+def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str, Any]]:
     config = get_config()
+    # by default n was set to 1, so no need for passing n as llm kwargs otherwise if we need to
+    kwargs: dict[str, Any] = {}
     model_kwargs: dict[str, Any] = {}
     if config.enable_logprobs and model_type == LLMType.NL_TO_SQL:
         model_kwargs["logprobs"] = config.custom_llm_logprobs_limit
@@ -39,9 +58,14 @@ def get_vllm_model_kwargs(model_type: LLMType, **kwargs) -> tuple[dict[str, Any]
         model_kwargs["use_beam_search"] = True
         kwargs["best_of"] = config.custom_llm_api_vllm_beam_width
         kwargs["n"] = 1
+    if model_type == LLMType.NL_TO_SQL:
+        kwargs["max_tokens"] = config.custom_llm_api_vllm_max_tokens
     return kwargs, model_kwargs
 
 
+@cached(
+    cache=TTLCache(maxsize=20, ttl=60 * 10)
+)  # a max of 20 unique calls can be cached at a time and each can live for 10 minutes
 def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
     """
     Gets the relevant instantiated LLM class by llm type.
@@ -54,6 +78,8 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
             LLMType.DEFAULT: config.openai_gpt_model,
             LLMType.NL_TO_SQL: config.openai_gpt_model_nl_to_sql,
             LLMType.SQL_TO_ANSWER: config.openai_gpt_model_sql_to_answer,
+            LLMType.NL_TO_TABLES: config.openai_gpt_model_nl_to_tables,
+            LLMType.INSTRUCT: config.openai_gpt_model_instruct,
         }
         model_name: str = openai_llm_mapping[LLMType.DEFAULT] if openai_llm_mapping[model_type] is None else openai_llm_mapping[model_type]  # type: ignore
         return get_openai_llm_by_model_name(model=model_name, **kwargs)
@@ -65,6 +91,11 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
                 config.custom_llm_api_sql_to_answer_base,
                 config.custom_llm_api_sql_to_answer_context_window,
             ),
+            LLMType.NL_TO_TABLES: (
+                config.custom_llm_api_nl_to_tables_base,
+                config.custom_llm_api_nl_to_tables_context_window,
+            ),
+            LLMType.INSTRUCT: (config.custom_llm_api_instruct_base, config.custom_llm_api_instruct_context_window),
         }
         api_base, context_window = (
             custom_llm_mapping[LLMType.DEFAULT]
@@ -91,7 +122,9 @@ def _get_custom_api_vllm_llm(model_type: LLMType, api_base: str, context_window:
     """
     Return the corresponding LLM class for the custom llm type API_VLLM.(ie. VLLM)
     """
-    kwargs, model_kwargs = get_vllm_model_kwargs(model_type, **kwargs)
+    # always pass immutable kwargs to the function decorated by lru_cache or otherwise you'll end up in
+    # unhashable type list (ie. mutable) when passing a mutable object.
+    vllm_kwargs, model_kwargs = get_vllm_model_kwargs(model_type)
     model_name = get_vllm_model_name(api_base)
     return OverrideVLLMOpenAI(
         openai_api_key="nothing",
@@ -100,6 +133,7 @@ def _get_custom_api_vllm_llm(model_type: LLMType, api_base: str, context_window:
         model_kwargs=model_kwargs,
         context_window=context_window,
         **kwargs,
+        **vllm_kwargs,
     )
 
 

@@ -1,26 +1,48 @@
 from typing import Any
 
+from asgi_correlation_id import CorrelationIdMiddleware
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from heavydb.exceptions import Error as HeavyDBError  # type: ignore
+from langchain.globals import set_llm_cache
 from starlette.exceptions import HTTPException
 
-from heavyiq.config import get_config
-from heavyiq.api.middlewares import AsyncLoggingMiddleware
-from asgi_correlation_id import CorrelationIdMiddleware
-from heavyiq.api.models.error import ErrorResponse
-from heavyiq.langchain.exceptions import NLtoSQLException
-from heavyiq.logging_utils import init_logs
-from heavyiq.langchain.utils import init_telemetrics
-from heavyiq.api.routes import defaultrouter, iqrouter
 from heavyiq.api.handlers import exception_handler as exh
+from heavyiq.api.middlewares import AsyncLoggingMiddleware
+from heavyiq.api.models.error import ErrorResponse
+from heavyiq.api.routes import bgrouter, defaultrouter, iqrouter, lcelrouter, llmrouter, streamrouter
+from heavyiq.config import HeavyIQConfig, get_config
+from heavyiq.langchain.exceptions import GenerateTableMetadataException, NLtoAnswerException, NLtoSQLException
+from heavyiq.langchain.utils import InMemoryLLMCache, init_telemetrics
+from heavyiq.logging_utils import get_heavyiq_logger, init_logs
+from heavyiq.utils import SharedDictSingleton
 
 
 def stripped_down_api() -> FastAPI:
     app = FastAPI(title="HeavyIQ")
     app.include_router(defaultrouter)
     return app
+
+
+def app_initialize(config: HeavyIQConfig):
+    """
+    App initialization code which get excuted before gunicorn process fork upon using `--preload` option.
+    """
+
+    logger = get_heavyiq_logger()
+    logger.info("Allocating Shared Dict....")
+    # shared manager
+    instance = SharedDictSingleton()
+    logger.info(f"Shared Manager PID: {instance._manager._process.pid}")
+
+    # w.r.t memory into consideration, we don't need to initialize/download HF model embeddings at the first place(ie. before process fork).
+    # We could make it happen on the fork/child process since the models are going to be stored inside a cache dir.
+    # and for the next time, HF model should be loaded from the cache dir itself.
+
+    # LLM Cache
+    if config.enable_llm_cache:
+        set_llm_cache(InMemoryLLMCache())
 
 
 def create_app(config_path: str = "./config.toml") -> FastAPI:
@@ -44,6 +66,8 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
 
     app = FastAPI(title="HeavyIQ")
 
+    app_initialize(config)
+
     cors_origins = ["http://localhost"]
 
     # add middlewares
@@ -64,10 +88,23 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
     app.add_exception_handler(ValueError, exh.value_error_handler)
     app.add_exception_handler(TypeError, exh.type_error_handler)
     app.add_exception_handler(NLtoSQLException, exh.nl_to_sql_exception_handler)
+    app.add_exception_handler(NLtoAnswerException, exh.nl_to_answer_exception_handler)
+    app.add_exception_handler(GenerateTableMetadataException, exh.generate_table_metadata_exception_handler)
     app.add_exception_handler(Exception, exh.unhandled_exception_handler)
 
     # Include your API routes
     app.include_router(defaultrouter)
+    app.include_router(
+        llmrouter,
+        prefix="/llm",
+        tags=["llm"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "model": ErrorResponse,
+            }
+        },
+    )
     app.include_router(
         iqrouter,
         prefix="/api/v1",
@@ -79,8 +116,42 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
             }
         },
     )
+    app.include_router(
+        lcelrouter,
+        prefix="/api/v1/lcel",
+        tags=["api.v1.lcel"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "model": ErrorResponse,
+            }
+        },
+    )
+    app.include_router(
+        streamrouter,
+        prefix="/api/v1/lcel/stream",
+        tags=["api.v1.lcel.stream"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "model": ErrorResponse,
+            }
+        },
+    )
+    app.include_router(
+        bgrouter,
+        prefix="/bgtask",
+        tags=["bgtask"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "model": ErrorResponse,
+            }
+        },
+    )
     if config.enable_debug_endpoints:
         from heavyiq.api.routes.debug_router import debug_router
+        from heavyiq.api.routes.runnable_router import runnable_router
 
         app.include_router(
             debug_router,
@@ -93,6 +164,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
                 }
             },
         )
+        app.include_router(runnable_router, prefix="/runnable", tags=["runnable"])
 
     # check heavydb connection
     @app.on_event("startup")
@@ -100,6 +172,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         """
         Code to be executed when application starts.
         """
+        import heavyiq.lcel.chains
         from heavyiq.logging_utils import heavyiq_logger as logger
 
         # TODO: Disabled for now, as no guarantee heavydb is running before heavyiq
@@ -113,6 +186,13 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         Code to be executed before FastAPI application ends.
         """
         from heavyiq.logging_utils import heavyiq_logger as logger
+
+        shared_dict_instance = SharedDictSingleton._instance
+        if shared_dict_instance:
+            shared_dict_manager = shared_dict_instance._manager
+            if shared_dict_manager._state.value == 1:  # terminate already started shared manager process
+                logger.info("Shutting down Shared Manager instance.")
+                shared_dict_manager.shutdown()
 
         logger.info("Shutting down FastAPI app.")
 

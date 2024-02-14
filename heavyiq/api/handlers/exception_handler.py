@@ -1,15 +1,16 @@
-from typing import Callable
 from functools import wraps
+from typing import Callable
 
 from fastapi.concurrency import run_in_threadpool
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import Response
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
+
 from heavyiq.api.models import ErrorResponse
-from heavyiq.langchain.exceptions import NLtoSQLException
+from heavyiq.langchain.exceptions import GenerateTableMetadataException, NLtoAnswerException, NLtoSQLException
 from heavyiq.logging_utils import get_heavyiq_logger
 
 
@@ -85,4 +86,20 @@ async def nl_to_sql_exception_handler(request: Request, exc: NLtoSQLException) -
     return JSONResponse(
         status_code=HTTP_500_INTERNAL_SERVER_ERROR,
         content=jsonable_encoder(_build_error_response("NLtoSQLException", exc.message or "")),
+    )
+
+
+@log_exception
+async def nl_to_answer_exception_handler(request: Request, exc: NLtoAnswerException) -> Response:
+    return JSONResponse(
+        status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+        content=jsonable_encoder(_build_error_response(exc.__class__.__name__, exc.message or "")),
+    )
+
+
+@log_exception
+async def generate_table_metadata_exception_handler(request: Request, exc: GenerateTableMetadataException) -> Response:
+    return JSONResponse(
+        status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+        content=jsonable_encoder(_build_error_response(exc.__class__.__name__, exc.message or "")),
     )

@@ -1,19 +1,18 @@
-import os
 import asyncio
-from fastapi.concurrency import run_in_threadpool
+import os
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
-from langchain.docstore.document import Document
+from fastapi.concurrency import run_in_threadpool
 from langchain.chat_models.openai import ChatOpenAI
+from langchain.docstore.document import Document
 from langchain.schema import HumanMessage, SystemMessage
 
 from heavyiq.config import get_config
-from heavyiq.utils import awrite_to_file
 from heavyiq.langchain import HeavyDB
-from heavyiq.langchain.llms import get_llm
+from heavyiq.langchain.llms import get_llm, is_using_custom_trained_llm
 from heavyiq.logging_utils import get_heavyiq_logger
-
+from heavyiq.utils import awrite_to_file
 
 table_summary_prompt = """With respect to the SQL table schema and sample data provided,
 please create a comprehensive response encompassing the following aspects:
@@ -154,15 +153,49 @@ async def acreate_and_write_table_document(heavydb: HeavyDB, table: str) -> None
     """
     logger = get_heavyiq_logger()
     logger.info(f"Summarizing {table}...")
-    docs = [
+    doc_tasks = [
         aget_table_summary_document(heavydb, table),
         aget_table_column_description_document(heavydb, table),
     ]
-    docs = await asyncio.gather(*docs)
+    try:
+        docs: list[Document] = await asyncio.gather(*doc_tasks)
+    except Exception as e:
+        raise e
     file_content = "\n\n".join([doc.page_content for doc in docs])
     file_path = f"table_documents/{table}.txt"
     await awrite_to_file(file_path, file_content)
     logger.info(f"Done writing table document {file_path}")
+
+
+async def acreate_and_write_table_custom_document(heavydb: HeavyDB, table: str) -> None:
+    """
+    Creates and writes a document asynchronously that includes the table schema and column list for a specified table.
+    Since the document generation process doesn't involve any LLM calls, it fetches data solely from the database
+    and writes it as a separate text document.
+
+    Args:
+        heavydb (HeavyDB): An instance of HeavyDB containing the table information.
+        table (str): The name of the table for which the document is to be created and written.
+    """
+    logger, config = get_heavyiq_logger(), get_config()
+    table_info = await heavydb.aget_table_info(
+        [table],
+        include_samples=config.include_samples_in_custom_table_document_generation,
+        include_top_k=config.include_top_k_in_custom_table_document_generation,
+    )
+    file_path = f"table_documents/{table}.txt"
+    await awrite_to_file(file_path, table_info)
+    logger.info(f"Done writing table custom document {file_path}")
+
+
+async def agenerate_table_document(heavydb: HeavyDB, table: str) -> None:
+    """
+    Responsible for generating table document in-respective of the llm model types (openai or custom).
+    """
+    coro = (
+        acreate_and_write_table_custom_document if is_using_custom_trained_llm() else acreate_and_write_table_document
+    )
+    await coro(heavydb, table)
 
 
 def write_to_file(file_name: str, content: str):
@@ -208,7 +241,7 @@ def generate_table_documents() -> list[str]:
     return list(table_names_to_generate)
 
 
-async def agenerate_table_documents() -> list[str]:
+async def agenerate_table_documents(session: str | None = None) -> list[str]:
     """
     Generates and writes documents for all usable tables in the HeavyDB instance, containing table summaries and column descriptions async.
     Saves them to the table_documents directory.
@@ -220,17 +253,30 @@ async def agenerate_table_documents() -> list[str]:
     logger.info("Generating summaries and column descriptions.")
     logger.debug(f"Tables with documents already (skipping): {tables_with_documents_already}")
 
-    heavydb = await run_in_threadpool(HeavyDB.from_env, ignore_tables=tables_with_documents_already)
+    if session:
+        logger.debug("Establishing HeavyDB connection from session id to generate table documents.")
+        heavydb = await HeavyDB.from_session_async(session, ignore_tables=tables_with_documents_already)
+    else:
+        logger.debug("Establishing HeavyDB connection from env config to generate table documents.")
+        heavydb = await HeavyDB.from_env_async(ignore_tables=tables_with_documents_already)
+
     table_names_to_generate = heavydb.get_usable_table_names()
 
     tasks = []
-    for table_name in table_names_to_generate:
-        tasks.append(asyncio.create_task(acreate_and_write_table_document(heavydb=heavydb, table=table_name)))
+
+    tasks.extend(
+        [
+            asyncio.create_task(agenerate_table_document(heavydb=heavydb, table=table_name))
+            for table_name in table_names_to_generate
+        ]
+    )
 
     await asyncio.gather(*tasks)
 
     logger.info(
-        f"Finished generating summaries and column descriptions for {len(list(table_names_to_generate))} tables."
+        f"Finished generating table schema and column details for {len(list(table_names_to_generate))} tables."
+        if is_using_custom_trained_llm()
+        else f"Finished generating summaries and column descriptions for {len(list(table_names_to_generate))} tables."
     )
 
     return list(table_names_to_generate)

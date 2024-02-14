@@ -1,11 +1,11 @@
-from typing import Any
+from unittest.mock import patch
+
 from confz import FileSource
+from fastapi import Depends
 
 from heavyiq.api.models import GenerateTableMetadataRequest, QueryRequest, QuestionRequest
-from unittest.mock import patch
-from heavyiq.langchain import HeavyDB
 from heavyiq.config.config_schema import AppConfig
-from fastapi import Depends
+from heavyiq.langchain import HeavyDB
 
 
 def override_heavydb_client():

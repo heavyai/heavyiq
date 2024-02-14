@@ -5,7 +5,10 @@
   "flake8.path": ["${workspaceFolder}/venv/bin/python", "-m", "flake8"],
   "[python]": {
     "editor.defaultFormatter": "ms-python.black-formatter",
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": true
+    }
   },
   "black-formatter.args": ["--line-length", "120"],
   "mypy-type-checker.args": ["--config-file=setup.cfg"],
@@ -15,7 +18,6 @@
     "mypy"
   ],
   "python.languageServer": "Pylance",
-  "python.analysis.typeCheckingMode": "basic",
   "files.exclude": {
     "**/.git": true,
     "**/.svn": true,

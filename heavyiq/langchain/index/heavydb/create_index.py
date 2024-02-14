@@ -1,18 +1,21 @@
+import asyncio
 from pathlib import Path
 
-from fastapi.concurrency import run_in_threadpool
 from chromadb.api import Where
-from langchain.vectorstores import Chroma
+from fastapi.concurrency import run_in_threadpool
 from langchain.indexes import VectorstoreIndexCreator
 from langchain.vectorstores.base import VectorStore
+from langchain.vectorstores.chroma import Chroma
 
-from heavyiq.utils import is_path_exists
-from heavyiq.logging_utils import get_heavyiq_logger
 from heavyiq.config import get_config
+from heavyiq.langchain.llms import is_using_custom_trained_llm
+from heavyiq.logging_utils import get_heavyiq_logger
+from heavyiq.utils import is_path_exists_and_has_file
+
 from ..utils import get_vectorstore_index_creator
-from .generate_table_documents import generate_table_documents, agenerate_table_documents
+from .generate_table_documents import agenerate_table_documents, generate_table_documents
 from .heavydb_metadata_index import HeavyDBMetadataIndex
-from .utils import read_table_documents, aread_table_documents
+from .utils import aread_table_documents, read_table_documents
 
 
 def update_tables_in_index(index_creator: VectorstoreIndexCreator, vectorstore: Chroma, tables_to_update: list[str]):
@@ -59,9 +62,9 @@ async def aupdate_tables_in_index(
         where = {"$or": [{"source": table_name} for table_name in tables_to_update]}
         await run_in_threadpool(vectorstore._collection.delete, where=where)
     logger.debug("Splitting documents...")
-    sub_docs = index_creator.text_splitter.split_documents(docs)
+    sub_docs = await index_creator.text_splitter.atransform_documents(docs)
     logger.debug(f"Indexing documents with {huggingface_model_name}...")
-    await run_in_threadpool(vectorstore.add_documents, sub_docs)
+    await vectorstore.aadd_documents(sub_docs)  # type: ignore
     logger.debug("Done")
 
 
@@ -72,10 +75,17 @@ def create_index_if_nonexistent() -> HeavyDBMetadataIndex:
     :param persist_directory: Path to the directory where the vector store index should be persisted.
     :return: A HeavyDBMetadataIndex instance containing the vector store index.
     """
-    config = get_config()
+    config, logger = get_config(), get_heavyiq_logger()
     huggingface_model_name = config.huggingface_embed_model
     metadata_index_dir = config.metadata_index_dir
-    tables_with_new_summaries = generate_table_documents()
+
+    if is_using_custom_trained_llm():
+        logger.warning(
+            "Custom LLM doesn't support generating table documents, please use a non-local model. Skipping table document generation."
+        )
+        tables_with_new_summaries = []
+    else:
+        tables_with_new_summaries = generate_table_documents()
 
     index_creator = get_vectorstore_index_creator(metadata_index_dir)
 
@@ -102,7 +112,7 @@ def create_index_if_nonexistent() -> HeavyDBMetadataIndex:
     return HeavyDBMetadataIndex(vectorstore=vectorstore, text_splitter=index_creator.text_splitter)  # type: ignore
 
 
-async def acreate_index_if_nonexistent() -> HeavyDBMetadataIndex:
+async def acreate_index_if_nonexistent(session: str | None = None) -> HeavyDBMetadataIndex:
     """
     Create a new vector store index if it does not exist, otherwise return the existing index asynchronously.
 
@@ -112,12 +122,17 @@ async def acreate_index_if_nonexistent() -> HeavyDBMetadataIndex:
     config = get_config()
     huggingface_model_name = config.huggingface_embed_model
     metadata_index_dir = config.metadata_index_dir
-    tables_with_new_summaries = await agenerate_table_documents()
+    tables_with_new_summaries: list[str]
+    index_creator: VectorstoreIndexCreator
 
-    index_creator = get_vectorstore_index_creator(metadata_index_dir)
+    tables_with_new_summaries = await agenerate_table_documents(session=session)
+
+    index_creator = await run_in_threadpool(get_vectorstore_index_creator, metadata_index_dir)
+
+    logger.debug("Got the index creator.")
 
     vectorstore: VectorStore
-    if await is_path_exists(metadata_index_dir):
+    if await is_path_exists_and_has_file(metadata_index_dir):
         logger.debug("HeavyDB Index already exists. Returning existing index.")
         vectorstore = Chroma(embedding_function=index_creator.embedding, persist_directory=metadata_index_dir)
         if len(tables_with_new_summaries) > 0:
@@ -130,7 +145,7 @@ async def acreate_index_if_nonexistent() -> HeavyDBMetadataIndex:
         logger.debug("Splitting documents...")
         sub_docs = index_creator.text_splitter.split_documents(docs)
         logger.debug(f"Indexing documents with {huggingface_model_name}...")
-        vectorstore = index_creator.vectorstore_cls.from_documents(
+        vectorstore = await index_creator.vectorstore_cls.afrom_documents(
             sub_docs, index_creator.embedding, **index_creator.vectorstore_kwargs
         )
         logger.debug("Done")

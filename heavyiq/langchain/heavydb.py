@@ -4,22 +4,24 @@ import asyncio
 import functools
 import multiprocessing
 import re
-from collections.abc import Awaitable
+from collections.abc import AsyncGenerator, Awaitable
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from copy import deepcopy
 from multiprocessing.managers import SyncManager
 from threading import Lock
-from typing import Any, Callable, Iterable, Optional, TypedDict
+from typing import Any, Callable, Optional, TypedDict
 
 import anyio
 from async_lru import alru_cache
 from heavyai import Connection, connect
 from heavydb._parsers import ColumnDetails, _thrift_values_to_encodings
-from heavydb.thrift.ttypes import TColumnType
 from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
-from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
+from heavyiq.utils import (LRUCache, calc_query_stats, is_destructive_sql,
+                           rate_sql_complexity, strip_sql_comments)
 
 
 class PersistantConnection(Connection):
@@ -116,6 +118,9 @@ class HeavyDB:
     _top_k_cache: Optional[LRUCache[str, str]] = None
     _sample_rows_cache: Optional[LRUCache[str, str]] = None
     _table_schema_cache: Optional[LRUCache[str, str]] = None
+    _table_text_columns_count_cache: Optional[LRUCache[str, int]] = None
+    _table_total_row_count_cache: Optional[LRUCache[str, int]] = None
+    _timestamp_cache: Optional[LRUCache[str, str]] = None
 
     def __init__(
         self,
@@ -136,6 +141,10 @@ class HeavyDB:
         )  # note: remove the wrapper once the pyheavydb version upgraded to the latest (ie, >6.4.1).
         self.lock = Lock()
         self.alock = asyncio.Lock()
+        self._dbname = self._conn._dbname
+        self._table_schema_change_callback: Callable[["HeavyDB", str], None] | None = (
+            None  # callback which deals with the table schema change
+        )
         """Async lock ensures exactly one coroutine was allowed to access a shared resource (db) at a time."""
 
         self._all_tables = set(self._conn.get_tables())
@@ -167,6 +176,19 @@ class HeavyDB:
                 (table, self._custom_table_info[table]) for table in self._custom_table_info if table in intersection
             )
 
+        # populate connection's _db_name attribute
+        if not self._dbname:
+            # connection established from session, so grab the session details
+            self._dbname = self._conn._client.get_session_info(self._conn._session).database
+
+    @property
+    def table_schema_change_callback(self) -> Callable:
+        return self._table_schema_change_callback
+
+    @table_schema_change_callback.setter
+    def table_schema_change_callback(self, callback: Callable | None):
+        self._table_schema_change_callback = callback
+
     def __del__(self):
         try:
             self._conn.close()
@@ -174,28 +196,46 @@ class HeavyDB:
             print(f"Error: {e}")
 
     @classmethod
-    def get_manager(cls: "type[HeavyDB]") -> SyncManager:
+    def get_manager(cls: type[HeavyDB]) -> SyncManager:
         if cls._manager is None:
             cls._manager = multiprocessing.Manager()
         return cls._manager
 
     @classmethod
-    def get_top_k_cache(cls) -> LRUCache[str, str]:
+    def get_top_k_cache(cls: type[HeavyDB]) -> LRUCache[str, str]:
         if cls._top_k_cache is None:
             cls._top_k_cache = LRUCache[str, str](manager=cls.get_manager())
         return cls._top_k_cache
 
     @classmethod
-    def get_sample_rows_cache(cls) -> LRUCache[str, str]:
+    def get_sample_rows_cache(cls: type[HeavyDB]) -> LRUCache[str, str]:
         if cls._sample_rows_cache is None:
             cls._sample_rows_cache = LRUCache[str, str](manager=cls.get_manager())
         return cls._sample_rows_cache
 
     @classmethod
-    def get_table_schema_cache(cls) -> LRUCache[str, str]:
+    def get_table_schema_cache(cls: type[HeavyDB]) -> LRUCache[str, str]:
         if cls._table_schema_cache is None:
             cls._table_schema_cache = LRUCache[str, str](manager=cls.get_manager())
         return cls._table_schema_cache
+
+    @classmethod
+    def get_table_text_columns_count_cache(cls: type[HeavyDB]) -> LRUCache[str, int]:
+        if cls._table_text_columns_count_cache is None:
+            cls._table_text_columns_count_cache = LRUCache[str, int](manager=cls.get_manager())
+        return cls._table_text_columns_count_cache
+
+    @classmethod
+    def get_table_total_row_count_cache(cls: type[HeavyDB]) -> LRUCache[str, int]:
+        if cls._table_total_row_count_cache is None:
+            cls._table_total_row_count_cache = LRUCache[str, int](manager=cls.get_manager())
+        return cls._table_total_row_count_cache
+
+    @classmethod
+    def get_timestamp_cache(cls: type[HeavyDB]) -> LRUCache[str, str]:
+        if cls._timestamp_cache is None:
+            cls._timestamp_cache = LRUCache[str, str](manager=cls.get_manager())
+        return cls._timestamp_cache
 
     @property
     def top_k_cache(self) -> LRUCache[str, str]:
@@ -208,6 +248,18 @@ class HeavyDB:
     @property
     def table_schema_cache(self) -> LRUCache[str, str]:
         return self.get_table_schema_cache()
+
+    @property
+    def table_text_columns_count_cache(self) -> LRUCache[str, int]:
+        return self.get_table_text_columns_count_cache()
+
+    @property
+    def table_total_row_count_cache(self) -> LRUCache[str, int]:
+        return self.get_table_total_row_count_cache()
+
+    @property
+    def timestamp_cache(self) -> LRUCache[str, str]:
+        return self.get_timestamp_cache()
 
     @classmethod
     def _connect_with_timeout(
@@ -300,7 +352,7 @@ class HeavyDB:
 
     @classmethod
     async def from_session_async(cls: type[HeavyDB], session_id: str, **kwargs: Any) -> HeavyDB:
-        """Create a database connection from environment variables."""
+        """Create a database connection from session."""
         config = get_config()
 
         async def aconnect_func() -> Connection:
@@ -311,7 +363,7 @@ class HeavyDB:
                 port=config.heavydb_port,
                 protocol=config.heavydb_protocol,
             )
-            return await anyio.to_thread.run_sync(func, cancellable=True)
+            return await anyio.to_thread.run_sync(func, cancellable=True)  # type: ignore
 
         conn = await cls._aconnect_with_timeout(aconnect_func(), kwargs.pop("timeout", 10))
         return cls(conn, **kwargs)
@@ -341,7 +393,7 @@ class HeavyDB:
         """Return string representation of dialect to use."""
         return "ANSI SQL"
 
-    def get_usable_table_names(self) -> Iterable[str]:
+    def get_usable_table_names(self) -> set[str]:
         """Get names of tables available."""
         if self._include_tables:
             return self._include_tables
@@ -366,6 +418,54 @@ class HeavyDB:
         )
         return conn._session
 
+    @classmethod
+    async def create_with_persistant_connection_async(
+        cls: type[HeavyDB], db_name: Optional[str] = None, **kwargs: Any
+    ) -> HeavyDB:
+        """
+        Creates a HeavyDB instance with a persistant db connection.
+        """
+        config = get_config()
+        if not config.heavydb_username or not config.heavydb_password or not (db_name or config.heavydb_dbname):
+            raise ValueError("Please set the config variables heavydb_username, heavydb_password and heavydb_dbname")
+
+        async def aconnect_func() -> PersistantConnection:
+            func = functools.partial(
+                PersistantConnection,
+                user=config.heavydb_username,
+                password=config.heavydb_password,
+                host=config.heavydb_host,
+                port=config.heavydb_port,
+                dbname=db_name or config.heavydb_dbname,
+                protocol=config.heavydb_protocol,
+            )
+            return await anyio.to_thread.run_sync(func, cancellable=True)
+
+        conn = await cls._aconnect_with_timeout(aconnect_func(), kwargs.pop("timeout", 10))
+        return cls(conn, **kwargs)
+
+    @classmethod
+    async def create_session_id_async(cls: type[HeavyDB], db_name: Optional[str] = None, **kwargs: Any) -> str:
+        """Creates a persistant database connection from environment variables and returns it's session id."""
+        config = get_config()
+        if not config.heavydb_username or not config.heavydb_password or not (db_name or config.heavydb_dbname):
+            raise ValueError("Please set the config variables heavydb_username, heavydb_password and heavydb_dbname")
+
+        async def aconnect_func() -> PersistantConnection:
+            func = functools.partial(
+                PersistantConnection,
+                user=config.heavydb_username,
+                password=config.heavydb_password,
+                host=config.heavydb_host,
+                port=config.heavydb_port,
+                dbname=db_name or config.heavydb_dbname,
+                protocol=config.heavydb_protocol,
+            )
+            return await anyio.to_thread.run_sync(func, cancellable=True)
+
+        conn = await cls._aconnect_with_timeout(aconnect_func(), kwargs.pop("timeout", 10))
+        return conn._session
+
     @property
     def table_info(self) -> str:
         """Information about all usable tables in the database."""
@@ -381,7 +481,7 @@ class HeavyDB:
 
     def get_table_schema(self, table: str) -> str:
         self.logger.debug(f"Getting schema for table {table}")
-        cache_key = f"{self._conn._dbname}.{table}"
+        cache_key = f"{self._dbname}.{table}"
         cached_value = self.table_schema_cache.get(cache_key)
         if cached_value is not None:
             self.logger.debug(f"Got schema for table {table} from cache")
@@ -457,7 +557,7 @@ class HeavyDB:
 
     def get_sample_rows(self, table_name: str) -> str:
         self.logger.debug(f"Getting sample rows for table {table_name}")
-        cache_key = f"{self._conn._dbname}.{table_name}"
+        cache_key = f"{self._dbname}.{table_name}"
         cached_value = self.sample_rows_cache.get(cache_key)
         if cached_value is not None:
             self.logger.debug(f"Got sample rows for table {table_name} from cache")
@@ -485,7 +585,7 @@ class HeavyDB:
 
     def get_top_k(self, table_name: str) -> str:
         self.logger.debug(f"Getting top k values for table {table_name}")
-        cache_key = f"{self._conn._dbname}.{table_name}"
+        cache_key = f"{self._dbname}.{table_name}"
         cached_value = self.top_k_cache.get(cache_key)
         if cached_value is not None:
             self.logger.debug(f"Got top k values for table {table_name} from cache")
@@ -517,6 +617,49 @@ class HeavyDB:
         self.logger.debug(f"Got top k values for table {table_name}")
         return top_k_strings
 
+    async def aget_column_timestamp(self, table_name: str, column: str) -> tuple[str, str]:
+        """
+        Get min/max values for a particular timestamp column.
+        """
+        self.logger.debug(f"Getting timestamp values for column {column} in table {table_name}")
+        min_max_statement = f"SELECT min({column}), max({column}) FROM {table_name};"
+        async with self.alock:
+            cursor = await run_in_threadpool(self._conn.execute, min_max_statement)
+        min_value, max_value = [str(v) for v in cursor.fetchone()]
+        self.logger.debug(f"Got timestamp values for column {column} in table {table_name}")
+        return min_value, max_value
+
+    async def aget_timestamp(self, table_name: str) -> str:
+        """
+        Get min/max values for all the timestamp, data columns exists on a table.
+        """
+        self.logger.debug(f"Getting min/max timestamp values for table {table_name}")
+        cache_key = f"{self._dbname}.{table_name}"
+        cached_value = self.timestamp_cache.get(cache_key)
+        if cached_value is not None:
+            self.logger.debug(f"Got timestamp values for table {table_name} from cache")
+            return cached_value
+
+        timestamp_columns = [
+            c.name
+            for c in self.get_table_columns(table_name)
+            if c.type in ["TIMESTAMP", "DATE"] and c.is_array is False
+        ]
+        timestamp_col_str = ""
+
+        if timestamp_columns:
+            tasks = [self.aget_column_timestamp(table_name, col) for col in timestamp_columns]
+            timestamp_values = await asyncio.gather(*tasks)
+
+            timestamp_col_str += "Timestamp and date columns with min and max values:\n"
+            for col, (min_value, max_value) in zip(timestamp_columns, timestamp_values):
+                timestamp_col_str += f"{col}: ({min_value}, {max_value})\n"
+
+        self.timestamp_cache.put(cache_key, timestamp_col_str)
+        self.logger.debug(f"Got min/max timestamp values for table {table_name}")
+
+        return timestamp_col_str
+
     async def aget_query_plan(self, query: str) -> str:
         query = strip_sql_comments(query)
         if is_destructive_sql(query):
@@ -527,9 +670,12 @@ class HeavyDB:
         return str(result[0])
 
     async def acomplexity(self, command: str) -> int:
+        self.logger.debug("Calculation SQL query complexity!")
         command = strip_sql_comments(command)
         plan = await self.aget_query_plan(command)
-        return rate_sql_complexity(plan)
+        out = rate_sql_complexity(plan)
+        self.logger.debug("Successfully calculated SQL query complexity!")
+        return out
 
     async def aquery_stats(self, command: str) -> dict[str, int]:
         command = strip_sql_comments(command)
@@ -539,13 +685,21 @@ class HeavyDB:
     async def avalidate_query(self, query: str) -> list:
         """Validate a query."""
         # Remove block comments
-        query = strip_sql_comments(query)
-        if is_destructive_sql(query):
-            raise ValueError("Destructive SQL is not allowed")
-        if "::" in query:
-            raise ValueError("Double colon cast syntax is not allowed. Use CAST() instead.")
-        async with self.alock:
-            return await run_in_threadpool(self._conn._client.sql_validate, self._conn._session, query)
+        self.logger.debug("Validating SQL query!")
+        try:
+            query = strip_sql_comments(query)
+            if is_destructive_sql(query):
+                raise ValueError("Destructive SQL is not allowed")
+            if "::" in query:
+                raise ValueError("Double colon cast syntax is not allowed. Use CAST() instead.")
+            async with self.alock:
+                out = await run_in_threadpool(self._conn._client.sql_validate, self._conn._session, query)
+        except Exception as e:
+            self.logger.exception("SQL query validation failed!")
+            raise e
+        else:
+            self.logger.debug("Successfully completed SQL query validation.")
+            return out
 
     async def aget_column_top_k(self, table: str, column: str, _k: int = 5) -> tuple[Optional[list[str]], bool]:
         config = get_config()
@@ -591,6 +745,7 @@ class HeavyDB:
             return top_k_res, is_high_cardinality
         return None, is_high_cardinality
 
+    @alru_cache(maxsize=32, ttl=10)
     async def aget_table_columns(self, table: str) -> list[ColumnDetails]:
         """Get details about the columns in a table."""
         self.logger.debug(f"Getting columns for table {table}")
@@ -602,17 +757,69 @@ class HeavyDB:
             except Exception as e:
                 raise e
 
-    async def aget_table_schema(self, table: str):
+    async def should_refresh_table_cache(self, table: str) -> bool:
         """
-        Get table schema from cache for from db async.
+        Determines whether the cache for a specified table should be refreshed.
+
+        Args:
+            table (str): The name of the table for which the cache status is checked.
+
+        Returns:
+            bool: True if the table cache should be refreshed, False otherwise.
         """
-        self.logger.debug(f"Getting schema for table {table}")
-        cache_key = f"{self._conn._dbname}.{table}"
-        cached_value = self.table_schema_cache.get(cache_key)
-        if cached_value is not None:
-            self.logger.debug(f"Got schema for table {table} from cache")
-            return cached_value
-        """Get the schema of a table."""
+        self.logger.debug(f"Checking for {table} table cache refresh...")
+        cache_key = f"{self._dbname}.{table}"
+        cached_schema = self.table_schema_cache.get(cache_key)
+        if cached_schema is None:
+            # no entry for the table on cache, so return False
+            return False
+
+        # check for any diff in current schema and cached schema
+        # if yes then return True else return False
+        current_schema = await self._aget_raw_table_schema(table)
+        if cached_schema == current_schema:
+            self.logger.debug(f"Table {table} schema unchanged.")
+            return False
+
+        self.logger.debug(f"Table {table} schema changed, invalidating table caches...")
+        return True
+
+    async def delete_table_cache(self, table: str) -> None:
+        """
+        Deletes all the cache entries associated with a particular table which includes top-k, sample_rows, schema, etc.
+        """
+        self.logger.debug(f"Deleteing all caches for the table {table}")
+        cache_key = f"{self._dbname}.{table}"
+        self.table_schema_cache.delete(cache_key)
+        self.top_k_cache.delete(cache_key)
+        self.sample_rows_cache.delete(cache_key)
+        self.table_text_columns_count_cache.delete(cache_key)
+        self.table_total_row_count_cache.delete(cache_key)
+        self.timestamp_cache.delete(cache_key)
+
+    async def trigger_table_schema_change_callback(self, table: str, callback: Callable | None = None):
+        schema_change_callback = callback or self.table_schema_change_callback
+        if schema_change_callback:
+            # run the callback as background task
+            self.logger.debug(f"Schema change detected, callback initiated for {table} table.")
+            asyncio.create_task(schema_change_callback(self, table))
+
+    async def check_and_invalidate_table_cache(self, table: str) -> None:
+        """
+        Checks for table schema changes and invalidates the table caches accordingly.
+        It also triggers the callback with the corresponding table name.
+        """
+        if await self.should_refresh_table_cache(table):
+            await self.delete_table_cache(table)
+            await self.trigger_table_schema_change_callback(table)
+
+    @alru_cache(
+        maxsize=32, ttl=10
+    )  # internal caches are used since this method gets called atleast 2 times in a single request
+    async def _aget_raw_table_schema(self, table: str) -> str:
+        """
+        Gets the table schema from db only.
+        """
         create_command = f"SHOW CREATE TABLE {table};"
 
         async with self.alock:
@@ -624,17 +831,32 @@ class HeavyDB:
         table_schema = re.sub(r"\n", "", table_schema)
         if "WITH (" in table_schema:
             table_schema = table_schema[: table_schema.index("WITH (")]
+
+        return table_schema
+
+    async def aget_table_schema(self, table: str) -> str:
+        """
+        Get table schema from cache for from db async.
+        """
+        self.logger.debug(f"Getting schema for table {table}")
+        cache_key = f"{self._dbname}.{table}"
+        cached_value = self.table_schema_cache.get(cache_key)
+        if cached_value is not None:
+            self.logger.debug(f"Got schema for table {table} from cache")
+            return cached_value
+        # Get the schema of a table from db
+        table_schema = await self._aget_raw_table_schema(table)
         self.table_schema_cache.put(cache_key, table_schema)
         self.logger.debug(f"Got schema for table {table}")
 
         return table_schema
 
-    async def aget_sample_rows(self, table_name: str):
+    async def aget_sample_rows(self, table_name: str) -> str:
         """
         Get table sample rows from cache for db async.
         """
         self.logger.debug(f"Getting sample rows for table {table_name}")
-        cache_key = f"{self._conn._dbname}.{table_name}"
+        cache_key = f"{self._dbname}.{table_name}"
         cached_value = self.sample_rows_cache.get(cache_key)
         if cached_value is not None:
             self.logger.debug(f"Got sample rows for table {table_name} from cache")
@@ -660,25 +882,71 @@ class HeavyDB:
         self.logger.debug(f"Got sample rows for table {table_name}")
         return res
 
-    async def aget_top_k(self, table_name: str):
+    async def aget_total_row_count(self, table_name: str) -> int:
         """
-        Get table top k rows from cache for db async.
+        Get total row count of the given database table.
         """
-        self.logger.debug(f"Getting top k values for table {table_name}")
-        cache_key = f"{self._conn._dbname}.{table_name}"
-        cached_value = self.top_k_cache.get(cache_key)
+        self.logger.debug(f"Getting total row count of table {table_name}")
+        cache_key = f"{self._dbname}.{table_name}"
+        cached_value = self.table_total_row_count_cache.get(cache_key)
         if cached_value is not None:
-            self.logger.debug(f"Got top k values for table {table_name} from cache")
+            self.logger.debug(f"Got total row count of table {table_name} from cache")
             return cached_value
-        text_columns = [
+        # build the select command
+        command = f"SELECT COUNT(*) FROM {table_name}"
+
+        # get the sample rows
+        async with self.alock:
+            sql_result = await run_in_threadpool(self._conn.execute, command)
+
+        row_count = sql_result.fetchone()[0]
+        self.table_total_row_count_cache.put(cache_key, row_count)
+        self.logger.debug(f"Got total row count of table {table_name}")
+        return row_count
+
+    @alru_cache(maxsize=32, ttl=10)  # internal cache used to cache the text columns for 10 secs
+    async def aget_text_columns(self, table_name: str) -> list[str]:
+        """
+        Retrieve the list of text columns available in a table.
+        """
+        return [
             c.name
             for c in await self.aget_table_columns(table_name)
             if c.type == "STR" and c.encoding == "DICT" and c.is_array is False
         ]
+
+    async def aget_text_columns_count(self, table_name: str) -> int:
+        """
+        Returns the number of text columns available in a table.
+        """
+        self.logger.debug(f"Getting text columns count for table {table_name}")
+        cache_key = f"{self._dbname}.{table_name}"
+        cached_value = self.table_text_columns_count_cache.get(cache_key)
+        if cached_value is not None:
+            self.logger.debug(f"Got text columns count for table {table_name} from cache")
+            return cached_value
+
+        text_columns = await self.aget_text_columns(table_name)
+        text_columns_count = len(text_columns)
+        self.table_text_columns_count_cache.put(cache_key, text_columns_count)
+        self.logger.debug(f"Got text columns count for table {table_name}")
+        return text_columns_count
+
+    async def aget_top_k(self, table_name: str) -> str:
+        """
+        Get table top k rows from cache for db async.
+        """
+        self.logger.debug(f"Getting top k values for table {table_name}")
+        cache_key = f"{self._dbname}.{table_name}"
+        cached_value = self.top_k_cache.get(cache_key)
+        if cached_value is not None:
+            self.logger.debug(f"Got top k values for table {table_name} from cache")
+            return cached_value
+        text_columns = await self.aget_text_columns(table_name)
         low_cardinality_columns = []
         high_cardinality_columns = []
-        for col in text_columns:
-            top_k_res, is_high_cardinality = await self.aget_column_top_k(table_name, col)
+        columns_top_k = await asyncio.gather(*[self.aget_column_top_k(table_name, col) for col in text_columns])
+        for col, (top_k_res, is_high_cardinality) in zip(text_columns, columns_top_k):
             if top_k_res:
                 if is_high_cardinality:
                     high_cardinality_columns.append((col, top_k_res))
@@ -697,9 +965,8 @@ class HeavyDB:
         self.logger.debug(f"Got top k values for table {table_name}")
         return top_k_strings
 
-    @alru_cache(typed=True)
     async def aget_single_table_info(
-        self, table_name: str, include_samples: bool = True, include_top_k: bool = True
+        self, table_name: str, include_samples: bool = True, include_top_k: bool = True, include_timestamp: bool = True
     ) -> str:
         """Get information about a single table asynchronously."""
         all_table_names = self.get_usable_table_names()
@@ -709,12 +976,21 @@ class HeavyDB:
         if self._custom_table_info and table_name in self._custom_table_info:
             return self._custom_table_info[table_name]
 
+        # It's not the right method to invoke table schema change callback through check_and_invalidate_table_cache method
+        # since aget_single_table_info can be called many times upon prompt generation in-order to get the desired table_info
+        # within the context length
+        # await self.check_and_invalidate_table_cache(table_name)
+
         tasks = [self.aget_table_schema(table_name)]
         if include_samples and self._sample_rows_in_table_info:
             tasks.append(self.aget_sample_rows(table_name))
 
         if include_top_k:
             tasks.append(self.aget_top_k(table_name))
+
+        if include_timestamp:
+            # include timestamp,date columns with min/max values
+            tasks.append(self.aget_timestamp(table_name))
 
         results = await asyncio.gather(*tasks)
         return "\n".join(results)
@@ -723,20 +999,31 @@ class HeavyDB:
         """
         Get information about specified tables asyc.
         """
+        config = get_config()
         all_table_names = self.get_usable_table_names()
         if table_names is not None:
-            missing_tables = set(table_names).difference(all_table_names)
+            table_names_set = set(table_names)
+            missing_tables = table_names_set.difference(all_table_names)
             if missing_tables:
                 raise ValueError(f"table_names {missing_tables} not found in database")
-            all_table_names = table_names
+            all_table_names = table_names_set
+
+        if len(all_table_names) > 1 and config.sort_prompt_tables_desc:
+            # sort tables in desc order based on total row count
+            table_row_count = await asyncio.gather(*[self.aget_total_row_count(table) for table in all_table_names])
+            sorted_tables = [
+                k[0] for k in sorted(zip(all_table_names, table_row_count), key=lambda x: x[1], reverse=True)
+            ]
+        else:
+            sorted_tables = list(all_table_names)
 
         tables = []
-        for table in all_table_names:
+        for table in sorted_tables:
             tables.append(self.aget_single_table_info(table, **kwargs))
 
         tasks_output = await asyncio.gather(*tables)
 
-        final_str = "\n\n".join(tasks_output)
+        final_str = "\n\n".join([i.strip() for i in tasks_output])
         return final_str
 
     async def arun(self, command: str, fetch: str = "all", to_str: bool = True) -> str | tuple | list:
@@ -764,7 +1051,7 @@ class HeavyDB:
             raise ValueError("Destructive SQL is not allowed")
         sql_stmt = f"EXPLAIN CALCITE DETAILED {query}" if detailed else f"EXPLAIN CALCITE {query}"
         async with self.alock:
-            cursor = self._conn.execute(sql_stmt)
+            cursor = await run_in_threadpool(self._conn.execute, sql_stmt)
         query_plan: tuple[str] = cursor.fetchone()  # type: ignore
         return str(query_plan[0])
 
@@ -784,14 +1071,18 @@ class HeavyDB:
     async def aextract_string_literal_ops(self, detailed_query_plan: str) -> dict[str, tuple[str, str]]:
         self.logger.debug(f"Extracting string literal operations from query plan: {detailed_query_plan}")
         result = {}
-        pattern1 = r"(LIKE|PG_ILIKE|>=|<=|<>|=)\(\$(\d+), '([\w\- ]+)'"
-        pattern2 = r"(LIKE|PG_ILIKE|>=|<=|<>|=)\('([\w\- ]+)', \$(\d+)\)"
+        pattern1 = r"(NOT\()?(LIKE|PG_ILIKE|>=|<=|<>|=)\(\$(\d+), '([\w\- ]+)'"
+        pattern2 = r"(NOT\()?(LIKE|PG_ILIKE|>=|<=|<>|=)\('([\w\- ]+)', \$(\d+)\)"
 
         matches1 = re.findall(pattern1, detailed_query_plan)
         matches2 = re.findall(pattern2, detailed_query_plan)
-        for op, id, literal in matches1:
+        for negation, op, id, literal in matches1:
+            if negation == "NOT(":
+                op = f"NOT {op}"
             result[id] = (op, literal)
-        for op, literal, id in matches2:
+        for negation, op, literal, id in matches2:
+            if negation == "NOT(":
+                op = f"NOT {op}"
             result[id] = (op, literal)
 
         self.logger.debug("Finished extracting string literal operations")
@@ -828,19 +1119,19 @@ class HeavyDB:
                 exact_match_count += row[1]  # type: ignore
             total_count += row[1]  # type: ignore
 
-        if total_count > 0 and literal["operator"] != "ILIKE":
+        if total_count > 0:  # and literal["operator"] != "ILIKE":
             if exact_match_count == 0 and num_case_match_rows == 1:
                 altered_literal["literal"] = str(case_match_rows[0][0])
-                return literal
+                return altered_literal
             elif exact_match_count / total_count < exact_match_threshold:
-                if literal["operator"] == "<>":
+                if literal["operator"] in ("<>", "!=", "NOT LIKE", "NOT PG_ILIKE", "NOT ILIKE", "NOT PG_ILIKE"):
                     altered_literal["operator"] = "NOT ILIKE"
                 else:
                     altered_literal["operator"] = "ILIKE"
                 return altered_literal
         elif total_count == 0:
             lower_literal = literal["literal"].lower()
-            similarity_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) FROM distinct_values WHERE LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) < 5 ORDER BY LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) ASC, num_str_values DESC LIMIT 2;"
+            similarity_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) FROM distinct_values WHERE LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) < 5 ORDER BY LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) ASC, ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) ASC, num_str_values DESC LIMIT 2;"
 
             async with self.alock:
                 cursor = await run_in_threadpool(self._conn.execute, similarity_query)
@@ -863,10 +1154,10 @@ class HeavyDB:
                     # top returned value (we've sorted in ascending order by score and descending order by number
                     # of string matches)
                     altered_literal["literal"] = str(similarity_rows[0][0])
-                if literal["operator"] == "<>":
-                    altered_literal["operator"] = "NOT ILIKE"
-                else:
-                    altered_literal["operator"] = "ILIKE"
+            if literal["operator"] in ("<>", "!=", "NOT LIKE", "NOT PG_ILIKE", "NOT ILIKE", "NOT PG_ILIKE"):
+                altered_literal["operator"] = "NOT ILIKE"
+            else:
+                altered_literal["operator"] = "ILIKE"
             return altered_literal
 
         return altered_literal
@@ -886,18 +1177,27 @@ class HeavyDB:
             for str_literal_op in str_literal_ops_list:
                 altered_str_literal_op = await self.acorrect_string_literal(str_literal_op, exact_match_threshold)
                 if altered_str_literal_op != str_literal_op:
-                    if altered_str_literal_op["operator"] != str_literal_op["operator"]:
-                        altered_query = altered_query.replace(
-                            f"{str_literal_op['column']} {str_literal_op['operator']} '{str_literal_op['literal']}'",
-                            f"{str_literal_op['column']} {altered_str_literal_op['operator']} '{altered_str_literal_op['literal']}'",
-                        )
+                    if (
+                        altered_str_literal_op["operator"] != str_literal_op["operator"]
+                        or altered_str_literal_op["literal"] != str_literal_op["literal"]
+                    ):
+                        search_literal_op = str_literal_op["operator"]
+                        if search_literal_op == "<>" or search_literal_op == "!=":
+                            # Handle case where AST shows <> but string is !=
+                            search_literal_op = "(<>|!=)"
+                        elif search_literal_op == "ILIKE" or search_literal_op == "PG_ILIKE":
+                            search_literal_op = "(ILIKE|PG_ILIKE)"
+                        elif search_literal_op == "NOT ILIKE" or search_literal_op == "NOT PG_ILIKE":
+                            search_literal_op = "(NOT ILIKE|NOT PG_ILIKE)"
+                        escaped_column = re.escape(str_literal_op["column"])
+                        escaped_literal = re.escape(str_literal_op["literal"])
+                        search_string = f"{escaped_column} {search_literal_op} '{escaped_literal}'"
+                        target_string = f"{str_literal_op['column']} {altered_str_literal_op['operator']} '{altered_str_literal_op['literal']}'"
+                        compiled_re = re.compile(search_string, re.IGNORECASE)
+                        altered_query = compiled_re.sub(target_string, altered_query)
+
                         self.logger.debug(
                             f"Operator changed from {str_literal_op['operator']} to {altered_str_literal_op['operator']}"
-                        )
-                    if altered_str_literal_op["literal"] != str_literal_op["literal"]:
-                        altered_query = altered_query.replace(
-                            f"{str_literal_op['column']} {altered_str_literal_op['operator']} '{str_literal_op['literal']}'",
-                            f"{str_literal_op['column']} {altered_str_literal_op['operator']} '{altered_str_literal_op['literal']}'",
                         )
                         self.logger.debug(
                             f"Literal changed from {str_literal_op['literal']} to {altered_str_literal_op['literal']}"
@@ -1176,7 +1476,44 @@ class HeavyDB:
         If the statement throws an error, the error message is returned.
         """
         try:
-            return self.run(command, fetch)
+            return self.run(command, fetch)  # type: ignore
         except Exception as e:
             """Format the error message"""
             return f"Error: {e}"
+
+
+heavydb_var: ContextVar[HeavyDB | None] = ContextVar("heavydb_var", default=None)
+
+
+@asynccontextmanager  # type: ignore
+async def heavydb_context(session_id_or_db: str | HeavyDB) -> AsyncGenerator[HeavyDB, None]:
+    """
+    Async Context which helps to optionally create HeavyDB instance on Setup, set context var and yields it, finally reset
+    context var on teardown.
+
+    Example:
+        async with heavydb_context(session_id) as db:
+            assert heavydb_var.get() == db
+    """
+    db = session_id_or_db
+    if not isinstance(db, HeavyDB):
+        db = await HeavyDB.from_session_async(session_id=session_id_or_db)  # type: ignore
+    heavydb_var.set(db)
+    yield db
+    heavydb_var.set(None)
+
+
+async def get_db(session_id: str) -> HeavyDB:
+    """
+    Gets heavydb instance from context var if there's any, else create it from session_id.
+    Always call this function within a heavydb_context ctx in-order to avoid redundant heavydb conntection calls.
+    """
+    from heavyiq.logging_utils import get_heavyiq_logger
+
+    db = heavydb_var.get()
+    if db:
+        return db
+
+    logger = get_heavyiq_logger()
+    logger.warning("Establishing HeavyDB connection outside of heavydb_context!")
+    return await HeavyDB.from_session_async(session_id=session_id)
