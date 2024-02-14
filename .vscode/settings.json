@@ -31,5 +31,8 @@
     "**/venv": true
   },
   "python.defaultInterpreterPath": "${workspaceFolder}/venv/bin/python",
-  "autoDocstring.docstringFormat": "google-notypes"
+  "autoDocstring.docstringFormat": "google-notypes",
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": true
+  }
 }
