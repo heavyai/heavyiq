@@ -10,7 +10,7 @@ class HeavyIQBaseException(Exception):
         return type(self)
 
     def __str__(self) -> str:
-        return f"{self.get_child_class()}: {self.message}"
+        return f"{self.get_child_class().__name__}: {self.message}"
 
 
 class NLtoSQLException(HeavyIQBaseException):
