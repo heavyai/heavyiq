@@ -20,8 +20,7 @@ from heavydb._parsers import ColumnDetails, _thrift_values_to_encodings
 from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
-from heavyiq.utils import (LRUCache, calc_query_stats, is_destructive_sql,
-                           rate_sql_complexity, strip_sql_comments)
+from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
 
 
 class PersistantConnection(Connection):
@@ -518,23 +517,7 @@ class HeavyDB:
         cardinality_threshold = config.column_top_k_cardinality_threshold
         high_cardinality_sample = config.column_top_k_high_cardinality_sample
 
-        # We need to ensure that column names that are reserved keywords are double quoted otherwise an error will occur
-        # Todo (todd): These are only a partial list of reserved keywords, ensure we have an exhaustive list
-        reserved_keywords = [
-            "LANGUAGE",
-            "RANK",
-            "RESULT",
-            "DATE",
-            "TIMESTAMP",
-            "LENGTH",
-            "YEAR",
-            "QUARTER",
-            "MONTH",
-            "WEEK",
-            "DAY",
-        ]
-        if column.upper() in reserved_keywords:
-            column = f'"{column}"'
+        column = f'"{column}"'
         # check to see if the column is low cardinality
         # fetch top (threshold + 1)
         # if there are < (threshold + 1) values, it's low cardinality and we can return all of them
@@ -624,7 +607,7 @@ class HeavyDB:
         Get min/max values for a particular timestamp column.
         """
         self.logger.debug(f"Getting timestamp values for column {column} in table {table_name}")
-        min_max_statement = f"SELECT min({column}), max({column}) FROM {table_name};"
+        min_max_statement = f'SELECT min("{column}"), max("{column}") FROM {table_name};'
         async with self.alock:
             cursor = await run_in_threadpool(self._conn.execute, min_max_statement)
         min_value, max_value = [str(v) for v in cursor.fetchone()]
@@ -708,23 +691,8 @@ class HeavyDB:
         cardinality_threshold = config.column_top_k_cardinality_threshold
         high_cardinality_sample = config.column_top_k_high_cardinality_sample
 
-        # We need to ensure that column names that are reserved keywords are double quoted otherwise an error will occur
-        # Todo (todd): These are only a partial list of reserved keywords, ensure we have an exhaustive list
-        reserved_keywords = [
-            "LANGUAGE",
-            "RANK",
-            "RESULT",
-            "DATE",
-            "TIMESTAMP",
-            "LENGTH",
-            "YEAR",
-            "QUARTER",
-            "MONTH",
-            "WEEK",
-            "DAY",
-        ]
-        if column.upper() in reserved_keywords:
-            column = f'"{column}"'
+        # always quote all the columns
+        column = f'"{column}"'
         # check to see if the column is low cardinality
         # fetch top (threshold + 1)
         # if there are < (threshold + 1) values, it's low cardinality and we can return all of them
