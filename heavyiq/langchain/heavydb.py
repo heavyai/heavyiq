@@ -517,22 +517,6 @@ class HeavyDB:
         cardinality_threshold = config.column_top_k_cardinality_threshold
         high_cardinality_sample = config.column_top_k_high_cardinality_sample
 
-        # We need to ensure that column names that are reserved keywords are double quoted otherwise an error will occur
-        # Todo (todd): These are only a partial list of reserved keywords, ensure we have an exhaustive list
-        reserved_keywords = [
-            "LANGUAGE",
-            "RANK",
-            "RESULT",
-            "DATE",
-            "TIMESTAMP",
-            "LENGTH",
-            "YEAR",
-            "QUARTER",
-            "MONTH",
-            "WEEK",
-            "DAY",
-        ]
-        # if column.upper() in reserved_keywords:
         column = f'"{column}"'
         # check to see if the column is low cardinality
         # fetch top (threshold + 1)
@@ -707,22 +691,6 @@ class HeavyDB:
         cardinality_threshold = config.column_top_k_cardinality_threshold
         high_cardinality_sample = config.column_top_k_high_cardinality_sample
 
-        # We need to ensure that column names that are reserved keywords are double quoted otherwise an error will occur
-        # Todo (todd): These are only a partial list of reserved keywords, ensure we have an exhaustive list
-        reserved_keywords = [
-            "LANGUAGE",
-            "RANK",
-            "RESULT",
-            "DATE",
-            "TIMESTAMP",
-            "LENGTH",
-            "YEAR",
-            "QUARTER",
-            "MONTH",
-            "WEEK",
-            "DAY",
-        ]
-        # if column.upper() in reserved_keywords:
         # always quote all the columns
         column = f'"{column}"'
         # check to see if the column is low cardinality
