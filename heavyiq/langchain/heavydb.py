@@ -20,8 +20,7 @@ from heavydb._parsers import ColumnDetails, _thrift_values_to_encodings
 from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
-from heavyiq.utils import (LRUCache, calc_query_stats, is_destructive_sql,
-                           rate_sql_complexity, strip_sql_comments)
+from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
 
 
 class PersistantConnection(Connection):
@@ -533,8 +532,8 @@ class HeavyDB:
             "WEEK",
             "DAY",
         ]
-        if column.upper() in reserved_keywords:
-            column = f'"{column}"'
+        # if column.upper() in reserved_keywords:
+        column = f'"{column}"'
         # check to see if the column is low cardinality
         # fetch top (threshold + 1)
         # if there are < (threshold + 1) values, it's low cardinality and we can return all of them
@@ -624,7 +623,7 @@ class HeavyDB:
         Get min/max values for a particular timestamp column.
         """
         self.logger.debug(f"Getting timestamp values for column {column} in table {table_name}")
-        min_max_statement = f"SELECT min({column}), max({column}) FROM {table_name};"
+        min_max_statement = f'SELECT min("{column}"), max("{column}") FROM {table_name};'
         async with self.alock:
             cursor = await run_in_threadpool(self._conn.execute, min_max_statement)
         min_value, max_value = [str(v) for v in cursor.fetchone()]
@@ -723,8 +722,9 @@ class HeavyDB:
             "WEEK",
             "DAY",
         ]
-        if column.upper() in reserved_keywords:
-            column = f'"{column}"'
+        # if column.upper() in reserved_keywords:
+        # always quote all the columns
+        column = f'"{column}"'
         # check to see if the column is low cardinality
         # fetch top (threshold + 1)
         # if there are < (threshold + 1) values, it's low cardinality and we can return all of them
