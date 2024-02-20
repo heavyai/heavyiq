@@ -1,5 +1,6 @@
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import cached_property
 from threading import Lock
 from typing import Any, Iterable, Optional
 
@@ -127,12 +128,21 @@ class HeavyDBReader(BaseReader):
             schema = first_row[0]
         return schema
 
-    def read_table_schemas(self, tables: Iterable[str] | None = None) -> list[Document]:
+    @cached_property
+    def tables(self) -> list[str]:
+        return self.connection.get_tables()
+
+    def read_table_schemas(self, exclude_tables: Iterable[str] | None = None) -> list[Document]:
         """
         Read schemas from multiple tables and generate documents based on them.
+        If exclude_tables was given, then it generates documents only for the missing tables.
         """
+        tables = set(self.tables)
+        if exclude_tables:
+            tables = tables - set(exclude_tables)
+
         if not tables:
-            tables = self.connection.get_tables()
+            return []
 
         documents = []
         with ThreadPoolExecutor() as executor:
