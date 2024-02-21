@@ -2,9 +2,9 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import cached_property
 from threading import Lock
-from typing import Any, Iterable, Optional
+from typing import Any, Callable, Iterable, Optional
 
-from heavyai.connection import connect
+from heavyai.connection import Connection, connect
 from llama_index.core.readers.base import BaseReader, Document
 from tqdm import tqdm
 
@@ -53,7 +53,14 @@ class HeavyDBReader(BaseReader):
             protocol: protocol to be used. Defaults to "binary".
             sessionid: HeavyDB session id. Defaults to None.
         """
-        self.connection = connect(
+
+        def foo(*args, **kwargs):
+            import time
+
+            time.sleep(5)
+
+        self.connection = self._connect_with_timeout(
+            connect,
             uri=uri,
             user=user,
             password=password,
@@ -65,6 +72,21 @@ class HeavyDBReader(BaseReader):
         )
         self.dbname = dbname
         self._lock = Lock()
+
+    @classmethod
+    def _connect_with_timeout(
+        cls: type["HeavyDBReader"],
+        connect_func: Callable[[], Connection],
+        *func_args,
+        timeout: float = 5,
+        **func_kwargs,
+    ) -> Connection:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(connect_func, *func_args, **func_kwargs)
+            try:
+                return future.result(timeout=timeout)
+            except TimeoutError:
+                raise Exception(f"HeavyDB failed to connect after {timeout} seconds")
 
     @staticmethod
     def is_destructive_sql(sql: str) -> bool:

@@ -2,10 +2,9 @@ import re
 from collections.abc import Sequence
 from typing import Any
 
-from llama_index.core.callbacks import CallbackManager, CBEventType, EventPayload
+from llama_index.core.callbacks import CBEventType, EventPayload
 from llama_index.core.node_parser import MetadataAwareTextSplitter
 from llama_index.core.schema import BaseNode, Document, MetadataMode, NodeRelationship
-from llama_index.core.utils import get_tqdm_iterable
 
 
 class TableSchemaSplitter(MetadataAwareTextSplitter):
