@@ -1,12 +1,15 @@
-import getpass
-import time
-import socket
-import os
 import copy
+import getpass
+import os
+import socket
+import time
+
 from loguru import logger as loguru_logger
+
 from heavyiq.config import get_config
-from .loguru_logging import BaseAsyncLogger, iq_formatter, access_formatter
-from heavyiq.langchain.callbacks import FileCallbackHandler, AsyncLogFileCallbackHandler
+from heavyiq.langchain.callbacks import AsyncLogFileCallbackHandler, FileCallbackHandler
+
+from .loguru_logging import BaseAsyncLogger, access_formatter, iq_formatter
 
 # remove existing handlers on the logger instance
 loguru_logger.remove()
@@ -37,6 +40,7 @@ class HeavyIQLogger(BaseAsyncLogger):
         log_file_path: str | None = None,
         level: str | None = None,
         enable_console_logging: bool = True,
+        max_file_size: int = 104857600,
     ):
         iq_logger = copy.deepcopy(loguru_logger)
         super().__init__(
@@ -46,7 +50,7 @@ class HeavyIQLogger(BaseAsyncLogger):
             format=iq_formatter,
             log_file_path=log_file_path,
             enable_console_logging=enable_console_logging,
-            max_file_size=1048576,
+            max_file_size=max_file_size,
         )
         self.info("HeavyIQ Logger initialized")
 
@@ -106,6 +110,7 @@ class _AccessLogger(BaseAsyncLogger):
         log_file_path: str | None = None,
         level: str | None = None,
         enable_console_logging: bool = True,
+        max_file_size: int = 104857600,
     ):
         access_logger = copy.deepcopy(loguru_logger)
         super().__init__(
@@ -114,7 +119,7 @@ class _AccessLogger(BaseAsyncLogger):
             level=level,
             format=access_formatter,
             log_file_path=log_file_path,
-            max_file_size=1048576,
+            max_file_size=max_file_size,
             enable_console_logging=enable_console_logging,
         )
 
@@ -159,6 +164,7 @@ def init_logs():
             log_file_path=os.path.join(log_dir, access_log_name),
             level=LOG_CONFIG.access_log_level,
             enable_console_logging=LOG_CONFIG.log_to_stdout,
+            max_file_size=LOG_CONFIG.access_log_max_file_size,
         )
 
         access_symlink = os.path.join(log_dir, "heavyiq.ACCESS")
@@ -186,6 +192,7 @@ def init_logs():
             log_file_path=os.path.join(log_dir, app_log_name),
             level=LOG_CONFIG.heavyiq_log_level,
             enable_console_logging=LOG_CONFIG.log_to_stdout,
+            max_file_size=LOG_CONFIG.heavyiq_log_max_file_size,
         )
 
         app_symlink = os.path.join(log_dir, "heavyiq.ALL")
