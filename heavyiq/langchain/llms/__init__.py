@@ -60,7 +60,7 @@ def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str
         kwargs["n"] = 1
     if model_type == LLMType.NL_TO_SQL:
         kwargs["max_tokens"] = config.custom_llm_api_vllm_max_tokens
-    return kwargs, model_kwargs
+    return kwargs, {"extra_body": model_kwargs}
 
 
 @cached(
