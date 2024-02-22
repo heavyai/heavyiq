@@ -26,6 +26,9 @@ def log_exception(func: Callable) -> Callable:
     @wraps(func)
     async def wrapper(request: Request, exc: Exception) -> Response:
         logger = get_heavyiq_logger()
+        import traceback
+
+        print(traceback.format_exc())
         await run_in_threadpool(logger.exception, f"Exception Occured: {exc}")
         result = await func(request, exc)
         return result

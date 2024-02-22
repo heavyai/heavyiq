@@ -1,7 +1,7 @@
 from functools import partial
 
-from langchain.llms.openai import OpenAI
 from langchain.schema.runnable import ConfigurableField
+from langchain_openai import OpenAI
 
 from heavyiq.langchain.llms import LLMType, get_llm_by_type
 

@@ -4,10 +4,10 @@ from typing import Any
 
 import requests
 from cachetools import LRUCache, TTLCache, cached
-from langchain.chat_models import AzureChatOpenAI, ChatOpenAI
 from langchain.chat_models.base import BaseChatModel
-from langchain.llms import AzureOpenAI
 from langchain.llms.base import BaseLLM
+from langchain_openai.chat_models import AzureChatOpenAI, ChatOpenAI
+from langchain_openai.llms import AzureOpenAI
 
 from heavyiq.config import get_config
 from heavyiq.logging_utils import get_heavyiq_logger

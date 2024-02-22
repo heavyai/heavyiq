@@ -1,4 +1,4 @@
-from langchain.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 
 
 class AnswerRequest(BaseModel):
@@ -14,7 +14,7 @@ class AnswerRequest(BaseModel):
     session_id: str = Field(..., max_length=32, min_length=32, description="Valid HeavyDB Session ID")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "examples": [
                 {
                     "session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
@@ -40,7 +40,7 @@ class AnswerResponse(BaseModel):
     )
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "examples": [
                 {
                     "answer": "4 states start with the letter A; Alaska, Arizona, Arkansas, and Alabama.",

@@ -14,7 +14,7 @@ class TablesRequest(BaseModel):
     )
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "examples": [
                 {
                     "session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
@@ -37,7 +37,7 @@ class TablesResponse(BaseModel):
     )
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "examples": [
                 {
                     "tables": {"usa_states": 1},

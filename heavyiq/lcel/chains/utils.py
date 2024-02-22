@@ -10,7 +10,10 @@ def get_value_from_runnable_binding(binding: RunnableBinding | RunnableConfigura
     """
     if isinstance(binding, RunnableConfigurableAlternatives):
         return binding.default
-    return binding.bound._prepare(binding.config)  # type: ignore
+    value = binding.bound._prepare(binding.config)  # type: ignore
+    if value and isinstance(value, tuple):
+        return value[0]
+    return value
 
 
 def configure_step(runnable: Runnable, run_name: str, step: str) -> Runnable:

@@ -10,7 +10,7 @@ class CallLLMRequest(BaseModel):
     stop: list[str] | None = Field(default=None, description="An optional list of stop words")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "examples": [
                 {
                     "question": "Return only the name of the capital for the following state, Idaho",
@@ -26,7 +26,7 @@ class CallLLMResponse(BaseModel):
     response: str = Field(..., description="Response from LLM")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "examples": [
                 {
                     "response": "Denver",
