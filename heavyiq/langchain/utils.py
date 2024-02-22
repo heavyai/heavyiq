@@ -7,11 +7,13 @@ from cachetools import LRUCache, TTLCache, cached
 from fastapi.concurrency import run_in_threadpool
 from heavydb.exceptions import TDBException
 from langchain.base_language import BaseLanguageModel
+from langchain.callbacks.tracers import langchain as langchain_tracer_module
 from langchain.callbacks.tracers.langchain import LangChainTracer
 from langchain.callbacks.tracers.schemas import Run
 from langchain.prompts import BaseChatPromptTemplate, BasePromptTemplate
 from langchain.schema.cache import RETURN_VAL_TYPE, BaseCache
 from langchain.schema.prompt import PromptValue
+from langsmith import Client
 from transformers import AutoTokenizer, LlamaTokenizer
 
 from heavyiq.config import HeavyIQConfig, get_config
@@ -28,6 +30,8 @@ def init_telemetrics() -> None:
     """
     Initializes langsmith env vars only if the langchain API key exists on the config.
     """
+    from heavyiq.logging_utils import get_heavyiq_logger
+
     global is_langsmith_active
     config = get_config()
     if config.langsmith_api_key and config.langsmith_project:
@@ -38,6 +42,8 @@ def init_telemetrics() -> None:
 
     # chromadb telemetry opt-out
     os.environ["ANONYMIZED_TELEMETRY"] = "false"
+    langchain_tracer_module._CLIENT = Client(timeout_ms=10000)
+    langchain_tracer_module.logger = get_heavyiq_logger()  # type: ignore
 
 
 @cached(cache=TTLCache(maxsize=30, ttl=60 * 10))
