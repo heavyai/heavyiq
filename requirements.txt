@@ -5,7 +5,7 @@ confz==2.0.1
 connexion[swagger-ui]==2.14.2
 fastapi==0.104.0
 gunicorn==21.2.0
-heavyai==1.1.0
+heavyai>=1.1.0
 langchain==0.0.330
 langsmith==0.0.53
 openai==0.28.1
