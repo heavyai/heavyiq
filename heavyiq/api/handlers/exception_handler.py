@@ -85,7 +85,7 @@ async def attribute_error_handler(request: Request, exc: Exception) -> Response:
 async def nl_to_sql_exception_handler(request: Request, exc: NLtoSQLException) -> Response:
     return JSONResponse(
         status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-        content=jsonable_encoder(_build_error_response("NLtoSQLException", exc.message or "")),
+        content=jsonable_encoder(ErrorResponse(error=str(exc))),
     )
 
 
@@ -93,7 +93,7 @@ async def nl_to_sql_exception_handler(request: Request, exc: NLtoSQLException) -
 async def nl_to_answer_exception_handler(request: Request, exc: NLtoAnswerException) -> Response:
     return JSONResponse(
         status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-        content=jsonable_encoder(_build_error_response(exc.__class__.__name__, exc.message or "")),
+        content=jsonable_encoder(ErrorResponse(error=str(exc))),
     )
 
 
@@ -101,5 +101,5 @@ async def nl_to_answer_exception_handler(request: Request, exc: NLtoAnswerExcept
 async def generate_table_metadata_exception_handler(request: Request, exc: GenerateTableMetadataException) -> Response:
     return JSONResponse(
         status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-        content=jsonable_encoder(_build_error_response(exc.__class__.__name__, exc.message or "")),
+        content=jsonable_encoder(ErrorResponse(error=str(exc))),
     )
