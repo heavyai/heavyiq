@@ -1,10 +1,15 @@
 # ENV Requirements
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+source  $SCRIPT_DIR/common_fn.sh
+process_args "$@"
 
 # Copy to dist
 rm -rf dist
 mkdir -p dist
 cp -r heavyiq dist/heavyiq
 cp requirements.txt ./dist/requirements.txt
+
+test_for_pyheavydb_dev_requirements
 
 # Create version.txt
 mkdir -p dist/public

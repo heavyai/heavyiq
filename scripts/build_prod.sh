@@ -1,9 +1,13 @@
 # ENV Requirements
 ## python3.10 (Installed)
-
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+source  $SCRIPT_DIR/common_fn.sh
+process_args "$@"
 # Create New Virtual Environment
 python3.10 -m venv venv
 . venv/bin/activate
+
+test_for_pyheavydb_local_install
 
 # Install Requirements
 pip install -r requirements.txt
