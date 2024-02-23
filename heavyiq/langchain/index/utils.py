@@ -76,5 +76,5 @@ class HeavyIQIndexWrapper(VectorStoreIndexWrapper):
         Returns:
             Retriever that can be used to search the index.
         """
-        search_kwargs = {"k": k, "fetch_k": fetch_k}
+        search_kwargs = {"k": k}
         return self.vectorstore.as_retriever(search_type=search_type.value, search_kwargs=search_kwargs)

@@ -164,7 +164,8 @@ class HeavyDBMetadataIndex(HeavyIQIndexWrapper):
         Returns:
             Retriever that can be used to search the index.
         """
-        search_kwargs = {"k": k, "fetch_k": fetch_k}
+        # latest chroma version won't suport fetch_k, so drop it
+        search_kwargs = {"k": k}
         search_kwargs = apply_retriever_filter(search_kwargs, allowable_tables)
         if search_type == SearchType.SIMILARITY_SCORE_THRESHOLD:
             search_kwargs["score_threshold"] = score_threshold  # type: ignore
