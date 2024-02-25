@@ -9,7 +9,10 @@ mkdir -p dist
 cp -r heavyiq dist/heavyiq
 cp requirements.txt ./dist/requirements.txt
 
-test_for_pyheavydb_dev_requirements
+# if INTERNALLY_RELEASED_PYHEAVYDB is set
+# 1. grab the whl and store in ./dist
+# 2. update the ./dist/requirements.txt file
+test_for_internally_released_pyheavydb
 
 # Create version.txt
 mkdir -p dist/public
