@@ -479,8 +479,17 @@ class InMemoryLLMCache(BaseCache):
 class NoopLangChainTracer(LangChainTracer):
     """
     Helps to disable langsmith tracing when this instance is being passed as callbacks while invoking a runnable.
+    Always initialize with dummy client, so that the client validation would never happen. Ex,
+
+    NoopLangChainTracer(client=1)
     """
 
     def _submit(self, function: Callable[[Run], None], run: Run) -> None:
         """Submit a function to the executor."""
+        pass
+
+    def _persist_run_single(self, run: Run) -> None:
+        pass
+
+    def _update_run_single(self, run: Run) -> None:
         pass

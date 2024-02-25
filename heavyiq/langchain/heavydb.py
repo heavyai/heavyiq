@@ -189,6 +189,7 @@ class HeavyDB:
         self._table_schema_change_callback = callback
 
     def __del__(self):
+        # TODO: Move this implementation to weakref.finalize
         try:
             self._conn.close()
         except Exception as e:

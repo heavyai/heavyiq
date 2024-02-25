@@ -19,5 +19,5 @@ async def call_llm(request: CallLLMRequest) -> CallLLMResponse:
         get_llm_by_type, LLMType.INSTRUCT, temperature=request.temperature, max_tokens=request.max_tokens
     )
     prompt = f"{config.custom_llm_api_instruct_prompt_start_token}{request.question}{config.custom_llm_api_instruct_prompt_end_token}"
-    response = await llm.apredict(prompt, stop=request.stop, callbacks=[NoopLangChainTracer()])
+    response = await llm.apredict(prompt, stop=request.stop, callbacks=[NoopLangChainTracer(client=1)])
     return CallLLMResponse(response=response.strip())
