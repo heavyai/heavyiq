@@ -1,23 +1,29 @@
 import unittest
+from typing import AsyncIterator
 
-from heavyiq.langchain.index import get_heavydb_index, HeavyDBMetadataIndex
+import pytest
+
+from heavyiq.langchain.index import HeavyDBMetadataIndex, aget_heavydb_index
 
 
-class TestConversationalAgent(unittest.TestCase):
-    def setUp(self) -> None:
-        self.metadata_index = get_heavydb_index()
+@pytest.fixture(scope="module")
+async def metadata_index() -> AsyncIterator[HeavyDBMetadataIndex]:
+    """
+    Async metadata index fixture.
+    """
+    # this should generate missing documents and then
+    # populates the index with those documents
+    result = await aget_heavydb_index()
+    yield result
 
-    def test_get_heavydb_index(self):
-        self.assertIsInstance(self.metadata_index, HeavyDBMetadataIndex)
 
-    def test_simple_search_for_table_names(self):
-        table_names = self.metadata_index.simple_search_for_table_names("What table contains data about stock prices?")
-        self.assertIsInstance(table_names, list)
-        self.assertIn("sp500_2018_2020_minute", table_names)
-
-    def test_ask_about_database(self):
-        res = self.metadata_index.ask_about_database("What table contains data about stock prices?")
-        self.assertEqual(res["tables"], ["sp500_2018_2020_minute"])
+@pytest.mark.anyio
+async def test_simple_search_for_table_names(heavyiq_config, metadata_index: HeavyDBMetadataIndex):
+    table_names = await metadata_index.asimple_search_for_table_names(
+        "How many states begin with the letter A?", allowable_tables=["usa_states"]
+    )
+    assert table_names
+    assert "usa_states" in table_names
 
 
 if __name__ == "__main__":

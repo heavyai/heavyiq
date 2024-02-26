@@ -27,11 +27,6 @@ from .dependencies import (
 )
 
 
-@pytest.fixture(scope="session")
-def anyio_backend():
-    return "asyncio"
-
-
 # AsyncClient comes from HTTPX and "app" is FastAPI
 @pytest.fixture(scope="module")
 async def aclient(config_file_path) -> AsyncIterator[AsyncClient]:
