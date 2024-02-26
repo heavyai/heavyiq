@@ -4,6 +4,7 @@
 export INTERNALLY_RELEASED_PYHEAVYDB=false
 export HTTP_PYTHON_DEPS="https://dependencies.mapd.com/python-deps"
 export PKG_PATH=""
+export PYHEAVYDB_ARCHIVE=""
 
 function process_args(){
   while (( $# )); do
@@ -20,10 +21,9 @@ function process_args(){
 }
 
 function get_pyheavydb_for_local_install() {
-  wget --continue ${HTTP_PYTHON_DEPS}/pyheavydb.whl.version > /dev/null 2>&1
-  local pyheavydb_archive=$(head -n 1 pyheavydb.whl.version)
-  wget --continue ${HTTP_PYTHON_DEPS}/${pyheavydb_archive} > /dev/null 2>&1
-  echo $pyheavydb_archive
+  wget --continue ${HTTP_PYTHON_DEPS}/pyheavydb.whl.version 
+  PYHEAVYDB_ARCHIVE=$(head -n 1 pyheavydb.whl.version)
+  wget --continue ${HTTP_PYTHON_DEPS}/${PYHEAVYDB_ARCHIVE} 
 }
 
 function update_pyheavydb_reference() {
@@ -58,16 +58,19 @@ function test_for_internally_release_pyheavydb() {
       "the script is being run from the wrong place"
     return
   fi
-  local pyheavydb_archive=$(get_pyheavydb_for_local_install)
-  mv ${pyheavydb_archive} ./dist
-  PKG_PATH=./dist/${pyheavydb_archive}
+  # get_pyheavydb_for_local_install sets PYHEAVYDB_ARCHIVE
+  get_pyheavydb_for_local_install
+
+  mv ${PYHEAVYDB_ARCHIVE} ./dist
+  PKG_PATH=./dist/${PYHEAVYDB_ARCHIVE}
   update_pyheavydb_reference ./dist/requirements.txt
 }
 
 function test_and_install_local_pyheavydb() {
-  local pyheavydb_archive=$(get_pyheavydb_for_local_install)
+  # get_pyheavydb_for_local_install sets PYHEAVYDB_ARCHIVE
+  get_pyheavydb_for_local_install
   if [[ $INTERNALLY_RELEASED_PYHEAVYDB == "false" ]];then
     return
   fi
-  pip install ${pyheavydb_archive} 
+  pip install ${PYHEAVYDB_ARCHIVE} 
 }
