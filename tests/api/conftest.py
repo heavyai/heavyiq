@@ -29,8 +29,10 @@ from .dependencies import (
 
 # AsyncClient comes from HTTPX and "app" is FastAPI
 @pytest.fixture(scope="module")
-async def aclient(config_file_path) -> AsyncIterator[AsyncClient]:
-    app = create_app(config_file_path)
+async def aclient(config_file_path: str) -> AsyncIterator[AsyncClient]:
+    # skip telemetrics initialization
+    with patch("heavyiq.api.init_telemetrics", return_value=None):
+        app = create_app(config_file_path)
     app.dependency_overrides[valid_query_db_session] = override_heavydb_client_for_query_request
     app.dependency_overrides[valid_question_db_session] = override_heavydb_client_for_question_request
     app.dependency_overrides[validate_db_session_for_table_metadata] = override_valid_table_metadata_db_session
@@ -42,9 +44,10 @@ async def aclient(config_file_path) -> AsyncIterator[AsyncClient]:
 
 
 @pytest.fixture(scope="module")
-def client(config_file_path):
+def client(config_file_path: str):
     # Initialize the TestClient with the provided base URL
-    app = create_app(config_file_path)
+    with patch("heavyiq.api.init_telemetrics", return_value=None):
+        app = create_app(config_file_path)
     app.dependency_overrides[valid_query_db_session] = override_heavydb_client_for_query_request
     app.dependency_overrides[valid_question_db_session] = override_heavydb_client_for_question_request
     app.dependency_overrides[validate_db_session_for_table_metadata] = override_valid_table_metadata_db_session
