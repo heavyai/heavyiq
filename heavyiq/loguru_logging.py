@@ -1,6 +1,5 @@
 import datetime
 import sys
-from copy import deepcopy
 from typing import Any, Callable
 
 from loguru._defaults import LOGURU_FORMAT as DEFAULT_LOGURU_FORMAT
@@ -35,7 +34,7 @@ def serialize(record: dict) -> dict:
     request_dict, response_dict = {}, {"status_code": "-", "response_size": "-"}
     request_id = record_extra.get("request_id", None)
     if request and isinstance(request, Request):
-        request_dict["remote_addr"] = request.client.host
+        request_dict["remote_addr"] = request.client.host if request.client else ""
         request_dict["username"] = request.headers.get("X-Remote-User") or "-"
         request_dict["request_method"] = request.method
         request_dict["request_uri"] = str(request.url)

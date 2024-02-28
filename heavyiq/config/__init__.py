@@ -4,10 +4,9 @@ from urllib.parse import urlparse
 from confz import FileSource
 from heavydb.thrift.Heavy import Client  # type: ignore
 from heavydb.thrift.ttypes import TLicenseInfo
+from openai import OpenAI
 from thrift.protocol import TBinaryProtocol
 from thrift.transport import TSocket, TTransport
-import openai
-
 
 from .config_schema import AppConfig, HeavyIQConfig
 
@@ -46,10 +45,10 @@ def get_config(file: str = "./config.toml") -> HeavyIQConfig:
             raise ValueError(
                 "Custom LLM type is set to 'AZURE', but deployment name or API base URL or API Version is not set."
             )
-        openai.api_key = app_config.iq.openai_api_key
+        openai_client = OpenAI(api_key=app_config.iq.openai_api_key)
         if app_config.iq.custom_llm_type is None:
             try:
-                openai.Model.list()
+                openai_client.models.list()
             except Exception as e:
                 raise ValueError(f"Unable to communicate with OpenAI API: {e}")
     elif app_config.iq.custom_llm_type == "API":

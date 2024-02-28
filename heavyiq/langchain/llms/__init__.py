@@ -4,10 +4,10 @@ from typing import Any
 
 import requests
 from cachetools import LRUCache, TTLCache, cached
-from langchain.chat_models import AzureChatOpenAI, ChatOpenAI
 from langchain.chat_models.base import BaseChatModel
-from langchain.llms import AzureOpenAI
 from langchain.llms.base import BaseLLM
+from langchain_openai.chat_models import AzureChatOpenAI, ChatOpenAI
+from langchain_openai.llms import AzureOpenAI
 
 from heavyiq.config import get_config
 from heavyiq.logging_utils import get_heavyiq_logger
@@ -60,7 +60,7 @@ def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str
         kwargs["n"] = 1
     if model_type == LLMType.NL_TO_SQL:
         kwargs["max_tokens"] = config.custom_llm_api_vllm_max_tokens
-    return kwargs, model_kwargs
+    return kwargs, {"extra_body": model_kwargs} if model_kwargs else {}
 
 
 @cached(
@@ -159,7 +159,7 @@ def _get_openai_llm(model: str, **kwargs) -> BaseLLM:
     config = get_config()
     if config.custom_llm_type == "AZURE":
         return AzureOpenAI(
-            openai_api_base=config.custom_llm_azure_openai_api_base,
+            azure_endpoint=config.custom_llm_azure_openai_api_base,
             openai_api_key=config.openai_api_key,
             openai_api_version=config.custom_llm_azure_openai_api_version,
             deployment_name=config.custom_llm_azure_deployment_name,
@@ -174,7 +174,7 @@ def _get_openai_chat_llm(model: str, **kwargs) -> BaseChatModel:
     config = get_config()
     if config.custom_llm_type == "AZURE":
         return AzureChatOpenAI(
-            openai_api_base=config.custom_llm_azure_openai_api_base,
+            azure_endpoint=config.custom_llm_azure_openai_api_base,
             openai_api_key=config.openai_api_key,
             openai_api_version=config.custom_llm_azure_openai_api_version,
             deployment_name=config.custom_llm_azure_deployment_name,

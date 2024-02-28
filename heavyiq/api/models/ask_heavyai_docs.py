@@ -5,7 +5,7 @@ class AskHeavyAIDocsRequest(BaseModel):
     question: str = Field(..., description="Question that can be answered using HeavyAI docs")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "examples": [
                 {
                     "question": "Can I configure a HeavyConnect import in the Immerse Data manager?",
@@ -22,7 +22,7 @@ class AskHeavyAIDocsResponse(BaseModel):
     )
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "examples": [
                 {
                     "answer": "Yes, you can configure a HeavyConnect import in the Immerse Data manager.",
