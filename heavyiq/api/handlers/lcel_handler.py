@@ -10,7 +10,8 @@ from heavyiq.api.models import (
     TablesResponse,
 )
 from heavyiq.config import get_config
-from heavyiq.langchain.exceptions import NLtoAnswerException, NLtoSQLException
+from heavyiq.langchain.exceptions import NLtoAnswerException, NLtoSQLException, NLtoSQLPredefinedException
+from heavyiq.utils import is_predefined_llm_error
 
 
 @with_db
@@ -24,7 +25,10 @@ async def handle_lcel_query_request(request_dict: dict, config: dict | None = No
     max_retries = get_config().max_retries_nl_to_sql
 
     out = await sql_chain.ainvoke(request_dict, config=config)  # type: ignore
-    if out["error"]:
+    error = out.get("error")
+    if error:
+        if is_predefined_llm_error(error):
+            raise NLtoSQLPredefinedException(message=error)
         raise NLtoSQLException(
             f"Language model failed to generate a valid SQL query after {max_retries} tries.",
             failed_sql=out["query"],

@@ -28,6 +28,16 @@ def strip_sql_comments(sql: str) -> str:
     return sql
 
 
+def is_predefined_llm_error(message: str) -> bool:
+    """
+    Checks whether the input message is a predefined llm error message or not.
+    """
+    message = message.strip()
+    if message.startswith("MISSING_DATA:") or message.startswith("AMBIGUOUS_QUESTION:"):
+        return True
+    return False
+
+
 def is_destructive_sql(sql: str) -> bool:
     """
     Determines if a provided SQL statement is destructive or causes a modification.
