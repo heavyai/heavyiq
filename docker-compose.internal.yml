@@ -1,0 +1,89 @@
+version: '3'
+
+services:
+  heavyiq-api:
+    container_name: heavyiq-api
+    build:
+      context: .
+      dockerfile: ./environment/heavyiq_api/Dockerfile.internal  # Specify the custom Dockerfile name
+    volumes:
+      - ./table_documents:/app/table_documents
+      - ./db:/app/db
+      - ./storage:/app/storage
+      - ./hf_models:/app/hf_models
+    network_mode: "bridge"
+    ports:
+      - "8000:8000"
+    command: ["gunicorn", "-b", ":8000", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--preload", "heavyiq.api:create_app('./config.toml')"]
+
+  heavyiq-test:
+    container_name: heavyiq-test
+    build:
+      context: .
+      dockerfile: ./environment/heavyiq_test/Dockerfile  # Specify the custom Dockerfile name
+    volumes:
+      - ./table_documents:/app/table_documents
+      - ./db:/app/db
+      - ./storage:/app/storage
+      - ./hf_models:/app/hf_models
+      - ./config.test.toml:/app/config.toml
+    network_mode: "bridge"
+    command: ['pytest', '/app/tests', '--disable-warnings', '-rs', '--config-path=./config.toml']
+
+  llama2-cpp:
+    container_name: llama2-cpp
+    build:
+      context: .
+      dockerfile: ./environment/llama2/Dockerfile.cuda
+    ports:
+      - "8001:8000"
+    volumes:
+      - /llm_servers/llama2/models:/models
+    environment:
+      - MODEL=/models/llama-model.gguf
+    command: python3 -m llama_cpp.server --model /models/llama-model.gguf
+
+  whisper-cpp:
+    container_name: whisper-cpp
+    build:
+      context: ./environment/whisper
+      dockerfile: Dockerfile
+    volumes:
+      - ./llm_servers/whisper/models:/app/models
+    entrypoint: /app/entrypoint.sh
+    environment:
+      - HOST=0.0.0.0
+    ports:
+      - "8002:8001"
+  
+  vllm:
+    image: vllm/vllm-openai:latest
+    command:
+      - --model
+      - heavyai/heavyiq-deepseek-coder-6-7b-combo-v49-2048-tokens-table-prompts-custom-instruct-lr-1-8
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5000"
+      - --trust-remote-code
+      - --max-num-batched-tokens
+      - "8192"
+      - --max-model-len
+      - "8192"
+      - --dtype
+      - float16
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - ./environment/vllm/.cache/huggingface:/root/.cache/huggingface
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=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
+    ports:
+      - "5000:5000"
+    ipc: host
