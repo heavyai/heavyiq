@@ -4,7 +4,7 @@ from uuid import UUID
 
 from langchain import callbacks
 from langchain.callbacks.base import AsyncCallbackHandler
-from langchain.pydantic_v1 import BaseModel
+from pydantic import BaseModel
 
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
