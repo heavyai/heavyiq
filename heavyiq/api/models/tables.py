@@ -45,3 +45,47 @@ class TablesResponse(BaseModel):
                 }
             ]
         }
+
+
+class TablesToQuestionsRequest(BaseModel):
+    """
+    /tables-to-questions endpoint's request schema class.
+    """
+
+    session_id: str = Field(..., max_length=32, min_length=32, description="Valid HeavyDB Session ID")
+    tables: list[str] = Field(
+        ...,
+        description="List of tables to consider.",
+    )
+
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {
+                    "session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+                    "tables": ["flights_2008"],
+                }
+            ]
+        }
+
+
+class TablesToQuestionsResponse(BaseModel):
+    """
+    /tables-to-questions endpoint's response schema class.
+    """
+
+    questions: list[str] = Field(..., description="List of generated questions.")
+    feedback_id: str = Field(
+        default="",
+        description="A unique identifier for this request that can be used to submit feedback about the response",
+    )
+
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {
+                    "questions": ["What are the top 5 airlines by number of flights operated?"],
+                    "feedback_id": "(Optional) xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+                }
+            ]
+        }

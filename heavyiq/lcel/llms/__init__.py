@@ -13,6 +13,7 @@ llm_runnable = (
         nl_to_sql=partial(get_llm_by_type, LLMType.NL_TO_SQL, temperature=0.0),  # type: ignore
         sql_to_answer=partial(get_llm_by_type, LLMType.SQL_TO_ANSWER, temperature=0.0),  # type: ignore
         nl_to_tables=partial(get_llm_by_type, LLMType.NL_TO_TABLES, temperature=0.0),  # type: ignore
+        tables_to_questions=partial(get_llm_by_type, LLMType.TABLES_TO_QUESTIONS, temperature=0.0),
         default_llm=partial(get_llm_by_type, LLMType.DEFAULT, temperature=0.0),  # type: ignore
     )
     .configurable_fields(

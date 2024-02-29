@@ -12,6 +12,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     openai_gpt_model_sql_to_answer: Optional[str] = None  # LLMType.SQL_TO_ANSWER
     openai_gpt_model_nl_to_tables: Optional[str] = None  # LLMType.NL_TO_TABLES
     openai_gpt_model_instruct: Optional[str] = None  # LLMType.INSTRUCT
+    openai_gpt_model_tables_to_questions: Optional[str] = None  # LLMType.TABLES_TO_QUESTIONS
     max_fields_limit_sql_to_answer: int = 20  # LLMType.SQL_TO_ANSWER
     """Max number of fields (rows x columns) allowed to pass onto sql_to_answer llm"""
     heavydb_dbname: Optional[str] = None
@@ -59,6 +60,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     custom_llm_api_sql_to_answer_context_window: int = 8192  # LLMType.SQL_TO_ANSWER
     custom_llm_api_nl_to_tables_base: Optional[str] = None  # LLMType.NL_TO_TABLES
     custom_llm_api_nl_to_tables_context_window: int = 8192  # LLMType.NL_TO_TABLES
+    custom_llm_api_tables_to_questions_base: Optional[str] = None  # LLMType.TABLES_TO_QUESTIONS
+    custom_llm_api_tables_to_questions_context_window: int = 8192  # LLMType.TABLES_TO_QUESTIONS
     custom_llm_api_instruct_base: Optional[str] = None  # LLMType.INSTRUCT
     custom_llm_api_instruct_context_window: int = 8192  # LLMType.INSTRUCT
     custom_llm_api_instruct_prompt_start_token: str = "<|prompt|>\n"
