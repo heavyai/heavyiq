@@ -306,6 +306,9 @@ def get_tokenizer() -> Any:
     elif "deepseek" in model_name:
         tokenizer_cls = AutoTokenizer
         model_local_path = "./heavyiq/langchain/tokenizer_models/deepseek_model"
+    elif "starcoder-2" in model_name:
+        tokenizer_cls = AutoTokenizer
+        model_local_path = "./heavyiq/langchain/tokenizer_models/starcoder2_model"
     else:
         raise ValueError("Unsupported model found for tokenization. Aavailable models are 'llama' and 'deepseek'.")
 
