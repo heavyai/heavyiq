@@ -1,4 +1,3 @@
-from langchain.schema import StrOutputParser
 from langchain.schema.runnable import Runnable, RunnableLambda, RunnablePassthrough
 
 from heavyiq.langchain.llms import LLMType, is_using_custom_trained_llm
@@ -6,6 +5,7 @@ from heavyiq.langchain.utils import aget_table_info_wrt_token_limit
 from heavyiq.lcel.chains.utils import configure_step, get_value_from_runnable_binding
 from heavyiq.lcel.llms import llm_runnable
 from heavyiq.lcel.prompts import to_questions_prompt_runnable
+from heavyiq.lcel.runnables.base import LLMGenerationRunnable
 from heavyiq.lcel.types import QuestionsChainInputType, QuestionsChainInputTypedDict, QuestionsChainOutputType
 
 # llm
@@ -48,7 +48,7 @@ prompt = configure_step(tables_to_questions_prompt_rbl, run_name="Format Prompt"
 
 # Step 3
 # Call LLM
-model = configure_step(tables_to_questions_llm_rbl, run_name="Call LLM", step="Calling LLM.")
+model = configure_step(LLMGenerationRunnable(tables_to_questions_llm_rbl), run_name="Call LLM", step="Calling LLM.")
 
 chain: Runnable = (
     (RunnablePassthrough.assign(table_info=retrieve_tables_info_lambda) | prompt | model)

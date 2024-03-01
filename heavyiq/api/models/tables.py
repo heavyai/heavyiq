@@ -57,6 +57,11 @@ class TablesToQuestionsRequest(BaseModel):
         ...,
         description="List of tables to consider.",
     )
+    n: int = Field(default=5, ge=1, le=10, description="Number of questions to be generated")
+    temperature: float = Field(default=0.5, ge=0.0, le=1.0, description="Number of questions to be generated")
+    max_tokens: int = Field(
+        default=512, ge=1, le=1024, description="Maxium number of tokens that a LLM can generate (ie. output tokens)"
+    )
 
     class Config:
         json_schema_extra = {
@@ -64,6 +69,9 @@ class TablesToQuestionsRequest(BaseModel):
                 {
                     "session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
                     "tables": ["flights_2008"],
+                    "n": 5,
+                    "temperature": 0.5,
+                    "max_tokens": 512,
                 }
             ]
         }

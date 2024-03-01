@@ -21,4 +21,4 @@ class QuestionsChainInputTypedDict(TypedDict):
 class QuestionsChainOutputType(BaseModel):
     """Tables to Questions chain output type"""
 
-    __root__: list[str] = Field(..., description="A list of generated questions.")
+    __root__: list[str] = Field(..., description="List of generated questions.")

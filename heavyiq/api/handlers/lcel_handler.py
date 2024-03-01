@@ -203,9 +203,14 @@ async def handle_lcel_tables_to_questions_request(
 
     config = config or {}
     configurable = config.pop("configurable", {})
-    configurable.update({"llm_temperature": 0.5, "llm_n": 5, "llm_max_tokens": 256})
+    configurable.update(
+        {
+            "llm_temperature": request_dict["temperature"],
+            "llm_n": request_dict["n"],
+            "llm_max_tokens": request_dict["max_tokens"],
+        }
+    )
 
     config = {**config, "configurable": configurable}
-    result = await question_chain.ainvoke(request_dict, config=config)  # type: ignore
-    # result contain string
-    return TablesToQuestionsResponse(questions=[result])
+    questions = await question_chain.ainvoke(request_dict, config=config)  # type: ignore
+    return TablesToQuestionsResponse(questions=questions)
