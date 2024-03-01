@@ -66,6 +66,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     custom_llm_api_instruct_context_window: int = 8192  # LLMType.INSTRUCT
     custom_llm_api_instruct_prompt_start_token: str = "<|prompt|>\n"
     custom_llm_api_instruct_prompt_end_token: str = "\n<|answer|>\n"
+    custom_llm_api_tables_to_questions_prompt_token: str = "<|table question prompt|>"
+    custom_llm_api_tables_to_questions_answer_token: str = "<|table question answer|>"
     custom_llm_api_vllm_beam_width: int = 2
     custom_llm_api_vllm_max_tokens: int = 512
     custom_llm_azure_openai_api_version: str = "2023-03-15-preview"
