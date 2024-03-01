@@ -10,7 +10,7 @@ from heavyiq.lcel.types import QuestionsChainInputType, QuestionsChainInputTyped
 
 # llm
 tables_to_questions_llm_rbl = llm_runnable.with_config(
-    configurable={"llm": "nl_to_tables", "llm_temperature": 0}, config={"tags": ["nl_to_tables_llm"]}  # type: ignore
+    configurable={"llm": "tables_to_questions", "llm_temperature": 0}, config={"tags": ["tables_to_questions_llm"]}  # type: ignore
 )
 # prompt
 tables_to_questions_prompt_rbl = (

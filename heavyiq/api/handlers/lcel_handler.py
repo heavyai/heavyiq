@@ -201,7 +201,11 @@ async def handle_lcel_tables_to_questions_request(
     """
     from heavyiq.lcel.chains import question_chain
 
-    config = {**config, "llm_temperature": 0.4}
+    config = config or {}
+    configurable = config.pop("configurable", {})
+    configurable.update({"llm_temperature": 0.5, "llm_n": 5, "llm_max_tokens": 256})
+
+    config = {**config, "configurable": configurable}
     result = await question_chain.ainvoke(request_dict, config=config)  # type: ignore
     # result contain string
     return TablesToQuestionsResponse(questions=[result])
