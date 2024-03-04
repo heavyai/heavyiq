@@ -366,7 +366,7 @@ class HeavyDB:
             return await anyio.to_thread.run_sync(func, cancellable=True)  # type: ignore
 
         conn = await cls._aconnect_with_timeout(aconnect_func(), kwargs.pop("timeout", 10))
-        return cls(conn, **kwargs)
+        return await run_in_threadpool(cls, conn, **kwargs)
 
     @classmethod
     def from_creds(

@@ -8,6 +8,7 @@ from heavyiq.api.dependencies import (
     valid_query_db_session,
     valid_question_db_session,
     valid_tables_db_session,
+    valid_tables_to_questions_db_session,
 )
 from heavyiq.api.handlers import (
     handle_lcel_answer_request,
@@ -16,6 +17,7 @@ from heavyiq.api.handlers import (
     handle_lcel_query_request,
     handle_lcel_question_request,
     handle_lcel_tables_request,
+    handle_lcel_tables_to_questions_request,
 )
 from heavyiq.api.models import (
     AnswerRequest,
@@ -30,6 +32,8 @@ from heavyiq.api.models import (
     QuestionResponse,
     TablesRequest,
     TablesResponse,
+    TablesToQuestionsRequest,
+    TablesToQuestionsResponse,
 )
 from heavyiq.api.routes.log_route import LoggingRoute
 from heavyiq.langchain import HeavyDB
@@ -122,3 +126,18 @@ async def tables(values: tuple[TablesRequest, HeavyDB] = Depends(valid_tables_db
     :param AnswerRequest request: Request Body
     """
     return await handle_lcel_tables_request(*values)
+
+
+@lcelrouter.post("/tables-to-questions", response_model=TablesToQuestionsResponse)
+async def tables_to_questions(
+    values: tuple[TablesToQuestionsRequest, HeavyDB] = Depends(valid_tables_to_questions_db_session)
+) -> TablesToQuestionsResponse:
+    """
+    Request to generate questions for the given tables with all the information:
+
+    - **tables**: Tables to consider for generating questions.
+    - **session_id**: HeavyDB session id.
+    \f
+    :param TablesToQuestionsRequest: Request Body
+    """
+    return await handle_lcel_tables_to_questions_request(*values)

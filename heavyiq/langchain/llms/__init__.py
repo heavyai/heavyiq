@@ -21,6 +21,7 @@ class LLMType(Enum):
     NL_TO_SQL = "nl_to_sql"
     SQL_TO_ANSWER = "sql_to_answer"
     NL_TO_TABLES = "nl_to_tables"
+    TABLES_TO_QUESTIONS = "tables_to_questions"
     INSTRUCT = "instruct"  # mainly used on /call-llm endpoint to resolve general instructions
 
 
@@ -80,6 +81,7 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
             LLMType.SQL_TO_ANSWER: config.openai_gpt_model_sql_to_answer,
             LLMType.NL_TO_TABLES: config.openai_gpt_model_nl_to_tables,
             LLMType.INSTRUCT: config.openai_gpt_model_instruct,
+            LLMType.TABLES_TO_QUESTIONS: config.openai_gpt_model_tables_to_questions,
         }
         model_name: str = openai_llm_mapping[LLMType.DEFAULT] if openai_llm_mapping[model_type] is None else openai_llm_mapping[model_type]  # type: ignore
         return get_openai_llm_by_model_name(model=model_name, **kwargs)
@@ -96,6 +98,10 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
                 config.custom_llm_api_nl_to_tables_context_window,
             ),
             LLMType.INSTRUCT: (config.custom_llm_api_instruct_base, config.custom_llm_api_instruct_context_window),
+            LLMType.TABLES_TO_QUESTIONS: (
+                config.custom_llm_api_tables_to_questions_base,
+                config.custom_llm_api_tables_to_questions_context_window,
+            ),  # uses the default model and context window
         }
         api_base, context_window = (
             custom_llm_mapping[LLMType.DEFAULT]
