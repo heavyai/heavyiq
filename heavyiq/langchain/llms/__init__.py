@@ -4,10 +4,10 @@ from typing import Any
 
 import requests
 from cachetools import LRUCache, TTLCache, cached
-from langchain.chat_models import AzureChatOpenAI, ChatOpenAI
 from langchain.chat_models.base import BaseChatModel
-from langchain.llms import AzureOpenAI
 from langchain.llms.base import BaseLLM
+from langchain_openai.chat_models import AzureChatOpenAI, ChatOpenAI
+from langchain_openai.llms import AzureOpenAI
 
 from heavyiq.config import get_config
 from heavyiq.logging_utils import get_heavyiq_logger
@@ -21,6 +21,7 @@ class LLMType(Enum):
     NL_TO_SQL = "nl_to_sql"
     SQL_TO_ANSWER = "sql_to_answer"
     NL_TO_TABLES = "nl_to_tables"
+    TABLES_TO_QUESTIONS = "tables_to_questions"
     INSTRUCT = "instruct"  # mainly used on /call-llm endpoint to resolve general instructions
 
 
@@ -60,7 +61,7 @@ def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str
         kwargs["n"] = 1
     if model_type == LLMType.NL_TO_SQL:
         kwargs["max_tokens"] = config.custom_llm_api_vllm_max_tokens
-    return kwargs, model_kwargs
+    return kwargs, {"extra_body": model_kwargs} if model_kwargs else {}
 
 
 @cached(
@@ -80,6 +81,7 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
             LLMType.SQL_TO_ANSWER: config.openai_gpt_model_sql_to_answer,
             LLMType.NL_TO_TABLES: config.openai_gpt_model_nl_to_tables,
             LLMType.INSTRUCT: config.openai_gpt_model_instruct,
+            LLMType.TABLES_TO_QUESTIONS: config.openai_gpt_model_tables_to_questions,
         }
         model_name: str = openai_llm_mapping[LLMType.DEFAULT] if openai_llm_mapping[model_type] is None else openai_llm_mapping[model_type]  # type: ignore
         return get_openai_llm_by_model_name(model=model_name, **kwargs)
@@ -96,6 +98,10 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
                 config.custom_llm_api_nl_to_tables_context_window,
             ),
             LLMType.INSTRUCT: (config.custom_llm_api_instruct_base, config.custom_llm_api_instruct_context_window),
+            LLMType.TABLES_TO_QUESTIONS: (
+                config.custom_llm_api_tables_to_questions_base,
+                config.custom_llm_api_tables_to_questions_context_window,
+            ),  # uses the default model and context window
         }
         api_base, context_window = (
             custom_llm_mapping[LLMType.DEFAULT]
@@ -159,7 +165,7 @@ def _get_openai_llm(model: str, **kwargs) -> BaseLLM:
     config = get_config()
     if config.custom_llm_type == "AZURE":
         return AzureOpenAI(
-            openai_api_base=config.custom_llm_azure_openai_api_base,
+            azure_endpoint=config.custom_llm_azure_openai_api_base,
             openai_api_key=config.openai_api_key,
             openai_api_version=config.custom_llm_azure_openai_api_version,
             deployment_name=config.custom_llm_azure_deployment_name,
@@ -174,7 +180,7 @@ def _get_openai_chat_llm(model: str, **kwargs) -> BaseChatModel:
     config = get_config()
     if config.custom_llm_type == "AZURE":
         return AzureChatOpenAI(
-            openai_api_base=config.custom_llm_azure_openai_api_base,
+            azure_endpoint=config.custom_llm_azure_openai_api_base,
             openai_api_key=config.openai_api_key,
             openai_api_version=config.custom_llm_azure_openai_api_version,
             deployment_name=config.custom_llm_azure_deployment_name,

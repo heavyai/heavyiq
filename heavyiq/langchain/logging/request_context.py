@@ -4,9 +4,10 @@ from datetime import datetime
 from typing import Any, Optional
 
 from langchain.agents.agent import AgentExecutor
-from langchain.callbacks import OpenAICallbackHandler, collect_runs, get_openai_callback
 from langchain.chains.base import Chain
 from langchain.schema.runnable import Runnable, RunnableConfig, RunnableSerializable
+from langchain_community.callbacks import OpenAICallbackHandler, get_openai_callback
+from langchain_core.tracers.context import collect_runs
 
 from heavyiq import VERSION_TAG
 from heavyiq.config import get_config

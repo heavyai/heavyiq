@@ -1,8 +1,8 @@
 from unittest.mock import patch
 
 import pytest
-from langchain.chat_models import AzureChatOpenAI, ChatOpenAI
-from langchain.llms import AzureOpenAI
+from langchain_openai.chat_models import AzureChatOpenAI, ChatOpenAI
+from langchain_openai.llms import AzureOpenAI
 
 from heavyiq.config import HeavyIQConfig
 from heavyiq.langchain.llms import LLMType, get_llm_by_type, get_vllm_model_kwargs, is_using_custom_trained_llm
@@ -26,7 +26,11 @@ def test_should_check_whether_custom_llm_used_or_not():
     "model_type, beam_width, expected",
     [
         (LLMType.DEFAULT, 1, ({}, {})),
-        (LLMType.NL_TO_SQL, 2, ({"n": 1, "best_of": 2, "max_tokens": 612}, {"use_beam_search": True, "logprobs": 5})),
+        (
+            LLMType.NL_TO_SQL,
+            2,
+            ({"n": 1, "best_of": 2, "max_tokens": 612}, {"extra_body": {"logprobs": 5, "use_beam_search": True}}),
+        ),
         (LLMType.SQL_TO_ANSWER, 2, ({}, {})),
     ],
 )

@@ -7,13 +7,12 @@ from cachetools import LRUCache, TTLCache, cached
 from fastapi.concurrency import run_in_threadpool
 from heavydb.exceptions import TDBException
 from langchain.base_language import BaseLanguageModel
-from langchain.callbacks.tracers import langchain as langchain_tracer_module
-from langchain.callbacks.tracers.langchain import LangChainTracer
-from langchain.callbacks.tracers.schemas import Run
 from langchain.prompts import BaseChatPromptTemplate, BasePromptTemplate
 from langchain.schema.cache import RETURN_VAL_TYPE, BaseCache
 from langchain.schema.prompt import PromptValue
-from langsmith import Client
+from langchain_core.tracers import langchain as langchain_tracer_module
+from langchain_core.tracers.langchain import LangChainTracer
+from langchain_core.tracers.schemas import Run
 from transformers import AutoTokenizer, LlamaTokenizer
 
 from heavyiq.config import HeavyIQConfig, get_config
@@ -42,7 +41,6 @@ def init_telemetrics() -> None:
 
     # chromadb telemetry opt-out
     os.environ["ANONYMIZED_TELEMETRY"] = "false"
-    langchain_tracer_module._CLIENT = Client(timeout_ms=10000)
     langchain_tracer_module.logger = get_heavyiq_logger()  # type: ignore
 
 
@@ -135,7 +133,7 @@ def get_table_info_wrt_token_limit(
 
 @alru_cache(maxsize=127, ttl=60 * 10)  # typed=True and passing kwargs seems buggy in async lru
 async def aget_table_info_from_cache_or_calculate(
-    session: str, tables: Sequence[str], include_samples: bool, include_top_k: bool
+    session: str, tables: Sequence[str], include_samples: bool, include_top_k: bool, include_timestamp: bool
 ) -> str:
     """
     Get tables info from cache or calculate based on the passed KW args.
@@ -145,10 +143,14 @@ async def aget_table_info_from_cache_or_calculate(
         table: list of tables to get info for
         include_samples: Whether to include samples on the table info. Defaults to True.
         include_top_k: Whether to include top-k on the table info. Defaults to True.
+        include_timestamp: Whether to include timestmp on the table info or not. Defaults to True.
     """
     heavydb = await get_db(session)
     table_info = await heavydb.aget_table_info(
-        table_names=list(tables), include_samples=include_samples, include_top_k=include_top_k
+        table_names=list(tables),
+        include_samples=include_samples,
+        include_top_k=include_top_k,
+        include_timestamp=include_timestamp,
     )
     return table_info
 
@@ -201,9 +203,9 @@ async def refresh_cache_for_tables(session: str, tables: Sequence[str]):
 
     # if any of the table schema gets changed, then clear it's table_info cache
     if True in do_refresh_results:
-        options_list = [(True, True), (True, False), (False, True), (False, False)]
-        for x, y in options_list:
-            aget_table_info_from_cache_or_calculate.cache_invalidate(heavydb._conn._session, tables, x, y)
+        options_list = [(False, True, True), (False, True, False), (False, False, True), (False, False, False)]
+        for x, y, z in options_list:
+            aget_table_info_from_cache_or_calculate.cache_invalidate(heavydb._conn._session, tables, x, y, z)
 
 
 async def aget_table_info_wrt_token_limit(
@@ -224,14 +226,16 @@ async def aget_table_info_wrt_token_limit(
             {},
             {"include_top_k": False},
             {"include_samples": False},
-            {"include_samples": False, "include_top_k": False},
+            {"include_samples": False, "include_timestamp": False},
+            {"include_samples": False, "include_timestamp": False, "include_top_k": False},
         ]
     else:
         token_limit = llm.context_window - 306  # type: ignore # (256 response + 50 buffer)
         token_counter = custom_model_token_counter
         table_info_options = [
             {"include_samples": False},
-            {"include_samples": False, "include_top_k": False},
+            {"include_samples": False, "include_timestamp": False},
+            {"include_samples": False, "include_timestamp": False, "include_top_k": False},
         ]
 
     top_k_max_str_column_count = (
@@ -253,11 +257,12 @@ async def aget_table_info_wrt_token_limit(
     for options in table_info_options:
         include_samples = options.get("include_samples", True)
         include_top_k = options.get("include_top_k", True)
+        include_timestamp = options.get("include_timestamp", True)
         if disable_top_k:
             include_top_k = False
 
         table_info = await aget_table_info_from_cache_or_calculate(
-            session, table_names_tuple, include_samples, include_top_k
+            session, table_names_tuple, include_samples, include_top_k, include_timestamp
         )
         formatted_prompt = prompt.format(table_info=table_info)
         prompt_tokens = await run_in_threadpool(token_counter, formatted_prompt)
@@ -308,6 +313,9 @@ def get_tokenizer() -> Any:
     elif "deepseek" in model_name:
         tokenizer_cls = AutoTokenizer
         model_local_path = "./heavyiq/langchain/tokenizer_models/deepseek_model"
+    elif "starcoder-2" in model_name:
+        tokenizer_cls = AutoTokenizer
+        model_local_path = "./heavyiq/langchain/tokenizer_models/starcoder2_model"
     else:
         raise ValueError("Unsupported model found for tokenization. Aavailable models are 'llama' and 'deepseek'.")
 
@@ -485,8 +493,17 @@ class InMemoryLLMCache(BaseCache):
 class NoopLangChainTracer(LangChainTracer):
     """
     Helps to disable langsmith tracing when this instance is being passed as callbacks while invoking a runnable.
+    Always initialize with dummy client, so that the client validation would never happen. Ex,
+
+    NoopLangChainTracer(client=1)
     """
 
     def _submit(self, function: Callable[[Run], None], run: Run) -> None:
         """Submit a function to the executor."""
+        pass
+
+    def _persist_run_single(self, run: Run) -> None:
+        pass
+
+    def _update_run_single(self, run: Run) -> None:
         pass

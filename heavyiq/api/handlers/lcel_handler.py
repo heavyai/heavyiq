@@ -8,6 +8,7 @@ from heavyiq.api.models import (
     QueryResponse,
     QuestionResponse,
     TablesResponse,
+    TablesToQuestionsResponse,
 )
 from heavyiq.config import get_config
 from heavyiq.langchain.exceptions import NLtoAnswerException, NLtoSQLException
@@ -181,3 +182,35 @@ async def handle_lcel_tables_request(request_dict: dict, config: dict | None = N
 
     result = await table_chain.ainvoke(request_dict, config=config)  # type: ignore
     return TablesResponse(tables=result)
+
+
+@with_db
+@with_feedback_id
+async def handle_lcel_tables_to_questions_request(
+    request_dict: dict, config: dict | None = None
+) -> TablesToQuestionsResponse:
+    """
+    Async LCEL handler for /tables-to-questions request (ie, Tables to NL questions).
+
+    Args:
+        request_dict: Input dict
+        config: Runnable config dict. Defaults to None.
+
+    Returns:
+        TablesToQuestionsResponse
+    """
+    from heavyiq.lcel.chains import question_chain
+
+    config = config or {}
+    configurable = config.pop("configurable", {})
+    configurable.update(
+        {
+            "llm_temperature": request_dict["temperature"],
+            "llm_n": request_dict["n"],
+            "llm_max_tokens": request_dict["max_tokens"],
+        }
+    )
+
+    config = {**config, "configurable": configurable}
+    questions = await question_chain.ainvoke(request_dict, config=config)  # type: ignore
+    return TablesToQuestionsResponse(questions=questions)

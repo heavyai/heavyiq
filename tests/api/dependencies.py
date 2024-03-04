@@ -1,9 +1,17 @@
+from typing import Any
 from unittest.mock import patch
 
 from confz import FileSource
 from fastapi import Depends
 
-from heavyiq.api.models import GenerateTableMetadataRequest, QueryRequest, QuestionRequest
+from heavyiq.api.models import (
+    AutoQueryRequest,
+    AutoQuestionRequest,
+    GenerateTableMetadataRequest,
+    QueryRequest,
+    QuestionRequest,
+    TablesRequest,
+)
 from heavyiq.config.config_schema import AppConfig
 from heavyiq.langchain import HeavyDB
 
@@ -49,3 +57,24 @@ def override_valid_table_metadata_db_session(
 ) -> tuple[GenerateTableMetadataRequest, HeavyDB]:
     assert db
     return (query_request, db)
+
+
+def override_valid_tables_db_session(
+    request: TablesRequest, db: HeavyDB | None = Depends(override_heavydb_client)
+) -> tuple[TablesRequest, HeavyDB]:
+    assert db
+    return (request, db)
+
+
+def override_valid_auto_query_db_session(
+    request: AutoQueryRequest, db: HeavyDB | None = Depends(override_heavydb_client)
+) -> tuple[AutoQueryRequest, HeavyDB]:
+    assert db
+    return (request, db)
+
+
+def override_valid_auto_question_db_session(
+    request: AutoQuestionRequest, db: HeavyDB | None = Depends(override_heavydb_client)
+) -> tuple[AutoQuestionRequest, HeavyDB]:
+    assert db
+    return (request, db)

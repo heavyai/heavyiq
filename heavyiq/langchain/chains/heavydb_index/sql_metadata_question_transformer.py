@@ -1,17 +1,16 @@
 from typing import Any, Optional
 
-from langchain.callbacks.manager import CallbackManagerForChainRun, AsyncCallbackManagerForChainRun
-from langchain.chains import LLMChain
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.prompts import PromptTemplate, FewShotPromptTemplate
-from langchain.prompts.example_selector import MaxMarginalRelevanceExampleSelector
-from langchain.vectorstores import Chroma
 from langchain.base_language import BaseLanguageModel
-from pydantic import BaseModel, Extra
+from langchain.callbacks.manager import AsyncCallbackManagerForChainRun, CallbackManagerForChainRun
+from langchain.chains import LLMChain
+from langchain.prompts import FewShotPromptTemplate, PromptTemplate
+from langchain.prompts.example_selector import MaxMarginalRelevanceExampleSelector
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores.chroma import Chroma
+from pydantic import Extra
 
 from heavyiq.config import get_config
 from heavyiq.langchain.chains import BaseChain
-
 
 rephrase_question_examples = [
     {
@@ -163,7 +162,7 @@ def get_example_selector() -> MaxMarginalRelevanceExampleSelector:
     return _example_selector
 
 
-class SQLMetadataQuestionTransformerChain(BaseChain, BaseModel):
+class SQLMetadataQuestionTransformerChain(BaseChain):
     """The HeavyDB Metadata Index performs best when the query input is about database tables and columns.
     This chain rephrases input to be more database-centric.
 
