@@ -16,7 +16,7 @@ from typing import Any, Callable, Optional, TypedDict
 import anyio
 from async_lru import alru_cache
 from heavyai import Connection, connect
-from heavydb._parsers import ColumnDetails, _thrift_values_to_encodings
+from heavydb._parsers import ColumnDetails
 from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
@@ -38,64 +38,6 @@ class PersistantConnection(Connection):
         """Don't disconnect from the database. Let the session expire automatically."""
         self._closed = 1
         self._rbc = None
-
-
-def patched_connection(conn: Connection) -> Connection:
-    """
-    Supposed to return a monkey patched Connection object.
-    """
-    _thrift_values_to_types = {
-        0: "SMALLINT",
-        1: "INT",
-        2: "BIGINT",
-        3: "FLOAT",
-        4: "DECIMAL",
-        5: "DOUBLE",
-        6: "STR",
-        7: "TIME",
-        8: "TIMESTAMP",
-        9: "DATE",
-        10: "BOOL",
-        11: "INTERVAL_DAY_TIME",
-        12: "INTERVAL_YEAR_MONTH",
-        13: "POINT",
-        14: "LINESTRING",
-        15: "POLYGON",
-        16: "MULTIPOLYGON",
-        17: "TINYINT",
-        18: "GEOMETRY",
-        19: "GEOGRAPHY",
-        20: "MULTILINESTRING",
-        21: "MULTIPOINT",
-    }
-
-    def _extract_column_details(row_desc: Any) -> list[ColumnDetails]:
-        return [
-            ColumnDetails(
-                x.col_name,
-                _thrift_values_to_types[x.col_type.type],
-                x.col_type.nullable,
-                x.col_type.precision,
-                x.col_type.scale,
-                x.col_type.comp_param,
-                _thrift_values_to_encodings[x.col_type.encoding],
-                x.col_type.is_array,
-            )
-            for x in row_desc
-        ]
-
-    def get_table_details(self: Connection, table_name: str) -> list[ColumnDetails]:
-        """
-        Patch method for Connection.get_table_details which helps to add data types for the missing thrift values.
-        pyheavydb<=6.4.0 doesnot provide support mapping types for the values 20 (MULTILINESTRING) and 21 (MULTIPOINT).
-        By monkey patching this method, you could get the tables details without any exception
-        otherwise you should endup with KeyError exception.
-        """
-        details = self._client.get_table_details(self._session, table_name)
-        return _extract_column_details(details.row_desc)
-
-    conn.get_table_details = functools.partial(get_table_details, conn)
-    return conn
 
 
 class StringLiteralOp(TypedDict):
@@ -135,9 +77,7 @@ class HeavyDB:
         from heavyiq.logging_utils import get_heavyiq_logger
 
         self.logger = get_heavyiq_logger()
-        self._conn = patched_connection(
-            conn
-        )  # note: remove the wrapper once the pyheavydb version upgraded to the latest (ie, >6.4.1).
+        self._conn = conn
         self.lock = Lock()
         self.alock = asyncio.Lock()
         self._dbname = self._conn._dbname
@@ -475,9 +415,9 @@ class HeavyDB:
         """Get details about the columns in a table."""
         self.logger.debug(f"Getting columns for table {table}")
         with self.lock:
-            table_details = self._conn.get_table_details(table)
+            column_details = self._conn.get_column_details(table)
             self.logger.debug(f"Got columns for table {table}")
-            return table_details
+            return column_details
 
     def get_table_schema(self, table: str) -> str:
         self.logger.debug(f"Getting schema for table {table}")
@@ -722,9 +662,9 @@ class HeavyDB:
         self.logger.debug(f"Getting columns for table {table}")
         async with self.alock:
             try:
-                table_details = await run_in_threadpool(self._conn.get_table_details, table)
+                column_details = await run_in_threadpool(self._conn.get_column_details, table)
                 self.logger.debug(f"Got columns for table {table}")
-                return table_details
+                return column_details
             except Exception as e:
                 raise e
 
