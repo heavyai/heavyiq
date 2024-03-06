@@ -81,6 +81,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     top_k_max_str_col_count_nl_to_tables: int = 30
     # table order in prompt
     sort_prompt_tables_desc: bool = True
+    # whether to include timestamp text on table prompt
+    include_timestamp_on_table_info_prompt: bool = True
     # maximum count of allowed_tables on nl-to-tables endpoint. If the count exceeds, then
     # index updation and search will happen in-order to find relevant tables.
     allowed_tables_max_count_nl_to_tables: int = 20
