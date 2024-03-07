@@ -20,6 +20,7 @@ from heavydb._parsers import ColumnDetails, _extract_column_details
 from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
+from heavyiq.langchain.heavydb_utils import DB_KEYWORDS
 from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
 
 
@@ -777,7 +778,11 @@ class HeavyDB:
         columns: list[ColumnDetails] = _extract_column_details(table_details.row_desc)
         column_name_comments_mapping = {x.col_name: x.comment or "" for x in table_details.row_desc}
         custom_columns = [
-            CustomColumnDetails(name=col.name, type=col.type, comment=column_name_comments_mapping[col.name])
+            CustomColumnDetails(
+                name=f'"{col.name}"' if col.name.upper() in DB_KEYWORDS else col.name,
+                type=col.type,
+                comment=column_name_comments_mapping[col.name],
+            )
             for col in columns
         ]
         return CustomTableDetails(name=table, columns=custom_columns, comment=table_comment)
