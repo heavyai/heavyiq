@@ -11,16 +11,36 @@ from contextvars import ContextVar
 from copy import deepcopy
 from multiprocessing.managers import SyncManager
 from threading import Lock
-from typing import Any, Callable, Optional, TypedDict
+from typing import Any, Callable, NamedTuple, Optional, TypedDict
 
 import anyio
 from async_lru import alru_cache
 from heavyai import Connection, connect
-from heavydb._parsers import ColumnDetails
+from heavydb._parsers import ColumnDetails, _extract_column_details
 from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
 from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
+
+
+class CustomColumnDetails(NamedTuple):
+    """
+    HeavyDB Table's custom column details including comment.
+    """
+
+    name: str
+    type: str
+    comment: str
+
+
+class CustomTableDetails(NamedTuple):
+    """
+    HeavyDB Table's custom details including table and column comments.
+    """
+
+    name: str
+    columns: list[CustomColumnDetails]
+    comment: str
 
 
 class PersistantConnection(Connection):
@@ -687,7 +707,7 @@ class HeavyDB:
 
         # check for any diff in current schema and cached schema
         # if yes then return True else return False
-        current_schema = await self._aget_raw_table_schema(table)
+        current_schema = await self._aget_raw_table_schema_from_thrift(table)
         if cached_schema == current_schema:
             self.logger.debug(f"Table {table} schema unchanged.")
             return False
@@ -726,7 +746,7 @@ class HeavyDB:
 
     @alru_cache(
         maxsize=32, ttl=10
-    )  # internal caches are used since this method gets called atleast 2 times in a single request
+    )  # [Obselete] internal caches are used since this method gets called atleast 2 times in a single request
     async def _aget_raw_table_schema(self, table: str) -> str:
         """
         Gets the table schema from db only.
@@ -747,6 +767,43 @@ class HeavyDB:
 
         return table_schema
 
+    async def _aget_table_custom_details(self, table: str) -> CustomTableDetails:
+        """
+        Return custom details of a heavyDB table.
+        """
+        async with self.alock:
+            table_details = await run_in_threadpool(self._conn.get_table_details, table)
+        table_comment = table_details.comment or ""
+        columns: list[ColumnDetails] = _extract_column_details(table_details.row_desc)
+        column_name_comments_mapping = {x.col_name: x.comment or "" for x in table_details.row_desc}
+        custom_columns = [
+            CustomColumnDetails(name=col.name, type=col.type, comment=column_name_comments_mapping[col.name])
+            for col in columns
+        ]
+        return CustomTableDetails(name=table, columns=custom_columns, comment=table_comment)
+
+    @alru_cache(maxsize=32, ttl=10)
+    async def _aget_raw_table_schema_from_thrift(self, table: str) -> str:
+        """
+        Method used to form table_schema from `get_table_details` thrift endpoint.
+        """
+        table_details: CustomTableDetails = await self._aget_table_custom_details(table)
+        schema_stmt = (
+            "CREATE TABLE {table_name} /* {table_comment} */ (\n{column_details});"
+            if table_details.comment
+            else "CREATE TABLE {table_name} {table_comment}(\n{column_details});"
+        )
+        return schema_stmt.format(
+            table_name=table_details.name,
+            table_comment=table_details.comment or "",
+            column_details=",\n".join(
+                [
+                    f"{x.name} {x.type} /* {x.comment} */" if x.comment else f"{x.name} {x.type}"
+                    for x in table_details.columns
+                ]
+            ),
+        )
+
     async def aget_table_schema(self, table: str) -> str:
         """
         Get table schema from cache for from db async.
@@ -758,7 +815,9 @@ class HeavyDB:
             self.logger.debug(f"Got schema for table {table} from cache")
             return cached_value
         # Get the schema of a table from db
-        table_schema = await self._aget_raw_table_schema(table)
+        # table_schema = await self._aget_raw_table_schema(table)
+        # Get table schema from thrift endpoint
+        table_schema = await self._aget_raw_table_schema_from_thrift(table)
         self.table_schema_cache.put(cache_key, table_schema)
         self.logger.debug(f"Got schema for table {table}")
 
