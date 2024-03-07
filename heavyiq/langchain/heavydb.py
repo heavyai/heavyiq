@@ -780,7 +780,7 @@ class HeavyDB:
         custom_columns = [
             CustomColumnDetails(
                 name=f'"{col.name}"' if col.name.upper() in DB_KEYWORDS else col.name,
-                type=col.type,
+                type="TEXT" if col.type == "STR" else col.type,
                 comment=column_name_comments_mapping[col.name],
             )
             for col in columns
