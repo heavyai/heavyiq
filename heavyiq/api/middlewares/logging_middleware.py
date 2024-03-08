@@ -87,8 +87,9 @@ class AsyncLoggingMiddleware(BaseHTTPMiddleware):
                 )
 
             # write access log immediately when the request received
-            self.write_log_data(
-                [Log(type=app_logger, level="info", message="Request Received!", extra={"request": request})]
+            await run_in_threadpool(
+                self.write_log_data,
+                [Log(type=app_logger, level="info", message="Request Received!", extra={"request": request})],
             )
 
             response = await call_next(request)
