@@ -793,13 +793,14 @@ class HeavyDB:
         Method used to form table_schema from `get_table_details` thrift endpoint.
         """
         table_details: CustomTableDetails = await self._aget_table_custom_details(table)
+        table_name = f'"{table_details.name}"' if table_details.name.upper() in DB_KEYWORDS else f"{table_details.name}"
         schema_stmt = (
             "CREATE TABLE {table_name} /* {table_comment} */ (\n{column_details});"
             if table_details.comment
             else "CREATE TABLE {table_name} {table_comment}(\n{column_details});"
         )
         return schema_stmt.format(
-            table_name=table_details.name,
+            table_name=table_name,
             table_comment=table_details.comment or "",
             column_details=",\n".join(
                 [
