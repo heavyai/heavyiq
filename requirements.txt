@@ -4,7 +4,7 @@ chromadb-pysqlite3==0.4.15
 confz==2.0.1
 fastapi==0.109.0
 gunicorn==21.2.0
-https://dependencies.mapd.com/python-deps/pyheavydb-8.0.0-py3-none-any.whl
+pyheavydb @ https://dependencies.mapd.com/python-deps/pyheavydb-8.0.0-py3-none-any.whl
 heavyai>=1.3.0
 pydantic==2.6.1
 openai==1.12.0
