@@ -254,12 +254,17 @@ async def aget_table_info_wrt_token_limit(
     if available_text_column_count > top_k_max_str_column_count:
         disable_top_k = True
 
+    # decides whether to include timestamp text or not
+    disable_timestamp = not (config.include_timestamp_on_table_info_prompt)
+
     for options in table_info_options:
         include_samples = options.get("include_samples", True)
         include_top_k = options.get("include_top_k", True)
         include_timestamp = options.get("include_timestamp", True)
         if disable_top_k:
             include_top_k = False
+        if disable_timestamp:
+            include_timestamp = False
 
         table_info = await aget_table_info_from_cache_or_calculate(
             session, table_names_tuple, include_samples, include_top_k, include_timestamp
