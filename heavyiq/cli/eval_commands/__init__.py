@@ -361,7 +361,7 @@ async def run_config_model_on_auto_questions(
         # await queue.put(None)  # Sentinel value to signal the end of input
         # Signal consumers to stop
         for _ in range(processor_count):
-            queue.put_nowait(None)
+            await queue.put(None)
 
     async def processor(input_queue: asyncio.Queue, output_queue: asyncio.Queue, processor_id: int):
         """

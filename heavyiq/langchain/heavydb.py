@@ -4,6 +4,7 @@ import asyncio
 import functools
 import multiprocessing
 import re
+import weakref
 from collections.abc import AsyncGenerator, Awaitable
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from contextlib import asynccontextmanager
@@ -21,7 +22,8 @@ from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
 from heavyiq.langchain.heavydb_utils import DB_KEYWORDS
-from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
+from heavyiq.utils import (LRUCache, calc_query_stats, is_destructive_sql,
+                           rate_sql_complexity, strip_sql_comments)
 
 
 class CustomColumnDetails(NamedTuple):
@@ -141,6 +143,9 @@ class HeavyDB:
             # connection established from session, so grab the session details
             self._dbname = self._conn._client.get_session_info(self._conn._session).database
 
+        # cleanup at the last
+        weakref.finalize(self, self.cleanup)
+
     @property
     def table_schema_change_callback(self) -> Callable:
         return self._table_schema_change_callback
@@ -149,12 +154,11 @@ class HeavyDB:
     def table_schema_change_callback(self, callback: Callable | None):
         self._table_schema_change_callback = callback
 
-    def __del__(self):
-        # TODO: Move this implementation to weakref.finalize
+    def cleanup(self):
         try:
             self._conn.close()
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Error on HeavyDB cleanup: {e}")
 
     @classmethod
     def get_manager(cls: type[HeavyDB]) -> SyncManager:
