@@ -341,65 +341,153 @@ async def run_config_model_on_auto_questions(
     eval_id = uuid4().hex[:8]
     eval_str = f"eval_{eval_id}"
     logger.info(f"Dataset ID: {eval_id}")
+    has_id: bool = True
+    processor_count = 30
 
-    rows_written: int = 0
-    eval_results_csv: str = f"./eval/results/{eval_str}_results.csv"
+    async def producer(queue: asyncio.Queue, input_file_path: str):
+        """
+        producer responsible for extracting the records from csv and put it in the queue.
+        """
+        nonlocal has_id
+        async with aiofiles.open(input_file_path, mode="r") as f:
+            csv_reader = AsyncReader(f)
+            header = await anext(csv_reader)
+            has_id = "id" == header[0]
+            async for row in csv_reader:
+                await queue.put(row)
+                await asyncio.sleep(0.1)
 
-    # csv must have columns: id (optional), db_id, tables, question, answer
-    async with aiofiles.open(eval_dataset_csv, mode="r") as f, aiofiles.open(eval_results_csv, "a", newline="") as wf:
-        csv_reader, writer = AsyncReader(f), AsyncWriter(wf, dialect="unix")
-        header = await anext(csv_reader)
-        has_id = "id" == header[0]  # type: ignore
+        print("Successfully filled the input queue.")
+        # await queue.put(None)  # Sentinel value to signal the end of input
+        # Signal consumers to stop
+        for _ in range(processor_count):
+            queue.put_nowait(None)
 
-        # write header
-        header_data = ["db_id", "gold_query", "pred_query", "success", "status", "error"]
-        if has_id:
-            header_data = ["id"] + header_data
-        if enable_query_stats:
-            header_data.extend(["num_joins", "num_unions", "num_aggs", "num_filters", "num_sorts"])
-        await writer.writerow(header_data)
-
+    async def processor(input_queue: asyncio.Queue, output_queue: asyncio.Queue, processor_id: int):
+        """
+        Trigger the undelying chain to produce answer.
+        """
         while True:
-            rows = []
-            for _ in range(batch_size):
-                try:
-                    rows.append(await csv_reader.__anext__())
-                except StopAsyncIteration:
-                    pass
-            if not rows:
+            prob_stats, query_stats = None, None
+            item = await input_queue.get()
+
+            if item is None:
+                print(f"Processor {processor_id} stopped!")
+                await output_queue.put(None)
+                await asyncio.sleep(0.1)
+                input_queue.task_done()
                 break
-            print(f"Processing {len(rows)} rows...")
-            batch_inputs = []
-            for row in rows:
-                if has_id:
-                    query_id, db_id, question, answer = row
-                else:
-                    query_id = None
-                    db_id, question, answer = row
-                batch_inputs.append(
-                    {
-                        "query_id": query_id,
-                        "db_id": db_id,
-                        "question": question,
-                        "sql": answer,
-                        "enable_query_stats": enable_query_stats,
-                    }
+
+            if has_id:
+                query_id, db_id, question, gold_query = item
+            else:
+                query_id = None
+                db_id, question, gold_query = item
+
+            chain_inputs = {
+                "query_id": query_id,
+                "db_id": db_id,
+                "question": question,
+                "sql": gold_query,
+                "enable_query_stats": enable_query_stats,
+            }
+
+            db = await HeavyDB.from_env_async(db_id)
+            async with heavydb_context(db):
+                chain_output = await chain.ainvoke(
+                    chain_inputs, config={"configurable": {"llm_temperature": temperature}}
                 )
-            if not batch_inputs:
-                break
+            # data = chain_output
+            # values_list = list(data.values())
+            query_stats = chain_output["query_stats"].values()
+            if not query_stats:
+                query_stats = [None, None, None, None, None]
 
-            chain_output = await chain.abatch(batch_inputs, config={"configurable": {"llm_temperature": temperature}})
-            row_datas = []
-            for data in chain_output:
-                values_list = list(data.values())
-                query_stats = list(values_list[-1].values())
-                if not query_stats:
-                    query_stats = [None, None, None, None, None]
-                row_datas.append(values_list[:-1] + query_stats)
-            if row_datas:
-                await writer.writerows(row_datas)
-                rows_written += len(row_datas)
+            output_item = (
+                query_id,
+                db_id,
+                question,
+                gold_query,
+                chain_output["pred_query"],
+                chain_output["success"],
+                chain_output["status"],
+                chain_output["error"],
+                prob_stats,
+                query_stats,
+            )
+            await output_queue.put(output_item)
+            await asyncio.sleep(0.1)
+            input_queue.task_done()
 
+    async def build_row_data(item: tuple) -> list:
+        """
+        Builds output csv record from the item we got from the output queue.
+        """
+        (
+            query_id,
+            db_id,
+            question,
+            gold_query,
+            pred_query,
+            eval_res_success,
+            eval_res_status,
+            eval_res_error,
+            prob_stats,
+            query_stats,
+        ) = item
+        row_data = []
+        if query_id:
+            row_data.append(query_id)
+
+        row_data.extend([db_id, gold_query, pred_query, eval_res_success, eval_res_status, eval_res_error or ""])
+        row_data = [str(item).replace("\n", " ").replace("\r", " ") for item in row_data]
+        return row_data
+
+    async def consumer(output_queue: asyncio.Queue, output_file_path: str, enable_query_stats: bool = False):
+        """
+        consumer
+        """
+        await asyncio.sleep(1)  # initial sleep to identify wherher the eval dataset contain header or not
+        async with aiofiles.open(output_file_path, "a", newline="") as wf:
+            writer = AsyncWriter(wf, dialect="unix")
+
+            # write header
+            header_data = ["db_id", "gold_query", "pred_query", "success", "status", "error"]
+            if has_id:
+                header_data = ["id"] + header_data
+            if enable_query_stats:
+                header_data.extend(["num_joins", "num_unions", "num_aggs", "num_filters", "num_sorts"])
+            await writer.writerow(header_data)
+            len_nones = 0
+            while True:
+                item = await output_queue.get()
+                if item is None:
+                    len_nones += 1
+                    if len_nones >= processor_count:
+                        output_queue.task_done()
+                        print("consumer stopped")
+                        break
+                    output_queue.task_done()
+                    continue
+                row = await build_row_data(item)
+                await writer.writerow(row)
+                output_queue.task_done()
+
+    eval_results_csv: str = f"./eval/results/{eval_str}_results.csv"
+    input_queue: asyncio.Queue = asyncio.Queue()  # contain csv record
+    output_queue: asyncio.Queue = asyncio.Queue()  # contain data to be written on output csv
+
+    producer_task = asyncio.create_task(producer(input_queue, eval_dataset_csv))
+    processors = [
+        asyncio.create_task(processor(input_queue, output_queue, processor_id))
+        for processor_id in range(processor_count)
+    ]
+    consumer_task = asyncio.create_task(consumer(output_queue, eval_results_csv, enable_query_stats=False))
+
+    await input_queue.join()
+    await output_queue.join()
+
+    await asyncio.gather(producer_task, *processors, consumer_task)
     await run_in_threadpool(summarize_eval_results, eval_str)
 
 
