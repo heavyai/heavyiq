@@ -439,7 +439,9 @@ async def run_config_model_on_auto_questions(
         if query_id:
             row_data.append(query_id)
 
-        row_data.extend([db_id, gold_query, pred_query, eval_res_success, eval_res_status, eval_res_error or ""])
+        row_data.extend(
+            [db_id, question, gold_query, pred_query, eval_res_success, eval_res_status, eval_res_error or ""]
+        )
         row_data = [str(item).replace("\n", " ").replace("\r", " ") for item in row_data]
         return row_data
 
@@ -452,7 +454,7 @@ async def run_config_model_on_auto_questions(
             writer = AsyncWriter(wf, dialect="unix")
 
             # write header
-            header_data = ["db_id", "gold_query", "pred_query", "success", "status", "error"]
+            header_data = ["db_id", "question", "gold_query", "pred_query", "success", "status", "error"]
             if has_id:
                 header_data = ["id"] + header_data
             if enable_query_stats:
@@ -638,7 +640,9 @@ async def run_config_model_on_questions_lcel(
         if query_id:
             row_data.append(query_id)
 
-        row_data.extend([db_id, gold_query, pred_query, eval_res_success, eval_res_status, eval_res_error or ""])
+        row_data.extend(
+            [db_id, question, gold_query, pred_query, eval_res_success, eval_res_status, eval_res_error or ""]
+        )
         row_data = [str(item).replace("\n", " ").replace("\r", " ") for item in row_data]
         return row_data
 
@@ -651,7 +655,7 @@ async def run_config_model_on_questions_lcel(
             writer = AsyncWriter(wf, dialect="unix")
 
             # write header
-            header_data = ["db_id", "gold_query", "pred_query", "success", "status", "error"]
+            header_data = ["db_id", "question", "gold_query", "pred_query", "success", "status", "error"]
             if has_id:
                 header_data = ["id"] + header_data
             if enable_query_stats:
