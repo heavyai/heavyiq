@@ -66,7 +66,7 @@ async def process_question(
                 compute_prob_stats, res["logprobs"]["tokens"], res["logprobs"]["top_logprobs"]
             )
 
-        eval_res = await sql_rate_reply(gold_query, pred_query, db=db)
+        eval_res = await sql_rate_reply(gold_query, pred_query, db=db, question=question)
         if eval_res.get("error"):
             del db
             db = await HeavyDB.from_env_async(db_id)
@@ -580,7 +580,7 @@ async def run_config_model_on_questions_lcel(
 
             if not query_error:
                 try:
-                    eval_res = await sql_rate_reply(gold_query, pred_query, db=db)
+                    eval_res = await sql_rate_reply(gold_query, pred_query, db=db, question=question)
                     if eval_res.get("error"):
                         del db
                         db = await HeavyDB.from_env_async(db_id)

@@ -64,7 +64,7 @@ def compute_prob_stats(selected_tokens: list[str], top_log_probs: list[dict[str,
 
 
 async def sql_rate_reply(
-    gold_query: str, pred_query: str, db_id: str | None = None, db: HeavyDB | None = None
+    gold_query: str, pred_query: str, db_id: str | None = None, db: HeavyDB | None = None, question: str | None = None
 ) -> dict[str, Any]:
     # motivated by https://github.com/lm-sys/FastChat/tree/main/fastchat/pred
     assert db_id or db, "sql_rate_reply expects either database_name or HeavyDB instance."
@@ -88,12 +88,14 @@ async def sql_rate_reply(
         num_pred_cols = len(pred_df.axes[1])  # type: ignore
         if num_gold_rows != num_pred_rows:
             print("ROW COUNT MISMATCH")
+            print(question)
             print(gold_query)
             print(pred_query)
             query_metadata["status"] = "row_count_mismatch"
             return query_metadata
         if num_gold_cols != num_pred_cols:
             print("COL COUNT MISMATCH")
+            print(question)
             print(gold_query)
             print(pred_query)
             query_metadata["status"] = "col_count_mismatch"
@@ -123,10 +125,12 @@ async def sql_rate_reply(
                     )
                 if dfs_are_equal:
                     print("COLUMN ORDER DIFF")
+                    print(question)
                     query_metadata["success"] = True
                     query_metadata["status"] = "column_order_difference"
                     return query_metadata
             print("VALUES MISMATCH")
+            print(question)
             query_metadata["status"] = "values_mismatch"
             print(gold_query)
             print(pred_query)
@@ -135,6 +139,7 @@ async def sql_rate_reply(
         print("QUERY FAIL")
         query_metadata["status"] = "execution_error"
         query_metadata["error"] = e
+        print(question)
         print(gold_query)
         print(pred_query)
         print(e)
