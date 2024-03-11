@@ -22,8 +22,7 @@ from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
 from heavyiq.langchain.heavydb_utils import DB_KEYWORDS
-from heavyiq.utils import (LRUCache, calc_query_stats, is_destructive_sql,
-                           rate_sql_complexity, strip_sql_comments)
+from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
 
 
 class CustomColumnDetails(NamedTuple):
@@ -156,7 +155,8 @@ class HeavyDB:
 
     def cleanup(self):
         try:
-            self._conn.close()
+            with self.lock:
+                self._conn.close()
         except Exception as e:
             print(f"Error on HeavyDB cleanup: {e}")
 

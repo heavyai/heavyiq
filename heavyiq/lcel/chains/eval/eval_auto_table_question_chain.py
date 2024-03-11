@@ -110,10 +110,6 @@ async def compare_and_format_output(inputs: dict) -> dict:
         eval_res["status"] = "failed_to_calculate_query_stats"
         exception = str(e)
 
-    # close the db connection
-    db._conn._client.disconnect(db._conn.sessionid)
-    db._conn.close()
-
     return {
         "query_id": inputs["query_id"],
         "db_id": inputs["db_id"],
