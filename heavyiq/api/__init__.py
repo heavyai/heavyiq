@@ -194,7 +194,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
                 continue
 
             body = {
-                "question": f"How many rows exists in {tables[0]} table?",
+                "question": "What is the meaning of life?",
                 "session_id": db._conn._session,
                 "tables": [tables[0]],
             }
