@@ -1,8 +1,7 @@
-import asyncio
 from typing import Any
 
 from asgi_correlation_id import CorrelationIdMiddleware
-from fastapi import BackgroundTasks, FastAPI
+from fastapi import FastAPI
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
@@ -31,12 +30,18 @@ def app_initialize(config: HeavyIQConfig):
     """
     App initialization code which get excuted before gunicorn process fork upon using `--preload` option.
     """
+    from heavyiq.langchain.heavydb import HeavyDB
 
     logger = get_heavyiq_logger()
     logger.info("Allocating Shared Dict....")
     # shared manager
     instance = SharedDictSingleton()
     logger.info(f"Shared Manager PID: {instance._manager._process.pid}")
+
+    # always create a HeavyDB's multiprocessing.Manager instance (which was being used for shared cache) before gunicorn process fork
+    # if we let it to happen on each worker process at the time of http request then
+    # we might endup in request pending issue.
+    HeavyDB.get_manager()
 
     # w.r.t memory into consideration, we don't need to initialize/download HF model embeddings at the first place(ie. before process fork).
     # We could make it happen on the fork/child process since the models are going to be stored inside a cache dir.
@@ -168,46 +173,6 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         )
         app.include_router(runnable_router, prefix="/runnable", tags=["runnable"])
 
-    async def startup_background_task():
-        """
-        starup background task used mainly for heavyiq warmup
-        which involves initial caching and much more.
-        This supposed to happen on every worker process.
-        """
-        from heavyiq.langchain.heavydb import HeavyDB, heavydb_context
-        from heavyiq.lcel.chains.heavydb.sql_chain import chain
-        from heavyiq.logging_utils import heavyiq_logger as logger
-
-        attempts = 0
-        max_attempts = 5
-        interval = 2
-
-        while attempts < max_attempts:
-            try:
-                # both functions having timeout
-                db = await HeavyDB.from_env_async()
-                tables = await HeavyDB._aconnect_with_timeout(run_in_threadpool(lambda: db._conn.get_tables()))
-            except Exception as e:
-                logger.error(f"HeavyIQ warmup failed, {e}")
-                await asyncio.sleep(interval)
-                attempts += 1
-                continue
-
-            body = {
-                "question": "What is the meaning of life?",
-                "session_id": db._conn._session,
-                "tables": [tables[0]],
-            }
-
-            try:
-                async with heavydb_context(db):
-                    await chain.ainvoke(body)
-            except Exception as e:
-                logger.error(f"Failed to execute warmup sql chain, {e}")
-            else:
-                logger.info("Startup Background task completed")
-            break
-
     @app.on_event("startup")
     async def initialize():
         """
@@ -215,9 +180,6 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         """
         import heavyiq.lcel.chains
         from heavyiq.logging_utils import heavyiq_logger as logger
-
-        # startup background task to run for heavyiq warmup
-        asyncio.create_task(startup_background_task())
 
         # TODO: Disabled for now, as no guarantee heavydb is running before heavyiq
         # logger.info("Connecting to heavydb...")
