@@ -11,7 +11,7 @@ from heavyiq.api.models import (
     TablesToQuestionsResponse,
 )
 from heavyiq.config import get_config
-from heavyiq.langchain.exceptions import NLtoAnswerException, NLtoSQLException
+from heavyiq.langchain.exceptions import NLtoAnswerException, NLtoSQLException, NLtoTableException
 
 
 @with_db
@@ -47,6 +47,10 @@ async def handle_lcel_auto_query_request(
     max_retries = get_config().max_retries_nl_to_sql
 
     out = await auto_sql_chain.ainvoke(request_dict, config=config)  # type: ignore
+
+    if not out["tables"]:
+        raise NLtoTableException("No tables match the requested question.")
+
     if out["error"]:
         raise NLtoSQLException(
             f"Language model failed to generate a valid SQL query after {max_retries} tries.", failed_sql=out["query"]
@@ -116,6 +120,9 @@ async def handle_lcel_auto_question_request(
     max_retries = get_config().max_retries_nl_to_sql
 
     result = await auto_answer_chain.ainvoke(request_dict, config=config)  # type: ignore
+    if not result["tables"]:
+        raise NLtoTableException("No tables match the requested question.")
+
     fail_reason = result["fail_reason"]
 
     if fail_reason:
