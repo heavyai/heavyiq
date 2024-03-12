@@ -1,7 +1,9 @@
+import asyncio
 from typing import Any
 
 from asgi_correlation_id import CorrelationIdMiddleware
-from fastapi import FastAPI
+from fastapi import BackgroundTasks, FastAPI
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from heavydb.exceptions import Error as HeavyDBError  # type: ignore
@@ -166,7 +168,46 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         )
         app.include_router(runnable_router, prefix="/runnable", tags=["runnable"])
 
-    # check heavydb connection
+    async def startup_background_task():
+        """
+        starup background task used mainly for heavyiq warmup
+        which involves initial caching and much more.
+        This supposed to happen on every worker process.
+        """
+        from heavyiq.langchain.heavydb import HeavyDB, heavydb_context
+        from heavyiq.lcel.chains.heavydb.sql_chain import chain
+        from heavyiq.logging_utils import heavyiq_logger as logger
+
+        attempts = 0
+        max_attempts = 5
+        interval = 2
+
+        while attempts < max_attempts:
+            try:
+                # both functions having timeout
+                db = await HeavyDB.from_env_async()
+                tables = await HeavyDB._aconnect_with_timeout(run_in_threadpool(lambda: db._conn.get_tables()))
+            except Exception as e:
+                logger.error(f"HeavyIQ warmup failed, {e}")
+                await asyncio.sleep(interval)
+                attempts += 1
+                continue
+
+            body = {
+                "question": f"How many rows exists in {tables[0]} table?",
+                "session_id": db._conn._session,
+                "tables": [tables[0]],
+            }
+
+            try:
+                async with heavydb_context(db):
+                    await chain.ainvoke(body)
+            except Exception as e:
+                logger.error(f"Failed to execute warmup sql chain, {e}")
+            else:
+                logger.info("Startup Background task completed")
+            break
+
     @app.on_event("startup")
     async def initialize():
         """
@@ -174,6 +215,9 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         """
         import heavyiq.lcel.chains
         from heavyiq.logging_utils import heavyiq_logger as logger
+
+        # startup background task to run for heavyiq warmup
+        asyncio.create_task(startup_background_task())
 
         # TODO: Disabled for now, as no guarantee heavydb is running before heavyiq
         # logger.info("Connecting to heavydb...")
