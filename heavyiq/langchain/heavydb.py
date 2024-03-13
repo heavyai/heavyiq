@@ -448,7 +448,7 @@ class HeavyDB:
             self.logger.debug(f"Got schema for table {table} from cache")
             return cached_value
         """Get the schema of a table."""
-        create_command = f"SHOW CREATE TABLE {table};"
+        create_command = f'SHOW CREATE TABLE "{table}";'
         with self.lock:
             cursor = self._conn.execute(create_command)
         table_schema = cursor.fetchone()[0]  # type: ignore
@@ -486,7 +486,7 @@ class HeavyDB:
         # if there are >= (threshold + 1) values, it's high cardinality and we need to sample the top high_cardinality_sample
         """Get the top k values for a column."""
         self.logger.debug(f"Getting top k values for column {column} in table {table}")
-        top_k_statement = f"SELECT {column}, COUNT(*) as cnt FROM {table} WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {cardinality_threshold + 1};"
+        top_k_statement = f'SELECT {column}, COUNT(*) as cnt FROM "{table}" WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {cardinality_threshold + 1};'
         with self.lock:
             cursor = self._conn.execute(top_k_statement)
         top_k_res: list[str] = [str(v[0]) for v in cursor.fetchall()]
@@ -510,7 +510,7 @@ class HeavyDB:
             self.logger.debug(f"Got sample rows for table {table_name} from cache")
             return cached_value
         # build the select command
-        command = f"SELECT * FROM {table_name} LIMIT {self._sample_rows_in_table_info}"
+        command = f'SELECT * FROM "{table_name}" LIMIT {self._sample_rows_in_table_info}'
 
         # save the columns in string format
         columns_str = ",".join([col.name for col in self.get_table_columns(table_name)])
@@ -569,7 +569,7 @@ class HeavyDB:
         Get min/max values for a particular timestamp column.
         """
         self.logger.debug(f"Getting timestamp values for column {column} in table {table_name}")
-        min_max_statement = f'SELECT min("{column}"), max("{column}") FROM {table_name};'
+        min_max_statement = f'SELECT min("{column}"), max("{column}") FROM "{table_name}";'
         async with self.alock:
             cursor = await run_in_threadpool(self._conn.execute, min_max_statement)
         min_value, max_value = [str(v) for v in cursor.fetchone()]
@@ -661,7 +661,7 @@ class HeavyDB:
         # if there are >= (threshold + 1) values, it's high cardinality and we need to sample the top high_cardinality_sample
         """Get the top k values for a column."""
         self.logger.debug(f"Getting top k values for column {column} in table {table}")
-        top_k_statement = f"SELECT {column}, COUNT(*) as cnt FROM {table} WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {cardinality_threshold + 1};"
+        top_k_statement = f'SELECT {column}, COUNT(*) as cnt FROM "{table}" WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {cardinality_threshold + 1};'
         async with self.alock:
             cursor = await run_in_threadpool(self._conn.execute, top_k_statement)
         top_k_res: list[str] = [str(v[0]) for v in cursor.fetchall()]
@@ -752,7 +752,7 @@ class HeavyDB:
         """
         Gets the table schema from db only.
         """
-        create_command = f"SHOW CREATE TABLE {table};"
+        create_command = f'SHOW CREATE TABLE "{table}";'
 
         async with self.alock:
             cursor = await run_in_threadpool(self._conn.execute, create_command)
@@ -840,7 +840,7 @@ class HeavyDB:
             self.logger.debug(f"Got sample rows for table {table_name} from cache")
             return cached_value
         # build the select command
-        command = f"SELECT * FROM {table_name} LIMIT {self._sample_rows_in_table_info}"
+        command = f'SELECT * FROM "{table_name}" LIMIT {self._sample_rows_in_table_info};'
 
         # save the columns in string format
         columns_str = ",".join([col.name for col in await self.aget_table_columns(table_name)])
@@ -871,7 +871,7 @@ class HeavyDB:
             self.logger.debug(f"Got total row count of table {table_name} from cache")
             return cached_value
         # build the select command
-        command = f"SELECT COUNT(*) FROM {table_name}"
+        command = f'SELECT COUNT(*) FROM "{table_name}"'
 
         # get the sample rows
         async with self.alock:
