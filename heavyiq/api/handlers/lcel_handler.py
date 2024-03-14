@@ -49,7 +49,7 @@ async def handle_lcel_auto_query_request(
     out = await auto_sql_chain.ainvoke(request_dict, config=config)  # type: ignore
 
     if not out["tables"]:
-        raise NLtoTableException("No tables match the requested question.")
+        raise NLtoTableException("No relevant tables found to answer question.")
 
     if out["error"]:
         raise NLtoSQLException(
@@ -121,7 +121,7 @@ async def handle_lcel_auto_question_request(
 
     result = await auto_answer_chain.ainvoke(request_dict, config=config)  # type: ignore
     if not result["tables"]:
-        raise NLtoTableException("No tables match the requested question.")
+        raise NLtoTableException("No relevant tables found to answer question.")
 
     fail_reason = result["fail_reason"]
 
