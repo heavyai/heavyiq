@@ -78,7 +78,7 @@ def on_starting(server: Any):
     print_gunicorn_args(gunicorn_args)
 
     proc_name = gunicorn_args["default_proc_name"].get()
-    conf_file_path = proc_name.split("(")[1].split(")")[0].strip("'").strip('"')
+    conf_file_path = proc_name.split("(")[1].split(")")[0].split("=")[-1].strip("'").strip('"')
     run_background_task_in_thread(conf_file_path)
 
 
