@@ -6,6 +6,7 @@ COPY config.toml ./
 COPY pyarmor-regfile-5130.zip ./
 COPY requirements.txt ./
 COPY requirements-dev.txt ./
+COPY gunicorn.conf.py ./
 COPY heavyiq/ ./heavyiq/
 
 RUN pip install --no-cache-dir pyarmor
