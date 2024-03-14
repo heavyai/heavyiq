@@ -9,6 +9,7 @@ from heavyiq.langchain.chains.heavydb.nl_to_sql import (
     NL_TO_SQL_TEMPLATE,
 )
 from heavyiq.langchain.chains.heavydb.nl_to_tables import NL_TO_TABLES_CUSTOM_TEMPLATE, NL_TO_TABLES_TEMPLATE
+from heavyiq.lcel.prompts.question_prompt import TABLES_TO_NL_QUESTIONS_CUSTOM_TEMPLATE, TABLES_TO_NL_QUESTIONS_TEMPLATE
 
 to_sql_prompt_runnable = PromptTemplate.from_template(NL_TO_SQL_TEMPLATE).configurable_alternatives(
     # This gives this field an id
@@ -34,4 +35,10 @@ to_tables_prompt_runnable = PromptTemplate.from_template(NL_TO_TABLES_TEMPLATE).
     ConfigurableField(id="prompt"),
     default_key="openai",
     custom=PromptTemplate.from_template(NL_TO_TABLES_CUSTOM_TEMPLATE),
+)
+
+to_questions_prompt_runnable = PromptTemplate.from_template(TABLES_TO_NL_QUESTIONS_TEMPLATE).configurable_alternatives(
+    ConfigurableField(id="prompt"),
+    default_key="openai",
+    custom=PromptTemplate.from_template(TABLES_TO_NL_QUESTIONS_CUSTOM_TEMPLATE),
 )

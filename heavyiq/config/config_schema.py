@@ -12,6 +12,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     openai_gpt_model_sql_to_answer: Optional[str] = None  # LLMType.SQL_TO_ANSWER
     openai_gpt_model_nl_to_tables: Optional[str] = None  # LLMType.NL_TO_TABLES
     openai_gpt_model_instruct: Optional[str] = None  # LLMType.INSTRUCT
+    openai_gpt_model_tables_to_questions: Optional[str] = None  # LLMType.TABLES_TO_QUESTIONS
     max_fields_limit_sql_to_answer: int = 20  # LLMType.SQL_TO_ANSWER
     """Max number of fields (rows x columns) allowed to pass onto sql_to_answer llm"""
     heavydb_dbname: Optional[str] = None
@@ -36,11 +37,19 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     langchain_endpoint: str = "https://api.smith.langchain.com"
     langsmith_api_key: Optional[str] = None
     langsmith_project: Optional[str] = None
+    langsmith_api_key_free_edition: Optional[str] = None
+    """langsmith apikey for free edition license"""
+    langsmith_project_free_edition: Optional[str] = None
+    """langsmith project for free edition license"""
     # LOGGING
     access_log_level: str = "INFO"
     """Used for the access log of the web server."""
     heavyiq_log_level: str = "INFO"
     """Used for the log of the application code."""
+    access_log_max_file_size: int = 104857600
+    """Default Access logs max file size is 100 MB"""
+    heavyiq_log_max_file_size: int = 104857600
+    """Default Application's log max file size is 100 MB"""
     log_to_stdout: bool = False
     enable_debug_endpoints: bool = False
     enable_llm_cache: bool = False
@@ -55,10 +64,14 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     custom_llm_api_sql_to_answer_context_window: int = 8192  # LLMType.SQL_TO_ANSWER
     custom_llm_api_nl_to_tables_base: Optional[str] = None  # LLMType.NL_TO_TABLES
     custom_llm_api_nl_to_tables_context_window: int = 8192  # LLMType.NL_TO_TABLES
+    custom_llm_api_tables_to_questions_base: Optional[str] = None  # LLMType.TABLES_TO_QUESTIONS
+    custom_llm_api_tables_to_questions_context_window: int = 8192  # LLMType.TABLES_TO_QUESTIONS
     custom_llm_api_instruct_base: Optional[str] = None  # LLMType.INSTRUCT
     custom_llm_api_instruct_context_window: int = 8192  # LLMType.INSTRUCT
     custom_llm_api_instruct_prompt_start_token: str = "<|prompt|>\n"
     custom_llm_api_instruct_prompt_end_token: str = "\n<|answer|>\n"
+    custom_llm_api_tables_to_questions_prompt_token: str = "<|table question prompt|>"
+    custom_llm_api_tables_to_questions_answer_token: str = "<|table question answer|>"
     custom_llm_api_vllm_beam_width: int = 2
     custom_llm_api_vllm_max_tokens: int = 512
     custom_llm_azure_openai_api_version: str = "2023-03-15-preview"
@@ -71,7 +84,9 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     top_k_max_str_col_count_nl_to_sql: int = 30
     top_k_max_str_col_count_nl_to_tables: int = 30
     # table order in prompt
-    sort_prompt_tables_desc = True
+    sort_prompt_tables_desc: bool = True
+    # whether to include timestamp text on table prompt
+    include_timestamp_on_table_info_prompt: bool = True
     # maximum count of allowed_tables on nl-to-tables endpoint. If the count exceeds, then
     # index updation and search will happen in-order to find relevant tables.
     allowed_tables_max_count_nl_to_tables: int = 20
@@ -80,6 +95,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     include_top_k_in_custom_table_document_generation: bool = True
     # nl to sql max query retries
     max_retries_nl_to_sql: int = 2
+    # llm api-key
+    heavylm_api_key: Optional[str] = None
 
 
 class AppConfig(OverrideBaseConfig):  # type: ignore

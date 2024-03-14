@@ -104,13 +104,17 @@ class SharedDictSingleton(Generic[KT, VT]):
     class Keys(Enum):
         HeavyDBLicenseEdition = "heavydb_license_edition"
 
-    def __new__(cls):
+    def __new__(cls) -> "SharedDictSingleton":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             manager = Manager()
-            cls._instance._manager = manager
-            cls._instance._shared_dict = manager.dict()
+            cls._instance._manager = manager  # type: ignore[attr-defined]
+            cls._instance._shared_dict = manager.dict()  # type: ignore[attr-defined]
         return cls._instance
+
+    @classmethod
+    def is_instantiated(cls: type["SharedDictSingleton"]) -> bool:
+        return cls._instance is not None
 
     async def get(self, key: KT) -> Any:
         async with self._lock:

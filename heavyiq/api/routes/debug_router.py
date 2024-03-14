@@ -7,9 +7,9 @@ debug_router = APIRouter()
 
 
 @debug_router.get("/db-session", response_model=DbSessionResponse)
-async def db_session() -> DbSessionResponse:
+async def db_session(db: str | None = None) -> DbSessionResponse:
     """
     Get HeavyDB session id.
     """
-    heavydb_sessionid = HeavyDB.create_session_id()
+    heavydb_sessionid = await HeavyDB.create_session_id_async(db_name=db)
     return DbSessionResponse(session_id=heavydb_sessionid)

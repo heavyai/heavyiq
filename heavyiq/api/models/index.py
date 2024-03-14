@@ -1,4 +1,4 @@
-from langchain.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 
 
 class UpdateIndexRequest(BaseModel):
@@ -9,7 +9,7 @@ class UpdateIndexRequest(BaseModel):
     session_id: str | None = Field(default=None, description="[Optional] Valid HeavyDB Session ID")
 
     class Config:
-        schema_extra = {"examples": [{"session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}, {}]}
+        json_schema_extra = {"examples": [{"session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}, {}]}
 
 
 class UpdateIndexResponse(BaseModel):

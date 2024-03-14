@@ -1,16 +1,26 @@
 from typing import Any
 
-from langchain.schema.runnable import Runnable, RunnableBinding
-from langchain.schema.runnable.configurable import RunnableConfigurableAlternatives
+from langchain.schema.runnable import Runnable, RunnableBinding, RunnableConfig
+from langchain.schema.runnable.configurable import RunnableConfigurableAlternatives, RunnableConfigurableFields
 
 
-def get_value_from_runnable_binding(binding: RunnableBinding | RunnableConfigurableAlternatives) -> Any:
+def get_value_from_runnable_binding(
+    binding: RunnableBinding | RunnableConfigurableAlternatives, config: RunnableConfig | None = None
+) -> Any:
     """
     Gets the actual value of a runnable binded using `with_config` method.
+    It's mainly used to get the underlying llm or prompt from an runnable.
+    Passed config would be used to prepare the default runnable of RunnableConfigurableFields instance.
     """
     if isinstance(binding, RunnableConfigurableAlternatives):
         return binding.default
-    return binding.bound._prepare(binding.config)  # type: ignore
+    value = binding.bound._prepare(binding.config)  # type: ignore
+    if value and isinstance(value, tuple):
+        actual_value = value[0]
+        if isinstance(actual_value, RunnableConfigurableFields):
+            return actual_value._prepare(config)[0]  # type: ignore
+        return actual_value
+    return value
 
 
 def configure_step(runnable: Runnable, run_name: str, step: str) -> Runnable:

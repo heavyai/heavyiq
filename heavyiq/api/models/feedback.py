@@ -16,7 +16,7 @@ class FeedbackRequest(BaseModel):
     comment: Optional[str] = Field(..., description="An optional comment about the feedback")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "examples": [
                 {
                     "feedback_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",

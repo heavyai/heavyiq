@@ -1,12 +1,12 @@
 import os
 from enum import Enum
 
-from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.indexes import VectorstoreIndexCreator
 from langchain.indexes.vectorstore import VectorStoreIndexWrapper
 from langchain.schema import BaseRetriever
 from langchain.text_splitter import TextSplitter
-from langchain.vectorstores.chroma import Chroma
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores.chroma import Chroma
 
 from heavyiq.config import get_config
 
@@ -76,5 +76,5 @@ class HeavyIQIndexWrapper(VectorStoreIndexWrapper):
         Returns:
             Retriever that can be used to search the index.
         """
-        search_kwargs = {"k": k, "fetch_k": fetch_k}
+        search_kwargs = {"k": k}
         return self.vectorstore.as_retriever(search_type=search_type.value, search_kwargs=search_kwargs)

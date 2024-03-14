@@ -95,7 +95,7 @@ async def compare_and_format_output(inputs: dict) -> dict:
         }
 
     db = await HeavyDB.from_session_async(session_id=inputs["session_id"])
-    tasks = [run_in_threadpool(sql_rate_reply, gold_query, pred_query, db=db)]
+    tasks = [sql_rate_reply(gold_query, pred_query, db=db)]
     if inputs["enable_query_stats"]:
         tasks.append(db.aquery_stats(pred_query))
     else:

@@ -2,13 +2,13 @@ from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Any, ClassVar, Optional
 
+from confz import BaseConfig, ConfigSource
 from confz.change import SourceChangeManager
 from confz.config_source import ConfigSources, FileFormat
 from confz.exceptions import ConfigException, FileException
+from confz.loaders import get_loader
 from confz.loaders.file_loader import FileLoader
 from pydantic import BaseModel
-from confz import BaseConfig, ConfigSource
-from confz.loaders import get_loader
 
 # These overrides are responsible for modifying the default behaviour of the ConfZ library.
 # 1. Treating a .conf file as TOML
@@ -110,7 +110,7 @@ class OverrideBaseConfig(BaseModel, metaclass=OverrideConfZMetaclass):
     listeners: ClassVar[Optional[list[Any]]] = None  #: *for internal use only*
 
     class Config:
-        allow_mutation = True  # 2. Allow ConfZ to be mutable
+        frozen = False  # 2. Allow ConfZ to be mutable
 
     @classmethod
     def change_config_sources(cls: type["OverrideBaseConfig"], config_sources: ConfigSources) -> AbstractContextManager:

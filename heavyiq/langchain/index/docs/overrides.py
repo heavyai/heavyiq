@@ -1,8 +1,8 @@
-from urllib.parse import urljoin
 from typing import Optional
+from urllib.parse import urljoin
 
-from langchain.docstore.document import Document
-from langchain.document_loaders import GitbookLoader
+from langchain_community.document_loaders import GitbookLoader
+from langchain_core.documents import Document
 
 
 class OverrideGitbookLoader(GitbookLoader):

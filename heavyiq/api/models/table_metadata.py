@@ -10,7 +10,7 @@ class GenerateTableMetadataRequest(BaseModel):
     session_id: str = Field(..., max_length=32, min_length=32, description="Valid HeavyDB Session ID")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "examples": [
                 {
                     "session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
@@ -33,7 +33,7 @@ class GenerateTableMetadataResponse(BaseModel):
     )
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "examples": [
                 {
                     "table_name": "us_pois_safegraph",
