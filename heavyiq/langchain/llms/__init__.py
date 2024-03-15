@@ -109,11 +109,19 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
                 config.custom_llm_api_tables_to_questions_context_window,
             ),  # uses the default model and context window
         }
-        api_base, context_window = (
-            custom_llm_mapping[LLMType.DEFAULT]
-            if custom_llm_mapping[model_type][0] is None
-            else custom_llm_mapping[model_type]
-        )
+        if model_type == LLMType.NL_TO_SQL_ERROR:
+            found_key = LLMType.DEFAULT
+            for key in [LLMType.NL_TO_SQL_ERROR, LLMType.NL_TO_SQL]:
+                if custom_llm_mapping[key][0]:
+                    found_key = key
+                    break
+            api_base, context_window = custom_llm_mapping[found_key]
+        else:
+            api_base, context_window = (
+                custom_llm_mapping[LLMType.DEFAULT]
+                if custom_llm_mapping[model_type][0] is None
+                else custom_llm_mapping[model_type]
+            )
         return _get_custom_llm(model_type, api_base, context_window, **kwargs)  # type: ignore
 
 
