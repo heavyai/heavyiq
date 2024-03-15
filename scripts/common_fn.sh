@@ -2,6 +2,7 @@
 ## python3.10 (Installed)
 
 export INTERNALLY_RELEASED_PYHEAVYDB=false
+export INCLUDE_ALL_DEPS=false
 export HTTP_PYTHON_DEPS="https://dependencies.mapd.com/python-deps"
 export PKG_PATH=""
 export PYHEAVYDB_ARCHIVE=""
@@ -12,6 +13,9 @@ function process_args(){
       --internally-built-pyheavydb)
         INTERNALLY_RELEASED_PYHEAVYDB=true
         ;;
+      --include_all_deps)
+        INCLUDE_ALL_DEPS=true
+        ;;
       *)
         break
         ;;
@@ -21,9 +25,35 @@ function process_args(){
 }
 
 function get_pyheavydb_for_local_install() {
-  wget --continue ${HTTP_PYTHON_DEPS}/pyheavydb.whl.version 
+  wget --continue ${HTTP_PYTHON_DEPS}/pyheavydb.whl.version
   PYHEAVYDB_ARCHIVE=$(head -n 1 pyheavydb.whl.version)
-  wget --continue ${HTTP_PYTHON_DEPS}/${PYHEAVYDB_ARCHIVE} 
+  wget --continue ${HTTP_PYTHON_DEPS}/${PYHEAVYDB_ARCHIVE}
+}
+
+function test_for_include_all_deps() {
+  if [[ $INCLUDE_ALL_DEPS == "false" ]]; then
+    return
+  fi
+  local requirements_file=$1
+  if [[ -z $requirements_file ]]; then
+    echo "Error. requirements_file required as a parameter"
+    return
+  fi
+
+  ## Assume this happens after the dist dir has been
+  ## made and the requirements.txt files has been copied
+  if [[ ! -d ./dist ]] ; then
+    echo "WARNING. Either the dist dir has not been created or" \
+      "the script is being run from the wrong place"
+    return
+  fi
+  ## If a local copy of pyheavydb hasn't already been added then
+  ## the ./packages dir will not have been created. Hence mkdir -p
+  mkdir -p ./packages
+  pip download -r $requirements_file --dest ./packages/
+  ## generate a new requirements file than will use the
+  ## archives in the packages directory
+  find ./packages -type f > ./dist/requirements.packages.txt
 }
 
 function update_pyheavydb_reference() {
@@ -40,7 +70,7 @@ function update_pyheavydb_reference() {
     return
   fi
 
-  # 1. If any then remove any existing refence to pyheavydb 
+  # 1. If any then remove any existing refence to pyheavydb
   # 2. Add the relative file reference at the top of the file.
   sed -i "/pyheavydb/d" ${requirements_file}
   sed -i "1 i ${PKG_PATH}" ${requirements_file}
@@ -53,16 +83,16 @@ function test_for_internally_release_pyheavydb() {
 
   ## Assume this happens after the dist dir has been
   ## made and the requirements.txt files has been copied
-  if [[ ! -d ./dist ]] ; then 
+  if [[ ! -d ./dist ]] ; then
     echo "WARNING. Either the dist dir has not been created or" \
       "the script is being run from the wrong place"
     return
   fi
   # get_pyheavydb_for_local_install sets PYHEAVYDB_ARCHIVE
   get_pyheavydb_for_local_install
-
-  mv ${PYHEAVYDB_ARCHIVE} ./dist
-  PKG_PATH=./dist/${PYHEAVYDB_ARCHIVE}
+  mkdir -p ./packages
+  mv ${PYHEAVYDB_ARCHIVE} ./packages
+  PKG_PATH=./packages/${PYHEAVYDB_ARCHIVE}
   update_pyheavydb_reference ./dist/requirements.txt
 }
 
@@ -72,5 +102,5 @@ function test_and_install_local_pyheavydb() {
   if [[ $INTERNALLY_RELEASED_PYHEAVYDB == "false" ]];then
     return
   fi
-  pip install ${PYHEAVYDB_ARCHIVE} 
+  pip install ${PYHEAVYDB_ARCHIVE}
 }
