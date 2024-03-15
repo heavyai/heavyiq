@@ -1,6 +1,7 @@
 from typing import NoReturn
 
 from heavyiq.api.handlers.decorators import with_db, with_feedback_id
+from heavyiq.api.handlers.utils import ChainOutputWithLogprobs, ainvoke_logprobs
 from heavyiq.api.models import (
     AnswerResponse,
     AutoQueryResponse,
@@ -22,16 +23,24 @@ async def handle_lcel_query_request(request_dict: dict, config: dict | None = No
     """
     from heavyiq.lcel.chains import sql_chain
 
-    max_retries = get_config().max_retries_nl_to_sql
+    global_config = get_config()
 
-    out = await sql_chain.ainvoke(request_dict, config=config)  # type: ignore
+    max_retries, is_logprobs_enabled, logprobs = global_config.max_retries_nl_to_sql, global_config.enable_logprobs, {}
+
+    if is_logprobs_enabled:
+        output_with_logprobs = await ainvoke_logprobs(sql_chain, request_dict, config=config)  # type: ignore
+        out, logprobs = output_with_logprobs.output, output_with_logprobs.logprobs
+
+    else:
+        out = await sql_chain.ainvoke(request_dict, config=config)  # type: ignore
+
     if out["error"]:
         raise NLtoSQLException(
             f"Language model failed to generate a valid SQL query after {max_retries} tries.",
             failed_sql=out["query"],
         )
 
-    return QueryResponse(sql=out["query"], sql_complexity=out["sql_complexity"], feedback_id="", logprobs={})
+    return QueryResponse(sql=out["query"], sql_complexity=out["sql_complexity"], feedback_id="", logprobs=logprobs)
 
 
 @with_db
