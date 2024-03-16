@@ -2,19 +2,17 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from pydantic import Extra
-from langchain.schema.language_model import BaseLanguageModel
-from langchain.schema import BasePromptTemplate
+from langchain.callbacks.manager import AsyncCallbackManagerForChainRun, CallbackManagerForChainRun
 from langchain.prompts.prompt import PromptTemplate
-from langchain.callbacks.manager import (
-    AsyncCallbackManagerForChainRun,
-    CallbackManagerForChainRun,
-)
+from langchain.schema import BasePromptTemplate
+from langchain.schema.language_model import BaseLanguageModel
+from pydantic import Extra
 
-from heavyiq.langchain.chains import BaseChain
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
+from heavyiq.langchain.chains import BaseChain
 from heavyiq.langchain.llms import is_using_custom_trained_llm
+
 from .nl_to_sql import BaseNLtoSQLChain, get_nl_to_sql_chain_by_llm
 
 ANSWER_TEMPLATE = """Given an input question, first create a syntactically correct SQL query to run, then look at the results of the query and return the answer.
@@ -24,6 +22,8 @@ SQLQuery: /* step-by-step thought process */ SQL Query to run
 SQLResult: Result of the SQLQuery
 Answer: Final answer here
 Question: {input}
+Columns Considered:
+{columns}
 SQLQuery: {sql_cmd}
 SQLResult: {sql_result}"""
 ANSWER_PROMPT = PromptTemplate.from_template(ANSWER_TEMPLATE)
@@ -31,6 +31,9 @@ ANSWER_PROMPT = PromptTemplate.from_template(ANSWER_TEMPLATE)
 CUSTOM_LLM_ANSWER_TEMPLATE = """<|english prompt|>
 The user asked the following question:
 {input}
+
+By considering the following columns:
+{columns}
 
 To answer the question, the following SQL query was generated:
 {sql_cmd}

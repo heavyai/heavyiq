@@ -17,6 +17,7 @@ import anyio
 from async_lru import alru_cache
 from heavyai import Connection, connect
 from heavydb._parsers import ColumnDetails, _extract_column_details
+from heavydb.thrift.ttypes import TTableDetails
 from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
@@ -768,12 +769,29 @@ class HeavyDB:
 
         return table_schema
 
+    @alru_cache(ttl=10)
+    async def _aget_table_details(self, table: str) -> TTableDetails:
+        """
+        Get table details through thrift endpoint.
+        """
+        async with self.alock:
+            table_details = await run_in_threadpool(self._conn.get_table_details, table)
+        return table_details
+
+    @alru_cache(ttl=10)
+    async def _aget_column_details(self, table: str) -> list[ColumnDetails]:
+        """
+        Get table column details through thrift endpoint.
+        """
+        async with self.alock:
+            column_details = await run_in_threadpool(self._conn.get_column_details, table)
+        return column_details
+
     async def _aget_table_custom_details(self, table: str) -> CustomTableDetails:
         """
         Return custom details of a heavyDB table.
         """
-        async with self.alock:
-            table_details = await run_in_threadpool(self._conn.get_table_details, table)
+        table_details = await self._aget_table_details(table)
         table_comment = table_details.comment or ""
         columns: list[ColumnDetails] = _extract_column_details(table_details.row_desc)
         column_name_comments_mapping = {x.col_name: x.comment or "" for x in table_details.row_desc}
@@ -1076,6 +1094,14 @@ class HeavyDB:
             db, table, column = col_mapping[id]
             result.append({"operator": op, "literal": literal, "database": db, "table": table, "column": column})
         return result
+
+    async def aretrieve_columns_from_query(self, query: str) -> dict[str, tuple[str, str, str]]:
+        """
+        Gets the columns used in the input SQL query.
+        """
+        detailed_query_plan = await self.aget_calcite_query_plan(query, detailed=True)
+        column_mapping = await self.aextract_column_mappings(detailed_query_plan)
+        return column_mapping
 
     async def acorrect_string_literal(self, literal: StringLiteralOp, exact_match_threshold: float) -> StringLiteralOp:
         """
