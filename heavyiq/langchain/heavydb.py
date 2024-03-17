@@ -678,17 +678,12 @@ class HeavyDB:
             return top_k_res, is_high_cardinality
         return None, is_high_cardinality
 
-    @alru_cache(maxsize=32, ttl=10)
     async def aget_table_columns(self, table: str) -> list[ColumnDetails]:
         """Get details about the columns in a table."""
         self.logger.debug(f"Getting columns for table {table}")
-        async with self.alock:
-            try:
-                column_details = await run_in_threadpool(self._conn.get_column_details, table)
-                self.logger.debug(f"Got columns for table {table}")
-                return column_details
-            except Exception as e:
-                raise e
+        column_details = await self._aget_column_details(table)
+        self.logger.debug(f"Got columns for table {table}")
+        return column_details
 
     async def should_refresh_table_cache(self, table: str) -> bool:
         """
@@ -729,6 +724,11 @@ class HeavyDB:
         self.table_text_columns_count_cache.delete(cache_key)
         self.table_total_row_count_cache.delete(cache_key)
         self.timestamp_cache.delete(cache_key)
+        # invalidate async-lru caches
+        self._aget_table_details.cache_invalidate(table)
+        self._aget_column_details.cache_invalidate(table)
+        self.aget_text_columns.cache_invalidate(table)
+        self._aget_raw_table_schema_from_thrift.cache_invalidate(table)
 
     async def trigger_table_schema_change_callback(self, table: str, callback: Callable | None = None):
         schema_change_callback = callback or self.table_schema_change_callback
@@ -769,7 +769,7 @@ class HeavyDB:
 
         return table_schema
 
-    @alru_cache(ttl=10)
+    @alru_cache(ttl=60 * 10)  # store atleast for 10 mins
     async def _aget_table_details(self, table: str) -> TTableDetails:
         """
         Get table details through thrift endpoint.
@@ -778,7 +778,7 @@ class HeavyDB:
             table_details = await run_in_threadpool(self._conn.get_table_details, table)
         return table_details
 
-    @alru_cache(ttl=10)
+    @alru_cache(ttl=60 * 10)  # store atleast for 10 mins
     async def _aget_column_details(self, table: str) -> list[ColumnDetails]:
         """
         Get table column details through thrift endpoint.
