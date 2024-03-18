@@ -83,6 +83,9 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     sort_prompt_tables_desc: bool = True
     # whether to include timestamp text on table prompt
     include_timestamp_on_table_info_prompt: bool = True
+    # form a inline-column metadata(top-k, time-range) on table_info generation part of prompt making
+    # if False, then column top-k and time-ranges should appear in a seperate paragraph block
+    inline_column_metadata_on_table_info_prompt: bool = False
     # maximum count of allowed_tables on nl-to-tables endpoint. If the count exceeds, then
     # index updation and search will happen in-order to find relevant tables.
     allowed_tables_max_count_nl_to_tables: int = 20
