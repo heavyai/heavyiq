@@ -32,6 +32,7 @@ class CustomColumnDetails(NamedTuple):
     name: str
     type: str
     comment: str
+    encoding: str
 
 
 class CustomTableDetails(NamedTuple):
@@ -780,8 +781,9 @@ class HeavyDB:
         custom_columns = [
             CustomColumnDetails(
                 name=f'"{col.name}"' if col.name.upper() in DB_KEYWORDS else col.name,
-                type="TEXT" if col.type == "STR" else col.type,
+                type="TEXT" if col.type == "STR" else ("REAL" if col.type == "DOUBLE" else col.type),
                 comment=column_name_comments_mapping[col.name],
+                encoding=col.encoding if col.encoding == "NONE" else "",
             )
             for col in columns
         ]
@@ -799,15 +801,25 @@ class HeavyDB:
             if table_details.comment
             else "CREATE TABLE {table_name} {table_comment}(\n{column_details});"
         )
+
+        def format_column(column: CustomColumnDetails) -> str:
+            """
+            Formats column for prompt.
+            """
+            parts = [column.name, column.type]
+            encoding = column.encoding
+            if encoding:
+                parts.append(f"ENCODING {encoding}")
+            comment = f"/* {column.comment} */" if column.comment else ""
+            if comment:
+                parts.append(comment)
+
+            return " ".join(parts)
+
         return schema_stmt.format(
             table_name=table_name,
             table_comment=table_details.comment or "",
-            column_details=",\n".join(
-                [
-                    f"{x.name} {x.type} /* {x.comment} */" if x.comment else f"{x.name} {x.type}"
-                    for x in table_details.columns
-                ]
-            ),
+            column_details="\n".join([format_column(x) for x in table_details.columns]),
         )
 
     async def aget_table_schema(self, table: str) -> str:
