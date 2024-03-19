@@ -21,7 +21,8 @@ from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
 from heavyiq.langchain.heavydb_utils import DB_KEYWORDS
-from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
+from heavyiq.utils import (LRUCache, calc_query_stats, is_destructive_sql,
+                           rate_sql_complexity, strip_sql_comments)
 
 
 class CustomColumnDetails(NamedTuple):
@@ -849,7 +850,11 @@ class HeavyDB:
             """
             Formats column for prompt.
             """
-            parts = [column.name_str, column.type_str]
+            parts = [column.name_str]
+            if column.is_array:
+                parts.append(f"{column.type_str}[]")
+            else:
+                parts.append(column.type_str)
             encoding = column.encoding_str
             if encoding:
                 parts.append(f"ENCODING {encoding}")
