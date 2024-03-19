@@ -792,7 +792,9 @@ class HeavyDB:
                 type_str="TEXT" if col.type == "STR" else ("REAL" if col.type == "DOUBLE" else col.type),
                 comment=column_name_comments_mapping[col.name],
                 encoding=col.encoding,
-                encoding_str=col.encoding if col.encoding == "NONE" else "",
+                encoding_str=(
+                    col.encoding if (col.type == "STR" and col.encoding == "NONE") else ""
+                ),  # add NONE encoding for only text columns
                 is_array=col.is_array,
                 is_timestamp_column=True if (col.type in ["TIMESTAMP", "DATE"] and col.is_array is False) else False,
                 is_text_column=(
@@ -831,7 +833,9 @@ class HeavyDB:
                     *[self.aget_column_top_k(table_details.name, col) for col in text_columns]
                 )
                 for colstr, (top_k_res, is_high_cardinality) in zip(text_columns, columns_top_k):
-                    if top_k_res:
+                    if top_k_res and is_high_cardinality:
+                        column_metadata_mapping[colstr] = top_k_res[:-1] + [top_k_res[-1] + "..."]
+                    elif top_k_res:
                         column_metadata_mapping[colstr] = top_k_res
 
             if timestamp_columns:
