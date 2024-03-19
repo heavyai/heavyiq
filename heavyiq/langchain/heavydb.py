@@ -826,7 +826,7 @@ class HeavyDB:
         return schema_stmt.format(
             table_name=table_name,
             table_comment=table_details.comment or "",
-            column_details="\n".join([format_column(x) for x in table_details.columns]),
+            column_details=",\n".join([format_column(x) for x in table_details.columns]),
         )
 
     async def aget_table_schema(self, table: str) -> str:
