@@ -77,10 +77,10 @@ async def nl_to_sql_retry(session_id: str):
 
 async def nl_to_sql_logprobs(session_id: str):
     final_output, logprobs = "", {}
-    async for log in nl_to_sql_chain.astream_log(input_ctx_var.get(), include_types=["llm"]):
+    async for log in nl_to_sql_chain.astream_log(input_ctx_var.get()):
         for op in log.ops:
             if op["path"] == "/final_output":
-                final_output = op["value"]["output"]
+                final_output = op["value"]
             if "/final_output" in op["path"]:
                 op_value = op["value"]
                 if "generations" in op_value:
@@ -193,6 +193,6 @@ if __name__ == "__main__":
         }
     )
     # you can call any of the above functions for testing purpose
-    asyncio.run(nl_to_answer(session_id))
+    asyncio.run(nl_to_sql_logprobs(session_id))
     end_time = time.perf_counter()
     print("Elapsed time during the whole program in seconds:", end_time - start_time)
