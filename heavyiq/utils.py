@@ -103,6 +103,7 @@ class SharedDictSingleton(Generic[KT, VT]):
 
     class Keys(Enum):
         HeavyDBLicenseEdition = "heavydb_license_edition"
+        ConfFilePath = "config_file_path"
 
     def __new__(cls) -> "SharedDictSingleton":
         if cls._instance is None:

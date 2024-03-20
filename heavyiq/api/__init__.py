@@ -32,7 +32,7 @@ def stripped_down_api() -> FastAPI:
     return app
 
 
-def app_initialize(config: HeavyIQConfig):
+def app_initialize(config: HeavyIQConfig, config_path: str):
     """
     App initialization code which get excuted before gunicorn process fork upon using `--preload` option.
     """
@@ -42,6 +42,7 @@ def app_initialize(config: HeavyIQConfig):
     logger.info("Allocating Shared Dict....")
     # shared manager
     instance = SharedDictSingleton()
+    instance.sput(SharedDictSingleton.Keys.ConfFilePath.name, config_path)
     logger.info(f"Shared Manager PID: {instance._manager._process.pid}")
 
     # always create a HeavyDB's multiprocessing.Manager instance (which was being used for shared cache) before gunicorn process fork
@@ -79,7 +80,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
 
     app = FastAPI(title="HeavyIQ")
 
-    app_initialize(config)
+    app_initialize(config, config_path)
 
     cors_origins = ["http://localhost"]
 
@@ -199,10 +200,14 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
                 license_edition = await shared_dict.get(SharedDictSingleton.Keys.HeavyDBLicenseEdition.name)
                 if not license_edition:
                     continue
-                logger.debug(f"Found HeavyAI license edition, license_type: {license_edition}")
+                logger.info(f"Found HeavyAI license edition, license_type: {license_edition}")
                 if license_edition == "free":
                     logger.info("Enabling langsmith telemetrics for free edition.")
-                    enable_telemetrics_for_free_edition()
+                    done = enable_telemetrics_for_free_edition()
+                    if done:
+                        logger.info("Successfully changed langsmith telemetrics and HeavyIQ configs for free edition.")
+                    else:
+                        logger.error("Failed to change langsmith telemetrics and HeavyIQ configs for free edition.")
                 break
             else:
                 logger.error(f"Failed to check HeavyAI license edition after {max_retries*2} seconds.")
