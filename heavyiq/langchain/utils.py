@@ -15,7 +15,7 @@ from langchain_core.tracers.langchain import LangChainTracer
 from langchain_core.tracers.schemas import Run
 from transformers import AutoTokenizer, LlamaTokenizer
 
-from heavyiq.config import HeavyIQConfig, get_config
+from heavyiq.config import HeavyIQConfig, change_iq_config_for_free_edition, get_config
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.heavydb import get_db
 from heavyiq.langchain.llms import LLMType, get_vllm_model_name
@@ -42,6 +42,22 @@ def init_telemetrics() -> None:
     # chromadb telemetry opt-out
     os.environ["ANONYMIZED_TELEMETRY"] = "false"
     langchain_tracer_module.logger = get_heavyiq_logger()  # type: ignore
+
+
+def enable_telemetrics_for_free_edition() -> bool:
+    """
+    Enables telemetrics for free edition.
+    """
+    if not change_iq_config_for_free_edition():
+        return False
+
+    global is_langsmith_active
+    os.environ["LANGCHAIN_TRACING_V2"] = "true"
+    os.environ["LANGCHAIN_API_KEY"] = "ls__05a28e5a4254408db4beeb06252af343"
+    os.environ["LANGCHAIN_PROJECT"] = "free-8-0-0"
+    is_langsmith_active = True
+
+    return True
 
 
 @cached(cache=TTLCache(maxsize=30, ttl=60 * 10))

@@ -1,5 +1,6 @@
 import asyncio
 import re
+from enum import Enum
 from multiprocessing import Manager
 from multiprocessing.managers import SyncManager
 from pathlib import Path
@@ -100,13 +101,21 @@ class SharedDictSingleton(Generic[KT, VT]):
     _instance: "SharedDictSingleton[KT, VT]" = None
     _lock: asyncio.Lock = asyncio.Lock()
 
-    def __new__(cls):
+    class Keys(Enum):
+        HeavyDBLicenseEdition = "heavydb_license_edition"
+        ConfFilePath = "config_file_path"
+
+    def __new__(cls) -> "SharedDictSingleton":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             manager = Manager()
-            cls._instance._manager = manager
-            cls._instance._shared_dict = manager.dict()
+            cls._instance._manager = manager  # type: ignore[attr-defined]
+            cls._instance._shared_dict = manager.dict()  # type: ignore[attr-defined]
         return cls._instance
+
+    @classmethod
+    def is_instantiated(cls: type["SharedDictSingleton"]) -> bool:
+        return cls._instance is not None
 
     async def get(self, key: KT) -> Any:
         async with self._lock:
