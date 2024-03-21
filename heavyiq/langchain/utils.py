@@ -51,11 +51,10 @@ def enable_telemetrics_for_free_edition() -> bool:
     if not change_iq_config_for_free_edition():
         return False
 
-    config = get_config()
     global is_langsmith_active
     os.environ["LANGCHAIN_TRACING_V2"] = "true"
-    os.environ["LANGCHAIN_API_KEY"] = config.langsmith_api_key_free_edition
-    os.environ["LANGCHAIN_PROJECT"] = config.langsmith_project_free_edition
+    os.environ["LANGCHAIN_API_KEY"] = "ls__05a28e5a4254408db4beeb06252af343"
+    os.environ["LANGCHAIN_PROJECT"] = "free-8-0-0"
     is_langsmith_active = True
 
     return True

@@ -37,10 +37,6 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     langchain_endpoint: str = "https://api.smith.langchain.com"
     langsmith_api_key: Optional[str] = None
     langsmith_project: Optional[str] = None
-    langsmith_api_key_free_edition: Optional[str] = None
-    """langsmith apikey for free edition license"""
-    langsmith_project_free_edition: Optional[str] = None
-    """langsmith project for free edition license"""
     # LOGGING
     access_log_level: str = "INFO"
     """Used for the access log of the web server."""
