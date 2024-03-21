@@ -52,4 +52,8 @@ echo "${current_timestamp}-${commit_hash}" > dist/public/version.txt
 # Compress Build Dir adding the packages folder under
 # the dist so that the install for heavydb-internal 
 # works
-tar -czf dist.tgz --transform='s|packages/|dist/packages/|' dist packages
+mv packages dist/.
+cd dist 
+tar -czf ../dist.tgz  .
+cd ..
+mv dist/packages .
