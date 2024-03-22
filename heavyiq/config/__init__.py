@@ -1,6 +1,4 @@
 import os
-import threading
-from typing import Any
 from urllib.parse import urlparse
 
 from confz import FileSource
@@ -13,7 +11,6 @@ from thrift.transport import TSocket, TTransport
 from .config_schema import AppConfig, HeavyIQConfig
 
 _config: HeavyIQConfig | None = None
-_config_lock = threading.Lock()
 
 
 def get_heavydb_license_claims(config: HeavyIQConfig) -> TLicenseInfo:
@@ -33,11 +30,12 @@ def get_heavydb_license_claims(config: HeavyIQConfig) -> TLicenseInfo:
         )
 
 
-def validate_config(app_config: AppConfig) -> AppConfig:
-    """
-    Validates app config after it's creation.
-    This involves basic validation of configs and creation of directory mentioned if not exists.
-    """
+def get_config(file: str = "./config.toml") -> HeavyIQConfig:
+    """If called with a non-default file path, must be called before importing any other modules that use the config."""
+    global _config
+    if _config:
+        return _config
+    app_config: AppConfig = AppConfig(config_sources=FileSource(file=file))  # type: ignore
     if app_config.iq.custom_llm_type is None or app_config.iq.custom_llm_type == "AZURE":
         if app_config.iq.custom_llm_type == "AZURE" and (
             app_config.iq.custom_llm_azure_deployment_name.strip() == ""
@@ -71,48 +69,9 @@ def validate_config(app_config: AppConfig) -> AppConfig:
     if not os.path.exists(app_config.iq.data):
         os.makedirs(app_config.iq.data)
 
-    return app_config
+    _config = app_config.iq
 
+    # disabled for now because HeavyIQ can startup before HeavyDB
+    # get_heavydb_license_claims(_config)
 
-def get_config(file: str = "./config.toml") -> HeavyIQConfig:
-    """If called with a non-default file path, must be called before importing any other modules that use the config."""
-    global _config
-    with _config_lock:
-        if _config:
-            return _config
-        app_config: AppConfig = AppConfig(config_sources=FileSource(file=file))  # type: ignore
-        app_config = validate_config(app_config)
-        _config = app_config.iq
-
-        return _config
-
-
-def change_iq_config(dict_: dict[str, Any]) -> bool:
-    """
-    Helps to change App.iq config w.r.t passed dict.
-    """
-    global _config
-    if not _config or not dict_:
-        return False
-
-    with _config_lock:
-        for key, value in dict_.items():
-            setattr(_config, key, value)
-
-    return True
-
-
-def change_iq_config_for_free_edition() -> bool:
-    """
-    IQ config keys to change if in case of free edition license.
-    """
-
-    keys_to_change = {
-        "custom_llm_api_base": "https://api2.heavy.ai/v1",
-        "custom_llm_api_nl_to_sql_base": "https://api2.heavy.ai/v1",
-        "custom_llm_api_sql_to_answer_base": "https://api2.heavy.ai/v1",
-        "custom_llm_api_nl_to_tables_base": "https://api2.heavy.ai/v1",
-        "custom_llm_api_tables_to_questions_base": "https://api2.heavy.ai/v1",
-        "custom_llm_api_instruct_base": "https://api2.heavy.ai/v1",
-    }
-    return change_iq_config(keys_to_change)
+    return _config

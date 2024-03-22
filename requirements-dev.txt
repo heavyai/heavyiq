@@ -6,6 +6,7 @@ flake8==6.1.0
 flake8-annotations==3.0.1
 flake8-pep585==0.1.7
 furo==2023.8.19
+httpx==0.24.1
 isort==5.12.0
 liccheck==0.9.1
 mypy==1.5.1

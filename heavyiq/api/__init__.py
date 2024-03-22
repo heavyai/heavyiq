@@ -1,4 +1,3 @@
-import asyncio
 from typing import Any
 
 from asgi_correlation_id import CorrelationIdMiddleware
@@ -21,7 +20,7 @@ from heavyiq.langchain.exceptions import (
     NLtoSQLException,
     NLtoTableException,
 )
-from heavyiq.langchain.utils import InMemoryLLMCache, enable_telemetrics_for_free_edition, init_telemetrics
+from heavyiq.langchain.utils import InMemoryLLMCache, init_telemetrics
 from heavyiq.logging_utils import get_heavyiq_logger, init_logs
 from heavyiq.utils import SharedDictSingleton
 
@@ -32,7 +31,7 @@ def stripped_down_api() -> FastAPI:
     return app
 
 
-def app_initialize(config: HeavyIQConfig, config_path: str):
+def app_initialize(config: HeavyIQConfig):
     """
     App initialization code which get excuted before gunicorn process fork upon using `--preload` option.
     """
@@ -42,7 +41,6 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
     logger.info("Allocating Shared Dict....")
     # shared manager
     instance = SharedDictSingleton()
-    instance.sput(SharedDictSingleton.Keys.ConfFilePath.name, config_path)
     logger.info(f"Shared Manager PID: {instance._manager._process.pid}")
 
     # always create a HeavyDB's multiprocessing.Manager instance (which was being used for shared cache) before gunicorn process fork
@@ -80,7 +78,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
 
     app = FastAPI(title="HeavyIQ")
 
-    app_initialize(config, config_path)
+    app_initialize(config)
 
     cors_origins = ["http://localhost"]
 
@@ -189,32 +187,10 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         import heavyiq.lcel.chains
         from heavyiq.logging_utils import heavyiq_logger as logger
 
-        async def enable_telemetrics_for_free_license_daemon():
-            """
-            This enables langsmith telemetrics for the free license by polling a shared multiprocessing dict.
-            """
-            shared_dict, max_retries, retry_count = SharedDictSingleton(), 20, 0
-            while retry_count < max_retries:
-                retry_count += 1
-                await asyncio.sleep(2)
-                license_edition = await shared_dict.get(SharedDictSingleton.Keys.HeavyDBLicenseEdition.name)
-                if not license_edition:
-                    continue
-                logger.info(f"Found HeavyAI license edition, license_type: {license_edition}")
-                if license_edition == "free":
-                    logger.info("Enabling langsmith telemetrics for free edition.")
-                    done = enable_telemetrics_for_free_edition()
-                    if done:
-                        logger.info("Successfully changed langsmith telemetrics and HeavyIQ configs for free edition.")
-                    else:
-                        logger.error("Failed to change langsmith telemetrics and HeavyIQ configs for free edition.")
-                break
-            else:
-                logger.error(f"Failed to check HeavyAI license edition after {max_retries*2} seconds.")
-
-        # run a background task to check license_edition got cached or not
-        # if yes, and it's a free edition then enable langsmith telemetry
-        asyncio.create_task(enable_telemetrics_for_free_license_daemon())
+        # TODO: Disabled for now, as no guarantee heavydb is running before heavyiq
+        # logger.info("Connecting to heavydb...")
+        # await run_in_threadpool(get_heavydb_license_claims, config)
+        # logger.info("Successfully connected to heavydb...")
 
     @app.on_event("shutdown")
     async def shutdown():
@@ -223,7 +199,14 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         """
         from heavyiq.logging_utils import heavyiq_logger as logger
 
-        logger.info("Shutting down FastAPI worker.")
+        shared_dict_instance = SharedDictSingleton._instance
+        if shared_dict_instance:
+            shared_dict_manager = shared_dict_instance._manager
+            if shared_dict_manager._state.value == 1:  # terminate already started shared manager process
+                logger.info("Shutting down Shared Manager instance.")
+                shared_dict_manager.shutdown()
+
+        logger.info("Shutting down FastAPI app.")
 
     def custom_openapi() -> dict[str, Any]:
         if app.openapi_schema:
