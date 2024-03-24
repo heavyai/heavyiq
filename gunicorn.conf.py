@@ -31,16 +31,16 @@ def cache_license_edition_background_task(conf_file_path: str):
             retry_count += 1
     else:
         # return None if it can't get the license info after specific retries
-        print("Background task cache_license_edition fails after specific retries.")
+        # print("Background task cache_license_edition fails after specific retries.")
         return None
 
     license_edition = jwt.decode(license_info.claims[0], options={"verify_signature": False})["edition"]
 
-    print(f"Setting license edition in the shared cache, license_edition: {license_edition}")
+    # print(f"Setting license edition in the shared cache, license_edition: {license_edition}")
 
     instance.sput(SharedDictSingleton.Keys.HeavyDBLicenseEdition.name, license_edition)
 
-    print("Background task cache_license_edition completed.")
+    # print("Background task cache_license_edition completed.")
 
 
 def run_background_task_in_thread(conf_file_path: str):
@@ -75,7 +75,7 @@ def on_starting(server: Any):
     """
 
     gunicorn_args = server.cfg.settings
-    print_gunicorn_args(gunicorn_args)
+    # print_gunicorn_args(gunicorn_args)
 
     proc_name = gunicorn_args["default_proc_name"].get()
     conf_file_path = proc_name.split("(")[1].split(")")[0].split("=")[-1].strip("'").strip('"')
