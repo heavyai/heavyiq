@@ -35,7 +35,7 @@ def cache_license_edition_background_task(conf_file_path):
     else:
         # return None if it can't get the license info after specific retries
         # print("Background task cache_license_edition fails after specific retries.")
-        pass
+        return None
 
     license_edition = jwt.decode(license_info.claims[0], options={"verify_signature": False})["edition"]
 
