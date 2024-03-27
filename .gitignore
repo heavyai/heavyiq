@@ -31,3 +31,4 @@ hf_models/
 
 pyheavydb.whl.version
 pyheavydb*.whl
+**/poetry.lock

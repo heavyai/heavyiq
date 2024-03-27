@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "heavyrag"
+version = "0.1.0"
+description = "Effortlessly locate tables based on your queries with real-time RAG guidance."
+authors = ["Your Name <you@example.com>"]
+license = "LICENSE.md"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+chromadb = "0.4.22"
+llama-index-core = "0.10.24"
+llama-index-embeddings-huggingface = "0.2.0"
+llama-index-vector-stores-chroma = "0.1.6"
+pyheavydb = "6.4.0"
+
+[tool.poetry.group.optionalgroup]
+optional = true
+
+[tool.poetry.group.optionalgroup.dependencies]
+fastapi = "^0.110.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
