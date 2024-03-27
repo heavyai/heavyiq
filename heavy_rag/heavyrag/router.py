@@ -1,8 +1,8 @@
 import logging
 
 from fastapi import APIRouter
+from heavyrag.main import get_heavydb_reader, get_or_create_index, retrieve_index
 from pydantic import BaseModel
-from rag.main import get_heavydb_reader, get_or_create_index, retrieve_index
 
 router = APIRouter()
 

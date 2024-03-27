@@ -3,10 +3,10 @@ import os
 
 import uvicorn
 from fastapi import FastAPI
+from heavyrag.router import router
 from llama_index.core import Settings as IndexSettings
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from rag.router import router
-from settings import Settings
+from heavyrag.settings import Settings
 
 os.environ["ANONYMIZED_TELEMETRY"] = "false"
 

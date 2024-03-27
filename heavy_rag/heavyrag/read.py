@@ -54,11 +54,6 @@ class HeavyDBReader(BaseReader):
             sessionid: HeavyDB session id. Defaults to None.
         """
 
-        def foo(*args, **kwargs):
-            import time
-
-            time.sleep(5)
-
         self.connection = self._connect_with_timeout(
             connect,
             uri=uri,
@@ -70,8 +65,11 @@ class HeavyDBReader(BaseReader):
             protocol=protocol,
             sessionid=sessionid,
         )
-        self.dbname = dbname
         self._lock = Lock()
+
+    @cached_property
+    def database_name(self):
+        return self.connection._client.get_session_info(self.connection._session).database
 
     @classmethod
     def _connect_with_timeout(
@@ -139,7 +137,7 @@ class HeavyDBReader(BaseReader):
             metadata_seperator="::",
             metadata_template="{key}=>{value}",
             text_template="Metadata: {metadata_str}\n-----\nContent:\n{content}",
-        )
+        ) # type: ignore
 
     def read_table_schema(self, table_name: str) -> str | None:
         """

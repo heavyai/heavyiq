@@ -1,11 +1,11 @@
 import chromadb
 from chromadb.config import Settings as ConfigSettings
+from heavyrag.read import HeavyDBReader
+from heavyrag.transform import TableSchemaSplitter
 from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
-from rag.read import HeavyDBReader
-from rag.transform import TableSchemaSplitter
-from settings import Settings
+from heavyrag.settings import Settings
 
 
 def get_vectorstore(persist_collection_dir: str, collection_name: str = "langchain") -> ChromaVectorStore:

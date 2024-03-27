@@ -1,13 +1,13 @@
 import logging
 import os
 
+from heavyrag.ingest import get_vectorstore, reload_index
+from heavyrag.read import HeavyDBReader
+from heavyrag.utils import get_existing_tables_from_collection
 from llama_index.core import StorageContext, VectorStoreIndex, load_index_from_storage
 from llama_index.core.schema import NodeWithScore
 from llama_index.core.vector_stores.types import FilterOperator, MetadataFilter, MetadataFilters
-from rag.ingest import get_vectorstore, reload_index
-from rag.read import HeavyDBReader
-from rag.utils import get_existing_tables_from_collection
-from settings import Settings
+from heavyrag.settings import Settings
 
 logger = logging.getLogger(__name__)
 # dict mapping of dbname and bool to represent whether an index building is in progress for
@@ -42,7 +42,7 @@ def get_or_create_index(sessionid: str | None = None, reader: HeavyDBReader | No
             protocol=settings.heavydb_protocol,
             sessionid=sessionid,
         )
-    conn_dbname = reader.connection._dbname
+    conn_dbname = reader.database_name
     if conn_dbname in INDEX_ON_PROGRESS:
         raise ValueError(f"Index building in-progress for {conn_dbname} database, please wait.")
 
