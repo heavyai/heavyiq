@@ -4,25 +4,46 @@ import asyncio
 import functools
 import multiprocessing
 import re
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from copy import deepcopy
 from multiprocessing.managers import SyncManager
 from threading import Lock
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Optional, TypedDict
+from typing import Any, Callable, NamedTuple, Optional, TypedDict
 
 import anyio
 from async_lru import alru_cache
 from heavyai import Connection, connect
+from heavydb._parsers import ColumnDetails, _extract_column_details
 from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
+from heavyiq.langchain.heavydb_utils import DB_KEYWORDS
 from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
 
-if TYPE_CHECKING:
-    from heavydb._parsers import ColumnDetails
+
+class CustomColumnDetails(NamedTuple):
+    """
+    HeavyDB Table's custom column details including comment.
+    """
+
+    name: str
+    type: str
+    comment: str
+    is_array: bool
+    encoding_str: Optional[str] = None
+
+
+class CustomTableDetails(NamedTuple):
+    """
+    HeavyDB Table's custom details including table and column comments.
+    """
+
+    name: str
+    columns: list[CustomColumnDetails]
+    comment: str
 
 
 class PersistantConnection(Connection):
@@ -131,6 +152,7 @@ class HeavyDB:
         self._table_schema_change_callback = callback
 
     def __del__(self):
+        # TODO: Move this implementation to weakref.finalize
         try:
             self._conn.close()
         except Exception as e:
@@ -215,7 +237,7 @@ class HeavyDB:
 
     @classmethod
     async def _aconnect_with_timeout(
-        cls: type[HeavyDB], coroutine: Coroutine[Any, Any, Connection], timeout: float = 10
+        cls: type[HeavyDB], coroutine: Awaitable[Connection], timeout: float = 10
     ) -> Connection:
         """
         Runs a coroutine inside a CancellableScope.
@@ -307,7 +329,7 @@ class HeavyDB:
             return await anyio.to_thread.run_sync(func, cancellable=True)  # type: ignore
 
         conn = await cls._aconnect_with_timeout(aconnect_func(), kwargs.pop("timeout", 10))
-        return cls(conn, **kwargs)
+        return await run_in_threadpool(cls, conn, **kwargs)
 
     @classmethod
     def from_creds(
@@ -416,9 +438,9 @@ class HeavyDB:
         """Get details about the columns in a table."""
         self.logger.debug(f"Getting columns for table {table}")
         with self.lock:
-            table_details = self._conn.get_table_details(table)
+            column_details = self._conn.get_column_details(table)
             self.logger.debug(f"Got columns for table {table}")
-            return table_details
+            return column_details
 
     def get_table_schema(self, table: str) -> str:
         self.logger.debug(f"Getting schema for table {table}")
@@ -428,13 +450,15 @@ class HeavyDB:
             self.logger.debug(f"Got schema for table {table} from cache")
             return cached_value
         """Get the schema of a table."""
-        create_command = f"SHOW CREATE TABLE {table};"
+        create_command = f'SHOW CREATE TABLE "{table}";'
         with self.lock:
             cursor = self._conn.execute(create_command)
         table_schema = cursor.fetchone()[0]  # type: ignore
         table_schema = re.sub(r" ENCODING .*\)([,\)])", r"\1", table_schema)  # type: ignore
         table_schema = re.sub(r",\n.*SHARED DICTIONARY.*REFERENCES.*\([A-Za-z0-9_]*\)", "", table_schema)
         table_schema = re.sub(r"\n", "", table_schema)
+        table_schema = re.sub(r"\( +", "(", table_schema)
+        table_schema = re.sub(r", +", ", ", table_schema)
         if "WITH (" in table_schema:
             table_schema = table_schema[: table_schema.index("WITH (")]
         self.table_schema_cache.put(cache_key, table_schema)
@@ -457,30 +481,14 @@ class HeavyDB:
         cardinality_threshold = config.column_top_k_cardinality_threshold
         high_cardinality_sample = config.column_top_k_high_cardinality_sample
 
-        # We need to ensure that column names that are reserved keywords are double quoted otherwise an error will occur
-        # Todo (todd): These are only a partial list of reserved keywords, ensure we have an exhaustive list
-        reserved_keywords = [
-            "LANGUAGE",
-            "RANK",
-            "RESULT",
-            "DATE",
-            "TIMESTAMP",
-            "LENGTH",
-            "YEAR",
-            "QUARTER",
-            "MONTH",
-            "WEEK",
-            "DAY",
-        ]
-        if column.upper() in reserved_keywords:
-            column = f'"{column}"'
+        column = f'"{column}"'
         # check to see if the column is low cardinality
         # fetch top (threshold + 1)
         # if there are < (threshold + 1) values, it's low cardinality and we can return all of them
         # if there are >= (threshold + 1) values, it's high cardinality and we need to sample the top high_cardinality_sample
         """Get the top k values for a column."""
         self.logger.debug(f"Getting top k values for column {column} in table {table}")
-        top_k_statement = f"SELECT {column}, COUNT(*) as cnt FROM {table} WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {cardinality_threshold + 1};"
+        top_k_statement = f'SELECT {column}, COUNT(*) as cnt FROM "{table}" WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {cardinality_threshold + 1};'
         with self.lock:
             cursor = self._conn.execute(top_k_statement)
         top_k_res: list[str] = [str(v[0]) for v in cursor.fetchall()]
@@ -504,7 +512,7 @@ class HeavyDB:
             self.logger.debug(f"Got sample rows for table {table_name} from cache")
             return cached_value
         # build the select command
-        command = f"SELECT * FROM {table_name} LIMIT {self._sample_rows_in_table_info}"
+        command = f'SELECT * FROM "{table_name}" LIMIT {self._sample_rows_in_table_info}'
 
         # save the columns in string format
         columns_str = ",".join([col.name for col in self.get_table_columns(table_name)])
@@ -563,7 +571,7 @@ class HeavyDB:
         Get min/max values for a particular timestamp column.
         """
         self.logger.debug(f"Getting timestamp values for column {column} in table {table_name}")
-        min_max_statement = f"SELECT min({column}), max({column}) FROM {table_name};"
+        min_max_statement = f'SELECT min("{column}"), max("{column}") FROM "{table_name}";'
         async with self.alock:
             cursor = await run_in_threadpool(self._conn.execute, min_max_statement)
         min_value, max_value = [str(v) for v in cursor.fetchone()]
@@ -647,30 +655,15 @@ class HeavyDB:
         cardinality_threshold = config.column_top_k_cardinality_threshold
         high_cardinality_sample = config.column_top_k_high_cardinality_sample
 
-        # We need to ensure that column names that are reserved keywords are double quoted otherwise an error will occur
-        # Todo (todd): These are only a partial list of reserved keywords, ensure we have an exhaustive list
-        reserved_keywords = [
-            "LANGUAGE",
-            "RANK",
-            "RESULT",
-            "DATE",
-            "TIMESTAMP",
-            "LENGTH",
-            "YEAR",
-            "QUARTER",
-            "MONTH",
-            "WEEK",
-            "DAY",
-        ]
-        if column.upper() in reserved_keywords:
-            column = f'"{column}"'
+        # always quote all the columns
+        column = f'"{column}"'
         # check to see if the column is low cardinality
         # fetch top (threshold + 1)
         # if there are < (threshold + 1) values, it's low cardinality and we can return all of them
         # if there are >= (threshold + 1) values, it's high cardinality and we need to sample the top high_cardinality_sample
         """Get the top k values for a column."""
         self.logger.debug(f"Getting top k values for column {column} in table {table}")
-        top_k_statement = f"SELECT {column}, COUNT(*) as cnt FROM {table} WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {cardinality_threshold + 1};"
+        top_k_statement = f'SELECT {column}, COUNT(*) as cnt FROM "{table}" WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {cardinality_threshold + 1};'
         async with self.alock:
             cursor = await run_in_threadpool(self._conn.execute, top_k_statement)
         top_k_res: list[str] = [str(v[0]) for v in cursor.fetchall()]
@@ -692,9 +685,9 @@ class HeavyDB:
         self.logger.debug(f"Getting columns for table {table}")
         async with self.alock:
             try:
-                table_details = await run_in_threadpool(self._conn.get_table_details, table)
+                column_details = await run_in_threadpool(self._conn.get_column_details, table)
                 self.logger.debug(f"Got columns for table {table}")
-                return table_details
+                return column_details
             except Exception as e:
                 raise e
 
@@ -717,7 +710,7 @@ class HeavyDB:
 
         # check for any diff in current schema and cached schema
         # if yes then return True else return False
-        current_schema = await self._aget_raw_table_schema(table)
+        current_schema = await self._aget_raw_table_schema_from_thrift(table)
         if cached_schema == current_schema:
             self.logger.debug(f"Table {table} schema unchanged.")
             return False
@@ -756,12 +749,12 @@ class HeavyDB:
 
     @alru_cache(
         maxsize=32, ttl=10
-    )  # internal caches are used since this method gets called atleast 2 times in a single request
+    )  # [Obselete] internal caches are used since this method gets called atleast 2 times in a single request
     async def _aget_raw_table_schema(self, table: str) -> str:
         """
         Gets the table schema from db only.
         """
-        create_command = f"SHOW CREATE TABLE {table};"
+        create_command = f'SHOW CREATE TABLE "{table}";'
 
         async with self.alock:
             cursor = await run_in_threadpool(self._conn.execute, create_command)
@@ -770,10 +763,71 @@ class HeavyDB:
         table_schema = re.sub(r" ENCODING .*\)([,\)])", r"\1", table_schema)  # type: ignore
         table_schema = re.sub(r",\n.*SHARED DICTIONARY.*REFERENCES.*\([A-Za-z0-9_]*\)", "", table_schema)
         table_schema = re.sub(r"\n", "", table_schema)
+        table_schema = re.sub(r"\( +", "(", table_schema)
+        table_schema = re.sub(r", +", ", ", table_schema)
         if "WITH (" in table_schema:
             table_schema = table_schema[: table_schema.index("WITH (")]
 
         return table_schema
+
+    async def _aget_table_custom_details(self, table: str) -> CustomTableDetails:
+        """
+        Return custom details of a heavyDB table.
+        """
+        async with self.alock:
+            table_details = await run_in_threadpool(self._conn.get_table_details, table)
+        table_comment = table_details.comment or ""
+        columns: list[ColumnDetails] = _extract_column_details(table_details.row_desc)
+        column_name_comments_mapping = {x.col_name: x.comment or "" for x in table_details.row_desc}
+        custom_columns = [
+            CustomColumnDetails(
+                name=f'"{col.name}"' if col.name.upper() in DB_KEYWORDS else col.name,
+                type="TEXT" if col.type == "STR" else col.type,
+                comment=column_name_comments_mapping[col.name],
+                is_array=col.is_array,
+                encoding_str=col.encoding if (col.type == "STR" and col.encoding == "NONE") else "",
+            )
+            for col in columns
+        ]
+        return CustomTableDetails(name=table, columns=custom_columns, comment=table_comment)
+
+    @alru_cache(maxsize=32, ttl=10)
+    async def _aget_raw_table_schema_from_thrift(self, table: str) -> str:
+        """
+        Method used to form table_schema from `get_table_details` thrift endpoint.
+        """
+        table_details: CustomTableDetails = await self._aget_table_custom_details(table)
+        table_name = f'"{table_details.name}"' if table_details.name.upper() in DB_KEYWORDS else f"{table_details.name}"
+        schema_stmt = (
+            "CREATE TABLE {table_name} /* {table_comment} */ (\n{column_details});"
+            if table_details.comment
+            else "CREATE TABLE {table_name} {table_comment}(\n{column_details});"
+        )
+
+        def format_column(column: CustomColumnDetails) -> str:
+            """
+            Formats column for prompt.
+            """
+            parts = [column.name]
+            if column.is_array:
+                parts.append(f"{column.type}[]")
+            else:
+                parts.append(column.type)
+            encoding = column.encoding_str
+            if encoding:
+                parts.append(f"ENCODING {encoding}")
+
+            comment = f"/* {column.comment} */" if column.comment else ""
+            if comment:
+                parts.append(comment)
+
+            return " ".join(parts)
+
+        return schema_stmt.format(
+            table_name=table_name,
+            table_comment=table_details.comment or "",
+            column_details=",\n".join([format_column(x) for x in table_details.columns]),
+        )
 
     async def aget_table_schema(self, table: str) -> str:
         """
@@ -786,7 +840,9 @@ class HeavyDB:
             self.logger.debug(f"Got schema for table {table} from cache")
             return cached_value
         # Get the schema of a table from db
-        table_schema = await self._aget_raw_table_schema(table)
+        # table_schema = await self._aget_raw_table_schema(table)
+        # Get table schema from thrift endpoint
+        table_schema = await self._aget_raw_table_schema_from_thrift(table)
         self.table_schema_cache.put(cache_key, table_schema)
         self.logger.debug(f"Got schema for table {table}")
 
@@ -803,7 +859,7 @@ class HeavyDB:
             self.logger.debug(f"Got sample rows for table {table_name} from cache")
             return cached_value
         # build the select command
-        command = f"SELECT * FROM {table_name} LIMIT {self._sample_rows_in_table_info}"
+        command = f'SELECT * FROM "{table_name}" LIMIT {self._sample_rows_in_table_info};'
 
         # save the columns in string format
         columns_str = ",".join([col.name for col in await self.aget_table_columns(table_name)])
@@ -834,7 +890,7 @@ class HeavyDB:
             self.logger.debug(f"Got total row count of table {table_name} from cache")
             return cached_value
         # build the select command
-        command = f"SELECT COUNT(*) FROM {table_name}"
+        command = f'SELECT COUNT(*) FROM "{table_name}"'
 
         # get the sample rows
         async with self.alock:

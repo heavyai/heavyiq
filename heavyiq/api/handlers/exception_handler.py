@@ -10,7 +10,12 @@ from starlette.responses import JSONResponse
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
 
 from heavyiq.api.models import ErrorResponse
-from heavyiq.langchain.exceptions import GenerateTableMetadataException, NLtoAnswerException, NLtoSQLException
+from heavyiq.langchain.exceptions import (
+    GenerateTableMetadataException,
+    NLtoAnswerException,
+    NLtoSQLException,
+    NLtoTableException,
+)
 from heavyiq.logging_utils import get_heavyiq_logger
 
 
@@ -26,6 +31,9 @@ def log_exception(func: Callable) -> Callable:
     @wraps(func)
     async def wrapper(request: Request, exc: Exception) -> Response:
         logger = get_heavyiq_logger()
+        import traceback
+
+        print(traceback.format_exc())
         await run_in_threadpool(logger.exception, f"Exception Occured: {exc}")
         result = await func(request, exc)
         return result
@@ -85,7 +93,7 @@ async def attribute_error_handler(request: Request, exc: Exception) -> Response:
 async def nl_to_sql_exception_handler(request: Request, exc: NLtoSQLException) -> Response:
     return JSONResponse(
         status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-        content=jsonable_encoder(_build_error_response("NLtoSQLException", exc.message or "")),
+        content=jsonable_encoder(ErrorResponse(error=str(exc))),
     )
 
 
@@ -93,7 +101,7 @@ async def nl_to_sql_exception_handler(request: Request, exc: NLtoSQLException) -
 async def nl_to_answer_exception_handler(request: Request, exc: NLtoAnswerException) -> Response:
     return JSONResponse(
         status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-        content=jsonable_encoder(_build_error_response(exc.__class__.__name__, exc.message or "")),
+        content=jsonable_encoder(ErrorResponse(error=str(exc))),
     )
 
 
@@ -101,5 +109,13 @@ async def nl_to_answer_exception_handler(request: Request, exc: NLtoAnswerExcept
 async def generate_table_metadata_exception_handler(request: Request, exc: GenerateTableMetadataException) -> Response:
     return JSONResponse(
         status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-        content=jsonable_encoder(_build_error_response(exc.__class__.__name__, exc.message or "")),
+        content=jsonable_encoder(ErrorResponse(error=str(exc))),
+    )
+
+
+@log_exception
+async def nl_to_tables_exception_handler(request: Request, exc: NLtoTableException) -> Response:
+    return JSONResponse(
+        status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+        content=jsonable_encoder(ErrorResponse(error=str(exc))),
     )

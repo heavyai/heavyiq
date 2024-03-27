@@ -28,8 +28,8 @@
     "**/__pycache__": true,
     "**/.pytest_cache": true,
     "**/.mypy_cache": true,
-    "**/venv": true
+    "**/*venv": true
   },
-  "python.defaultInterpreterPath": "${workspaceFolder}/venv/bin/python",
+  "python.defaultInterpreterPath": "${workspaceFolder}/lvenv/bin/python",
   "autoDocstring.docstringFormat": "google-notypes"
 }

@@ -1,8 +1,10 @@
 import os
-import pytest
 import time
 from unittest.mock import patch
+
+import pytest
 from fastapi.testclient import TestClient
+
 from heavyiq.config import get_config
 
 
@@ -19,6 +21,11 @@ def pytest_configure(config):
     CONFIG_FILE = config.getoption("--config-path")
 
 
+@pytest.fixture(scope="package")
+def anyio_backend():
+    return "asyncio"
+
+
 @pytest.fixture(scope="session")
 def config_file_path(pytestconfig):
     """
@@ -32,7 +39,7 @@ def config_file_path(pytestconfig):
     return config_path
 
 
-@pytest.fixture(scope="package")
+@pytest.fixture(scope="package", autouse=True)
 def heavyiq_config(config_file_path):
     """
     Fixture that supposed to return HeavyIQConfig by reading the config from passed config_file_path fixture..

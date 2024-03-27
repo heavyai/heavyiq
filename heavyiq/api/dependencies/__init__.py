@@ -8,6 +8,7 @@ from heavyiq.api.models import (
     QueryRequest,
     QuestionRequest,
     TablesRequest,
+    TablesToQuestionsRequest,
 )
 from heavyiq.langchain import HeavyDB
 
@@ -71,3 +72,12 @@ async def valid_auto_question_db_session(
     Dependency where the injected handler function gets a tuple of auto question request and db objects.
     """
     return request, await HeavyDB.from_session_async(request.session_id)
+
+
+async def valid_tables_to_questions_db_session(
+    request: TablesToQuestionsRequest = Body(...),
+) -> tuple[TablesToQuestionsRequest, HeavyDB]:
+    """
+    Dependency where the injected handler function gets a tuple of query request and db objects.
+    """
+    return request, await HeavyDB.from_session_async(request.session_id, include_tables=request.tables)

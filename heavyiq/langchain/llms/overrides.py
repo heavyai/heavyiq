@@ -18,5 +18,5 @@ class OverrideVLLMOpenAI(VLLMOpenAI):
         config = get_config()
         invocation_params = super()._invocation_params  # type: ignore
         if config.heavylm_api_key:
-            invocation_params["headers"] = {"Authorization": f"Bearer {config.heavylm_api_key}"}
+            invocation_params["extra_headers"] = {"Authorization": f"Bearer {config.heavylm_api_key}"}
         return invocation_params

@@ -28,3 +28,6 @@ eval/results/*.csv
 *.log
 testdb/
 hf_models/
+
+pyheavydb.whl.version
+pyheavydb*.whl

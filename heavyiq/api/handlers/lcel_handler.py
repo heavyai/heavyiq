@@ -1,6 +1,7 @@
 from typing import NoReturn
 
 from heavyiq.api.handlers.decorators import with_db, with_feedback_id
+from heavyiq.api.handlers.utils import ChainOutputWithLogprobs, ainvoke_logprobs
 from heavyiq.api.models import (
     AnswerResponse,
     AutoQueryResponse,
@@ -8,9 +9,10 @@ from heavyiq.api.models import (
     QueryResponse,
     QuestionResponse,
     TablesResponse,
+    TablesToQuestionsResponse,
 )
 from heavyiq.config import get_config
-from heavyiq.langchain.exceptions import NLtoAnswerException, NLtoSQLException
+from heavyiq.langchain.exceptions import NLtoAnswerException, NLtoSQLException, NLtoTableException
 
 
 @with_db
@@ -21,16 +23,24 @@ async def handle_lcel_query_request(request_dict: dict, config: dict | None = No
     """
     from heavyiq.lcel.chains import sql_chain
 
-    max_retries = get_config().max_retries_nl_to_sql
+    global_config = get_config()
 
-    out = await sql_chain.ainvoke(request_dict, config=config)  # type: ignore
+    max_retries, is_logprobs_enabled, logprobs = global_config.max_retries_nl_to_sql, global_config.enable_logprobs, {}
+
+    if is_logprobs_enabled:
+        output_with_logprobs = await ainvoke_logprobs(sql_chain, request_dict, config=config)  # type: ignore
+        out, logprobs = output_with_logprobs.output, output_with_logprobs.logprobs
+
+    else:
+        out = await sql_chain.ainvoke(request_dict, config=config)  # type: ignore
+
     if out["error"]:
         raise NLtoSQLException(
             f"Language model failed to generate a valid SQL query after {max_retries} tries.",
             failed_sql=out["query"],
         )
 
-    return QueryResponse(sql=out["query"], sql_complexity=out["sql_complexity"], feedback_id="", logprobs={})
+    return QueryResponse(sql=out["query"], sql_complexity=out["sql_complexity"], feedback_id="", logprobs=logprobs)
 
 
 @with_db
@@ -46,6 +56,10 @@ async def handle_lcel_auto_query_request(
     max_retries = get_config().max_retries_nl_to_sql
 
     out = await auto_sql_chain.ainvoke(request_dict, config=config)  # type: ignore
+
+    if not out["tables"]:
+        raise NLtoTableException("No relevant tables found to answer question.")
+
     if out["error"]:
         raise NLtoSQLException(
             f"Language model failed to generate a valid SQL query after {max_retries} tries.", failed_sql=out["query"]
@@ -115,6 +129,9 @@ async def handle_lcel_auto_question_request(
     max_retries = get_config().max_retries_nl_to_sql
 
     result = await auto_answer_chain.ainvoke(request_dict, config=config)  # type: ignore
+    if not result["tables"]:
+        raise NLtoTableException("No relevant tables found to answer question.")
+
     fail_reason = result["fail_reason"]
 
     if fail_reason:
@@ -181,3 +198,35 @@ async def handle_lcel_tables_request(request_dict: dict, config: dict | None = N
 
     result = await table_chain.ainvoke(request_dict, config=config)  # type: ignore
     return TablesResponse(tables=result)
+
+
+@with_db
+@with_feedback_id
+async def handle_lcel_tables_to_questions_request(
+    request_dict: dict, config: dict | None = None
+) -> TablesToQuestionsResponse:
+    """
+    Async LCEL handler for /tables-to-questions request (ie, Tables to NL questions).
+
+    Args:
+        request_dict: Input dict
+        config: Runnable config dict. Defaults to None.
+
+    Returns:
+        TablesToQuestionsResponse
+    """
+    from heavyiq.lcel.chains import question_chain
+
+    config = config or {}
+    configurable = config.pop("configurable", {})
+    configurable.update(
+        {
+            "llm_temperature": request_dict["temperature"],
+            "llm_n": request_dict["n"],
+            "llm_max_tokens": request_dict["max_tokens"],
+        }
+    )
+
+    config = {**config, "configurable": configurable}
+    questions = await question_chain.ainvoke(request_dict, config=config)  # type: ignore
+    return TablesToQuestionsResponse(questions=questions)

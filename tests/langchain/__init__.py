@@ -1,12 +1,13 @@
-from typing import Optional, Any
 import functools
-import pytest
+from typing import Any, Optional
 from unittest.mock import patch
-from openai.openai_object import OpenAIObject
-from langchain.schema import BaseMessage, LLMResult, ChatGeneration, AIMessage, ChatResult, Generation, PromptValue
-from langchain.callbacks.manager import CallbackManagerForLLMRun
+
+import pytest
 from langchain.callbacks.base import Callbacks
-from langchain.chat_models import ChatOpenAI
+from langchain.callbacks.manager import CallbackManagerForLLMRun
+from langchain.schema import AIMessage, BaseMessage, ChatGeneration, ChatResult, Generation, LLMResult, PromptValue
+from langchain_openai.chat_models import ChatOpenAI
+
 from heavyiq.langchain.llms.overrides import OverrideOpenAI
 
 
@@ -17,7 +18,7 @@ class FakeChatOpenAI(ChatOpenAI):
     Uses: Mainly used to test NLtoSQL chain.
     """
 
-    generation_info = {"finish_reason": "stop", "logprobs": OpenAIObject.construct_from({"logprobs_token": []})}
+    generation_info = {"finish_reason": "stop"}
     content = "SELECT SUM(POPULATION) AS total_population\nFROM usa_states"
 
     @property

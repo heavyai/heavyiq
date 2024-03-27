@@ -13,7 +13,7 @@ class QueryRequest(BaseModel):
     session_id: str = Field(..., max_length=32, min_length=32, description="Valid HeavyDB Session ID")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "examples": [
                 {
                     "session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
@@ -37,7 +37,7 @@ class QueryResponse(BaseModel):
     logprobs: dict = Field(..., description="Log probs for each generated token.")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "examples": [
                 {
                     "sql": "SELECT COUNT(*) AS num_states, STATE_NAME FROM usa_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;",
@@ -381,7 +381,7 @@ class AutoQueryRequest(BaseModel):
     )
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "examples": [
                 {
                     "session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
@@ -400,7 +400,7 @@ class AutoQueryResponse(QueryResponse):
     tables: list[str] = Field(..., min_items=1, description="List of found table names.")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "examples": [
                 {
                     "sql": "SELECT COUNT(*) AS num_states, STATE_NAME FROM usa_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;",

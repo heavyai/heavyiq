@@ -1,13 +1,13 @@
-from concurrent.futures import ThreadPoolExecutor
 import csv
-from functools import partial
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from typing import Optional
 
-from langchain.callbacks import get_openai_callback
-from langchain.chat_models import ChatOpenAI
-from langchain.schema import HumanMessage, SystemMessage, AIMessage
+from langchain.schema import AIMessage, HumanMessage, SystemMessage
+from langchain_community.callbacks.manager import get_openai_callback
+from langchain_openai.chat_models import ChatOpenAI
 
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB

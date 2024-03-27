@@ -1,9 +1,10 @@
+# from pydantic import BaseModel, Extra, Field
+from langchain.pydantic_v1 import BaseModel, Extra, Field
 from langchain.tools import BaseTool
-from pydantic import BaseModel, Extra, Field
 
-from heavyiq.langchain.index import get_heavydb_index
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.chains import AskHeavyDBMetadataIndexChain
+from heavyiq.langchain.index import get_heavydb_index
 
 
 class BaseHeavyDBTool(BaseModel):

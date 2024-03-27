@@ -1,7 +1,8 @@
 import pytest
+
 from heavyiq.langchain import HeavyDB
-from heavyiq.langchain.logging import log_chain_call_async, log_chain_call
 from heavyiq.langchain.chains import NLtoSQLChatChain
+from heavyiq.langchain.logging import log_chain_call, log_chain_call_async
 from tests.langchain import FakeChatOpenAI
 
 
@@ -16,7 +17,7 @@ async def test_nl_to_sql_chat_async_chain_should_pass(mock_heavy_db: HeavyDB, fa
     chain_output = res[chain.output_key]
     logprobs_output = res[chain.output_logprobs_key]
     assert chain_output == "SELECT SUM(POPULATION) AS total_population\nFROM usa_states;"
-    assert logprobs_output == {"logprobs_token": []}
+    assert logprobs_output == {}
 
 
 def test_nl_to_sql_chat_sync_chain_should_pass(mock_heavy_db: HeavyDB, fake_chat_llm: FakeChatOpenAI):
