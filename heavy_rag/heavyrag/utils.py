@@ -16,8 +16,7 @@ def get_existing_tables_from_collection(collection: Any, dbname: str) -> list[st
     """
     Gets the existing tables from ChromaDB collection.
     """
-    logger.debug("Getting existing tables from the collection...")
-    print(dbname)
+    logger.debug(f'Getting existing tables from the "{dbname}" collection...')
     filters = MetadataFilters(
         filters=[
             MetadataFilter(key="database", operator=FilterOperator.EQ, value=dbname),

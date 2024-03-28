@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from heavyrag.router import router
 from llama_index.core import Settings as IndexSettings
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from heavyrag.settings import Settings
+from heavyrag.settings import settings, Settings
 
 os.environ["ANONYMIZED_TELEMETRY"] = "false"
 
@@ -33,7 +33,6 @@ def create_app(settings: Settings) -> FastAPI:
 
 if __name__ == "__main__":
     # Initialize your settings
-    settings = Settings()
     # Create FastAPI app
     app = create_app(settings)
     # Run the FastAPI app using Uvicorn server

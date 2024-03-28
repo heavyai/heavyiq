@@ -21,11 +21,11 @@ class RAGSettings(BaseSettings):
     """
 
     persistant_storage_dir: str = Field(
-        default="index-storage",
+        default="data/index-storage",
         description="Local directory for storage index related data.",
     )
     persistant_collection_dir: str = Field(
-        default="chromadb", description="Local directory where chormadb resides."
+        default="data/chromadb", description="Local directory where chormadb resides."
     )
     hf_embedding_model: str = Field(
         default="BAAI/bge-base-en-v1.5", description="HuggingFace Embedding model name."
@@ -47,3 +47,6 @@ class HeavyDBSettings(BaseSettings):
 
 class Settings(ServerSettings, RAGSettings, HeavyDBSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+
+settings = Settings()

@@ -1,7 +1,7 @@
 import logging
 import os
 
-from heavyrag.ingest import get_vectorstore, reload_index
+from heavyrag.ingest import sync_index
 from heavyrag.read import HeavyDBReader
 from heavyrag.utils import get_existing_tables_from_collection
 from llama_index.core import StorageContext, VectorStoreIndex, load_index_from_storage
@@ -12,7 +12,7 @@ from llama_index.core.vector_stores.types import (
     MetadataFilter,
     MetadataFilters,
 )
-from heavyrag.settings import Settings
+from heavyrag.settings import settings
 
 logger = logging.getLogger(__name__)
 # dict mapping of dbname and bool to represent whether an index building is in progress for
@@ -26,83 +26,35 @@ def get_heavydb_reader(
     """
     Gets HeavyDB reader object.
     """
-    settings = Settings()
     reader = HeavyDBReader(
-        host=settings.heavydb_host,
-        port=settings.heavydb_port,
+        host=dbhost or settings.heavydb_host,
+        port=dbport or settings.heavydb_port,
         protocol=settings.heavydb_protocol,
         sessionid=sessionid,
     )
     return reader
 
 
-def get_or_create_index(
-    sessionid: str | None = None, reader: HeavyDBReader | None = None
-) -> VectorStoreIndex:
+def get_or_sync_index(reader: HeavyDBReader) -> VectorStoreIndex:
     """
-    Get or create VectorStore Index.
-    if not exists, create a new one by querying the heavydb for all the table schemas and then load it to the index.
-    if exists, then load only the missing tables into the index.
+    Get or create or update VectorStore Index.
+    If not exists, create a new one by querying the heavydb for all the table schemas and then load it into the index.
+    If exists, then load only the missing tables into the index.
     """
-    settings = Settings()
-    if not reader:
-        if not sessionid:
-            raise ValueError("sessionid needs to be passed!")
-        reader = HeavyDBReader(
-            host=settings.heavydb_host,
-            port=settings.heavydb_port,
-            protocol=settings.heavydb_protocol,
-            sessionid=sessionid,
-        )
     conn_dbname = reader.database_name
     if conn_dbname in INDEX_ON_PROGRESS:
         raise ValueError(
             f"Index building in-progress for {conn_dbname} database, please wait."
         )
 
-    if not os.path.exists(settings.persistant_storage_dir):
-        logger.info("Creating new index...")
-        try:
-            INDEX_ON_PROGRESS[conn_dbname] = True
-            index = reload_index(reader, settings=settings)
-        except Exception as e:
-            raise e
-        finally:
-            INDEX_ON_PROGRESS.pop(conn_dbname, None)
-        logger.info("Index created successfully.")
-    else:
-        logger.info("Index already exists, so loading it from the cache dir.")
-        index = load_index_from_storage(
-            StorageContext.from_defaults(
-                persist_dir=settings.persistant_storage_dir,
-                vector_store=get_vectorstore(
-                    settings.persistant_collection_dir,
-                    collection_name=settings.collection_name,
-                ),
-            ),
-            embed_model=HuggingFaceEmbedding(model_name=settings.hf_embedding_model),
-            # show_progress=True
-        )  # type: ignore
-        # grab the chromadb collection and then search for existing tables
-        existing_tables = get_existing_tables_from_collection(
-            index._vector_store.client, conn_dbname
-        )
-        if sorted(reader.tables) != sorted(existing_tables):
-            # reload index in-case of missing tables
-            logger.info(
-                "No tables or Some tables not found in the index, triggering a reload of the index."
-            )
-            try:
-                INDEX_ON_PROGRESS[conn_dbname] = True
-                index = reload_index(
-                    reader, settings=settings, exclude_tables=existing_tables
-                )
-            except Exception as e:
-                raise e
-            finally:
-                INDEX_ON_PROGRESS.pop(conn_dbname, None)
-            logger.info("Index reloaded successfully.")
-
+    try:
+        INDEX_ON_PROGRESS[conn_dbname] = True
+        index = sync_index(reader)
+    except Exception as e:
+        raise e
+    finally:
+        INDEX_ON_PROGRESS.pop(conn_dbname, None)
+    logger.info("Index synced successfully.")
     return index
 
 
@@ -151,6 +103,6 @@ def ask(sessionid: str, question: str, n: int = 2) -> list[str]:
         A list of matched table names.
     """
     dbreader = get_heavydb_reader(sessionid)
-    index = get_or_create_index(reader=dbreader)
+    index = get_or_sync_index(reader=dbreader)
     tables_with_score = retrieve_index(index, question, dbname=dbreader.database_name)
     return list(tables_with_score.keys())[:n]
