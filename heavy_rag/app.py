@@ -15,7 +15,9 @@ def create_app(settings: Settings) -> FastAPI:
     # Create FastAPI app instance
     app = FastAPI(title=settings.app_name)
     # set the embed model globally
-    IndexSettings.embed_model = HuggingFaceEmbedding(model_name=settings.hf_embedding_model)
+    IndexSettings.embed_model = HuggingFaceEmbedding(
+        model_name=settings.hf_embedding_model
+    )
 
     # Configure logging
     log_level = logging.DEBUG if settings.debug else logging.INFO

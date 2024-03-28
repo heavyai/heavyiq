@@ -69,7 +69,9 @@ class HeavyDBReader(BaseReader):
 
     @cached_property
     def database_name(self):
-        return self.connection._client.get_session_info(self.connection._session).database
+        return self.connection._client.get_session_info(
+            self.connection._session
+        ).database
 
     @classmethod
     def _connect_with_timeout(
@@ -98,7 +100,16 @@ class HeavyDBReader(BaseReader):
             bool: True if the SQL statement is destructive, False if it is non-destructive.
         """
         # Check for destructive SQL statements
-        destructive_statements = {"INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "TRUNCATE", "REPLACE", "CREATE"}
+        destructive_statements = {
+            "INSERT",
+            "UPDATE",
+            "DELETE",
+            "DROP",
+            "ALTER",
+            "TRUNCATE",
+            "REPLACE",
+            "CREATE",
+        }
 
         # Convert the SQL statement to uppercase and split it by whitespace
         sql_parts = sql.strip().upper().split()
@@ -133,11 +144,11 @@ class HeavyDBReader(BaseReader):
         """
         return Document(
             text=table_comment,
-            metadata={"table": table_name, "database": self.dbname},
+            metadata={"table": table_name, "database": self.database_name},
             metadata_seperator="::",
             metadata_template="{key}=>{value}",
             text_template="Metadata: {metadata_str}\n-----\nContent:\n{content}",
-        ) # type: ignore
+        )  # type: ignore
 
     def read_table_schema(self, table_name: str) -> str | None:
         """
@@ -152,7 +163,9 @@ class HeavyDBReader(BaseReader):
     def tables(self) -> list[str]:
         return self.connection.get_tables()
 
-    def read_table_schemas(self, exclude_tables: Iterable[str] | None = None) -> list[Document]:
+    def read_table_schemas(
+        self, exclude_tables: Iterable[str] | None = None
+    ) -> list[Document]:
         """
         Read schemas from multiple tables and generate documents based on them.
         If exclude_tables was given, then it generates documents only for the missing tables.
@@ -167,11 +180,16 @@ class HeavyDBReader(BaseReader):
         documents = []
         with ThreadPoolExecutor() as executor:
             # Submit tasks to the executor
-            future_to_task = {executor.submit(self.read_table_schema, table): table for table in tables}
+            future_to_task = {
+                executor.submit(self.read_table_schema, table): table
+                for table in tables
+            }
             with tqdm(desc="Fetching table schemas", total=len(future_to_task)) as pbar:
                 for future in as_completed(future_to_task):
                     task_result = future.result()
-                    documents.append(self._create_table_document(future_to_task[future], task_result))
+                    documents.append(
+                        self._create_table_document(future_to_task[future], task_result)
+                    )
                     pbar.update(1)
 
         return documents

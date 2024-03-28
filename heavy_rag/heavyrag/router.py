@@ -19,5 +19,7 @@ def query(request: QueryRequest) -> dict:
     """
     dbreader = get_heavydb_reader(request.sessionid)
     index = get_or_create_index(reader=dbreader)
-    tables_with_score = retrieve_index(index, request.question, dbname=dbreader.connection._dbname)
+    tables_with_score = retrieve_index(
+        index, request.question, dbname=dbreader.database_name
+    )
     return tables_with_score

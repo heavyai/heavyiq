@@ -9,7 +9,9 @@ class ServerSettings(BaseSettings):
 
     host: str = Field(default="localhost", description="Listen address")
     port: int = Field(default=8006, description="Listen port")
-    app_name: str = Field(default="HeavyIQ RAG", description="RAG approach using llama-index")
+    app_name: str = Field(
+        default="HeavyIQ RAG", description="RAG approach using llama-index"
+    )
     debug: bool = Field(default=False, description="Run on debug mode or not.")
 
 
@@ -19,11 +21,18 @@ class RAGSettings(BaseSettings):
     """
 
     persistant_storage_dir: str = Field(
-        default="index-storage", description="Local directory for storage index related data."
+        default="index-storage",
+        description="Local directory for storage index related data.",
     )
-    persistant_collection_dir: str = Field(default="chromadb", description="Local directory where chormadb resides.")
-    hf_embedding_model: str = Field(default="BAAI/bge-base-en-v1.5", description="HuggingFace Embedding model name.")
-    collection_name: str = Field(default="iqrag", description="Name of the chromadb collection.")
+    persistant_collection_dir: str = Field(
+        default="chromadb", description="Local directory where chormadb resides."
+    )
+    hf_embedding_model: str = Field(
+        default="BAAI/bge-base-en-v1.5", description="HuggingFace Embedding model name."
+    )
+    collection_name: str = Field(
+        default="iqrag", description="Name of the chromadb collection."
+    )
 
 
 class HeavyDBSettings(BaseSettings):

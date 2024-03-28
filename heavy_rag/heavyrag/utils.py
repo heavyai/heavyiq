@@ -1,7 +1,12 @@
 import logging
 from typing import Any
 
-from llama_index.core.vector_stores.types import FilterCondition, FilterOperator, MetadataFilter, MetadataFilters
+from llama_index.core.vector_stores.types import (
+    FilterCondition,
+    FilterOperator,
+    MetadataFilter,
+    MetadataFilters,
+)
 from llama_index.vector_stores.chroma.base import _to_chroma_filter
 
 logger = logging.getLogger(__name__)
@@ -12,6 +17,7 @@ def get_existing_tables_from_collection(collection: Any, dbname: str) -> list[st
     Gets the existing tables from ChromaDB collection.
     """
     logger.debug("Getting existing tables from the collection...")
+    print(dbname)
     filters = MetadataFilters(
         filters=[
             MetadataFilter(key="database", operator=FilterOperator.EQ, value=dbname),
@@ -23,5 +29,5 @@ def get_existing_tables_from_collection(collection: Any, dbname: str) -> list[st
     query_result = collection.get(where=where, include=["metadatas"])
 
     tables = list(set([i["table"] for i in query_result["metadatas"]]))
-    logger.debug(f"{len(tables)} tables already exist in the vectorstore collection")
+    logger.debug(f"{len(tables)} tables already exists in the vectorstore collection")
     return tables
