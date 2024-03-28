@@ -87,10 +87,10 @@ def get_or_create_index(
         existing_tables = get_existing_tables_from_collection(
             index._vector_store.client, conn_dbname
         )
-        if existing_tables and (sorted(reader.tables) != sorted(existing_tables)):
+        if sorted(reader.tables) != sorted(existing_tables):
             # reload index in-case of missing tables
             logger.info(
-                "Some tables not found in the index, triggering a reload of the index."
+                "No tables or Some tables not found in the index, triggering a reload of the index."
             )
             try:
                 INDEX_ON_PROGRESS[conn_dbname] = True
