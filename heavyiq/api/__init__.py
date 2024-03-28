@@ -201,7 +201,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
                 if not license_edition:
                     continue
                 logger.info(f"Found HeavyAI license edition, license_type: {license_edition}")
-                if license_edition == "enterprise":
+                if license_edition == "free":
                     logger.info("Enabling langsmith telemetrics for free edition.")
                     done = enable_telemetrics_for_free_edition()
                     if done:
