@@ -1,5 +1,6 @@
 {
-  "add_prefix_space": false,
+  "add_bos_token": true,
+  "add_eos_token": false,
   "added_tokens_decoder": {
     "32000": {
       "content": "õ",
@@ -185,7 +186,7 @@
   "legacy": true,
   "model_max_length": 16384,
   "pad_token": "<｜end▁of▁sentence｜>",
-  "safetensors": false,
+  "padding_side": "left",
   "sep_token": "<｜end▁of▁sentence｜>",
   "sp_model_kwargs": {},
   "tokenizer_class": "LlamaTokenizer",
