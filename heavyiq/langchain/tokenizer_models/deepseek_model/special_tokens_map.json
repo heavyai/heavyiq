@@ -6,7 +6,13 @@
     "rstrip": false,
     "single_word": false
   },
-  "cls_token": "<｜end▁of▁sentence｜>",
+  "cls_token": {
+    "content": "<｜end▁of▁sentence｜>",
+    "lstrip": false,
+    "normalized": true,
+    "rstrip": false,
+    "single_word": false
+  },
   "eos_token": {
     "content": "<｜end▁of▁sentence｜>",
     "lstrip": false,
@@ -21,5 +27,11 @@
     "rstrip": false,
     "single_word": false
   },
-  "sep_token": "<｜end▁of▁sentence｜>"
+  "sep_token": {
+    "content": "<｜end▁of▁sentence｜>",
+    "lstrip": false,
+    "normalized": true,
+    "rstrip": false,
+    "single_word": false
+  }
 }
