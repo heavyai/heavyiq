@@ -1,18 +1,19 @@
 import logging
 import os
 
-from heavyrag.ingest import sync_index
-from heavyrag.read import HeavyDBReader
-from heavyrag.utils import get_existing_tables_from_collection
 from llama_index.core import StorageContext, VectorStoreIndex, load_index_from_storage
 from llama_index.core.schema import NodeWithScore
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.core.vector_stores.types import (
     FilterOperator,
     MetadataFilter,
     MetadataFilters,
 )
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+
+from heavyrag.ingest import sync_index
+from heavyrag.read import HeavyDBReader
 from heavyrag.settings import settings
+from heavyrag.utils import get_existing_tables_from_collection
 
 logger = logging.getLogger(__name__)
 # dict mapping of dbname and bool to represent whether an index building is in progress for

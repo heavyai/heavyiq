@@ -1,17 +1,26 @@
+from functools import lru_cache
+
 import chromadb
-from llama_index.core import VectorStoreIndex
+from chromadb.api.types import CollectionMetadata
 from chromadb.config import Settings as ConfigSettings
-from heavyrag.transform import TableSchemaSplitter
 from llama_index.core import VectorStoreIndex
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
+
 from heavyrag.settings import settings
-from functools import lru_cache
+from heavyrag.transform import TableSchemaSplitter
+
+# metadata relevant to collection types
+COLLECTION_TYPE_METADATA = {
+    "database": {"type": "database"},
+    "documents": {"type": "documents"},
+}
 
 
-@lru_cache
 def get_vectorstore(
-    persist_collection_dir: str, collection_name: str
+    persist_collection_dir: str,
+    collection_name: str,
+    metadata: CollectionMetadata | None = None,
 ) -> ChromaVectorStore:
     """
     Supposed to get the corresponding vectorstore.
@@ -22,23 +31,26 @@ def get_vectorstore(
         path=persist_collection_dir,
         settings=ConfigSettings(anonymized_telemetry=False, is_persistent=True),
     )
-    chroma_collection = chroma_client.get_or_create_collection(collection_name)
+    chroma_collection = chroma_client.get_or_create_collection(
+        collection_name, metadata=metadata
+    )
     # set up ChromaVectorStore
     return ChromaVectorStore.from_collection(chroma_collection)
 
 
-@lru_cache
 def get_hf_embeddings():
     return HuggingFaceEmbedding(model_name=settings.hf_embedding_model)
 
 
 @lru_cache
-def get_or_create_index():
+def get_or_create_index(collection_name: str | None = None):
     """
     Creates a new index from documents.
     """
     vector_store = get_vectorstore(
-        settings.persistant_collection_dir, settings.collection_name
+        settings.persistant_collection_dir,
+        collection_name or settings.collection_name,
+        metadata=COLLECTION_TYPE_METADATA["database"],
     )
     index = VectorStoreIndex.from_vector_store(
         vector_store=vector_store,

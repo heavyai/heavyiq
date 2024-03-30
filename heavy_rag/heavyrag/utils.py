@@ -1,6 +1,6 @@
 import logging
-from typing import Any
 
+from chromadb.api.models.Collection import Collection
 from llama_index.core.vector_stores.types import (
     FilterCondition,
     FilterOperator,
@@ -12,10 +12,11 @@ from llama_index.vector_stores.chroma.base import _to_chroma_filter
 logger = logging.getLogger(__name__)
 
 
-def get_existing_tables_from_collection(collection: Any, dbname: str) -> list[str]:
+def get_existing_tables_from_collection(collection: Collection) -> list[str]:
     """
     Gets the existing tables from ChromaDB collection.
     """
+    dbname = collection.name
     logger.debug(f'Getting existing tables from the "{dbname}" collection...')
     filters = MetadataFilters(
         filters=[
@@ -27,6 +28,26 @@ def get_existing_tables_from_collection(collection: Any, dbname: str) -> list[st
     where = _to_chroma_filter(filters)
     query_result = collection.get(where=where, include=["metadatas"])
 
-    tables = list(set([i["table"] for i in query_result["metadatas"]]))
+    tables: list[str] = list(set([i["table"] for i in query_result["metadatas"]]))  # type: ignore
     logger.debug(f"{len(tables)} tables already exists in the vectorstore collection")
     return tables
+
+
+def delete_table_nodes(collection: Collection, tables: list[str]):
+    """
+    Helps to delete all the nodes associated with a table from the chroma collection.
+    """
+    dbname = collection.name
+    filters = MetadataFilters(
+        filters=[
+            MetadataFilter(key="table", operator=FilterOperator.EQ, value=table)
+            for table in tables
+        ],
+        condition=FilterCondition.OR,
+    )
+
+    where = _to_chroma_filter(filters)
+    collection.delete(where=where)
+    logger.debug(
+        f'Deleted all nodes associated with the "{tables}" table from "{dbname}" collection...'
+    )
