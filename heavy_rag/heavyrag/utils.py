@@ -1,12 +1,7 @@
 import logging
 
 from chromadb.api.models.Collection import Collection
-from llama_index.core.vector_stores.types import (
-    FilterCondition,
-    FilterOperator,
-    MetadataFilter,
-    MetadataFilters,
-)
+from llama_index.core.vector_stores.types import FilterCondition, FilterOperator, MetadataFilter, MetadataFilters
 from llama_index.vector_stores.chroma.base import _to_chroma_filter
 
 logger = logging.getLogger(__name__)
@@ -39,15 +34,10 @@ def delete_table_nodes(collection: Collection, tables: list[str]):
     """
     dbname = collection.name
     filters = MetadataFilters(
-        filters=[
-            MetadataFilter(key="table", operator=FilterOperator.EQ, value=table)
-            for table in tables
-        ],
+        filters=[MetadataFilter(key="table", operator=FilterOperator.EQ, value=table) for table in tables],
         condition=FilterCondition.OR,
     )
 
     where = _to_chroma_filter(filters)
     collection.delete(where=where)
-    logger.debug(
-        f'Deleted all nodes associated with the "{tables}" table from "{dbname}" collection...'
-    )
+    logger.debug(f'Deleted all nodes associated with the "{tables}" table from "{dbname}" collection...')

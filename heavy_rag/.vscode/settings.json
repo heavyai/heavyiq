@@ -16,7 +16,9 @@
   "mypy-type-checker.cwd": "${workspaceFolder}/heavyrag",
   "[python]": {
     "editor.defaultFormatter": "ms-python.black-formatter",
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": { "source.organizeImports": "always" }
   },
-  "black-formatter.cwd": "${workspaceFolder}/heavyrag"
+  "black-formatter.cwd": "${workspaceFolder}/heavyrag",
+  "black-formatter.args": ["--line-length", "120"]
 }
