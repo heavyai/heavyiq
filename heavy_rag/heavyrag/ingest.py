@@ -30,3 +30,18 @@ def sync_index(reader: HeavyDBReader) -> VectorStoreIndex:
             index.insert(doc)
 
     return index
+
+
+def sync_index_with_table_documents(reader: HeavyDBReader, table: str | list[str]) -> VectorStoreIndex:
+    """
+    Delete and re-create index nodes/documents w.r.t the particular table.
+    """
+    tables = table if isinstance(table, list) else [table]
+    index = get_or_create_index(reader.database_name)
+    chroma_collection = index._vector_store.client
+    # delete the documents/nodes associated with a particular table
+    delete_table_nodes(chroma_collection, tables)
+    documents = reader.read_table_schemas(include_tables=tables)
+    for doc in documents:
+        index.insert(doc)
+    return index

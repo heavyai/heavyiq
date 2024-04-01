@@ -161,14 +161,21 @@ class HeavyDBReader(BaseReader):
     def tables(self) -> list[str]:
         return self.connection.get_tables()
 
-    def read_table_schemas(self, exclude_tables: Iterable[str] | None = None) -> list[Document]:
+    def read_table_schemas(
+        self, exclude_tables: Iterable[str] | None = None, include_tables: Iterable[str] | None = None
+    ) -> list[Document]:
         """
         Read schemas from multiple tables and generate documents based on them.
         If exclude_tables was given, then it generates documents only for the missing tables.
         """
-        tables = set(self.tables)
+        if exclude_tables and include_tables:
+            raise ValueError("Only one of 'exclude_tables' or 'include_tables' should be passed, not both.")
+
+        tables: Iterable[str] = self.tables
         if exclude_tables:
-            tables = tables - set(exclude_tables)
+            tables = set(tables) - set(exclude_tables)
+        elif include_tables:
+            tables = include_tables
 
         if not tables:
             return []
