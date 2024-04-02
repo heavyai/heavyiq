@@ -1,3 +1,4 @@
+import math
 from typing import NamedTuple, final
 
 from langchain.schema.runnable import Runnable, RunnableConfig
@@ -34,3 +35,9 @@ async def ainvoke_logprobs(
                         pass
 
     return ChainOutputWithLogprobs(output=final_output, logprobs=logprobs)
+
+
+def compute_total_probability(log_probs: list) -> float:
+    # Convert each log probability to a probability and multiply them
+    total_prob = math.exp(sum(log_probs))
+    return total_prob

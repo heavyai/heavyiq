@@ -35,6 +35,7 @@ class QueryResponse(BaseModel):
         ..., description="A unique identifier for this request that can be used to submit feedback about the response"
     )
     logprobs: dict = Field(..., description="Log probs for each generated token.")
+    total_score: float | None = Field(default=None, description="Total probablity score of all the Logprobs data.")
 
     class Config:
         json_schema_extra = {
@@ -363,6 +364,7 @@ class QueryResponse(BaseModel):
                             },
                         ],
                     },
+                    "total_score": 0.13983904530851943,
                 }
             ]
         }
