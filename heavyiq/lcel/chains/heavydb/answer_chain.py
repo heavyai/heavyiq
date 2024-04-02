@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Any, TypedDict
 
 from langchain.schema.output_parser import StrOutputParser
@@ -73,9 +74,9 @@ async def change_format(inputs: dict) -> Any:
         sql_complexity=inputs["sql_complexity"],
         results=str(inputs["sql_result"]),
         answer=inputs["answer"],
-        fail_reason=""
-        if inputs["do_forward"]
-        else output_fail_reasons["max_size_reached"],  # Fix this for more than 1 fail reasons
+        fail_reason=(
+            "" if inputs["do_forward"] else output_fail_reasons["max_size_reached"]
+        ),  # Fix this for more than 1 fail reasons
     ).dict()
 
 
@@ -91,6 +92,34 @@ async def change_format_for_error(inputs: dict) -> Any:
         answer="",
         fail_reason=sql_chain_output["error"],
     ).dict()
+
+
+async def derive_column_metadata_from_sql(inputs: dict) -> str:
+    """
+    Helps to derive column metadata from sql query.
+    """
+    sql_cmd = inputs["sql_cmd"]
+    db = await get_db(inputs["session_id"])
+    columns_mapping: dict = await db.aretrieve_columns_from_query(sql_cmd)
+    comments = []
+    # extracted columns
+    extracted_table_column_mapping = defaultdict(list)
+
+    for detail in columns_mapping.values():
+        _, table, column = detail
+        extracted_table_column_mapping[table].append(column)
+
+    for table, columns in extracted_table_column_mapping.items():
+        table_details = await db._aget_table_custom_details(table)
+        for col in table_details.columns:
+            col_name = col.name.strip('"')
+            if col_name in columns:
+                comment = f" /* {col.comment} */" if col.comment else ""
+                comments.append(f" - {table}.{col_name}{comment}")
+
+    summarize = "\n".join(comments)
+
+    return summarize
 
 
 generate_sql_resultset_step = RunnablePassthrough.assign(
@@ -112,7 +141,11 @@ should_forward_resultset_to_llm_step = RunnablePassthrough.assign(
     }
 )
 
-sql_to_answer_step = (sql_to_answer_prompt_rbl | sql_to_answer_llm_rbl | StrOutputParser()).with_config(
+derive_column_metadata_step = RunnablePassthrough.assign(columns=RunnableLambda(derive_column_metadata_from_sql))
+
+sql_to_answer_step = (
+    derive_column_metadata_step | sql_to_answer_prompt_rbl | sql_to_answer_llm_rbl | StrOutputParser()
+).with_config(
     config={
         "run_name": "Predict Answer",
         "tags": ["intermediate-step"],
