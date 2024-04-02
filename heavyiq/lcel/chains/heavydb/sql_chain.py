@@ -21,6 +21,9 @@ from heavyiq.utils import strip_sql_comments
 nl_to_sql_llm_rbl = llm_runnable.with_config(
     configurable={"llm": "nl_to_sql", "llm_temperature": 0}, config={"tags": ["nl_to_sql_llm"]}  # type: ignore
 )
+nl_to_sql_error_llm_rbl = llm_runnable.with_config(
+    configurable={"llm": "nl_to_sql_error", "llm_temperature": 0}, config={"tags": ["nl_to_sql_error_llm"]}  # type: ignore
+)
 nl_to_sql_prompt_rbl = (
     to_sql_prompt_runnable.with_config(configurable={"prompt": "custom"})
     if is_using_custom_trained_llm()
@@ -79,7 +82,7 @@ query_prompt: Runnable = nl_to_sql_prompt_rbl.with_config(  # type: ignore
     }
 )
 # Step 3
-query_llm: Runnable = nl_to_sql_llm_rbl.bind(stop=["\nSQLResult:", "\n<|sql result|>"]).with_config(  # type: ignore
+query_llm: Runnable = nl_to_sql_llm_rbl.bind(stop=["\nSQLResult:", "\n<|sql result|>", "\n<|sql answer|>"]).with_config(  # type: ignore
     config={
         "tags": ["intermediate-step"],
         "run_name": "Calling LLM",
@@ -115,7 +118,7 @@ retry_query_prompt: Runnable = nl_to_sql_retry_prompt_rbl.with_config(  # type: 
 )
 
 # Step 3
-retry_query_llm: Runnable = nl_to_sql_llm_rbl.bind(stop=["\nSQLResult:", "\n<|sql result|>"]).with_config(  # type: ignore
+retry_query_llm: Runnable = nl_to_sql_error_llm_rbl.bind(stop=["\nSQLResult:", "\n<|sql result|>", "\n<|sql error answer|>"]).with_config(  # type: ignore
     config={
         "tags": ["intermediate-step"],
         "run_name": "ReCalling LLM",

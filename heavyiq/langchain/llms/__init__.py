@@ -19,6 +19,7 @@ from .overrides import OverrideOpenAI, OverrideVLLMOpenAI
 class LLMType(Enum):
     DEFAULT = "default"
     NL_TO_SQL = "nl_to_sql"
+    NL_TO_SQL_ERROR = "nl_to_sql_error"
     SQL_TO_ANSWER = "sql_to_answer"
     NL_TO_TABLES = "nl_to_tables"
     TABLES_TO_QUESTIONS = "tables_to_questions"
@@ -47,19 +48,19 @@ def get_vllm_model_name(api_base: str) -> str:
     return model_name
 
 
-@cached(cache=LRUCache(maxsize=5))  # only four options availabe for LLMType, so set it to 5
+@cached(cache=LRUCache(maxsize=10))
 def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str, Any]]:
     config = get_config()
     # by default n was set to 1, so no need for passing n as llm kwargs otherwise if we need to
     kwargs: dict[str, Any] = {}
     model_kwargs: dict[str, Any] = {}
-    if config.enable_logprobs and model_type == LLMType.NL_TO_SQL:
+    if config.enable_logprobs and model_type in [LLMType.NL_TO_SQL, LLMType.NL_TO_SQL_ERROR]:
         model_kwargs["logprobs"] = config.custom_llm_logprobs_limit
-    if config.custom_llm_api_vllm_beam_width >= 2 and model_type == LLMType.NL_TO_SQL:
+    if config.custom_llm_api_vllm_beam_width >= 2 and model_type in [LLMType.NL_TO_SQL, LLMType.NL_TO_SQL_ERROR]:
         model_kwargs["use_beam_search"] = True
         kwargs["best_of"] = config.custom_llm_api_vllm_beam_width
         kwargs["n"] = 1
-    if model_type == LLMType.NL_TO_SQL:
+    if model_type in [LLMType.NL_TO_SQL, LLMType.NL_TO_SQL_ERROR]:
         kwargs["max_tokens"] = config.custom_llm_api_vllm_max_tokens
     return kwargs, {"extra_body": model_kwargs} if model_kwargs else {}
 
@@ -78,6 +79,7 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
         openai_llm_mapping: dict[LLMType, str | None] = {
             LLMType.DEFAULT: config.openai_gpt_model,
             LLMType.NL_TO_SQL: config.openai_gpt_model_nl_to_sql,
+            LLMType.NL_TO_SQL_ERROR: config.openai_gpt_model_nl_to_sql_error,
             LLMType.SQL_TO_ANSWER: config.openai_gpt_model_sql_to_answer,
             LLMType.NL_TO_TABLES: config.openai_gpt_model_nl_to_tables,
             LLMType.INSTRUCT: config.openai_gpt_model_instruct,
@@ -89,6 +91,10 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
         custom_llm_mapping: dict[LLMType, tuple[str | None, int]] = {
             LLMType.DEFAULT: (config.custom_llm_api_base, config.custom_llm_api_context_window),
             LLMType.NL_TO_SQL: (config.custom_llm_api_nl_to_sql_base, config.custom_llm_api_nl_to_sql_context_window),
+            LLMType.NL_TO_SQL_ERROR: (
+                config.custom_llm_api_nl_to_sql_error_base,
+                config.custom_llm_api_nl_to_sql_error_context_window,
+            ),
             LLMType.SQL_TO_ANSWER: (
                 config.custom_llm_api_sql_to_answer_base,
                 config.custom_llm_api_sql_to_answer_context_window,
@@ -103,11 +109,19 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
                 config.custom_llm_api_tables_to_questions_context_window,
             ),  # uses the default model and context window
         }
-        api_base, context_window = (
-            custom_llm_mapping[LLMType.DEFAULT]
-            if custom_llm_mapping[model_type][0] is None
-            else custom_llm_mapping[model_type]
-        )
+        if model_type == LLMType.NL_TO_SQL_ERROR:
+            found_key = LLMType.DEFAULT
+            for key in [LLMType.NL_TO_SQL_ERROR, LLMType.NL_TO_SQL]:
+                if custom_llm_mapping[key][0]:
+                    found_key = key
+                    break
+            api_base, context_window = custom_llm_mapping[found_key]
+        else:
+            api_base, context_window = (
+                custom_llm_mapping[LLMType.DEFAULT]
+                if custom_llm_mapping[model_type][0] is None
+                else custom_llm_mapping[model_type]
+            )
         return _get_custom_llm(model_type, api_base, context_window, **kwargs)  # type: ignore
 
 
