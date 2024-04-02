@@ -385,7 +385,7 @@ async def aget_token_limit_and_token_counter_func_by_llm_with_table_options(
             {"include_samples": False, "include_top_k": False},
         ]
     else:
-        token_limit = llm.context_window - 306  # type: ignore # (256 response + 50 buffer)
+        token_limit = llm.context_window - (config.custom_llm_api_vllm_max_tokens + 50)  # type: ignore # (256 response + 50 buffer)
         token_counter = custom_model_token_counter
         table_info_options = [
             {"include_samples": False},

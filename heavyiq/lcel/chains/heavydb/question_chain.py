@@ -34,7 +34,7 @@ async def get_table_info(inputs: QuestionsChainInputTypedDict) -> str:
         prompt_token=CONFIG.custom_llm_api_tables_to_questions_prompt_token,
         answer_token=CONFIG.custom_llm_api_tables_to_questions_answer_token,
     )
-    llm = get_value_from_runnable_binding(tables_to_questions_llm_rbl)
+    llm = get_value_from_runnable_binding(tables_to_questions_llm_rbl)  # type: ignore
 
     table_info = await aget_table_info_wrt_token_limit(
         llm, inputs["session_id"], prompt_template, inputs["tables"], caller=LLMType.NL_TO_TABLES  # type: ignore

@@ -198,7 +198,7 @@ def test_llm_by_type_should_return_overrided_openai_llm_for_api_custom_type(mode
 
 
 @patch("heavyiq.langchain.llms.get_vllm_model_name", return_value="dummy-model")
-def test_llm_by_type_should_return_oevrrided_vllm_for_vllm_api_custom_type(mock):
+def test_llm_by_type_should_return_overrided_vllm_for_vllm_api_custom_type(mock):
     with patch(
         "heavyiq.langchain.llms.get_config",
         return_value=HeavyIQConfig(
@@ -255,6 +255,34 @@ def test_llm_by_type_should_return_cached_overrided_openai_llm_for_custom_type(m
         llm = get_llm_by_type(model_type)
         assert isinstance(llm, OverrideVLLMOpenAI)
         assert llm.openai_api_base == expected_api_base  # returned from the cached result
+
+
+@pytest.mark.parametrize(
+    "model_type, default_api_base, nl_to_sql_error_base, expected_api_base",
+    [
+        (LLMType.NL_TO_SQL_ERROR, "http://localhost:4000", None, "http://localhost:4000"),
+        (LLMType.NL_TO_SQL_ERROR, "http://localhost:4000", "http://localhost:5000", "http://localhost:5000"),
+    ],
+)
+def test_llm_by_type_should_return_nl_to_sql_error_model(
+    model_type, default_api_base, nl_to_sql_error_base, expected_api_base
+):
+    func = get_llm_by_type
+    func.cache_clear()
+    with patch(
+        "heavyiq.langchain.llms.get_config",
+        return_value=HeavyIQConfig(
+            openai_api_key="dummy-key",
+            custom_llm_type="API_VLLM",
+            custom_llm_api_base=default_api_base,
+            custom_llm_api_context_window=4096,
+            custom_llm_api_nl_to_sql_error_base=nl_to_sql_error_base,
+            custom_llm_api_nl_to_sql_error_context_window=5092,
+        ),
+    ), patch("heavyiq.langchain.llms.get_vllm_model_name", return_value="dummy-model"):
+        llm = func(model_type)
+        assert isinstance(llm, OverrideVLLMOpenAI)
+        assert llm.openai_api_base == expected_api_base
 
 
 @pytest.mark.parametrize(
