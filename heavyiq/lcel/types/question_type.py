@@ -9,7 +9,7 @@ class QuestionsChainInputType(BaseModel):
     session_id: str = Field(..., description="HeavyDB session id.")
     tables: list[str] = Field(
         ...,
-        description="Optional field representing a list of tables to consider. If this list is empty, all the database tables will be included.",
+        description="List of tables to consider.",
     )
 
 

@@ -9,7 +9,7 @@ python3.10 -m venv venv
 
 
 # Install Requirements
-mkdir -p ./dist 
+mkdir -p ./dist
 cp requirements.txt ./dist/requirements.txt
 # if INTERNALLY_RELEASED_PYHEAVYDB is set
 # (see common_fn.sh argument processing)
@@ -21,7 +21,7 @@ test_for_internally_release_pyheavydb
 # (see common_fn.sh argument processing)
 # 1. Download all of the deps and store in
 # ./packages
-# 2. Update ./dist/requirments to use the 
+# 2. Update ./dist/requirments to use the
 # packages stored in ./packages
 test_for_include_all_deps ./dist/requirements.txt
 
@@ -42,6 +42,7 @@ pyarmor reg pyarmor-regfile-5130.zip
 # ./dist dir if it doesn't already exist.
 pyarmor gen ./heavyiq
 cp -r heavyiq/langchain/tokenizer_models/ ./dist/heavyiq/langchain/tokenizer_models/
+cp gunicorn.conf.py ./dist/gunicorn.conf.py
 
 # Create version.txt
 mkdir -p dist/public
@@ -50,6 +51,10 @@ commit_hash=$(git rev-parse --short HEAD)
 echo "${current_timestamp}-${commit_hash}" > dist/public/version.txt
 
 # Compress Build Dir adding the packages folder under
-# the dist so that the install for heavydb-internal 
+# the dist so that the install for heavydb-internal
 # works
-tar -czf dist.tgz --transform='s|packages/|dist/packages/|' dist packages
+mv packages dist/.
+cd dist
+tar -czf ../dist.tgz  .
+cd ..
+mv dist/packages .

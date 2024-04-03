@@ -4,6 +4,7 @@ import asyncio
 import functools
 import multiprocessing
 import re
+import weakref
 from collections.abc import AsyncGenerator, Awaitable
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from contextlib import asynccontextmanager
@@ -17,12 +18,12 @@ import anyio
 from async_lru import alru_cache
 from heavyai import Connection, connect
 from heavydb._parsers import ColumnDetails, _extract_column_details
+from heavydb.thrift.ttypes import TTableDetails
 from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
 from heavyiq.langchain.heavydb_utils import DB_KEYWORDS
-from heavyiq.utils import (LRUCache, calc_query_stats, is_destructive_sql,
-                           rate_sql_complexity, strip_sql_comments)
+from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
 
 
 class CustomColumnDetails(NamedTuple):
@@ -149,6 +150,9 @@ class HeavyDB:
             # connection established from session, so grab the session details
             self._dbname = self._conn._client.get_session_info(self._conn._session).database
 
+        # cleanup at the last
+        weakref.finalize(self, self.cleanup)
+
     @property
     def table_schema_change_callback(self) -> Callable:
         return self._table_schema_change_callback
@@ -157,12 +161,12 @@ class HeavyDB:
     def table_schema_change_callback(self, callback: Callable | None):
         self._table_schema_change_callback = callback
 
-    def __del__(self):
-        # TODO: Move this implementation to weakref.finalize
+    def cleanup(self):
         try:
-            self._conn.close()
+            with self.lock:
+                self._conn.close()
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Error on HeavyDB cleanup: {e}")
 
     @classmethod
     def get_manager(cls: type[HeavyDB]) -> SyncManager:
@@ -685,17 +689,12 @@ class HeavyDB:
             return top_k_res, is_high_cardinality
         return None, is_high_cardinality
 
-    @alru_cache(maxsize=32, ttl=10)
     async def aget_table_columns(self, table: str) -> list[ColumnDetails]:
         """Get details about the columns in a table."""
         self.logger.debug(f"Getting columns for table {table}")
-        async with self.alock:
-            try:
-                column_details = await run_in_threadpool(self._conn.get_column_details, table)
-                self.logger.debug(f"Got columns for table {table}")
-                return column_details
-            except Exception as e:
-                raise e
+        column_details = await self._aget_column_details(table)
+        self.logger.debug(f"Got columns for table {table}")
+        return column_details
 
     async def should_refresh_table_cache(self, table: str) -> bool:
         """
@@ -736,6 +735,11 @@ class HeavyDB:
         self.table_text_columns_count_cache.delete(cache_key)
         self.table_total_row_count_cache.delete(cache_key)
         self.timestamp_cache.delete(cache_key)
+        # invalidate async-lru caches
+        self._aget_table_details.cache_invalidate(table)
+        self._aget_column_details.cache_invalidate(table)
+        self.aget_text_columns.cache_invalidate(table)
+        self._aget_raw_table_schema_from_thrift.cache_invalidate(table)
 
     async def trigger_table_schema_change_callback(self, table: str, callback: Callable | None = None):
         schema_change_callback = callback or self.table_schema_change_callback
@@ -776,12 +780,29 @@ class HeavyDB:
 
         return table_schema
 
+    @alru_cache(ttl=60 * 10)  # store atleast for 10 mins
+    async def _aget_table_details(self, table: str) -> TTableDetails:
+        """
+        Get table details through thrift endpoint.
+        """
+        async with self.alock:
+            table_details = await run_in_threadpool(self._conn.get_table_details, table)
+        return table_details
+
+    @alru_cache(ttl=60 * 10)  # store atleast for 10 mins
+    async def _aget_column_details(self, table: str) -> list[ColumnDetails]:
+        """
+        Get table column details through thrift endpoint.
+        """
+        async with self.alock:
+            column_details = await run_in_threadpool(self._conn.get_column_details, table)
+        return column_details
+
     async def _aget_table_custom_details(self, table: str) -> CustomTableDetails:
         """
         Return custom details of a heavyDB table.
         """
-        async with self.alock:
-            table_details = await run_in_threadpool(self._conn.get_table_details, table)
+        table_details = await self._aget_table_details(table)
         table_comment = table_details.comment or ""
         columns: list[ColumnDetails] = _extract_column_details(table_details.row_desc)
         column_name_comments_mapping = {x.col_name: x.comment or "" for x in table_details.row_desc}
@@ -1146,6 +1167,14 @@ class HeavyDB:
             db, table, column = col_mapping[id]
             result.append({"operator": op, "literal": literal, "database": db, "table": table, "column": column})
         return result
+
+    async def aretrieve_columns_from_query(self, query: str) -> dict[str, tuple[str, str, str]]:
+        """
+        Gets the columns used in the input SQL query.
+        """
+        detailed_query_plan = await self.aget_calcite_query_plan(query, detailed=True)
+        column_mapping = await self.aextract_column_mappings(detailed_query_plan)
+        return column_mapping
 
     async def acorrect_string_literal(self, literal: StringLiteralOp, exact_match_threshold: float) -> StringLiteralOp:
         """

@@ -43,16 +43,17 @@ llm_configurable_fields = {
 }
 
 llm_runnable = (
-    OpenAI(temperature=0, openai_api_key="nothing")
+    OpenAI(temperature=0, openai_api_key="nothing")  # type: ignore
     .configurable_alternatives(
         ConfigurableField(id="llm"),
         default_key="openai",
         nl_to_sql=partial(make_llm_configurable, LLMType.NL_TO_SQL, default_temperature=0.0, **llm_configurable_fields),  # type: ignore
+        nl_to_sql_error=partial(make_llm_configurable, LLMType.NL_TO_SQL_ERROR, default_temperature=0.0, **llm_configurable_fields),  # type: ignore
         sql_to_answer=partial(make_llm_configurable, LLMType.SQL_TO_ANSWER, default_temperature=0.0, **llm_configurable_fields),  # type: ignore
         nl_to_tables=partial(make_llm_configurable, LLMType.NL_TO_TABLES, default_temperature=0.0, **llm_configurable_fields),  # type: ignore
         tables_to_questions=partial(
             make_llm_configurable, LLMType.TABLES_TO_QUESTIONS, default_temperature=0.0, **llm_configurable_fields
-        ),
+        ),  # type: ignore
         default_llm=partial(make_llm_configurable, LLMType.DEFAULT, default_temperature=0.0, **llm_configurable_fields),  # type: ignore
     )
     .configurable_fields(

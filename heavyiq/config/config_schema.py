@@ -9,6 +9,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     openai_api_key: Optional[str] = None
     openai_gpt_model: str = "gpt-3.5-turbo-16k"  # LLMType.DEFAULT
     openai_gpt_model_nl_to_sql: Optional[str] = None  # LLMType.NL_TO_SQL
+    openai_gpt_model_nl_to_sql_error: Optional[str] = None  # LLMType.NL_TO_SQL_ERROR
     openai_gpt_model_sql_to_answer: Optional[str] = None  # LLMType.SQL_TO_ANSWER
     openai_gpt_model_nl_to_tables: Optional[str] = None  # LLMType.NL_TO_TABLES
     openai_gpt_model_instruct: Optional[str] = None  # LLMType.INSTRUCT
@@ -56,6 +57,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     custom_llm_api_context_window: int = 8192  # LLMType.DEFAULT
     custom_llm_api_nl_to_sql_base: Optional[str] = None  # LLMType.NL_TO_SQL
     custom_llm_api_nl_to_sql_context_window: int = 8192  # LLMType.NL_TO_SQL
+    custom_llm_api_nl_to_sql_error_base: Optional[str] = None  # LLMType.NL_TO_SQL_ERROR
+    custom_llm_api_nl_to_sql_error_context_window: int = 8192  # LLMType.NL_TO_SQL_ERROR
     custom_llm_api_sql_to_answer_base: Optional[str] = None  # LLMType.SQL_TO_ANSWER
     custom_llm_api_sql_to_answer_context_window: int = 8192  # LLMType.SQL_TO_ANSWER
     custom_llm_api_nl_to_tables_base: Optional[str] = None  # LLMType.NL_TO_TABLES
