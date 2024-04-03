@@ -856,7 +856,7 @@ class HeavyDB:
                 )
                 for colstr, (top_k_res, is_high_cardinality) in zip(text_columns, columns_top_k):
                     if top_k_res and is_high_cardinality:
-                        column_metadata_mapping[colstr] = top_k_res[:-1] + [top_k_res[-1] + "..."]
+                        column_metadata_mapping[colstr] = top_k_res[:-1] + [top_k_res[-1] + " ..."]
                     elif top_k_res:
                         column_metadata_mapping[colstr] = top_k_res
 
@@ -884,7 +884,7 @@ class HeavyDB:
                 # add column metadata (top-k, time-range) inline.
                 col_metadata = column_metadata_mapping.get(column.name)
                 if col_metadata:
-                    parts.append("({})".format(",".join(col_metadata)))
+                    parts.append("({})".format(", ".join(col_metadata)))
 
             comment = f"/* {column.comment} */" if column.comment else ""
             if comment:
