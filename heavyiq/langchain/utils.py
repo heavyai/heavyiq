@@ -365,38 +365,6 @@ def custom_model_tokenizer_decode(token_ids: list[int]) -> str:
     return get_tokenizer().decode(token_ids, skip_special_tokens=True)
 
 
-async def aget_token_limit_and_token_counter_func_by_llm_with_table_options(
-    llm: BaseLanguageModel,
-) -> tuple[int, Callable[[str], int], int, list[dict[str, bool]]]:
-    """
-    Based on the llm type (openai or custom) and the model name, this function is
-    supposed to return the token limit and the method for counting the tokens from text/prompt.
-    """
-    config = get_config()
-    table_info_options: list[dict[str, bool]]
-
-    if config.custom_llm_type is None or config.custom_llm_type == "AZURE":
-        token_limit = get_token_limit(llm.model_name)  # type: ignore
-        token_counter = llm.get_num_tokens
-        table_info_options = [
-            {},
-            {"include_top_k": False},
-            {"include_samples": False},
-            {"include_samples": False, "include_top_k": False},
-        ]
-    else:
-        token_limit = llm.context_window - (config.custom_llm_api_vllm_max_tokens + 50)  # type: ignore # (256 response + 50 buffer)
-        token_counter = custom_model_token_counter
-        table_info_options = [
-            {"include_samples": False},
-            {"include_samples": False, "include_top_k": False},
-        ]
-
-    top_k_max_str_column_count = config.top_k_max_str_col_count_nl_to_tables
-
-    return token_limit, token_counter, top_k_max_str_column_count, table_info_options
-
-
 @alru_cache(maxsize=127, ttl=60 * 10)
 async def get_all_text_column_count(session: str, tables: Sequence[str]) -> int:
     """
@@ -410,44 +378,10 @@ async def get_all_text_column_count(session: str, tables: Sequence[str]) -> int:
     return sum(await asyncio.gather(*tasks))
 
 
-# this function exactly does the job of aget_table_info_wrt_token_limit function
-# but in modular form.
-# TODO: remove the old function and change this func name
 async def aget_table_info_for_nl_to_tables_prompt_wrt_token_limit(
     llm: BaseLanguageModel, session: str, prompt: BasePromptTemplate, table_names_to_use: list[str]
 ) -> str:
-    (
-        token_limit,
-        token_counter,
-        top_k_max_str_column_count,
-        table_info_options,
-    ) = await aget_token_limit_and_token_counter_func_by_llm_with_table_options(llm)
-
-    # refresh-cache
-    table_names_tuple = tuple(table_names_to_use)
-    await refresh_cache_for_tables(session, table_names_tuple)
-
-    # decides whether to include top-k or not
-    disable_top_k = False
-    available_text_column_count = await get_all_text_column_count(session, table_names_tuple)
-    if available_text_column_count > top_k_max_str_column_count:
-        disable_top_k = True
-
-    for options in table_info_options:
-        include_samples = options.get("include_samples", True)
-        include_top_k = options.get("include_top_k", True)
-        if disable_top_k:
-            include_top_k = False
-        table_info = await aget_table_info_from_cache_or_calculate(
-            session, table_names_tuple, include_samples, include_top_k
-        )
-        formatted_prompt = prompt.format(table_info=table_info)
-        if token_counter(formatted_prompt) <= token_limit:
-            break
-    else:  # executed if the loop finished normally (no break)
-        raise RuntimeError("Couldn't find suitable prompt provided token limit")
-
-    return table_info
+    return await aget_table_info_wrt_token_limit(llm, session, prompt, table_names_to_use, caller=LLMType.NL_TO_TABLES)
 
 
 async def apopulate_table_info_into_nl_to_tables_prompt(

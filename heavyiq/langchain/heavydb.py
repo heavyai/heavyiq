@@ -34,7 +34,12 @@ class CustomColumnDetails(NamedTuple):
     name: str
     type: str
     comment: str
+    encoding: str
     is_array: bool
+    is_text_column: Optional[bool] = None
+    is_timestamp_column: Optional[bool] = None
+    name_str: Optional[str] = None
+    type_str: Optional[str] = None
     encoding_str: Optional[str] = None
 
 
@@ -803,11 +808,20 @@ class HeavyDB:
         column_name_comments_mapping = {x.col_name: x.comment or "" for x in table_details.row_desc}
         custom_columns = [
             CustomColumnDetails(
-                name=f'"{col.name}"' if col.name.upper() in DB_KEYWORDS else col.name,
-                type="TEXT" if col.type == "STR" else col.type,
+                name=col.name,
+                name_str=f'"{col.name}"' if col.name.upper() in DB_KEYWORDS else col.name,
+                type=col.type,
+                type_str="TEXT" if col.type == "STR" else ("REAL" if col.type == "DOUBLE" else col.type),
                 comment=column_name_comments_mapping[col.name],
+                encoding=col.encoding,
+                encoding_str=(
+                    col.encoding if (col.type == "STR" and col.encoding == "NONE") else ""
+                ),  # add NONE encoding for only text columns
                 is_array=col.is_array,
-                encoding_str=col.encoding if (col.type == "STR" and col.encoding == "NONE") else "",
+                is_timestamp_column=True if (col.type in ["TIMESTAMP", "DATE"] and col.is_array is False) else False,
+                is_text_column=(
+                    True if (col.type == "STR" and col.encoding == "DICT" and col.is_array is False) else False
+                ),
             )
             for col in columns
         ]
@@ -819,25 +833,58 @@ class HeavyDB:
         Method used to form table_schema from `get_table_details` thrift endpoint.
         """
         table_details: CustomTableDetails = await self._aget_table_custom_details(table)
+        config = get_config()
         table_name = f'"{table_details.name}"' if table_details.name.upper() in DB_KEYWORDS else f"{table_details.name}"
         schema_stmt = (
             "CREATE TABLE {table_name} /* {table_comment} */ (\n{column_details});"
             if table_details.comment
             else "CREATE TABLE {table_name} {table_comment}(\n{column_details});"
         )
+        column_metadata_mapping = {}
+        if config.inline_column_metadata_on_table_info_prompt:
+            # always adds column metadata when add inline metada config flag is been enabled
+            text_columns, timestamp_columns = [], []
+            for col in table_details.columns:
+                if col.is_text_column:
+                    text_columns.append(col.name)
+                elif col.is_timestamp_column:
+                    timestamp_columns.append(col.name)
+
+            if text_columns:
+                columns_top_k = await asyncio.gather(
+                    *[self.aget_column_top_k(table_details.name, col) for col in text_columns]
+                )
+                for colstr, (top_k_res, is_high_cardinality) in zip(text_columns, columns_top_k):
+                    if top_k_res and is_high_cardinality:
+                        column_metadata_mapping[colstr] = top_k_res[:-1] + [top_k_res[-1] + "..."]
+                    elif top_k_res:
+                        column_metadata_mapping[colstr] = top_k_res
+
+            if timestamp_columns:
+                timestamp_values = await asyncio.gather(
+                    *[self.aget_column_timestamp(table_details.name, col) for col in timestamp_columns]
+                )
+                for colstr, (min_value, max_value) in zip(timestamp_columns, timestamp_values):
+                    column_metadata_mapping[colstr] = [min_value, max_value]
 
         def format_column(column: CustomColumnDetails) -> str:
             """
             Formats column for prompt.
             """
-            parts = [column.name]
+            parts = [column.name_str]
             if column.is_array:
-                parts.append(f"{column.type}[]")
+                parts.append(f"{column.type_str}[]")
             else:
-                parts.append(column.type)
+                parts.append(column.type_str)
             encoding = column.encoding_str
             if encoding:
                 parts.append(f"ENCODING {encoding}")
+
+            if config.inline_column_metadata_on_table_info_prompt:
+                # add column metadata (top-k, time-range) inline.
+                col_metadata = column_metadata_mapping.get(column.name)
+                if col_metadata:
+                    parts.append("({})".format(",".join(col_metadata)))
 
             comment = f"/* {column.comment} */" if column.comment else ""
             if comment:
@@ -848,7 +895,9 @@ class HeavyDB:
         return schema_stmt.format(
             table_name=table_name,
             table_comment=table_details.comment or "",
-            column_details=",\n".join([format_column(x) for x in table_details.columns]),
+            column_details=config.inline_column_metadata_delimiter.join(
+                [format_column(x) for x in table_details.columns]
+            ),
         )
 
     async def aget_table_schema(self, table: str) -> str:
@@ -1004,12 +1053,15 @@ class HeavyDB:
         if include_samples and self._sample_rows_in_table_info:
             tasks.append(self.aget_sample_rows(table_name))
 
-        if include_top_k:
-            tasks.append(self.aget_top_k(table_name))
+        config = get_config()
+        # adds top-k, time-range in seprate paragraphs
+        if not config.inline_column_metadata_on_table_info_prompt:
+            if include_top_k:
+                tasks.append(self.aget_top_k(table_name))
 
-        if include_timestamp:
-            # include timestamp,date columns with min/max values
-            tasks.append(self.aget_timestamp(table_name))
+            if include_timestamp:
+                # include timestamp,date columns with min/max values
+                tasks.append(self.aget_timestamp(table_name))
 
         results = await asyncio.gather(*tasks)
         return "\n".join(results)
