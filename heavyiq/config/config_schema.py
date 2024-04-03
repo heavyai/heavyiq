@@ -89,6 +89,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     # form a inline-column metadata(top-k, time-range) on table_info generation part of prompt making
     # if False, then column top-k and time-ranges should appear in a seperate paragraph block
     inline_column_metadata_on_table_info_prompt: bool = False
+    # delimiter for the column details when inline_column_metadata_on_table_info_prompt is enabled
+    inline_column_metadata_delimiter: str = ",\n"
     # maximum count of allowed_tables on nl-to-tables endpoint. If the count exceeds, then
     # index updation and search will happen in-order to find relevant tables.
     allowed_tables_max_count_nl_to_tables: int = 20
