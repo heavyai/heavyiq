@@ -811,7 +811,7 @@ class HeavyDB:
                 name=col.name,
                 name_str=f'"{col.name}"' if col.name.upper() in DB_KEYWORDS else col.name,
                 type=col.type,
-                type_str="TEXT" if col.type == "STR" else ("REAL" if col.type == "DOUBLE" else col.type),
+                type_str="TEXT" if col.type == "STR" else col.type,
                 comment=column_name_comments_mapping[col.name],
                 encoding=col.encoding,
                 encoding_str=(
