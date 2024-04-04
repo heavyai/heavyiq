@@ -5,7 +5,8 @@ from threading import Lock
 from typing import Any, Callable, Iterable, Optional
 
 from heavyai.connection import Connection, connect
-from llama_index.core.readers.base import BaseReader, Document
+from llama_index.core.readers.base import BaseReader
+from llama_index.core.schema import Document
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)

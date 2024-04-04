@@ -3,22 +3,20 @@ import logging
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from heavyrag.main import get_heavydb_reader, get_or_sync_index, retrieve_index
+from heavyrag.main import ask_db_index
 
-router = APIRouter()
+dbidx_router = APIRouter(prefix="/db")
+docidx_router = APIRouter(prefix="/doc")
 
 
-class QueryRequest(BaseModel):
+class DBIndexRetrieveRequest(BaseModel):
     sessionid: str
     question: str
 
 
-@router.post("/query")
-def query(request: QueryRequest) -> dict:
+@dbidx_router.post("/retrieve/tables")
+def retrieve_tables(request: DBIndexRetrieveRequest) -> list[str]:
     """
-    Query the index.
+    Retrieve
     """
-    dbreader = get_heavydb_reader(request.sessionid)
-    index = get_or_sync_index(dbreader)
-    tables_with_score = retrieve_index(index, request.question, dbname=dbreader.database_name)
-    return tables_with_score
+    return ask_db_index(request.sessionid, request.question)

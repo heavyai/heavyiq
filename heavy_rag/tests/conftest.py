@@ -1,5 +1,6 @@
 import pytest
-from heavyrag.read import HeavyDBReader
+
+from heavyrag.database.read import HeavyDBReader
 
 
 @pytest.fixture(scope="package", autouse=True)
