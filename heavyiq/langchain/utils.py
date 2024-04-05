@@ -149,7 +149,12 @@ def get_table_info_wrt_token_limit(
 
 @alru_cache(maxsize=127, ttl=60 * 10)  # typed=True and passing kwargs seems buggy in async lru
 async def aget_table_info_from_cache_or_calculate(
-    session: str, tables: Sequence[str], include_samples: bool, include_top_k: bool, include_timestamp: bool
+    session: str,
+    tables: Sequence[str],
+    include_samples: bool,
+    include_top_k: bool,
+    include_timestamp: bool,
+    include_comments: bool,
 ) -> str:
     """
     Get tables info from cache or calculate based on the passed KW args.
@@ -167,6 +172,7 @@ async def aget_table_info_from_cache_or_calculate(
         include_samples=include_samples,
         include_top_k=include_top_k,
         include_timestamp=include_timestamp,
+        include_comments=include_comments,
     )
     return table_info
 
@@ -219,9 +225,14 @@ async def refresh_cache_for_tables(session: str, tables: Sequence[str]):
 
     # if any of the table schema gets changed, then clear it's table_info cache
     if True in do_refresh_results:
-        options_list = [(False, True, True), (False, True, False), (False, False, True), (False, False, False)]
-        for x, y, z in options_list:
-            aget_table_info_from_cache_or_calculate.cache_invalidate(heavydb._conn._session, tables, x, y, z)
+        options_list = [
+            (False, True, True, True),
+            (False, False, True, True),
+            (False, False, False, True),
+            (False, False, False, False),
+        ]
+        for w, x, y, z in options_list:
+            aget_table_info_from_cache_or_calculate.cache_invalidate(heavydb._conn._session, tables, w, x, y, z)
 
 
 async def aget_table_info_wrt_token_limit(
@@ -252,6 +263,7 @@ async def aget_table_info_wrt_token_limit(
             {"include_samples": False},
             {"include_samples": False, "include_timestamp": False},
             {"include_samples": False, "include_timestamp": False, "include_top_k": False},
+            {"include_samples": False, "include_timestamp": False, "include_top_k": False, "include_comments": False},
         ]
 
     top_k_max_str_column_count = (
@@ -277,13 +289,14 @@ async def aget_table_info_wrt_token_limit(
         include_samples = options.get("include_samples", True)
         include_top_k = options.get("include_top_k", True)
         include_timestamp = options.get("include_timestamp", True)
+        include_comments = options.get("include_comments", True)
         if disable_top_k:
             include_top_k = False
         if disable_timestamp:
             include_timestamp = False
 
         table_info = await aget_table_info_from_cache_or_calculate(
-            session, table_names_tuple, include_samples, include_top_k, include_timestamp
+            session, table_names_tuple, include_samples, include_top_k, include_timestamp, include_comments
         )
         formatted_prompt = prompt.format(table_info=table_info)
         prompt_tokens = await run_in_threadpool(token_counter, formatted_prompt)
