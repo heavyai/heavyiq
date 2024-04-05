@@ -23,8 +23,7 @@ from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
 from heavyiq.langchain.heavydb_utils import DB_KEYWORDS
-from heavyiq.utils import (LRUCache, calc_query_stats, is_destructive_sql,
-                           rate_sql_complexity, strip_sql_comments)
+from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
 
 
 class CustomColumnDetails(NamedTuple):
@@ -740,7 +739,6 @@ class HeavyDB:
         self._aget_table_details.cache_invalidate(table)
         self._aget_column_details.cache_invalidate(table)
         self.aget_text_columns.cache_invalidate(table)
-        self._aget_raw_table_schema_from_thrift.cache_invalidate(table)
 
     async def trigger_table_schema_change_callback(self, table: str, callback: Callable | None = None):
         schema_change_callback = callback or self.table_schema_change_callback
@@ -1088,7 +1086,7 @@ class HeavyDB:
             tasks.append(self.aget_sample_rows(table_name))
 
         results = await asyncio.gather(*tasks)
-        return "\n".join(results)
+        return "\n".join(results).strip()
 
     async def aget_table_info(self, table_names: Optional[list[str]] = None, **kwargs) -> str:
         """
