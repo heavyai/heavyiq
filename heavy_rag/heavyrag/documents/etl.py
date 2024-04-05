@@ -1,7 +1,7 @@
 import logging
 
 from llama_index.core import VectorStoreIndex
-from llama_index.core.schema import Document, NodeWithScore
+from llama_index.core.schema import BaseNode, Document, NodeWithScore
 from llama_index.core.vector_stores.types import FilterOperator, MetadataFilter, MetadataFilters
 
 from heavyrag.common.etl import BaseETL
@@ -36,9 +36,7 @@ class DocumentIndexETL(BaseETL):
         """
         # define metadata filters
         filters = MetadataFilters(
-            filters=[
-                MetadataFilter(key="database", operator=FilterOperator.EQ, value=index.vector_store.client.name)
-            ]  # type: ignore
+            filters=[MetadataFilter(key="type", operator=FilterOperator.EQ, value="document")]  # type: ignore
         )
         retriever = index.as_retriever(
             similarity_top_k=10,
@@ -59,7 +57,7 @@ class DocumentIndexETL(BaseETL):
         return nodes_with_scores
 
 
-def ask_doc_index(question: str, query: str | None = None, **dbargs):
+def ask_doc_index(question: str, query: str | None = None, n: int = 2, **dbargs) -> list[BaseNode]:
     """
     Ask a question against the stored document index.
 
@@ -78,5 +76,5 @@ def ask_doc_index(question: str, query: str | None = None, **dbargs):
         reader_cls=DocumentDatabaseReader,
         reader_init_kwargs=dbargs,
     )
-    etl.run(question)
-    return True
+    nodes_with_score = etl.run(question)
+    return [i.node for i in nodes_with_score[:n]]

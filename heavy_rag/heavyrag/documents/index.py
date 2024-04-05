@@ -1,7 +1,6 @@
 from functools import lru_cache
 
 from llama_index.core import VectorStoreIndex
-from llama_index.core.node_parser import SentenceSplitter
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
 from heavyrag.common import COLLECTION_TYPE_METADATA, get_vectorstore
@@ -21,10 +20,7 @@ def get_or_create_document_index(collection_name: str):
     index = VectorStoreIndex.from_vector_store(
         vector_store=vector_store,
         show_progress=True,
-        transformations=[
-            SentenceSplitter(chunk_size=1024, chunk_overlap=20),
-            HuggingFaceEmbedding(model_name=settings.hf_embedding_model),
-        ],
+        insert_batch_size=166,
         embed_model=HuggingFaceEmbedding(model_name=settings.hf_embedding_model),
     )
     return index

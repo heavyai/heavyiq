@@ -2,11 +2,14 @@
 Read raw documents from SQlite database table using DBReader 
 """
 
+from io import BytesIO
 from typing import List
 
 from llama_index.core.schema import Document
 from llama_index.readers.database import DatabaseReader
 from sqlalchemy import text
+
+from heavyrag.common.overrides import CustomPDFReader
 
 
 class DocumentDatabaseReader(DatabaseReader):
@@ -15,7 +18,13 @@ class DocumentDatabaseReader(DatabaseReader):
     """
 
     def load_data(self, query: str) -> List[Document]:
-        """Query and load data from the Database, returning a list of Documents.
+        """
+        Query and load data from the Database, returning a list of Documents.
+        Table which holds the documents must posses the following fields,
+           - id
+           - name
+           - content
+           - document_type
 
         Args:
             query (str): Query parameter to filter tables and rows.
@@ -32,8 +41,27 @@ class DocumentDatabaseReader(DatabaseReader):
 
             for item in result.fetchall():
                 # fetch each item
-                doc_str = ", ".join([f"{col}: {entry}" for col, entry in zip(result.keys(), item)])
-                documents.append(Document(text=doc_str))
+                column_data_mapping = dict(zip(result.keys(), item))
+                doc_type = column_data_mapping["document_type"]
+                file_name = column_data_mapping["name"]
+                doc_id = column_data_mapping["id"]
+                content = column_data_mapping["content"]
+
+                doc_metadata = {"database_doc_id": doc_id, "type": "document"}
+
+                if doc_type == "PDF":
+                    doc_metadata["doc_type"] = "PDF"
+                    splitted_documents = CustomPDFReader().load_data_from_file_object(
+                        BytesIO(content), file_name=file_name, extra_info=doc_metadata
+                    )
+                    documents.extend(splitted_documents)
+                elif doc_type == "TXT":
+                    doc_metadata["doc_type"] = "TXT"
+                    doc_metadata["file_name"] = file_name
+                    documents.append(Document(text=content, metadata=doc_metadata))  # type: ignore
+                else:
+                    doc_str = ", ".join([f"{col}: {entry}" for col, entry in zip(result.keys(), item)])
+                    documents.append(Document(text=doc_str))
         return documents
 
 
@@ -45,8 +73,8 @@ def read_documents(reader: DocumentDatabaseReader, query: str | None = None) -> 
         query
         or f"""
         SELECT
-            id, content AS text
-        FROM documents.documents;
+            *
+        FROM documents;
     """
     )
     return reader.load_data(query=query)

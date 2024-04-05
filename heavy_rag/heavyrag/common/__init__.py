@@ -22,6 +22,13 @@ COLLECTION_TYPE_METADATA = {
 }
 
 
+def get_chromadb_client(persist_dir: str):
+    return chromadb.PersistentClient(
+        path=persist_dir,
+        settings=ConfigSettings(anonymized_telemetry=False, is_persistent=True),
+    )
+
+
 def get_vectorstore(
     persist_collection_dir: str,
     collection_name: str,
@@ -32,10 +39,16 @@ def get_vectorstore(
     """
     # set up ChromaVectorStore
 
-    chroma_client = chromadb.PersistentClient(
-        path=persist_collection_dir,
-        settings=ConfigSettings(anonymized_telemetry=False, is_persistent=True),
-    )
+    chroma_client = get_chromadb_client(persist_collection_dir)
     chroma_collection = chroma_client.get_or_create_collection(collection_name, metadata=metadata)
     # set up ChromaVectorStore
     return ChromaVectorStore.from_collection(chroma_collection)
+
+
+def delete_collection(persist_collection_dir: str, collection_name: str):
+    """
+    Helps to delete a collection.
+    """
+    chroma_client = get_chromadb_client(persist_collection_dir)
+
+    chroma_client.delete_collection(collection_name)

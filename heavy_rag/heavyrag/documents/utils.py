@@ -19,5 +19,5 @@ def get_existing_doc_ids_from_collection(collection: Collection) -> list[str]:
     where = _to_chroma_filter(filters)
     query_result = collection.get(where=where, include=["metadatas"])
 
-    doc_ids: list[str] = list(set([i["parent_doc_id"] for i in query_result["metadatas"]]))  # type: ignore
+    doc_ids: list[str] = list(set([i["database_doc_id"] for i in query_result["metadatas"]]))  # type: ignore
     return doc_ids
