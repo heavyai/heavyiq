@@ -708,14 +708,31 @@ class HeavyDB:
         """
         self.logger.debug(f"Checking for {table} table cache refresh...")
         cache_key = f"{self._dbname}.{table}"
-        cached_schema = self.table_schema_cache.get(cache_key)
-        if cached_schema is None:
-            # no entry for the table on cache, so return False
+        keys_found = self.table_schema_cache.get_key_starts_with(cache_key)
+
+        # compare the LRU cache value stored for a particular table with the
+        # async_lru cache value (shorter cache) for the same table
+        most_recent_key_args = None
+        if keys_found:
+            most_recent_key = keys_found[-1]
+            cached_schema = self.table_schema_cache.get(most_recent_key)
+            if cached_schema is None:
+                # no entry for the table on cache, so return False
+                return False
+
+            _, _, x, y, z = most_recent_key.split(".")
+            most_recent_key_args = tuple([True if i == "True" else False for i in [x, y, z]])
+        else:
+            # no keys found to compare, so return False
             return False
 
         # check for any diff in current schema and cached schema
         # if yes then return True else return False
-        current_schema = await self._aget_raw_table_schema_from_thrift(table)
+        if most_recent_key_args:
+            current_schema = await self._aget_raw_table_schema_from_thrift(table, *most_recent_key_args)
+        else:
+            current_schema = await self._aget_raw_table_schema_from_thrift(table)
+
         if cached_schema == current_schema:
             self.logger.debug(f"Table {table} schema unchanged.")
             return False
@@ -729,7 +746,7 @@ class HeavyDB:
         """
         self.logger.debug(f"Deleteing all caches for the table {table}")
         cache_key = f"{self._dbname}.{table}"
-        self.table_schema_cache.delete(cache_key)
+        self.table_schema_cache.delete_by_key_prefix(cache_key)
         self.top_k_cache.delete(cache_key)
         self.sample_rows_cache.delete(cache_key)
         self.table_text_columns_count_cache.delete(cache_key)
@@ -739,6 +756,7 @@ class HeavyDB:
         self._aget_table_details.cache_invalidate(table)
         self._aget_column_details.cache_invalidate(table)
         self.aget_text_columns.cache_invalidate(table)
+        self._aget_raw_table_schema_from_thrift.cache_invalidate(table)
 
     async def trigger_table_schema_change_callback(self, table: str, callback: Callable | None = None):
         schema_change_callback = callback or self.table_schema_change_callback
@@ -826,6 +844,7 @@ class HeavyDB:
         ]
         return CustomTableDetails(name=table, columns=custom_columns, comment=table_comment)
 
+    @alru_cache(ttl=60)
     async def _aget_raw_table_schema_from_thrift(
         self, table: str, include_top_k: bool = True, include_timestamp: bool = True, include_comments: bool = True
     ) -> str:

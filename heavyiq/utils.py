@@ -183,6 +183,36 @@ class LRUCache(Generic[KT, VT]):
         except KeyError:
             pass
 
+    def get_key_starts_with(self, key_prefix: KT) -> list[KT]:
+        """
+        Gets the list of cache keys which startswith a particular prefix.
+        This might be useful for getting all the keys relevant to a particular table
+        which has the different caches stored based different params such as include_comments, include_top_k, etc.
+        """
+        keys_found = []
+        for key in self.cache:
+            if key.startswith(key_prefix):
+                keys_found.append(key)
+
+        return keys_found
+
+    def delete_by_key_prefix(self, key_prefix: KT) -> None:
+        """
+        Deletes all the caches by key prefix.
+        """
+        for key in self.get_key_starts_with(key_prefix):
+            self.delete(key)
+
+    def get_recent_cache_by_key_prefix(self, key_prefix: KT) -> Optional[VT]:
+        """
+        Gets the most recent cache by key prefix.
+        """
+        keys = self.get_key_starts_with(key_prefix)
+        if keys:
+            return self.get(keys[-1])
+
+        return None
+
     def put(self, key: KT, value: VT) -> None:
         """
         Helps to put the given key, value pair on the manager.Dict.
