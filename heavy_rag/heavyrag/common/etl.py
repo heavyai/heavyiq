@@ -2,6 +2,7 @@ from abc import ABCMeta, abstractmethod, abstractproperty
 from functools import cached_property
 
 from llama_index.core import VectorStoreIndex
+from llama_index.core.base.response.schema import RESPONSE_TYPE
 from llama_index.core.readers.base import BaseReader
 from llama_index.core.schema import Document, NodeWithScore
 
@@ -63,5 +64,5 @@ class BaseETL(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def run(self, question: str) -> list[NodeWithScore]:
+    def run(self, question: str) -> RESPONSE_TYPE | list[NodeWithScore]:
         pass

@@ -10,6 +10,7 @@ from llama_index.readers.database import DatabaseReader
 from sqlalchemy import text
 
 from heavyrag.common.overrides import CustomPDFReader
+from heavyrag.documents.enums import DocType
 
 
 class DocumentDatabaseReader(DatabaseReader):
@@ -49,14 +50,14 @@ class DocumentDatabaseReader(DatabaseReader):
 
                 doc_metadata = {"database_doc_id": doc_id, "type": "document"}
 
-                if doc_type == "PDF":
-                    doc_metadata["doc_type"] = "PDF"
+                if doc_type == DocType.PDF.value:
+                    doc_metadata["doc_type"] = DocType.PDF.value
                     splitted_documents = CustomPDFReader().load_data_from_file_object(
                         BytesIO(content), file_name=file_name, extra_info=doc_metadata
                     )
                     documents.extend(splitted_documents)
-                elif doc_type == "TXT":
-                    doc_metadata["doc_type"] = "TXT"
+                elif doc_type == DocType.TXT.value:
+                    doc_metadata["doc_type"] = DocType.TXT.value
                     doc_metadata["file_name"] = file_name
                     documents.append(Document(text=content, metadata=doc_metadata))  # type: ignore
                 else:
