@@ -80,17 +80,17 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     enable_logprobs: bool = False
     custom_llm_logprobs_limit: int = 1
     # top-k
-    top_k_max_str_col_count_nl_to_sql: int = 30
-    top_k_max_str_col_count_nl_to_tables: int = 30
+    top_k_max_str_col_count_nl_to_sql: int = 50
+    top_k_max_str_col_count_nl_to_tables: int = 50
     # table order in prompt
     sort_prompt_tables_desc: bool = True
     # whether to include timestamp text on table prompt
     include_timestamp_on_table_info_prompt: bool = True
     # form a inline-column metadata(top-k, time-range) on table_info generation part of prompt making
     # if False, then column top-k and time-ranges should appear in a seperate paragraph block
-    inline_column_metadata_on_table_info_prompt: bool = False
+    inline_column_metadata_on_table_info_prompt: bool = True
     # delimiter for the column details when inline_column_metadata_on_table_info_prompt is enabled
-    inline_column_metadata_delimiter: str = ",\n"
+    inline_column_metadata_delimiter: str = "\n"
     # maximum count of allowed_tables on nl-to-tables endpoint. If the count exceeds, then
     # index updation and search will happen in-order to find relevant tables.
     allowed_tables_max_count_nl_to_tables: int = 20
