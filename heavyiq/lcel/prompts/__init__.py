@@ -1,15 +1,19 @@
 from langchain.prompts.prompt import PromptTemplate
 from langchain.schema.runnable import ConfigurableField
 
-from heavyiq.langchain.chains.heavydb.nl_to_answer import ANSWER_TEMPLATE, CUSTOM_LLM_ANSWER_TEMPLATE
-from heavyiq.langchain.chains.heavydb.nl_to_sql import CUSTOM_LLM_NL_TO_SQL_TEMPLATE as CUSTOM_NL_TO_SQL_TEMPLATE
-from heavyiq.langchain.chains.heavydb.nl_to_sql import (
-    CUSTOM_NL_TO_SQL_ERROR_TEMPLATE,
-    NL_TO_SQL_ERROR_TEMPLATE,
-    NL_TO_SQL_TEMPLATE,
-)
-from heavyiq.langchain.chains.heavydb.nl_to_tables import NL_TO_TABLES_CUSTOM_TEMPLATE, NL_TO_TABLES_TEMPLATE
-from heavyiq.lcel.prompts.question_prompt import TABLES_TO_NL_QUESTIONS_CUSTOM_TEMPLATE, TABLES_TO_NL_QUESTIONS_TEMPLATE
+from heavyiq.langchain.chains.heavydb.nl_to_answer import ANSWER_TEMPLATE
+from heavyiq.langchain.chains.heavydb.nl_to_sql import NL_TO_SQL_ERROR_TEMPLATE, NL_TO_SQL_TEMPLATE
+from heavyiq.langchain.chains.heavydb.nl_to_tables import NL_TO_TABLES_TEMPLATE
+from heavyiq.langchain.llms import LLMType
+from heavyiq.lcel.prompts.base import get_prompt_by_llm_type
+from heavyiq.lcel.prompts.question_prompt import TABLES_TO_NL_QUESTIONS_TEMPLATE
+
+CUSTOM_NL_TO_SQL_TEMPLATE = get_prompt_by_llm_type(LLMType.NL_TO_SQL)
+CUSTOM_NL_TO_SQL_ERROR_TEMPLATE = get_prompt_by_llm_type(LLMType.NL_TO_SQL_ERROR)
+CUSTOM_LLM_ANSWER_TEMPLATE = get_prompt_by_llm_type(LLMType.SQL_TO_ANSWER)
+NL_TO_TABLES_CUSTOM_TEMPLATE = get_prompt_by_llm_type(LLMType.NL_TO_TABLES)
+TABLES_TO_NL_QUESTIONS_CUSTOM_TEMPLATE = get_prompt_by_llm_type(LLMType.TABLES_TO_QUESTIONS)
+
 
 to_sql_prompt_runnable = PromptTemplate.from_template(NL_TO_SQL_TEMPLATE).configurable_alternatives(
     # This gives this field an id
