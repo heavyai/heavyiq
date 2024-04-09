@@ -101,6 +101,31 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     max_retries_nl_to_sql: int = 2
     # llm api-key
     heavylm_api_key: Optional[str] = None
+    # prompts
+    # nl to sql
+    custom_prompt_nl_to_sql_start_token: str = "<|sql prompt|>\n"
+    custom_prompt_nl_to_sql_body: Optional[str] = None
+    custom_prompt_nl_to_sql_end_token: str = "\n<|sql answer|>\n"
+    # nl to sql error
+    custom_prompt_nl_to_sql_error_start_token: str = "<|sql error prompt|>\n"
+    custom_prompt_nl_to_sql_error_body: Optional[str] = None
+    custom_prompt_nl_to_sql_error_end_token: str = "\n<|sql error answer|>\n"
+    # sql to answer
+    custom_prompt_sql_to_answer_start_token: str = "<|english prompt|>\n"
+    custom_prompt_sql_to_answer_body: Optional[str] = None
+    custom_prompt_sql_to_answer_end_token: str = "\n<|english answer|>\n"
+    # nl to tables
+    custom_prompt_nl_to_tables_start_token: str = "<|table prompt|>\n"
+    custom_prompt_nl_to_tables_body: Optional[str] = None
+    custom_prompt_nl_to_tables_end_token: str = "\n<|table answer|>\n"
+    # tables to questions
+    custom_prompt_tables_to_questions_start_token: str = "<|table question prompt|>\n"
+    custom_prompt_tables_to_questions_body: Optional[str] = None
+    custom_prompt_tables_to_questions_end_token: str = "\n<|table question answer|>\n"
+    # instruct
+    custom_prompt_instruct_start_token: str = "<|prompt|>\n"
+    custom_prompt_instruct_body: Optional[str] = None
+    custom_prompt_instruct_end_token: str = "\n<|prompt|>\n"
 
 
 class AppConfig(OverrideBaseConfig):  # type: ignore
