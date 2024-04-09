@@ -37,9 +37,11 @@ SQLQuery:"""
 NL_TO_SQL_PROMPT = PromptTemplate.from_template(NL_TO_SQL_TEMPLATE)
 
 CUSTOM_LLM_NL_TO_SQL_TEMPLATE = """<|sql prompt|>
-You are an experienced data analyst adept at writing SQL queries to answer user questions.
+You are an expert data analyst adept at writing SQL queries to answer user questions.
 
 You have access to the following relational tables, with schemas below.
+
+Alongside each text column, in parentheses "()" you will see the top 3 values followed by "..." for columns with more than 5 distinct values, or the top 5 values otherwise. For timestamp and date columns you will see the min/max range of the column.
 
 {table_info}
 
@@ -72,6 +74,8 @@ CUSTOM_NL_TO_SQL_ERROR_TEMPLATE = """<|sql error prompt|>
 You generated a SQL query that generated an exception when executed in the HeavyDB database.
 
 You have access to the following relation tables, with schemas below.
+
+Alongside each text column, in parentheses "()" you will see the top 3 values followed by "..." for columns with more than 5 distinct values, or the top 5 values otherwise. For timestamp and date columns you will see the min/max range of the column.
 
 {table_info}
 
