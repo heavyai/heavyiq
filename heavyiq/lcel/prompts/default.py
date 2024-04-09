@@ -1,17 +1,20 @@
-DEFAULT_NL_TO_SQL_PROMPT = """<|sql prompt|>
-You are an experienced data analyst adept at writing SQL queries to answer user questions.
+DEFAULT_NL_TO_SQL_PROMPT = (
+    "<|sql prompt|>\n",
+    """You are an experienced data analyst adept at writing SQL queries to answer user questions.
 
 You have access to the following relational tables, with schemas below.
 
 {table_info}
 
 Write a SQL query to answer the following question:
-{input}
-<|sql answer|>
-"""
+{input}""",
+    "\n<|sql answer|>\n",
+)
 
-DEFAULT_NL_TO_SQL_ERROR_PROMPT = """<|sql error prompt|>
-You generated a SQL query that generated an exception when executed in the HeavyDB database.
+
+DEFAULT_NL_TO_SQL_ERROR_PROMPT = (
+    "<|sql error prompt|>\n",
+    """You generated a SQL query that generated an exception when executed in the HeavyDB database.
 
 You have access to the following relation tables, with schemas below.
 
@@ -25,12 +28,13 @@ you generated the following SQL query:
 , which failed to run in the HeavyDB database, generating the following error:
 {error}
 
-Please alter the query to run without error in HeavyDB:
-<|sql error answer|>
-"""
+Please alter the query to run without error in HeavyDB:""",
+    "\n<|sql error answer|>\n",
+)
 
-DEFAULT_SQL_TO_ANSWER_PROMPT = """<|english prompt|>
-The user asked the following question:
+DEFAULT_SQL_TO_ANSWER_PROMPT = (
+    "<|english prompt|>\n",
+    """The user asked the following question:
 {input}
 
 By considering the following columns:
@@ -42,12 +46,13 @@ To answer the question, the following SQL query was generated:
 The following results were returned:
 {sql_result}
 
-Now explain the results in English, referencing the question and the SQL query as needed.
-<|english answer|>
-"""
+Now explain the results in English, referencing the question and the SQL query as needed.""",
+    "\n<|english answer|>\n",
+)
 
-DEFAULT_NL_TO_TABLES_PROMPT = """<|table prompt|>
-You are an experienced data analyst adept at analyzing user questions to determine the SQL tables required to generate an answer.
+DEFAULT_NL_TO_TABLES_PROMPT = (
+    "<|table prompt|>\n",
+    """You are an experienced data analyst adept at analyzing user questions to determine the SQL tables required to generate an answer.
 You have access to the following relational tables, with schemas below.
 
 {table_info}
@@ -55,21 +60,19 @@ You have access to the following relational tables, with schemas below.
 Emit each table name along with a 1 if the table is required to answer the following user question, or a 0 if the table is not required.
 
 Question: {input}
+""",
+    "\n<|table answer|>\n",
+)
 
-<|table answer|>
-"""
-
-DEFAULT_TABLES_TO_QUESTIONS_PROMPT = """<|table question prompt|>
-You are an experienced data analyst adept at asking compelling questions of your data.
+DEFAULT_TABLES_TO_QUESTIONS_PROMPT = (
+    "<|table question prompt|>\n",
+    """You are an experienced data analyst adept at asking compelling questions of your data.
 You have access to the following relational tables, with schemas below.
 
 {table_info}
 
-Write a compelling question to ask of the above data:
-<|table question answer|>
-"""
+Write a compelling question to ask of the above data:""",
+    """\n<|table question answer|>\n""",
+)
 
-DEFAULT_INSTRUCT_PROMPT = """<|prompt|>
-{question}
-<|answer|>
-"""
+DEFAULT_INSTRUCT_PROMPT = ("<|prompt|>\n", "{question}", "\n<|answer|>\n")

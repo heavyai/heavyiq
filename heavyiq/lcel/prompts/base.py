@@ -24,9 +24,10 @@ class BasePromptBuilder(metaclass=ABCMeta):
     def __init__(self):
         self._prompt = None
         start_token, body, end_token = self.get_prompt_parts_by_llm_type(self.llm_type)
-        self.start_token = start_token or ""
-        self.body = body or ""
-        self.end_token = end_token or ""
+        default_start_token, default_body, default_end_token = self.default_prompt
+        self.start_token = start_token or default_start_token
+        self.body = body or default_body
+        self.end_token = end_token or default_end_token
 
     @property
     @abstractmethod
@@ -81,7 +82,7 @@ class BasePromptBuilder(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def default_prompt(self) -> str:
+    def default_prompt(self) -> tuple[str, str, str]:
         """
         Default prompt.
         """
@@ -93,12 +94,8 @@ class BasePromptBuilder(metaclass=ABCMeta):
         """
         if self._prompt:
             return self._prompt
-        # build the prompt only if all the three parts are available
-        # else return the default prompt
-        if self.start_token and self.body and self.end_token:
-            self._prompt = self._build_prompt()
-            return self._prompt
-        return self.default_prompt
+        self._prompt = self._build_prompt()
+        return self._prompt
 
     def _build_prompt(self) -> str:
         """
@@ -119,7 +116,7 @@ class NLtoSQLPromptBuilder(BasePromptBuilder):
         return LLMType.NL_TO_SQL
 
     @property
-    def default_prompt(self) -> str:
+    def default_prompt(self) -> tuple[str, str, str]:
         return DEFAULT_NL_TO_SQL_PROMPT
 
 
@@ -133,7 +130,7 @@ class NLtoSQLErrorPromptBuilder(BasePromptBuilder):
         return LLMType.NL_TO_SQL_ERROR
 
     @property
-    def default_prompt(self) -> str:
+    def default_prompt(self) -> tuple[str, str, str]:
         return DEFAULT_NL_TO_SQL_ERROR_PROMPT
 
 
@@ -147,7 +144,7 @@ class SQLtoAnswerPromptBuilder(BasePromptBuilder):
         return LLMType.SQL_TO_ANSWER
 
     @property
-    def default_prompt(self) -> str:
+    def default_prompt(self) -> tuple[str, str, str]:
         return DEFAULT_SQL_TO_ANSWER_PROMPT
 
 
@@ -161,7 +158,7 @@ class NLtoTablesPromptBuilder(BasePromptBuilder):
         return LLMType.NL_TO_TABLES
 
     @property
-    def default_prompt(self) -> str:
+    def default_prompt(self) -> tuple[str, str, str]:
         return DEFAULT_NL_TO_TABLES_PROMPT
 
 
@@ -175,7 +172,7 @@ class TablestoQuestionsPromptBuilder(BasePromptBuilder):
         return LLMType.TABLES_TO_QUESTIONS
 
     @property
-    def default_prompt(self) -> str:
+    def default_prompt(self) -> tuple[str, str, str]:
         return DEFAULT_TABLES_TO_QUESTIONS_PROMPT
 
 
@@ -189,7 +186,7 @@ class InstructPromptBuilder(BasePromptBuilder):
         return LLMType.INSTRUCT
 
     @property
-    def default_prompt(self) -> str:
+    def default_prompt(self) -> tuple[str, str, str]:
         return DEFAULT_INSTRUCT_PROMPT
 
 
