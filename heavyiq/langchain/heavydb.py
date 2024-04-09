@@ -708,14 +708,31 @@ class HeavyDB:
         """
         self.logger.debug(f"Checking for {table} table cache refresh...")
         cache_key = f"{self._dbname}.{table}"
-        cached_schema = self.table_schema_cache.get(cache_key)
-        if cached_schema is None:
-            # no entry for the table on cache, so return False
+        keys_found = self.table_schema_cache.get_key_starts_with(cache_key)
+
+        # compare the LRU cache value stored for a particular table with the
+        # async_lru cache value (shorter cache) for the same table
+        most_recent_key_args = None
+        if keys_found:
+            most_recent_key = keys_found[-1]
+            cached_schema = self.table_schema_cache.get(most_recent_key)
+            if cached_schema is None:
+                # no entry for the table on cache, so return False
+                return False
+
+            _, _, x, y, z = most_recent_key.split(".")
+            most_recent_key_args = tuple([True if i == "True" else False for i in [x, y, z]])
+        else:
+            # no keys found to compare, so return False
             return False
 
         # check for any diff in current schema and cached schema
         # if yes then return True else return False
-        current_schema = await self._aget_raw_table_schema_from_thrift(table)
+        if most_recent_key_args:
+            current_schema = await self._aget_raw_table_schema_from_thrift(table, *most_recent_key_args)
+        else:
+            current_schema = await self._aget_raw_table_schema_from_thrift(table)
+
         if cached_schema == current_schema:
             self.logger.debug(f"Table {table} schema unchanged.")
             return False
@@ -729,7 +746,7 @@ class HeavyDB:
         """
         self.logger.debug(f"Deleteing all caches for the table {table}")
         cache_key = f"{self._dbname}.{table}"
-        self.table_schema_cache.delete(cache_key)
+        self.table_schema_cache.delete_by_key_prefix(cache_key)
         self.top_k_cache.delete(cache_key)
         self.sample_rows_cache.delete(cache_key)
         self.table_text_columns_count_cache.delete(cache_key)
@@ -827,8 +844,10 @@ class HeavyDB:
         ]
         return CustomTableDetails(name=table, columns=custom_columns, comment=table_comment)
 
-    @alru_cache(maxsize=32, ttl=10)
-    async def _aget_raw_table_schema_from_thrift(self, table: str) -> str:
+    @alru_cache(ttl=60)
+    async def _aget_raw_table_schema_from_thrift(
+        self, table: str, include_top_k: bool = True, include_timestamp: bool = True, include_comments: bool = True
+    ) -> str:
         """
         Method used to form table_schema from `get_table_details` thrift endpoint.
         """
@@ -837,35 +856,33 @@ class HeavyDB:
         table_name = f'"{table_details.name}"' if table_details.name.upper() in DB_KEYWORDS else f"{table_details.name}"
         schema_stmt = (
             "CREATE TABLE {table_name} /* {table_comment} */ (\n{column_details});"
-            if table_details.comment
+            if (include_comments and table_details.comment)
             else "CREATE TABLE {table_name} {table_comment}(\n{column_details});"
         )
         column_metadata_mapping = {}
-        if config.inline_column_metadata_on_table_info_prompt:
-            # always adds column metadata when add inline metada config flag is been enabled
-            text_columns, timestamp_columns = [], []
-            for col in table_details.columns:
-                if col.is_text_column:
-                    text_columns.append(col.name)
-                elif col.is_timestamp_column:
-                    timestamp_columns.append(col.name)
+        text_columns, timestamp_columns = [], []
+        for col in table_details.columns:
+            if col.is_text_column:
+                text_columns.append(col.name)
+            elif col.is_timestamp_column:
+                timestamp_columns.append(col.name)
 
-            if text_columns:
-                columns_top_k = await asyncio.gather(
-                    *[self.aget_column_top_k(table_details.name, col) for col in text_columns]
-                )
-                for colstr, (top_k_res, is_high_cardinality) in zip(text_columns, columns_top_k):
-                    if top_k_res and is_high_cardinality:
-                        column_metadata_mapping[colstr] = top_k_res[:-1] + [top_k_res[-1] + " ..."]
-                    elif top_k_res:
-                        column_metadata_mapping[colstr] = top_k_res
+        if include_top_k and text_columns:
+            columns_top_k = await asyncio.gather(
+                *[self.aget_column_top_k(table_details.name, col) for col in text_columns]
+            )
+            for colstr, (top_k_res, is_high_cardinality) in zip(text_columns, columns_top_k):
+                if top_k_res and is_high_cardinality:
+                    column_metadata_mapping[colstr] = top_k_res[:-1] + [top_k_res[-1] + " ..."]
+                elif top_k_res:
+                    column_metadata_mapping[colstr] = top_k_res
 
-            if timestamp_columns:
-                timestamp_values = await asyncio.gather(
-                    *[self.aget_column_timestamp(table_details.name, col) for col in timestamp_columns]
-                )
-                for colstr, (min_value, max_value) in zip(timestamp_columns, timestamp_values):
-                    column_metadata_mapping[colstr] = [min_value, max_value]
+        if include_timestamp and timestamp_columns:
+            timestamp_values = await asyncio.gather(
+                *[self.aget_column_timestamp(table_details.name, col) for col in timestamp_columns]
+            )
+            for colstr, (min_value, max_value) in zip(timestamp_columns, timestamp_values):
+                column_metadata_mapping[colstr] = [min_value, max_value]
 
         def format_column(column: CustomColumnDetails) -> str:
             """
@@ -880,40 +897,43 @@ class HeavyDB:
             if encoding:
                 parts.append(f"ENCODING {encoding}")
 
-            if config.inline_column_metadata_on_table_info_prompt:
-                # add column metadata (top-k, time-range) inline.
-                col_metadata = column_metadata_mapping.get(column.name)
-                if col_metadata:
-                    parts.append("({})".format(", ".join(col_metadata)))
+            # add column metadata (top-k, time-range) inline.
+            col_metadata = column_metadata_mapping.get(column.name)
+            if col_metadata:
+                parts.append("({})".format(", ".join(col_metadata)))
 
-            comment = f"/* {column.comment} */" if column.comment else ""
-            if comment:
-                parts.append(comment)
+            if include_comments:
+                comment = f"/* {column.comment} */" if column.comment else ""
+                if comment:
+                    parts.append(comment)
 
             return " ".join(parts)
 
+        table_comment = (table_details.comment or "") if include_comments else ""
         return schema_stmt.format(
             table_name=table_name,
-            table_comment=table_details.comment or "",
+            table_comment=table_comment,
             column_details=config.inline_column_metadata_delimiter.join(
                 [format_column(x) for x in table_details.columns]
             ),
         )
 
-    async def aget_table_schema(self, table: str) -> str:
+    async def aget_table_schema(
+        self, table: str, include_top_k: bool = True, include_timestamp: bool = True, include_comments: bool = True
+    ) -> str:
         """
         Get table schema from cache for from db async.
         """
         self.logger.debug(f"Getting schema for table {table}")
-        cache_key = f"{self._dbname}.{table}"
+        cache_key = f"{self._dbname}.{table}.{include_top_k}.{include_timestamp}.{include_comments}"
         cached_value = self.table_schema_cache.get(cache_key)
         if cached_value is not None:
             self.logger.debug(f"Got schema for table {table} from cache")
             return cached_value
-        # Get the schema of a table from db
-        # table_schema = await self._aget_raw_table_schema(table)
         # Get table schema from thrift endpoint
-        table_schema = await self._aget_raw_table_schema_from_thrift(table)
+        table_schema = await self._aget_raw_table_schema_from_thrift(
+            table, include_top_k=include_top_k, include_timestamp=include_timestamp, include_comments=include_comments
+        )
         self.table_schema_cache.put(cache_key, table_schema)
         self.logger.debug(f"Got schema for table {table}")
 
@@ -1034,7 +1054,12 @@ class HeavyDB:
         return top_k_strings
 
     async def aget_single_table_info(
-        self, table_name: str, include_samples: bool = True, include_top_k: bool = True, include_timestamp: bool = True
+        self,
+        table_name: str,
+        include_samples: bool = True,
+        include_top_k: bool = True,
+        include_timestamp: bool = True,
+        include_comments: bool = True,
     ) -> str:
         """Get information about a single table asynchronously."""
         all_table_names = self.get_usable_table_names()
@@ -1048,23 +1073,39 @@ class HeavyDB:
         # since aget_single_table_info can be called many times upon prompt generation in-order to get the desired table_info
         # within the context length
         # await self.check_and_invalidate_table_cache(table_name)
-
-        tasks = [self.aget_table_schema(table_name)]
-        if include_samples and self._sample_rows_in_table_info:
-            tasks.append(self.aget_sample_rows(table_name))
-
         config = get_config()
-        # adds top-k, time-range in seprate paragraphs
-        if not config.inline_column_metadata_on_table_info_prompt:
+        tasks = []
+        # if inline column metadata config enabled then
+        # let the get_table_schema method to return table schema along with top-k and timestamp text
+        # else make the method to return only schema long with optional comments
+        if config.inline_column_metadata_on_table_info_prompt:
+            tasks.append(
+                self.aget_table_schema(
+                    table_name,
+                    include_top_k=include_top_k,
+                    include_timestamp=include_timestamp,
+                    include_comments=include_comments,
+                )
+            )
+        else:
+            tasks.append(
+                self.aget_table_schema(
+                    table_name, include_top_k=False, include_timestamp=False, include_comments=include_comments
+                )
+            )
+            # since top-k, timestamp data not included on the table_schema text
+            # we have to detect it manually by calling it's relevant functions
             if include_top_k:
                 tasks.append(self.aget_top_k(table_name))
-
             if include_timestamp:
                 # include timestamp,date columns with min/max values
                 tasks.append(self.aget_timestamp(table_name))
 
+        if include_samples and self._sample_rows_in_table_info:
+            tasks.append(self.aget_sample_rows(table_name))
+
         results = await asyncio.gather(*tasks)
-        return "\n".join(results)
+        return "\n".join(results).strip()
 
     async def aget_table_info(self, table_names: Optional[list[str]] = None, **kwargs) -> str:
         """

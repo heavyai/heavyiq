@@ -25,7 +25,7 @@ nl_to_tables_prompt_rbl = (
 )
 
 
-async def get_tables(inputs: dict) -> list[str]:
+async def get_tables(inputs: dict, use_rag: bool = False) -> list[str]:
     """
     Return a list of allowed tables by doing similarity search on chroma db when tables length goes beyond certain limit.
     """
@@ -37,7 +37,7 @@ async def get_tables(inputs: dict) -> list[str]:
 
     found_tables: list[str] = []
 
-    if len(allowed_tables) > config.allowed_tables_max_count_nl_to_tables:
+    if (len(allowed_tables) > config.allowed_tables_max_count_nl_to_tables) or use_rag:
         heavydb_index = await aget_heavydb_index(session=inputs["session_id"])
         found_tables = await heavydb_index.asimple_search_for_table_names(
             inputs["question"],
@@ -45,6 +45,40 @@ async def get_tables(inputs: dict) -> list[str]:
         )
 
     return found_tables or allowed_tables
+
+
+async def get_and_retrieve_table_info(inputs: dict) -> str:
+    """
+    Identify tables and retieve it's relevant information.
+    """
+    tables_found = await get_tables(inputs, use_rag=False)
+    inputs["tables"] = tables_found
+    table_info = None
+
+    try:
+        table_info = await get_table_info(inputs)
+    except RuntimeError:
+        # if token exceeds for the previously passed tables
+        # then try to reduce the tables list by using the RAG approach
+        # this time unnecessary tables get filtered out
+
+        tables = await get_tables(inputs, use_rag=True)
+        if tables and (len(tables_found) == len(tables)):
+            tables.pop()
+        # try to reduce the table on each time until we get the table info
+        # without token limit exceeds exception being raised
+        while len(tables) >= 1:
+            inputs["tables"] = tables
+            try:
+                table_info = await get_table_info(inputs)
+            except RuntimeError:
+                tables.pop()
+            else:
+                break
+
+    if not table_info:
+        raise RuntimeError("Couldn't find suitable prompt provided token limit")
+    return table_info
 
 
 async def get_table_info(inputs: dict) -> str:
@@ -69,20 +103,28 @@ async def parse_output(text: str) -> dict[str, int]:
     return {x: int(y) for x, y in re.findall(r"(\w+):\s*([01])", text)}
 
 
+# TODO: remove the below commented code
 # Step 1
-# Find relevant tables by doing smilarity search on chroma db
-get_tables_lambda = configure_step(
-    RunnableLambda(get_tables),
-    run_name="Similarity Search for Relevant Tables",
-    step="Finding relevant tables by querying ChromaDB.",
-)
+# Find relevant tables by doing similarity search on chroma db
+# get_tables_lambda = configure_step(
+#     RunnableLambda(get_tables),
+#     run_name="Similarity Search for Relevant Tables",
+#     step="Finding relevant tables by querying ChromaDB.",
+# )
 
-# Step 2
-# Retrieve table information for the identified tables in order to construct the prompt
-retrieve_tables_info_lambda = configure_step(
-    RunnableLambda(get_table_info),
-    run_name="Retrieve Table Information",
-    step="Retrieving table information for the identified tables.",
+# # Step 2
+# # Retrieve table information for the identified tables in order to construct the prompt
+# retrieve_tables_info_lambda = configure_step(
+#     RunnableLambda(get_table_info),
+#     run_name="Retrieve Table Information",
+#     step="Retrieving table information for the identified tables.",
+# )
+
+# Step 1 and Step 2 combined
+get_and_retrieve_table_info_lambda = configure_step(
+    RunnableLambda(get_and_retrieve_table_info),
+    run_name="Get and Retrieve Table Information",
+    step="Identify and Retrieve table information.",
 )
 
 # Step 3
@@ -101,8 +143,7 @@ parse_output_lambda = configure_step(
 
 chain: Runnable = (
     (
-        RunnablePassthrough.assign(tables=get_tables_lambda)
-        | RunnablePassthrough.assign(table_info=retrieve_tables_info_lambda, input=lambda x: x["question"])
+        RunnablePassthrough.assign(table_info=get_and_retrieve_table_info_lambda, input=lambda x: x["question"])
         | prompt
         | model
         | StrOutputParser()  # needed for chat models to efficiently convert chat message instance to str
