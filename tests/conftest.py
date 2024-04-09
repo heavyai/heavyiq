@@ -1,3 +1,4 @@
+import asyncio
 import os
 import time
 from unittest.mock import patch
@@ -59,3 +60,10 @@ def print_total_time(request):
     total_time = end_time - start_time
 
     print(f"\nTotal time taken for all test cases: {total_time:.2f} seconds")
+
+
+# declare this before any other fixtures with the "session" scope
+# that may reference the event loop
+@pytest.fixture(scope="session")
+def event_loop():
+    return asyncio.get_event_loop()
