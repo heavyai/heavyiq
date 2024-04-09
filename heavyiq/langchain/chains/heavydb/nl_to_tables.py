@@ -13,7 +13,7 @@ from heavyiq.langchain.llms import is_using_custom_trained_llm
 from heavyiq.langchain.utils import apopulate_table_info_into_nl_to_tables_prompt
 
 NL_TO_TABLES_TEMPLATE = """
-You are an experienced data analyst adept at analyzing user questions to determine the SQL tables required to generate an answer.
+You are an expert data analyst adept at analyzing user questions to determine the SQL tables required to generate an answer.
 You have access to the following relational tables, with schemas below.
 
 {table_info}
@@ -24,8 +24,11 @@ Question: {input}
 Tables:"""
 
 NL_TO_TABLES_CUSTOM_TEMPLATE = """<|table prompt|>
-You are an experienced data analyst adept at analyzing user questions to determine the SQL tables required to generate an answer.
+You are an expert data analyst adept at analyzing user questions to determine the SQL tables required to generate an answer.
+
 You have access to the following relational tables, with schemas below.
+
+Alongside each text column, in parentheses "()" you will see the top 3 values followed by "..." for columns with more than 5 distinct values, or the top 5 values otherwise. For timestamp and date columns you will see the min/max range of the column.
 
 {table_info}
 

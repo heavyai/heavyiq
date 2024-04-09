@@ -1,8 +1,10 @@
 DEFAULT_NL_TO_SQL_PROMPT = (
     "<|sql prompt|>\n",
-    """You are an experienced data analyst adept at writing SQL queries to answer user questions.
+    """You are an expert data analyst adept at writing SQL queries to answer user questions.
 
 You have access to the following relational tables, with schemas below.
+
+Alongside each text column, in parentheses "()" you will see the top 3 values followed by "..." for columns with more than 5 distinct values, or the top 5 values otherwise. For timestamp and date columns you will see the min/max range of the column.
 
 {table_info}
 
@@ -17,6 +19,8 @@ DEFAULT_NL_TO_SQL_ERROR_PROMPT = (
     """You generated a SQL query that generated an exception when executed in the HeavyDB database.
 
 You have access to the following relation tables, with schemas below.
+
+Alongside each text column, in parentheses "()" you will see the top 3 values followed by "..." for columns with more than 5 distinct values, or the top 5 values otherwise. For timestamp and date columns you will see the min/max range of the column.
 
 {table_info}
 
@@ -52,8 +56,11 @@ Now explain the results in English, referencing the question and the SQL query a
 
 DEFAULT_NL_TO_TABLES_PROMPT = (
     "<|table prompt|>\n",
-    """You are an experienced data analyst adept at analyzing user questions to determine the SQL tables required to generate an answer.
+    """You are an expert data analyst adept at analyzing user questions to determine the SQL tables required to generate an answer.
+
 You have access to the following relational tables, with schemas below.
+
+Alongside each text column, in parentheses "()" you will see the top 3 values followed by "..." for columns with more than 5 distinct values, or the top 5 values otherwise. For timestamp and date columns you will see the min/max range of the column.
 
 {table_info}
 
@@ -66,8 +73,11 @@ Question: {input}
 
 DEFAULT_TABLES_TO_QUESTIONS_PROMPT = (
     "<|table question prompt|>\n",
-    """You are an experienced data analyst adept at asking compelling questions of your data.
+    """You are an expert data analyst adept at asking compelling questions of your data.
+
 You have access to the following relational tables, with schemas below.
+
+Alongside each text column, in parentheses "()" you will see the top 3 values followed by "..." for columns with more than 5 distinct values, or the top 5 values otherwise. For timestamp and date columns you will see the min/max range of the column.
 
 {table_info}
 
