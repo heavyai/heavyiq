@@ -23,7 +23,8 @@ from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
 from heavyiq.langchain.heavydb_utils import DB_KEYWORDS
-from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
+from heavyiq.utils import (LRUCache, calc_query_stats, is_destructive_sql,
+                           rate_sql_complexity, strip_sql_comments)
 
 
 class CustomColumnDetails(NamedTuple):
@@ -1183,8 +1184,8 @@ class HeavyDB:
     async def aextract_string_literal_ops(self, detailed_query_plan: str) -> dict[str, tuple[str, str]]:
         self.logger.debug(f"Extracting string literal operations from query plan: {detailed_query_plan}")
         result = {}
-        pattern1 = r"(NOT\()?(LIKE|PG_ILIKE|>=|<=|<>|=)\(\$(\d+), '([\w\- ]+)'"
-        pattern2 = r"(NOT\()?(LIKE|PG_ILIKE|>=|<=|<>|=)\('([\w\- ]+)', \$(\d+)\)"
+        pattern1 = r"(NOT\()?(LIKE|PG_ILIKE|>=|<=|<>|=)\(\$(\d+), '((?:''|[\w -])+)'\)"
+        pattern2 = r"(NOT\()?(LIKE|PG_ILIKE|>=|<=|<>|=)\('((?:''|[\w -])+)', \$(\d+)\)"
 
         matches1 = re.findall(pattern1, detailed_query_plan)
         matches2 = re.findall(pattern2, detailed_query_plan)
@@ -1241,7 +1242,11 @@ class HeavyDB:
 
         if total_count > 0:  # and literal["operator"] != "ILIKE":
             if exact_match_count == 0 and num_case_match_rows == 1:
-                altered_literal["literal"] = str(case_match_rows[0][0])
+                matched_literal = str(case_match_rows[0][0])
+                # if ' exists in matched rows, then one or more ' with exactly two single quotes
+                if "'" in matched_literal:
+                    matched_literal = re.sub(r"'+", "''", matched_literal)
+                altered_literal["literal"] = matched_literal
                 return altered_literal
             elif exact_match_count / total_count < exact_match_threshold:
                 if literal["operator"] in ("<>", "!=", "NOT LIKE", "NOT PG_ILIKE", "NOT ILIKE", "NOT PG_ILIKE"):
