@@ -5,12 +5,12 @@ Read raw documents from SQlite database table using DBReader
 from io import BytesIO
 from typing import List
 
+from heavyrag.common.overrides import CustomPDFReader
+from heavyrag.documents.enums import DocType
+from heavyrag.logging_conf import logger
 from llama_index.core.schema import Document
 from llama_index.readers.database import DatabaseReader
 from sqlalchemy import text
-
-from heavyrag.common.overrides import CustomPDFReader
-from heavyrag.documents.enums import DocType
 
 
 class DocumentDatabaseReader(DatabaseReader):
@@ -33,6 +33,7 @@ class DocumentDatabaseReader(DatabaseReader):
         Returns:
             List[Document]: A list of Document objects.
         """
+        logger.info("Reading and transforming a single uploaded document into multiple llama index documents.")
         documents = []
         with self.sql_database.engine.connect() as connection:
             if query is None:
@@ -63,6 +64,7 @@ class DocumentDatabaseReader(DatabaseReader):
                 else:
                     doc_str = ", ".join([f"{col}: {entry}" for col, entry in zip(result.keys(), item)])
                     documents.append(Document(text=doc_str))
+        logger.info("Done reading and transforming documents.")
         return documents
 
 

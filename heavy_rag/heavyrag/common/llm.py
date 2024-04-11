@@ -44,6 +44,7 @@ class OverrideVllmServer(VllmServer):
         sampling_params = dict(**params)
         sampling_params["prompt"] = prompt
         response = post_http_request(self.api_url, sampling_params, stream=False)
+        response.raise_for_status()
         output = get_completion_response(response)
 
         return CompletionResponse(text=output)
