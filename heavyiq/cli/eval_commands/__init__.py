@@ -23,9 +23,14 @@ from heavyiq.langchain.heavydb import heavydb_context
 from heavyiq.langchain.llms import LLMType, get_llm_by_type
 from heavyiq.logging_utils import get_heavyiq_logger
 
-from .utils import (aextract_tables_from_query, awrite_eval_results_header,
-                    awrite_eval_results_row, compute_prob_stats,
-                    sql_rate_reply, summarize_eval_results)
+from .utils import (
+    aextract_tables_from_query,
+    awrite_eval_results_header,
+    awrite_eval_results_row,
+    compute_prob_stats,
+    sql_rate_reply,
+    summarize_eval_results,
+)
 
 
 @click.group()
@@ -579,6 +584,8 @@ async def run_config_model_on_questions_lcel(
                     gold_queries = [gold_query] + optional_gold_queries
                     eval_res = None
                     for gold in gold_queries:
+                        if not gold:
+                            continue
                         eval_res = await sql_rate_reply(gold, pred_query, db=db, question=question)
                         if eval_res.get("success") == True:
                             gold_query = gold
