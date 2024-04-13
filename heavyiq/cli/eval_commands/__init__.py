@@ -23,14 +23,9 @@ from heavyiq.langchain.heavydb import heavydb_context
 from heavyiq.langchain.llms import LLMType, get_llm_by_type
 from heavyiq.logging_utils import get_heavyiq_logger
 
-from .utils import (
-    aextract_tables_from_query,
-    awrite_eval_results_header,
-    awrite_eval_results_row,
-    compute_prob_stats,
-    sql_rate_reply,
-    summarize_eval_results,
-)
+from .utils import (aextract_tables_from_query, awrite_eval_results_header,
+                    awrite_eval_results_row, compute_prob_stats,
+                    sql_rate_reply, summarize_eval_results)
 
 
 @click.group()
@@ -569,18 +564,25 @@ async def run_config_model_on_questions_lcel(
                 input_queue.task_done()
                 break
 
+            optional_gold_queries = []
             if has_id:
-                query_id, db_id, question, gold_query = item
+                query_id, db_id, question, gold_query, *optional_gold_queries = item
             else:
                 query_id = None
-                db_id, question, gold_query = item
+                db_id, question, gold_query, *optional_gold_queries = item
 
             db = await HeavyDB.from_env_async(db_id)
             pred_query, query_error = await predict_query(question, gold_query, db)
 
             if not query_error:
                 try:
-                    eval_res = await sql_rate_reply(gold_query, pred_query, db=db, question=question)
+                    gold_queries = [gold_query] + optional_gold_queries
+                    eval_res = None
+                    for gold in gold_queries:
+                        eval_res = await sql_rate_reply(gold, pred_query, db=db, question=question)
+                        if eval_res.get("success") == True:
+                            gold_query = gold
+                            break
                     if eval_res.get("error"):
                         del db
                         db = await HeavyDB.from_env_async(db_id)
