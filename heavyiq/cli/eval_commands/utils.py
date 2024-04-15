@@ -1,18 +1,16 @@
-import asyncio
-import csv
-import io
 import math
 import re
 from collections import Counter
 from itertools import permutations
 from typing import Any, Optional
 
-import aiocsv
 import aiofiles
 import numpy as np
 import pandas as pd
+import sqlparse
 from aiocsv.writers import AsyncWriter
 from fastapi.concurrency import run_in_threadpool
+from sqlparse.sql import Token
 
 from heavyiq.langchain import HeavyDB
 
@@ -63,6 +61,62 @@ def compute_prob_stats(selected_tokens: list[str], top_log_probs: list[dict[str,
     return prob_stats
 
 
+class SQL:
+    """
+    Class which helps to compare semantic equallity of two SQL queries.
+    """
+
+    ALIAS_RGX = re.compile(r"(?i) AS \w+")
+
+    def __init__(self, query: str) -> None:
+        # format the query by removing unnecesary whitespace, strip_comments, changing keywords to upper
+        self.query = sqlparse.format(query, strip_comments=True, strip_whitespace=True, keyword_case="upper")
+
+    @property
+    def tokenize(self) -> list[Token]:
+        return sqlparse.parse(self.query)[0].tokens
+
+    def _token_equals(self, current_token: Token, other_token: Token) -> bool:
+        """
+        Compare two tokens to check for equality.
+
+        Args:
+            current_token: token from current
+            other_token: token from other
+        """
+        if current_token == other_token:
+            return True
+        # check for any content diff after removing aliases
+        if self.ALIAS_RGX.sub("", current_token.value) == self.ALIAS_RGX.sub("", other_token.value):
+            return True
+
+        return False
+
+    def __eq__(self, other: object) -> bool:
+        """
+        Compare two SQL queries and return True if both are semantically equals else return False.
+        """
+        if not isinstance(other, SQL):
+            return NotImplemented
+        # check queries after formatting
+        if self.query == other.query:
+            return True
+        # tokenize and check
+        # token len check
+        current_tokens, other_tokens = self.tokenize, other.tokenize
+        if len(current_tokens) != len(other_tokens):
+            return False
+
+        for current_token, other_token in zip(current_tokens, other_tokens):
+            # skip whitespace
+            if not current_token or not other_token:
+                continue
+            if not self._token_equals(current_token, other_token):
+                return False
+
+        return True
+
+
 async def sql_rate_reply(
     gold_query: str, pred_query: str, db_id: str | None = None, db: HeavyDB | None = None, question: str | None = None
 ) -> dict[str, Any]:
@@ -74,7 +128,7 @@ async def sql_rate_reply(
         "error": None,
     }
     try:
-        if gold_query == pred_query:
+        if (gold_query == pred_query) or (SQL(pred_query) == SQL(gold_query)):
             query_metadata["success"] = True
             return query_metadata
         if not db:
