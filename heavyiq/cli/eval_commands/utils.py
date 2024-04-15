@@ -84,7 +84,7 @@ class SQL:
             current_token: token from current
             other_token: token from other
         """
-        if current_token == other_token:
+        if current_token.value == other_token.value:
             return True
         # check for any content diff after removing aliases
         if self.ALIAS_RGX.sub("", current_token.value) == self.ALIAS_RGX.sub("", other_token.value):
@@ -109,12 +109,21 @@ class SQL:
 
         for current_token, other_token in zip(current_tokens, other_tokens):
             # skip whitespace
-            if not current_token or not other_token:
+            if not current_token.value or not other_token.value:
                 continue
             if not self._token_equals(current_token, other_token):
                 return False
 
         return True
+
+
+def check_predicted_query_equals_gold_query(pred_query: str, gold_query: str) -> bool:
+    """
+    Determine if the predicted query is semantically equivalent to the gold query.
+    """
+    if (gold_query == pred_query) or (SQL(pred_query) == SQL(gold_query)):
+        return True
+    return False
 
 
 async def sql_rate_reply(
@@ -128,7 +137,7 @@ async def sql_rate_reply(
         "error": None,
     }
     try:
-        if (gold_query == pred_query) or (SQL(pred_query) == SQL(gold_query)):
+        if check_predicted_query_equals_gold_query(pred_query, gold_query):
             query_metadata["success"] = True
             return query_metadata
         if not db:

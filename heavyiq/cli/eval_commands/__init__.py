@@ -27,6 +27,7 @@ from .utils import (
     aextract_tables_from_query,
     awrite_eval_results_header,
     awrite_eval_results_row,
+    check_predicted_query_equals_gold_query,
     compute_prob_stats,
     sql_rate_reply,
     summarize_eval_results,
@@ -582,14 +583,13 @@ async def run_config_model_on_questions_lcel(
             if not query_error:
                 try:
                     gold_queries = [gold_query] + optional_gold_queries
-                    eval_res = None
                     for gold in gold_queries:
                         if not gold:
                             continue
-                        eval_res = await sql_rate_reply(gold, pred_query, db=db, question=question)
-                        if eval_res.get("success") == True:
+                        if check_predicted_query_equals_gold_query(pred_query, gold):
                             gold_query = gold
                             break
+                    eval_res = await sql_rate_reply(gold_query, pred_query, db=db, question=question)
                     if eval_res.get("error"):
                         del db
                         db = await HeavyDB.from_env_async(db_id)
