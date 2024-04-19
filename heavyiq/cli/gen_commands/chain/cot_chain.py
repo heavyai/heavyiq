@@ -7,8 +7,9 @@ from typing_extensions import Any
 
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
-from heavyiq.langchain.llms import LLMType, get_llm_by_type
 from heavyiq.langchain.utils import aget_table_info_wrt_token_limit
+from heavyiq.lcel.chains.utils import get_value_from_runnable_binding
+from heavyiq.lcel.llms import llm_runnable
 
 raw_prompt = """
 From the given natural language question and gold sql query, return the relevant Chain Of Thoughts reasoning back as an ordered list.
@@ -30,7 +31,7 @@ chat_openai = ChatOpenAI(model_name=config.openai_gpt_model, openai_api_key=conf
     )
 )
 
-llm = get_llm_by_type(LLMType.DEFAULT)
+llm_configured = llm_runnable.with_config(configurable={"llm": "default_llm"})
 
 custom_prompt = """From the given natural language question and gold sql query, return the relevant Chain Of Thoughts reasoning back as an ordered list.
 
@@ -85,7 +86,7 @@ async def get_prompt(inputs: dict[str, Any]) -> ChatPromptTemplate | PromptTempl
         partial_prompt = prompt.partial(question=question, query=query)
 
     table_info = await aget_table_info_wrt_token_limit(
-        llm=llm,
+        llm=get_value_from_runnable_binding(llm_configured),
         session=heavydb._conn._session,
         prompt=partial_prompt,
         table_names_to_use=tables,
@@ -103,12 +104,6 @@ async def format_output(inputs: dict) -> dict:
     return {**chain_inputs, "cot": inputs["cot"]}
 
 
-async def get_llm(inputs: dict):
-    if not config.custom_llm_type:
-        return chat_openai
-    return llm
-
-
 chain = (
     RunnableParallel(
         cot=(
@@ -120,7 +115,7 @@ chain = (
                 "tables": lambda x: x["tables"],
             }
             | RunnableLambda(get_prompt)  # type: ignore
-            | RunnableLambda(get_llm)
+            | llm_configured
             | StrOutputParser()
         ),
         inputs=RunnablePassthrough(),
