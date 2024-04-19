@@ -341,7 +341,10 @@ def get_tokenizer() -> Any:
 
     model_name = get_vllm_model_name(api_base=config.custom_llm_api_base).lower()
     model_local_path: str
-    if "llama" in model_name:
+    if "llama-3" in model_name:
+        tokenizer_cls = AutoTokenizer
+        model_local_path = "./heavyiq/langchain/tokenizer_models/llama3_model"
+    elif "llama" in model_name:
         tokenizer_cls = LlamaTokenizer
         model_local_path = "./heavyiq/langchain/tokenizer_models/llama_model"
     elif "deepseek" in model_name:
