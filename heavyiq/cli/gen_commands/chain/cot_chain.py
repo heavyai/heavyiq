@@ -44,6 +44,20 @@ Question: {question}
 SQLQuery: {query}
 ASSISTANT: """
 
+custom_llama_3_prompt = """<|begin_of_text|><|start_header_id|>user<|end_header_id|>
+
+From the given natural language question and gold sql query, return the relevant Chain Of Thoughts reasoning back as an ordered list.
+
+Question: [QUESTION]
+SQLQuery: [SINGLE SQL QUERY]
+Only use the tables listed below. Some of the tables may not be relevant.
+
+{table_info}
+
+Question: {question}
+SQLQuery: {query}
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"""
+
 
 async def get_prompt(inputs: dict[str, Any]) -> ChatPromptTemplate | PromptTemplate:
     """
@@ -67,7 +81,7 @@ async def get_prompt(inputs: dict[str, Any]) -> ChatPromptTemplate | PromptTempl
         partial_prompt = prompt.partial(question=question, query=query)
     else:
         # custom prompt
-        prompt = PromptTemplate.from_template(custom_prompt)
+        prompt = PromptTemplate.from_template(custom_llama_3_prompt)
         partial_prompt = prompt.partial(question=question, query=query)
 
     table_info = await aget_table_info_wrt_token_limit(
