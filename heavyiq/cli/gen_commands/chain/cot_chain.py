@@ -1,4 +1,6 @@
 # Gen command chain to generate Chain of Thoughts for the given question and gold query
+import re
+
 from langchain.chat_models.openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate, PromptTemplate
 from langchain.schema.output_parser import StrOutputParser
@@ -10,6 +12,15 @@ from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.utils import aget_table_info_wrt_token_limit
 from heavyiq.lcel.chains.utils import get_value_from_runnable_binding
 from heavyiq.lcel.llms import llm_runnable
+
+
+class COTOutputParser(StrOutputParser):
+    def parse(self, text: str) -> str:
+        """
+        Strips out empty space at the last or hanging bulletin point.
+        """
+        return re.sub(r"(?s)(?:\n\d+\.)?\s*$", "", text)
+
 
 raw_prompt = """
 From the given natural language question and gold sql query, return the relevant Chain Of Thoughts reasoning back as an ordered list.
@@ -115,8 +126,17 @@ chain = (
                 "tables": lambda x: x["tables"],
             }
             | RunnableLambda(get_prompt)  # type: ignore
-            | llm_configured
-            | StrOutputParser()
+            | llm_configured.bind(
+                stop=[
+                    "<|eot_id|>",
+                    "The final SQL query is:",
+                    "The resulting SQL query is:",
+                    "The final query is:",
+                    "SQL query:",
+                    "sql query:",
+                ]
+            )
+            | COTOutputParser()
         ),
         inputs=RunnablePassthrough(),
     )
