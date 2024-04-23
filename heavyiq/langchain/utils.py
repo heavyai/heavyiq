@@ -339,9 +339,12 @@ def get_tokenizer() -> Any:
 
     config = get_config()
 
-    model_name = get_vllm_model_name(api_base=config.custom_llm_api_base)
+    model_name = get_vllm_model_name(api_base=config.custom_llm_api_base).lower()
     model_local_path: str
-    if "llama" in model_name:
+    if "llama-3" in model_name:
+        tokenizer_cls = AutoTokenizer
+        model_local_path = "./heavyiq/langchain/tokenizer_models/llama3_model"
+    elif "llama" in model_name:
         tokenizer_cls = LlamaTokenizer
         model_local_path = "./heavyiq/langchain/tokenizer_models/llama_model"
     elif "deepseek" in model_name:
@@ -350,8 +353,11 @@ def get_tokenizer() -> Any:
     elif "starcoder-2" in model_name:
         tokenizer_cls = AutoTokenizer
         model_local_path = "./heavyiq/langchain/tokenizer_models/starcoder2_model"
+    elif ("mixtral" in model_name) or ("wizard" in model_name):
+        tokenizer_cls = AutoTokenizer
+        model_local_path = "./heavyiq/langchain/tokenizer_models/mixtral_model"
     else:
-        raise ValueError("Unsupported model found for tokenization. Aavailable models are 'llama' and 'deepseek'.")
+        raise ValueError("Unsupported model found for tokenization.")
 
     return tokenizer_cls.from_pretrained(model_local_path, local_files_only=True, legacy=False)
 

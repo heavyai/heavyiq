@@ -1,6 +1,8 @@
 # Gen command chain to generate Chain of Thoughts for the given question and gold query
-from langchain.chat_models import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
+import re
+
+from langchain.chat_models.openai import ChatOpenAI
+from langchain.prompts import ChatPromptTemplate, PromptTemplate
 from langchain.schema.output_parser import StrOutputParser
 from langchain.schema.runnable import ConfigurableField, RunnableLambda, RunnableParallel, RunnablePassthrough
 from typing_extensions import Any
@@ -8,6 +10,17 @@ from typing_extensions import Any
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.utils import aget_table_info_wrt_token_limit
+from heavyiq.lcel.chains.utils import get_value_from_runnable_binding
+from heavyiq.lcel.llms import llm_runnable
+
+
+class COTOutputParser(StrOutputParser):
+    def parse(self, text: str) -> str:
+        """
+        Strips out empty space at the last or hanging bulletin point.
+        """
+        return re.sub(r"(?s)(?:\n\d+\.)?\s*$", "", text)
+
 
 raw_prompt = """
 From the given natural language question and gold sql query, return the relevant Chain Of Thoughts reasoning back as an ordered list.
@@ -21,7 +34,7 @@ Only use the tables listed below. Some of the tables may not be relevant.
 config = get_config()
 
 # configurable model field where it's value can be passed from the invoke call
-chat_openai = ChatOpenAI(model_name=config.openai_gpt_model, openai_api_key=config.openai_api_key).configurable_fields(  # type: ignore
+chat_openai = ChatOpenAI(model_name=config.openai_gpt_model, openai_api_key=config.openai_api_key or "xxxxxxxxx").configurable_fields(  # type: ignore
     model_name=ConfigurableField(
         id="llm_model",
         name="LLM Model",
@@ -29,8 +42,36 @@ chat_openai = ChatOpenAI(model_name=config.openai_gpt_model, openai_api_key=conf
     )
 )
 
+llm_configured = llm_runnable.with_config(configurable={"llm": "default_llm"})
 
-async def get_prompt(inputs: dict[str, Any]) -> ChatPromptTemplate:
+custom_prompt = """From the given natural language question and gold sql query, return the relevant Chain Of Thoughts reasoning back as an ordered list.
+
+Question: [QUESTION]
+SQLQuery: [SINGLE SQL QUERY]
+Only use the tables listed below. Some of the tables may not be relevant.
+
+{table_info}
+
+Question: {question}
+SQLQuery: {query}
+ASSISTANT: """
+
+custom_llama_3_prompt = """<|begin_of_text|><|start_header_id|>user<|end_header_id|>
+
+From the given natural language question and gold sql query, return the relevant Chain Of Thoughts reasoning back as an ordered list.
+
+Question: [QUESTION]
+SQLQuery: [SINGLE SQL QUERY]
+Only use the tables listed below. Some of the tables may not be relevant.
+
+{table_info}
+
+Question: {question}
+SQLQuery: {query}
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"""
+
+
+async def get_prompt(inputs: dict[str, Any]) -> ChatPromptTemplate | PromptTemplate:
     """
     Gets the prompt.
     """
@@ -44,14 +85,20 @@ async def get_prompt(inputs: dict[str, Any]) -> ChatPromptTemplate:
         inputs.get("question"),
         inputs.get("query"),
     )
-    # build prompt from messages
-    messages = [("system", raw_prompt), ("human", "\nQuestion: {question}\nSQLQuery: {query}")]
-    prompt = ChatPromptTemplate.from_messages(messages)
-    partial_prompt = prompt.partial(question=question, query=query)
+    if not config.custom_llm_type:
+        # build prompt from messages
+        # openai prompt
+        messages = [("system", raw_prompt), ("human", "\nQuestion: {question}\nSQLQuery: {query}")]
+        prompt = ChatPromptTemplate.from_messages(messages)
+        partial_prompt = prompt.partial(question=question, query=query)
+    else:
+        # custom prompt
+        prompt = PromptTemplate.from_template(custom_llama_3_prompt)
+        partial_prompt = prompt.partial(question=question, query=query)
 
     table_info = await aget_table_info_wrt_token_limit(
-        llm=ChatOpenAI(openai_api_key=config.openai_api_key),
-        heavydb=heavydb,
+        llm=get_value_from_runnable_binding(llm_configured),
+        session=heavydb._conn._session,
         prompt=partial_prompt,
         table_names_to_use=tables,
     )
@@ -63,6 +110,7 @@ async def format_output(inputs: dict) -> dict:
     """
     Formats the final output.
     """
+    print(inputs)
     chain_inputs = inputs["inputs"].copy()
     return {**chain_inputs, "cot": inputs["cot"]}
 
@@ -78,8 +126,17 @@ chain = (
                 "tables": lambda x: x["tables"],
             }
             | RunnableLambda(get_prompt)  # type: ignore
-            | chat_openai
-            | StrOutputParser()
+            | llm_configured.bind(
+                stop=[
+                    "<|eot_id|>",
+                    "The final SQL query is:",
+                    "The resulting SQL query is:",
+                    "The final query is:",
+                    "SQL query:",
+                    "sql query:",
+                ]
+            )
+            | COTOutputParser()
         ),
         inputs=RunnablePassthrough(),
     )
