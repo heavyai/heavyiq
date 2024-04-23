@@ -276,6 +276,6 @@ async def generate_chain_of_thoughts(ctx: click.Context, gen_dataset_csv: str, b
 
     record_generator = batched_generator(generate_record(gen_dataset_csv, gen_str), batch_size=batch_size)
     chain_input_generator = generate_cot_chain_input(record_generator)
-    llm_config = {"configurable": {"llm_model": gpt_model}}
+    llm_config = {"configurable": {"llm_model": gpt_model, "llm_temperature": 0.2, "llm_max_tokens": 512}}
     cot_generator = generate_cot(chain_input_generator, chain=chain, config=llm_config)  # type: ignore
     await write_cot_output_to_csv(cot_generator, gen_str=gen_str)
