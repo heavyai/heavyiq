@@ -4,8 +4,8 @@ from heavyiq.api.models import QueryRequest, QuestionRequest
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.heavydb import heavydb_context
 from heavyiq.lcel.callbacks.file_callback import LogFileCallbackHandler
-from heavyiq.lcel.chains import answer_chain, sql_chain
-from heavyiq.lcel.runnables import StreamStepsRunnableWrapper
+from heavyiq.lcel.chains import answer_chain, sql_chain, sql_cot_chain
+from heavyiq.lcel.runnables import StreamLLMRunnableWrapper, StreamStepsRunnableWrapper
 from heavyiq.lcel.types import StepDict
 
 
@@ -23,6 +23,13 @@ async def streaming_query(request: QueryRequest, db: HeavyDB) -> AsyncIterator[S
     """
     async with heavydb_context(db):
         stream_chain = StreamStepsRunnableWrapper(sql_chain)
+        async for step in stream_chain.start(request.dict(), config={"callbacks": [LogFileCallbackHandler()]}):
+            yield step
+
+
+async def streaming_query_with_cot(request, db) -> AsyncIterator[StepDict]:
+    async with heavydb_context(db):
+        stream_chain = StreamLLMRunnableWrapper(sql_cot_chain)
         async for step in stream_chain.start(request.dict(), config={"callbacks": [LogFileCallbackHandler()]}):
             yield step
 

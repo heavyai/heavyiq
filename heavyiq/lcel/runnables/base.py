@@ -50,6 +50,27 @@ class StreamStepsRunnableWrapper(BaseRunnableWrapper):
                     yield {"event": "output", "data": json.dumps(step_value)}
 
 
+class StreamLLMRunnableWrapper(BaseRunnableWrapper):
+    """
+    Runnable wrapper which helps to stream the llm output.
+    """
+
+    async def start(self, input: Any, config: RunnableConfig | None = None, **kwargs) -> AsyncIterator[StepDict]:
+        """
+        Helps to stream intermediate steps.
+        """
+        async for step in self.chain.astream_log(input, config=config, **kwargs, include_tags=["stream_llm"]):
+            # yield intermediate-steps and final response
+            op = step.ops[0]["op"]
+            if op == "add":
+                step_path = step.ops[0]["path"]
+                step_value = step.ops[0]["value"]
+                if "streamed_output/-" in step_path:
+                    yield {"event": "stream", "data": step_value}
+                elif step_path == "/final_output" or step_path.startswith("/streamed_output/"):
+                    yield {"event": "output", "data": json.dumps(step_value)}
+
+
 class LLMGenerationRunnable(Runnable):
     """
     Mainly used to wrap the LanguageModel runnable to return LLMResult Generations.

@@ -13,7 +13,10 @@ CUSTOM_NL_TO_SQL_ERROR_TEMPLATE = get_prompt_by_llm_type(LLMType.NL_TO_SQL_ERROR
 CUSTOM_LLM_ANSWER_TEMPLATE = get_prompt_by_llm_type(LLMType.SQL_TO_ANSWER)
 NL_TO_TABLES_CUSTOM_TEMPLATE = get_prompt_by_llm_type(LLMType.NL_TO_TABLES)
 TABLES_TO_NL_QUESTIONS_CUSTOM_TEMPLATE = get_prompt_by_llm_type(LLMType.TABLES_TO_QUESTIONS)
-
+CUSTOM_NL_TO_SQL_COT_TEMPLATE = get_prompt_by_llm_type(LLMType.NL_TO_SQL_COT, prompt_type="custom")
+NL_TO_SQL_COT_TEMPLATE = get_prompt_by_llm_type(LLMType.NL_TO_SQL_COT, prompt_type="openai")
+NL_TO_SQL_COT_ERROR_TEMPLATE = get_prompt_by_llm_type(LLMType.NL_TO_SQL_COT_ERROR, prompt_type="openai")
+CUSTOM_NL_TO_SQL_COT_ERROR_TEMPLATE = get_prompt_by_llm_type(LLMType.NL_TO_SQL_COT_ERROR, prompt_type="custom")
 
 to_sql_prompt_runnable = PromptTemplate.from_template(NL_TO_SQL_TEMPLATE).configurable_alternatives(
     # This gives this field an id
@@ -45,4 +48,12 @@ to_questions_prompt_runnable = PromptTemplate.from_template(TABLES_TO_NL_QUESTIO
     ConfigurableField(id="prompt"),
     default_key="openai",
     custom=PromptTemplate.from_template(TABLES_TO_NL_QUESTIONS_CUSTOM_TEMPLATE),
+)
+
+to_sql_with_cot_prompt_runnable = PromptTemplate.from_template(NL_TO_SQL_COT_TEMPLATE).configurable_alternatives(
+    ConfigurableField(id="prompt"),
+    default_key="openai",
+    custom=PromptTemplate.from_template(CUSTOM_NL_TO_SQL_COT_TEMPLATE),
+    openai_error=PromptTemplate.from_template(NL_TO_SQL_COT_ERROR_TEMPLATE),
+    custom_error=PromptTemplate.from_template(CUSTOM_NL_TO_SQL_COT_ERROR_TEMPLATE),
 )
