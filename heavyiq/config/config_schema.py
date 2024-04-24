@@ -103,9 +103,9 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     heavylm_api_key: Optional[str] = None
     # prompts
     # nl to sql
-    custom_prompt_nl_to_sql_start_token: str = "<|sql prompt|>\n"
+    custom_prompt_nl_to_sql_start_token: str = "<|cot sql prompt|>\n"
     custom_prompt_nl_to_sql_body: Optional[str] = None
-    custom_prompt_nl_to_sql_end_token: str = "\n<|sql answer|>\n"
+    custom_prompt_nl_to_sql_end_token: str = "\n<|cot sql answer|>\n"
     # nl to sql error
     custom_prompt_nl_to_sql_error_start_token: str = "<|sql error prompt|>\n"
     custom_prompt_nl_to_sql_error_body: Optional[str] = None

@@ -1,17 +1,30 @@
 {
   "editor.formatOnSave": true,
-  "editor.rulers": [140],
-  "flake8.args": ["--config=setup.cfg"],
-  "flake8.path": ["${workspaceFolder}/venv/bin/python", "-m", "flake8"],
+  "editor.rulers": [
+    140
+  ],
+  "flake8.args": [
+    "--config=setup.cfg"
+  ],
+  "flake8.path": [
+    "${workspaceFolder}/venv/bin/python",
+    "-m",
+    "flake8"
+  ],
   "[python]": {
     "editor.defaultFormatter": "ms-python.black-formatter",
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
-      "source.organizeImports": true
+      "source.organizeImports": "explicit"
     }
   },
-  "black-formatter.args": ["--line-length", "120"],
-  "mypy-type-checker.args": ["--config-file=setup.cfg"],
+  "black-formatter.args": [
+    "--line-length",
+    "120"
+  ],
+  "mypy-type-checker.args": [
+    "--config-file=setup.cfg"
+  ],
   "mypy-type-checker.path": [
     "${workspaceFolder}/venv/bin/python",
     "-m",

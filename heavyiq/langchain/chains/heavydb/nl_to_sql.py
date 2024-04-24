@@ -36,7 +36,7 @@ Question: {input}
 SQLQuery:"""
 NL_TO_SQL_PROMPT = PromptTemplate.from_template(NL_TO_SQL_TEMPLATE)
 
-CUSTOM_LLM_NL_TO_SQL_TEMPLATE = """<|sql prompt|>
+CUSTOM_LLM_NL_TO_SQL_TEMPLATE = """<|cot sql prompt|>
 You are an expert data analyst adept at writing SQL queries to answer user questions.
 
 You have access to the following relational tables, with schemas below.
@@ -45,9 +45,9 @@ Alongside each text column, in parentheses "()" you will see the top 3 values fo
 
 {table_info}
 
-Write a SQL query to answer the following question:
+Write a SQL query to answer the following question, first outputting the chain-of-thought reasoning neccessary to go from question to answer, preceded by a "** Chain-of-Thought Reasoning **" header, and then the SQL query itself, preceded by a "** SQL Query **" header.
 {input}
-<|sql answer|>
+<|cot sql answer|>
 """
 CUSTOM_LLM_NL_TO_SQL_PROMPT = PromptTemplate.from_template(CUSTOM_LLM_NL_TO_SQL_TEMPLATE)
 
@@ -224,6 +224,7 @@ class NLtoSQLChain(BaseNLtoSQLChain):
             [gen_sql_prompt], callbacks=run_manager.get_child() if run_manager else None
         )
         sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
+        print(sql_cmd)
         verified = False
         retries = 0
 
@@ -251,6 +252,8 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                     [correct_error_prompt], callbacks=run_manager.get_child() if run_manager else None
                 )
                 sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
+                print("AAA")
+                print(sql_cmd)
 
         if not verified:
             self.write_callback_message(
@@ -294,7 +297,9 @@ class NLtoSQLChain(BaseNLtoSQLChain):
         response = await self.llm.agenerate_prompt(
             [gen_sql_prompt], callbacks=run_manager.get_child() if run_manager else None
         )
+        print(response)
         sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
+        print(sql_cmd)
         verified = False
         retries = 0
 
@@ -475,6 +480,7 @@ class NLtoSQLChatChain(BaseNLtoSQLChain):
         messages = gen_sql_prompt.to_messages()
         response = await self.llm.agenerate([messages], callbacks=run_manager.get_child() if run_manager else None)
         sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
+        #print(f"SQL: {sql_cmd}")
         sql_cmd = self.get_sql_query(sql_cmd)
         verified = False
         retries = 0
