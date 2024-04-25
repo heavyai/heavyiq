@@ -432,9 +432,15 @@ class COTQueryResponse(BaseModel):
         json_schema_extra = {
             "examples": [
                 {
-                    "sql": "SELECT COUNT(*) AS num_states, STATE_NAME FROM usa_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;",
+                    "sql": 'SELECT DATE_TRUNC(DAY, start_time) AS "day", COUNT(*) AS num_trips FROM austin_bikeshare_trips WHERE start_time IS NOT NULL GROUP BY "day" ORDER BY "day" ASC NULLS LAST;',
+                    "cot": [
+                        "1. The question asks to show the number of trips per day, which implies we need to count the number of trips for each day.",
+                        "2. To count the number of trips, we need to use the `COUNT(*)` aggregation function.",
+                        "3. The question also asks to show the results in chronological order, which implies we need to group the results by day.",
+                        "4. To group the results by day, we need to extract the day from the `start_time` column using the `DATE_TRUNC` function.",
+                        "5. We need to filter out any null values in the `start_time` column, so we add a `WHERE` clause with `start_time IS NOT NULL`.",
+                    ],
                     "sql_complexity": 3,
-                    "tables": ["usa_states"],
                     "feedback_id": "(Optional) xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
                 }
             ]
