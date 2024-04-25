@@ -48,7 +48,7 @@ Alongside each text column, in parentheses "()" you will see the top 3 values fo
 Write a SQL query to answer the following question, first outputting the chain-of-thought reasoning neccessary to go from question to answer, preceded by a "** Chain-of-Thought Reasoning **" header, and then the SQL query itself, preceded by a "** SQL Query **" header.
 {input}
 <|cot sql answer|>
-"""
+** Chain-of-Thought Reasoning **\n\n"""
 CUSTOM_LLM_NL_TO_SQL_PROMPT = PromptTemplate.from_template(CUSTOM_LLM_NL_TO_SQL_TEMPLATE)
 
 NL_TO_SQL_ERROR_TEMPLATE = """Correct the given SQL query:
@@ -172,7 +172,7 @@ class BaseNLtoSQLChain(BaseChain):
         Returns the generated sql and the lobprobs for each token.
         """
         first_generation = result.generations[0][0]  # type: ignore
-        sql_cmd = first_generation.text.strip()
+        sql_cmd = first_generation.text.split("** SQL Query **")[-1].strip()
         if logprobs := first_generation.generation_info.get("logprobs", {}):
             logprobs = logprobs.to_dict_recursive()
 
@@ -224,7 +224,6 @@ class NLtoSQLChain(BaseNLtoSQLChain):
             [gen_sql_prompt], callbacks=run_manager.get_child() if run_manager else None
         )
         sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
-        print(sql_cmd)
         verified = False
         retries = 0
 
@@ -252,8 +251,6 @@ class NLtoSQLChain(BaseNLtoSQLChain):
                     [correct_error_prompt], callbacks=run_manager.get_child() if run_manager else None
                 )
                 sql_cmd, logprobs = self.get_sql_cmd_and_logprobs_from_llm_result(response)
-                print("AAA")
-                print(sql_cmd)
 
         if not verified:
             self.write_callback_message(

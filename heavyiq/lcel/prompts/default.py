@@ -10,7 +10,7 @@ Alongside each text column, in parentheses "()" you will see the top 3 values fo
 
 Write a SQL query to answer the following question, first outputting the chain-of-thought reasoning neccessary to go from question to answer, preceded by a "** Chain-of-Thought Reasoning **" header, and then the SQL query itself, preceded by a "** SQL Query **" header.
 {input}""",
-    "\n<|cot sql answer|>\n",
+    "\n<|cot sql answer|>\n** Chain-of-Thought Reasoning **\n\n",
 )
 
 

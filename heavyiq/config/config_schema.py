@@ -105,7 +105,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     # nl to sql
     custom_prompt_nl_to_sql_start_token: str = "<|cot sql prompt|>\n"
     custom_prompt_nl_to_sql_body: Optional[str] = None
-    custom_prompt_nl_to_sql_end_token: str = "\n<|cot sql answer|>\n"
+    custom_prompt_nl_to_sql_end_token: str = "\n<|cot sql answer|>\n** Chain-of-Thought Reasoning**\n\n"
     # nl to sql error
     custom_prompt_nl_to_sql_error_start_token: str = "<|sql error prompt|>\n"
     custom_prompt_nl_to_sql_error_body: Optional[str] = None
