@@ -74,11 +74,12 @@ class COTJsonOutputParser(JsonOutputParser):
                 cot = out[0]
             else:
                 cot, sql = out
+            cot = cot.strip()
             return {"cot": cot.split("\n") if cot else [], "sql": sql}
         else:
             match = self.complete_rgx.search(text)
             if not match:
                 raise OutputParserException(f"Invalid json output: {text}", llm_output=text)
             group_dict = match.groupdict()
-            group_dict["cot"] = group_dict["cot"].split("\n")
+            group_dict["cot"] = group_dict["cot"].strip().split("\n")
             return group_dict

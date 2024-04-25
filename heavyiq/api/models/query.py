@@ -412,3 +412,30 @@ class AutoQueryResponse(QueryResponse):
                 }
             ]
         }
+
+
+class COTQueryResponse(BaseModel):
+    """
+    /query endpoint's response schema class.
+    """
+
+    sql: str = Field(..., description="A SQL statement")
+    cot: list[str] = Field(..., description="Ordered list of Chain of Thoughts")
+    sql_complexity: int = Field(..., description="The complexity level of the SQL statement")
+    feedback_id: str = Field(
+        ..., description="A unique identifier for this request that can be used to submit feedback about the response"
+    )
+    logprobs: dict = Field(..., description="Log probs for each generated token.")
+    total_score: float | None = Field(default=None, description="Total probablity score of all the Logprobs data.")
+
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {
+                    "sql": "SELECT COUNT(*) AS num_states, STATE_NAME FROM usa_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;",
+                    "sql_complexity": 3,
+                    "tables": ["usa_states"],
+                    "feedback_id": "(Optional) xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+                }
+            ]
+        }
