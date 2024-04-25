@@ -89,7 +89,7 @@ DEFAULT_INSTRUCT_PROMPT = ("<|prompt|>\n", "{question}", "\n<|answer|>\n")
 
 
 DEFAULT_NL_TO_SQL_COT_PROMPT = (
-    "<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n",
+    "<|cot sql prompt|>\n",
     """You are an expert data analyst adept at writing SQL queries to answer user questions.
 
 You have access to the following relational tables, with schemas below.
@@ -98,11 +98,9 @@ Alongside each text column, in parentheses "()" you will see the top 3 values fo
 
 {table_info}
 
-{format_instructions}
-
-Write a SQL query along with chain of thought reasoning necessary to answer the following question and ensure that the output structure adheres to the JSON schema outlined above:
+Write a SQL query to answer the following question, first outputting the chain-of-thought reasoning neccessary to go from question to answer, preceded by a "** Chain-of-Thought Reasoning **" header, and then the SQL query itself, preceded by a "** SQL Query **" header.
 {input}""",
-    "\n<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+    "\n<|cot sql answer|>\n** Chain-of-Thought Reasoning **\n\n",
 )
 
 DEFAULT_NL_TO_SQL_COT_ERROR_PROMPT = (

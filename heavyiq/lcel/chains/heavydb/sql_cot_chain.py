@@ -1,7 +1,7 @@
 from typing import Any
 
 from langchain.schema.runnable import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
-from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.pydantic_v1 import BaseModel, Field
 
 from heavyiq.langchain.heavydb import get_config
@@ -9,7 +9,7 @@ from heavyiq.langchain.llms import is_using_custom_trained_llm
 from heavyiq.langchain.utils import aget_table_info_wrt_token_limit
 from heavyiq.lcel.chains.utils import get_value_from_runnable_binding
 from heavyiq.lcel.llms import llm_runnable
-from heavyiq.lcel.output_parsers import OverrideJsonOutputParser
+from heavyiq.lcel.output_parsers import COTJsonOutputParser
 from heavyiq.lcel.prompts import to_sql_with_cot_prompt_runnable
 from heavyiq.lcel.types.sql_type import SqlChainWithCOTOutputType
 from heavyiq.utils import strip_sql_comments
@@ -20,17 +20,8 @@ from .sql_chain import (
     validation_step,
 )
 
-
-class SQLwithCOT(BaseModel):
-    sql: str = Field(description="Generated SQL Query")
-    cot: list[str] = Field(description="Generated Chain of Thoughts")
-
-
-parser = OverrideJsonOutputParser(pydantic_object=SQLwithCOT)
-# parser = JsonOutputParser(pydantic_object=SQLwithCOT)
-
 nl_to_sql_llm_rbl = llm_runnable.with_config(
-    configurable={"llm": "nl_to_sql", "llm_temperature": 0}, config={"tags": ["nl_to_sql_llm"]}  # type: ignore
+    configurable={"llm": "nl_to_sql", "llm_temperature": 0, "llm_max_tokens": 1024}, config={"tags": ["nl_to_sql_llm"]}  # type: ignore
 )
 nl_to_sql_error_llm_rbl = llm_runnable.with_config(
     configurable={"llm": "nl_to_sql_error", "llm_temperature": 0}, config={"tags": ["nl_to_sql_error_llm"]}  # type: ignore
@@ -55,7 +46,7 @@ async def get_table_info(sql_chain_inputs: dict) -> str:
     on_retry = True if sql_chain_inputs.get("sql_cmd") else False
 
     prompt_rbl = nl_to_sql_cot_retry_prompt_rbl if on_retry else nl_to_sql_cot_prompt_rbl
-    partial_inputs = {"input": sql_chain_inputs["question"], "format_instructions": parser.get_format_instructions()}
+    partial_inputs = {"input": sql_chain_inputs["question"]}
     if on_retry:
         partial_inputs.update({"sql_cmd": sql_chain_inputs["sql_cmd"], "error": sql_chain_inputs["error"]})  # type: ignore
 
@@ -73,7 +64,7 @@ table_info_runnable_lambda: Runnable = RunnableLambda(get_table_info).with_confi
         "metadata": {"step": "Retrieving table information for prompt."},
     }
 )
-query_variables = RunnablePassthrough.assign(table_info=table_info_runnable_lambda, input=lambda x: x["question"], format_instructions=lambda x: parser.get_format_instructions()).with_config(  # type: ignore
+query_variables = RunnablePassthrough.assign(table_info=table_info_runnable_lambda, input=lambda x: x["question"]).with_config(  # type: ignore
     config={
         "tags": ["intermediate-step"],
         "run_name": "Calculate Input Variables",
@@ -90,18 +81,7 @@ query_prompt: Runnable = nl_to_sql_cot_prompt_rbl.with_config(  # type: ignore
     }
 )
 # Step 3
-query_llm: Runnable = nl_to_sql_llm_rbl.bind(
-    stop=[
-        "<|eot_id|>",
-        "The final SQL query is:",
-        "The resulting SQL query is:",
-        "The final query is:",
-        "SQL query:",
-        "sql query:",
-    ],
-    echo=False,
-    frequency_penalty=1.1,
-).with_config(  # type: ignore
+query_llm: Runnable = nl_to_sql_llm_rbl.with_config(  # type: ignore
     config={
         "tags": ["intermediate-step"],
         "run_name": "call_llm",
@@ -110,7 +90,7 @@ query_llm: Runnable = nl_to_sql_llm_rbl.bind(
 )
 
 query_cot_runnable = (
-    (query_variables | query_prompt | query_llm.with_config({"run_name": "stream_llm"}) | parser)
+    (query_variables | query_prompt | query_llm.with_config({"run_name": "stream_llm"}) | COTJsonOutputParser())
     .with_config(config={"tags": ["nl_to_sql_cot_predict_query_runnable"], "run_name": "find_query"})  # type: ignore
     .with_types(input_type=SqlChainInputType)  # type: ignore
 )
@@ -132,7 +112,7 @@ final_step = RunnableLambda(
 
 # retry
 # Step 1
-retry_query_variables = RunnablePassthrough.assign(table_info=table_info_runnable_lambda, format_instructions=lambda x: parser.get_format_instructions(), input=lambda x: x["question"]).with_config(  # type: ignore
+retry_query_variables = RunnablePassthrough.assign(table_info=table_info_runnable_lambda, input=lambda x: x["question"]).with_config(  # type: ignore
     config={
         "tags": ["intermediate-step"],
         "run_name": "Retry: Calculate Input Variables",
@@ -165,8 +145,6 @@ async def unpack_cot(inputs: dict) -> dict:
     if not inputs:
         return inputs
     sql_with_cot = inputs.pop("sql_with_cot", None)
-    if sql_with_cot and isinstance(sql_with_cot, SQLwithCOT):
-        return {**inputs, "sql_cmd": sql_with_cot.sql, "cot": sql_with_cot.cot}
     if sql_with_cot and isinstance(sql_with_cot, dict):
         return {**inputs, "sql_cmd": sql_with_cot["sql"], "cot": sql_with_cot["cot"]}
     return inputs
@@ -195,7 +173,7 @@ revise_lambda: Runnable = RunnableLambda(revise_loop)
 
 chain: Runnable[Any, Any] = (
     (
-        RunnablePassthrough().assign(sql_with_cot=query_cot_runnable).with_types(output_type=SQLwithCOT)
+        RunnablePassthrough().assign(sql_with_cot=query_cot_runnable)
         | RunnableLambda(unpack_cot)
         | RunnablePassthrough().assign(
             max_revisions=lambda x: get_config().max_retries_nl_to_sql,

@@ -3,7 +3,7 @@ from json import JSONDecodeError
 from typing import Any, Callable
 
 from langchain_core.exceptions import OutputParserException
-from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 from langchain_core.output_parsers import json as jop
 from langchain_core.outputs import Generation
 
@@ -55,3 +55,30 @@ class OverrideJsonOutputParser(JsonOutputParser):
             except JSONDecodeError as e:
                 msg = f"Invalid json output: {text}"
                 raise OutputParserException(msg, llm_output=text) from e
+
+
+class COTJsonOutputParser(JsonOutputParser):
+    """
+    Custom JSON parser for parsing SQL COT output.
+    """
+
+    complete_rgx = re.compile(r"(?s)^\s*(?P<cot>.+?)\s*\*\*\s*SQL Query \*\*\s*(?P<sql>.+)")
+
+    def parse_result(self, result: list[Generation], *, partial: bool = False) -> Any:
+        text = result[0].text
+        text = text.strip()
+        if partial:
+            cot, sql = "", ""
+            out = text.split("** SQL Query **")
+            if len(out) == 1:
+                cot = out[0]
+            else:
+                cot, sql = out
+            return {"cot": cot.split("\n") if cot else [], "sql": sql}
+        else:
+            match = self.complete_rgx.search(text)
+            if not match:
+                raise OutputParserException(f"Invalid json output: {text}", llm_output=text)
+            group_dict = match.groupdict()
+            group_dict["cot"] = group_dict["cot"].split("\n")
+            return group_dict
