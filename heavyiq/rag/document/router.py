@@ -100,10 +100,9 @@ async def ask(request: AskDocumentRequest, collection_name: str = Depends(get_co
     Ask questions regrading the uploaded docs.
     """
     etl = DocumentIndexETL(
-        reader_cls=DocumentDatabaseReader,
+        collection_name=collection_name,
         reader_init_kwargs={"engine": engine},
     )
-    etl.collection_name = collection_name
     response = etl.run(request.question)
     output, metadata, source_nodes = response.response, response.metadata or {}, response.source_nodes
     output = re.sub(r"^Response\s*\d+\s*:\s*", "", output)

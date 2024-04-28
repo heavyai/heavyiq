@@ -13,21 +13,26 @@ async def insert_document(
     """
     Inserts document into sqlite documents table.
     """
-    file_content, path = None, None
+    file_content, filename = None, None
     if file:
         # Read the content of the file
         file_content = await file.read()
+        filename = file.filename
         document_type = DocumentTypeEnum.get_by_content_type(file.content_type)  # type: ignore
     elif file_path:
-        posix_path = Path(path)
-        document_type = DocumentTypeEnum.get_by_content_type(posix_path.name)
-        path = file_path
+        filename = Path(file_path).name
+        document_type = DocumentTypeEnum.get_by_content_type(filename)
     else:
         raise ValueError("Atleast file or file_path should be passed!")
 
+    # check for document exists
+    document = session.query(Document).filter_by(name=filename, collection_name=heavydb_name).first()
+    if document:
+        return None
+
     # Create a Document object
     document = Document(
-        name=file.filename, content=file_content, path=path, document_type=document_type, collection_name=heavydb_name
+        name=filename, content=file_content, path=file_path, document_type=document_type, collection_name=heavydb_name
     )
 
     # Add the Document object to the session and commit changes
