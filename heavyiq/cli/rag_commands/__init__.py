@@ -14,6 +14,8 @@ from heavyiq.rag.document.database import Session as DBSession
 from heavyiq.rag.document.database import engine
 from heavyiq.rag.document.operations import insert_document
 
+settings.hf_embedding_model = "sentence-transformers/all-MiniLM-L6-v2"
+
 
 @click.group()
 def rag():
@@ -75,9 +77,12 @@ async def run_documents_import(ctx: click.Context, rag_documents_folder: str) ->
     parent_folder = pathlib.Path(rag_documents_folder)
     tasks = []
     for heavydb_name, files in list_documents_grouped_by_heavydb_name(parent_folder).items():
-        print(heavydb_name, files)
         heavydb = await HeavyDB.from_env_async(db_name=heavydb_name)
-        tasks.append(import_documents(heavydb._dbname, files))
+        if heavydb_name != heavydb._dbname:
+            print(f"Invalid heavydb name {heavydb_name}, skipping...")
+            continue
+        heavydb.cleanup()
+        tasks.append(import_documents(heavydb_name, files))
 
     await asyncio.gather(*tasks)
     print(f"Successfully imported documents from {rag_documents_folder} folder.")
