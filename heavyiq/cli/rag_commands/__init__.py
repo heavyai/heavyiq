@@ -51,6 +51,7 @@ async def import_documents(heavydb_name: str, files: list[str]) -> bool:
     """
     Import documents.
     """
+    print(f"Importing {heavydb_name} database documents...")
     try:
         session = DBSession()
         tasks = [insert_document(session, heavydb_name, file_path=f) for f in files]
@@ -58,9 +59,6 @@ async def import_documents(heavydb_name: str, files: list[str]) -> bool:
         reader = DocumentDatabaseReader(engine=session.bind)
         sync_doc_index(reader, heavydb_name)
     except Exception as e:
-        import traceback
-
-        print(traceback.format_exc())
         print(f"Failed to import files for database {heavydb_name}, {e}")
         return False
     return True
@@ -100,16 +98,21 @@ async def run_documents_import(ctx: click.Context, rag_documents_folder: str) ->
 @click.option(
     "--llm-url", default="http://209.20.159.184:5000/v1", help="VLLM server url which ends with /v1", type=str
 )
+@click.option("--with-source", default=False, help="VLLM server url which ends with /v1", type=bool)
 @click.argument("question", type=str)
 @click.argument("dbname", type=str)
 @click.pass_context  # type: ignore
-async def ask(ctx: click.Context, question: str, dbname: str, file: str, llm_url: str, llm_model: str):
+async def ask(
+    ctx: click.Context, question: str, dbname: str, file: str, llm_url: str, llm_model: str, with_source: bool
+):
     """
     Ask questions about the uploaded documents specific to a particular database
     or specific to a particular file.
     """
     settings.llm_api_url = llm_url
     settings.llm_model = llm_model
+    settings.llm_max_tokens = 512
+    settings.llm_temperature = 0.0
     from heavyrag.documents.etl import DocumentIndexETL
 
     etl = DocumentIndexETL(
@@ -117,4 +120,10 @@ async def ask(ctx: click.Context, question: str, dbname: str, file: str, llm_url
         reader_init_kwargs={"engine": engine},
     )
     response = etl.run(question)
-    print(response.response)
+    print("=" * 50)
+    print(response.response.strip())
+    print("=" * 50)
+    if with_source:
+        for node in response.source_nodes:
+            print(node.get_content().strip())
+            print("-" * 50)
