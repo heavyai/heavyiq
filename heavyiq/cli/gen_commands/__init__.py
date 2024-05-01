@@ -11,6 +11,7 @@ from fastapi.concurrency import run_in_threadpool
 from langchain.chat_models.base import BaseChatModel
 from langchain.llms.base import BaseLLM
 from langchain.schema.runnable import Runnable, RunnablePassthrough
+from langchain_core.tracers.log_stream import RunLogPatch
 from langsmith import Client
 
 from heavyiq.cli.decorators import coro
@@ -30,7 +31,9 @@ from .utils import (
     generate_cot,
     generate_cot_chain_input,
     generate_record,
+    generate_sql_cot_chain_input,
     sql_rate_reply,
+    stream_cot,
     write_cot_output_to_csv,
 )
 
@@ -279,3 +282,68 @@ async def generate_chain_of_thoughts(ctx: click.Context, gen_dataset_csv: str, b
     llm_config = {"configurable": {"llm_model": gpt_model, "llm_temperature": 0.2, "llm_max_tokens": 512}}
     cot_generator = generate_cot(chain_input_generator, chain=chain, config=llm_config)  # type: ignore
     await write_cot_output_to_csv(cot_generator, gen_str=gen_str)
+
+
+@gen.command()
+@coro
+@click.option("--gpt_model", type=str, default="gpt-3.5-turbo-16k", help="OpenAI GPT model to be used.")
+@click.option("--batch_size", type=int, default=20, help="Batch size")
+@click.argument("gen_dataset_csv", type=str)
+@click.pass_context  # type: ignore
+async def stream_chain_of_thoughts(ctx: click.Context, gen_dataset_csv: str, batch_size: int, gpt_model: str):
+    """
+    gen cli command responsible for generating Chain of Thoughts reasoning based on the input question and golden query.
+    """
+    from .chain.cot_chain import stream_chain as chain
+
+    logger = get_heavyiq_logger()
+    if not await run_in_threadpool(os.path.exists, gen_dataset_csv):
+        raise Exception(f"gen_dataset_csv does not exist: {gen_dataset_csv}")
+
+    gen_id = uuid4().hex[:8]
+    gen_str = f"gen_{gen_id}"
+    logger.info(f"Invoking generate_chain_of_thoughts with gen_id: {gen_id}")
+
+    record_generator = batched_generator(generate_record(gen_dataset_csv, gen_str), batch_size=batch_size)
+    chain_input_generator = generate_cot_chain_input(record_generator)
+    llm_config = {"configurable": {"llm_model": gpt_model, "llm_temperature": 0.2, "llm_max_tokens": 512}}
+    cot_generator = stream_cot(chain_input_generator, chain=chain, config=llm_config)  # type: ignore
+    async for text in cot_generator:
+        op = text.ops[-1]
+        if "streamed_output/-" in op["path"]:
+            print(text.ops[-1]["value"], flush=True, end="")
+
+
+@gen.command()
+@coro
+@click.option("--batch_size", type=int, default=20, help="Batch size")
+@click.argument("gen_dataset_csv", type=str)
+@click.pass_context  # type: ignore
+async def stream_query_and_chain_of_thoughts(ctx: click.Context, gen_dataset_csv: str, batch_size: int):
+    """
+    gen cli command responsible for generating Chain of Thoughts reasoning based on the input question and golden query.
+    """
+    from heavyiq.lcel.chains.heavydb.sql_cot_chain import chain
+
+    logger = get_heavyiq_logger()
+    if not await run_in_threadpool(os.path.exists, gen_dataset_csv):
+        raise Exception(f"gen_dataset_csv does not exist: {gen_dataset_csv}")
+
+    gen_id = uuid4().hex[:8]
+    gen_str = f"gen_{gen_id}"
+    logger.info(f"Invoking generate_chain_of_thoughts with gen_id: {gen_id}")
+
+    record_generator = batched_generator(generate_record(gen_dataset_csv, gen_str), batch_size=batch_size)
+    chain_input_generator = generate_sql_cot_chain_input(record_generator)
+    llm_config = {"configurable": {"llm_temperature": 0.0, "llm_max_tokens": 700}}
+    # inputs = next(chain_input_generator)
+    cot_generator = stream_cot(chain_input_generator, chain=chain, config=llm_config)  # type: ignore
+    async for text in cot_generator:
+        print(text)
+        # op = text.ops[-1]
+        # if "streamed_output/-" in op["path"]:
+        #     print(text.ops[-1]["value"])
+    # async for inputs in chain_input_generator:
+    #     out = await chain.ainvoke(inputs[0], config=llm_config)
+    #     print(out)
+    #     break

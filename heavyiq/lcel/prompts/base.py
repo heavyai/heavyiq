@@ -1,10 +1,13 @@
 from abc import ABCMeta, abstractmethod
 from functools import cached_property
+from typing import Literal
 
 from heavyiq.config import get_config
 from heavyiq.langchain.llms import LLMType
 from heavyiq.lcel.prompts.default import (
     DEFAULT_INSTRUCT_PROMPT,
+    DEFAULT_NL_TO_SQL_COT_ERROR_PROMPT,
+    DEFAULT_NL_TO_SQL_COT_PROMPT,
     DEFAULT_NL_TO_SQL_ERROR_PROMPT,
     DEFAULT_NL_TO_SQL_PROMPT,
     DEFAULT_NL_TO_TABLES_PROMPT,
@@ -78,6 +81,10 @@ class BasePromptBuilder(metaclass=ABCMeta):
                 config.custom_prompt_instruct_body,
                 config.custom_prompt_instruct_end_token,
             )
+        if llm_type == LLMType.NL_TO_SQL_COT:
+            return (None, None, None)
+        if llm_type == LLMType.NL_TO_SQL_COT_ERROR:
+            return (None, None, None)
         raise ValueError(f"Prompt builder config not available for {llm_type} llm type")
 
     @property
@@ -96,6 +103,13 @@ class BasePromptBuilder(metaclass=ABCMeta):
             return self._prompt
         self._prompt = self._build_prompt()
         return self._prompt
+
+    @cached_property
+    def openai_prompt(self) -> str:
+        """
+        Gets the openai prompt. ie. only the prompt body
+        """
+        return self.default_prompt[1]
 
     def _build_prompt(self) -> str:
         """
@@ -190,6 +204,34 @@ class InstructPromptBuilder(BasePromptBuilder):
         return DEFAULT_INSTRUCT_PROMPT
 
 
+class NLtoSQLwithCOTPromptBuilder(BasePromptBuilder):
+    """
+    Builds NL to SQL with COT prompt template
+    """
+
+    @property
+    def llm_type(self) -> LLMType:
+        return LLMType.NL_TO_SQL_COT
+
+    @property
+    def default_prompt(self) -> tuple[str, str, str]:
+        return DEFAULT_NL_TO_SQL_COT_PROMPT
+
+
+class NLtoSQLwithCOTErrorPromptBuilder(BasePromptBuilder):
+    """
+    Builds NL to SQL with COT prompt template
+    """
+
+    @property
+    def llm_type(self) -> LLMType:
+        return LLMType.NL_TO_SQL_COT_ERROR
+
+    @property
+    def default_prompt(self) -> tuple[str, str, str]:
+        return DEFAULT_NL_TO_SQL_COT_ERROR_PROMPT
+
+
 LLMTypeBuilderMapping: dict[LLMType, BasePromptBuilder] = {
     LLMType.NL_TO_SQL: NLtoSQLPromptBuilder(),
     LLMType.NL_TO_SQL_ERROR: NLtoSQLErrorPromptBuilder(),
@@ -197,8 +239,12 @@ LLMTypeBuilderMapping: dict[LLMType, BasePromptBuilder] = {
     LLMType.NL_TO_TABLES: NLtoTablesPromptBuilder(),
     LLMType.TABLES_TO_QUESTIONS: TablestoQuestionsPromptBuilder(),
     LLMType.INSTRUCT: InstructPromptBuilder(),
+    LLMType.NL_TO_SQL_COT: NLtoSQLwithCOTPromptBuilder(),
+    LLMType.NL_TO_SQL_COT_ERROR: NLtoSQLwithCOTErrorPromptBuilder(),
 }
 
 
-def get_prompt_by_llm_type(llm_type: LLMType) -> str:
+def get_prompt_by_llm_type(llm_type: LLMType, prompt_type: Literal["custom", "openai"] = "custom") -> str:
+    if prompt_type == "openai":
+        return LLMTypeBuilderMapping[llm_type].openai_prompt
     return LLMTypeBuilderMapping[llm_type].prompt

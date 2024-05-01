@@ -412,3 +412,36 @@ class AutoQueryResponse(QueryResponse):
                 }
             ]
         }
+
+
+class COTQueryResponse(BaseModel):
+    """
+    /query endpoint's response schema class.
+    """
+
+    sql: str = Field(..., description="A SQL statement")
+    cot: list[str] = Field(..., description="Ordered list of Chain of Thoughts")
+    sql_complexity: int = Field(..., description="The complexity level of the SQL statement")
+    feedback_id: str = Field(
+        ..., description="A unique identifier for this request that can be used to submit feedback about the response"
+    )
+    logprobs: dict = Field(..., description="Log probs for each generated token.")
+    total_score: float | None = Field(default=None, description="Total probablity score of all the Logprobs data.")
+
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {
+                    "sql": 'SELECT DATE_TRUNC(DAY, start_time) AS "day", COUNT(*) AS num_trips FROM austin_bikeshare_trips WHERE start_time IS NOT NULL GROUP BY "day" ORDER BY "day" ASC NULLS LAST;',
+                    "cot": [
+                        "1. The question asks to show the number of trips per day, which implies we need to count the number of trips for each day.",
+                        "2. To count the number of trips, we need to use the `COUNT(*)` aggregation function.",
+                        "3. The question also asks to show the results in chronological order, which implies we need to group the results by day.",
+                        "4. To group the results by day, we need to extract the day from the `start_time` column using the `DATE_TRUNC` function.",
+                        "5. We need to filter out any null values in the `start_time` column, so we add a `WHERE` clause with `start_time IS NOT NULL`.",
+                    ],
+                    "sql_complexity": 3,
+                    "feedback_id": "(Optional) xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+                }
+            ]
+        }
