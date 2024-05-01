@@ -20,6 +20,15 @@ class SqlChainOutputType(BaseModel):
     error: str = Field(..., description="description about the error which might occur during query validation.")
 
 
+class SqlChainWithCOTOutputType(BaseModel):
+    """NLtoSQLwithCOT chain output type."""
+
+    query: str = Field(..., description="Generated query.")
+    cot: list[str] = Field(..., description="Chain of Thoughts")
+    sql_complexity: int = Field(..., description="sql complexity of the generated query.")
+    error: str = Field(..., description="description about the error which might occur during query validation.")
+
+
 class SqlChainIntermediateType(BaseModel):
     """NLtoSQL chain intermediate type, ie. query retry input type."""
 

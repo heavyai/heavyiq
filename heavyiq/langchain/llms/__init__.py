@@ -19,7 +19,9 @@ from .overrides import OverrideOpenAI, OverrideVLLMOpenAI
 class LLMType(Enum):
     DEFAULT = "default"
     NL_TO_SQL = "nl_to_sql"
+    NL_TO_SQL_COT = "nl_to_sql_cot"
     NL_TO_SQL_ERROR = "nl_to_sql_error"
+    NL_TO_SQL_COT_ERROR = "nl_to_sql_cot_error"
     SQL_TO_ANSWER = "sql_to_answer"
     NL_TO_TABLES = "nl_to_tables"
     TABLES_TO_QUESTIONS = "tables_to_questions"

@@ -221,6 +221,41 @@ async def generate_cot_chain_input(input_gen: AsyncGenerator):
         yield await asyncio.gather(*[generate_input(record) for record in record_inputs])
 
 
+async def generate_sql_cot_chain_input(input_gen: AsyncGenerator):
+    """
+    Generate input for Chain Of Thoghts Chain.
+    """
+
+    async def generate_input(row: list | tuple) -> dict:
+        try:
+            query_id, db_id, tables, question = row
+        except ValueError:
+            query_id = None
+            db_id, tables, question = row
+
+        heavydb = await get_connection(db_id)
+
+        return {
+            "question": question,
+            "db_id": db_id,
+            "session_id": heavydb._conn._session,
+            "tables": tables.split(","),
+            "query_id": query_id,
+        }
+
+    async for row in input_gen:
+        record_inputs = []
+        print(f"Generating chain inputs for {len(row)} records...")
+        if row and isinstance(row, list):
+            if isinstance(row[0], list):
+                for chain_input in row:
+                    record_inputs.append(chain_input)
+            else:
+                record_inputs.append(row)
+
+        yield await asyncio.gather(*[generate_input(record) for record in record_inputs])
+
+
 async def write_cot_output_to_csv(
     generator: AsyncGenerator,
     gen_str: str,
@@ -276,3 +311,15 @@ async def generate_cot(generator: AsyncGenerator, chain: Runnable, config: Runna
     async for chain_inputs_batch in generator:
         print(f"Processing {len(chain_inputs_batch)} records...")
         yield await chain.abatch(chain_inputs_batch, config=config)
+
+
+async def stream_cot(generator: AsyncGenerator, chain: Runnable, config: RunnableConfig | None = None):
+    async for chain_inputs_batch in generator:
+        for inputs in chain_inputs_batch:
+            async for txt in chain.astream_log(
+                inputs,
+                config=config,
+                # version="v1",
+                # include_names=["stream_llm", "find_query"],
+            ):
+                yield txt

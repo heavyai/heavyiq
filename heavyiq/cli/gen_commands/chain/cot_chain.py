@@ -5,6 +5,7 @@ from langchain.chat_models.openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate, PromptTemplate
 from langchain.schema.output_parser import StrOutputParser
 from langchain.schema.runnable import ConfigurableField, RunnableLambda, RunnableParallel, RunnablePassthrough
+from langchain_core.output_parsers import JsonOutputParser
 from typing_extensions import Any
 
 from heavyiq.config import get_config
@@ -141,4 +142,26 @@ chain = (
         inputs=RunnablePassthrough(),
     )
     | format_output
+)
+
+stream_chain = (
+    {
+        "question": lambda x: x["question"],
+        "query": lambda x: x["query"],
+        "session": lambda x: x.get("session"),
+        "heavydb": lambda x: x.get("heavydb"),
+        "tables": lambda x: x["tables"],
+    }
+    | RunnableLambda(get_prompt)  # type: ignore
+    | llm_configured.bind(
+        stop=[
+            "<|eot_id|>",
+            "The final SQL query is:",
+            "The resulting SQL query is:",
+            "The final query is:",
+            "SQL query:",
+            "sql query:",
+        ]
+    ).with_config({"run_name": "stream_llm"})
+    | JsonOutputParser().with_config({"run_name": "stream_parser"})
 )

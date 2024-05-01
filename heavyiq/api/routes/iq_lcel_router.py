@@ -14,6 +14,7 @@ from heavyiq.api.handlers import (
     handle_lcel_answer_request,
     handle_lcel_auto_query_request,
     handle_lcel_auto_question_request,
+    handle_lcel_cot_query_request,
     handle_lcel_query_request,
     handle_lcel_question_request,
     handle_lcel_tables_request,
@@ -26,6 +27,7 @@ from heavyiq.api.models import (
     AutoQueryResponse,
     AutoQuestionRequest,
     AutoQuestionResponse,
+    COTQueryResponse,
     QueryRequest,
     QueryResponse,
     QuestionRequest,
@@ -141,3 +143,17 @@ async def tables_to_questions(
     :param TablesToQuestionsRequest: Request Body
     """
     return await handle_lcel_tables_to_questions_request(*values)
+
+
+@lcelrouter.post("/cot_query", response_model=COTQueryResponse)
+async def query_with_cot(values: tuple[QueryRequest, HeavyDB] = Depends(valid_query_db_session)) -> COTQueryResponse:
+    """
+    Request to generate query with chain of thoughts for the given tables with all the information:
+
+    - **question**: Actual NL question asked.
+    - **tables**: List of tables to consider.
+    - **session_id**: HeavyDB session id.
+    \f
+    :param QueryRequest: Request Body
+    """
+    return await handle_lcel_cot_query_request(*values)
