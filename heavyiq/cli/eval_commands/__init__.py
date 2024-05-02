@@ -380,10 +380,10 @@ async def run_config_model_on_auto_questions(
                 break
 
             if has_id:
-                query_id, db_id, question, gold_query = item
+                query_id, db_id, question, gold_query, *optional_gold_queries = item
             else:
                 query_id = None
-                db_id, question, gold_query = item
+                db_id, question, gold_query, *optional_gold_queries = item
 
             chain_inputs = {
                 "query_id": query_id,
@@ -391,6 +391,7 @@ async def run_config_model_on_auto_questions(
                 "question": question,
                 "sql": gold_query,
                 "enable_query_stats": enable_query_stats,
+                "gold_queries": optional_gold_queries,
             }
 
             db = await HeavyDB.from_env_async(db_id)

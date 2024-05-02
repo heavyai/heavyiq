@@ -18,6 +18,7 @@ class InputType(BaseModel):
     question: str = Field(..., description="Natural Language question.")
     sql: str | None = Field(default=None, description="HeavyDB compatible SQL query.")
     enable_query_stats: bool = Field(default=True, description="Whether to calculate query stats or not.")
+    gold_queries: list[str] = Field(default=[], description="List of optional gold queries.")
 
 
 class OutputType(BaseModel):
@@ -61,6 +62,18 @@ async def compare_tables(inputs: dict) -> dict:
     return {**inputs, "error": error, "tables": pred_tables}
 
 
+def pick_matching_gold_query(pred_query: str, gold_queries: list[str]) -> str:
+    """
+    Return a matching gold query.
+    """
+    from heavyiq.cli.eval_commands.utils import check_predicted_query_equals_gold_query
+
+    for gold in gold_queries:
+        if check_predicted_query_equals_gold_query(pred_query, gold):
+            return gold
+    return gold_queries[0]
+
+
 async def compare_and_format_output(inputs: dict) -> dict:
     """
     Formats the llm results according to the chain's output schema.
@@ -68,10 +81,11 @@ async def compare_and_format_output(inputs: dict) -> dict:
     from heavyiq.cli.eval_commands.utils import sql_rate_reply
 
     sql_outputs = inputs["sql_outputs"]
-    gold_tables, pred_tables, gold_query, pred_query, error = (
+    gold_tables, pred_tables, gold_query, optional_gold_queries, pred_query, error = (
         sorted(inputs["gold_tables"]),
         sorted(sql_outputs["tables"]),
         inputs["sql"],
+        inputs["gold_queries"],
         sql_outputs["query"],
         sql_outputs["error"],
     )
@@ -93,6 +107,9 @@ async def compare_and_format_output(inputs: dict) -> dict:
             "error": error,
             "query_stats": {},
         }
+
+    # from the list of gold queries pick the exact matching if there's any
+    gold_query = pick_matching_gold_query(pred_query, [gold_query] + optional_gold_queries)
 
     db = await HeavyDB.from_session_async(session_id=inputs["session_id"])
     tasks = [sql_rate_reply(gold_query, pred_query, db=db)]
