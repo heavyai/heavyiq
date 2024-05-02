@@ -386,7 +386,7 @@ async def run_config_model_on_auto_questions(
                 query_id = None
                 db_id, question, gold_query, *optional_gold_queries = item
 
-            logger.debug(f'Processing "{question}"...')
+            logger.info(f'Processing "{question}"...')
 
             chain_inputs = {
                 "query_id": query_id,
