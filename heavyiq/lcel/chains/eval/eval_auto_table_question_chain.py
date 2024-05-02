@@ -112,7 +112,7 @@ async def compare_and_format_output(inputs: dict) -> dict:
     gold_query = pick_matching_gold_query(pred_query, [gold_query] + optional_gold_queries)
 
     db = await HeavyDB.from_session_async(session_id=inputs["session_id"])
-    tasks = [sql_rate_reply(gold_query, pred_query, db=db)]
+    tasks = [sql_rate_reply(gold_query, pred_query, db=db, question=inputs["question"])]
     if inputs["enable_query_stats"]:
         tasks.append(db.aquery_stats(pred_query))
     else:
