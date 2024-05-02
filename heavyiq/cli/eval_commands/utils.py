@@ -145,7 +145,8 @@ async def sql_rate_reply(
             db = await HeavyDB.from_env_async(db_name=db_id)
         gold_df_awaitable = run_in_threadpool(pd.read_sql, gold_query, db._conn)
         pred_df_awaitable = run_in_threadpool(pd.read_sql, pred_query, db._conn)
-        gold_df, pred_df = await gold_df_awaitable, await pred_df_awaitable
+        gold_df = await gold_df_awaitable
+        pred_df = await pred_df_awaitable
         num_gold_rows = len(gold_df.axes[0])  # type: ignore
         num_pred_rows = len(pred_df.axes[0])  # type: ignore
         num_gold_cols = len(gold_df.axes[1])  # type: ignore
