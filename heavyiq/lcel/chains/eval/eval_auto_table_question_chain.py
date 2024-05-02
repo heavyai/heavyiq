@@ -5,7 +5,7 @@ from fastapi.concurrency import run_in_threadpool
 from langchain.pydantic_v1 import BaseModel, Field
 from langchain.schema.runnable import Runnable, RunnableLambda, RunnablePassthrough
 
-from heavyiq.langchain.heavydb import HeavyDB
+from heavyiq.langchain.heavydb import HeavyDB, get_db
 
 from ..heavydb.auto_sql_chain import chain as auto_sql_chain
 
@@ -112,7 +112,7 @@ async def compare_and_format_output(inputs: dict) -> dict:
     # from the list of gold queries pick the exact matching if there's any
     gold_query = pick_matching_gold_query(pred_query, [gold_query] + optional_gold_queries)
 
-    db = await HeavyDB.from_session_async(session_id=inputs["session_id"])
+    db = await get_db(inputs["session_id"])
     tasks = [sql_rate_reply(gold_query, pred_query, db=db, question=inputs["question"])]
     if inputs["enable_query_stats"]:
         tasks.append(db.aquery_stats(pred_query))

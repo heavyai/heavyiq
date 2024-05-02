@@ -121,6 +121,7 @@ def check_predicted_query_equals_gold_query(pred_query: str, gold_query: str) ->
     """
     Determine if the predicted query is semantically equivalent to the gold query.
     """
+    pred_query, gold_query = pred_query.rstrip(";"), gold_query.rstrip(";")
     if (gold_query == pred_query) or (SQL(pred_query) == SQL(gold_query)):
         return True
     return False
