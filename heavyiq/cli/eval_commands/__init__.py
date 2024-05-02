@@ -14,7 +14,6 @@ from langchain.pydantic_v1 import BaseModel
 from langsmith import Client
 from thrift.transport.TTransport import TTransportException
 
-from heavyiq.cli.common import HeavyDBConnectionPool
 from heavyiq.cli.decorators import coro
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
@@ -344,7 +343,7 @@ async def run_config_model_on_auto_questions(
     eval_str = f"eval_{eval_id}"
     logger.info(f"Dataset ID: {eval_id}")
     has_id: bool = True
-    processor_count = 1
+    processor_count = batch_size
 
     async def producer(queue: asyncio.Queue, input_file_path: str):
         """
@@ -397,7 +396,7 @@ async def run_config_model_on_auto_questions(
                 "gold_queries": optional_gold_queries,
             }
 
-            db = await HeavyDBConnectionPool.get_connection(db_id)
+            db = await HeavyDB.from_env_async(db_id)
             async with heavydb_context(db):
                 chain_output = await chain.ainvoke(
                     chain_inputs, config={"configurable": {"llm_temperature": temperature}}
@@ -405,8 +404,6 @@ async def run_config_model_on_auto_questions(
             query_stats = chain_output["query_stats"].values()
             if not query_stats:
                 query_stats = [None, None, None, None, None]
-            if chain_output["error"]:
-                await HeavyDBConnectionPool.refresh_connection(db_id)
 
             output_item = (
                 query_id,
