@@ -113,16 +113,14 @@ async def compare_and_format_output(inputs: dict) -> dict:
     gold_query = pick_matching_gold_query(pred_query, [gold_query] + optional_gold_queries)
 
     db = await get_db(inputs["session_id"])
-    tasks = [sql_rate_reply(gold_query, pred_query, db=db, question=inputs["question"])]
-    if inputs["enable_query_stats"]:
-        tasks.append(db.aquery_stats(pred_query))
-    else:
-        async_lambda: Coroutine = asyncio.coroutine(lambda x: {})  # type: ignore
-        tasks.append(async_lambda)
-
     exception, query_stats, eval_res = None, {}, {"success": False, "status": "", "error": ""}
     try:
-        eval_res, query_stats = await asyncio.gather(*tasks)
+        # eval_res, query_stats = await asyncio.gather(*tasks)
+        eval_res = await sql_rate_reply(gold_query, pred_query, db=db, question=inputs["question"])
+        if eval_res["error"] and inputs["enable_query_stats"]:
+            # refresh connection if in case of sql_rate_reply error
+            db = await HeavyDB.from_session_async(inputs["session_id"])
+            query_stats = await db.aquery_stats(pred_query)
     except Exception as e:
         eval_res["success"] = False
         eval_res["status"] = "failed_to_calculate_query_stats"
