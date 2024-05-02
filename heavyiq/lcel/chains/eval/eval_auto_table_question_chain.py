@@ -91,6 +91,7 @@ async def compare_and_format_output(inputs: dict) -> dict:
     )
 
     has_tables_mismatch = True if gold_tables != pred_tables else False
+    optional_gold_queries = [q for q in optional_gold_queries if q.strip()]
 
     # has error then pred query failed to pass the validation step
     # or the tables might get mismatched. In this case, don't calculate sql_rate_reply and query_stats
