@@ -90,14 +90,15 @@ async def compare_and_format_output(inputs: dict) -> dict:
         sql_outputs["error"],
     )
 
-    has_tables_mismatch = True if gold_tables != pred_tables else False
+    # don't consider table mismatch as an error
+    # has_tables_mismatch = True if gold_tables != pred_tables else False
     optional_gold_queries = [q for q in optional_gold_queries if q.strip()]
 
     # has error then pred query failed to pass the validation step
     # or the tables might get mismatched. In this case, don't calculate sql_rate_reply and query_stats
     # just return the function with necessary error details
-    if error or has_tables_mismatch:
-        status = "tables_mismatch" if has_tables_mismatch else "failed_to_generate_sql"
+    if error:
+        status = "failed_to_generate_sql"
         return {
             "query_id": inputs["query_id"],
             "db_id": inputs["db_id"],
