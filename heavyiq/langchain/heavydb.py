@@ -629,12 +629,16 @@ class HeavyDB:
         return str(result[0])
 
     async def acomplexity(self, command: str) -> int:
-        self.logger.debug("Calculation SQL query complexity!")
-        command = strip_sql_comments(command)
-        plan = await self.aget_query_plan(command)
-        out = rate_sql_complexity(plan)
-        self.logger.debug("Successfully calculated SQL query complexity!")
-        return out
+        try:
+            self.logger.debug("Calculation SQL query complexity!")
+            command = strip_sql_comments(command)
+            plan = await self.aget_query_plan(command)
+            out = rate_sql_complexity(plan)
+            self.logger.debug("Successfully calculated SQL query complexity!")
+            return out
+        except Exception as e:
+            self.logger.error(f"Failed to calculate complexity, {e}")
+            return 0
 
     async def aquery_stats(self, command: str) -> dict[str, int]:
         command = strip_sql_comments(command)
