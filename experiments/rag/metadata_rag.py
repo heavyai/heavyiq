@@ -1,27 +1,35 @@
 import argparse
 import asyncio
-import logging
 import pickle
-import sys
 import time
+from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import chromadb.api
 import chromadb.api.client
 import chromadb.config
 import fitz
 import nest_asyncio
-from llama_index.core import VectorStoreIndex
+from llama_index.core import StorageContext, VectorStoreIndex, load_index_from_storage
 from llama_index.core.base.embeddings.base import BaseEmbedding
-from llama_index.core.extractors import QuestionsAnsweredExtractor, SummaryExtractor, TitleExtractor
+from llama_index.core.base.llms.types import CompletionResponse
+from llama_index.core.base.response.schema import RESPONSE_TYPE
+from llama_index.core.evaluation import BatchEvalRunner, FaithfulnessEvaluator, RelevancyEvaluator
+from llama_index.core.evaluation.faithfulness import DEFAULT_EVAL_TEMPLATE as DEFAULT_FAITH_EVAL_TEMPLATE
+from llama_index.core.evaluation.faithfulness import DEFAULT_REFINE_TEMPLATE as DEFAULT_FAITH_REFINE_TEMPLATE
+from llama_index.core.evaluation.relevancy import DEFAULT_EVAL_TEMPLATE as DEFAULT_REL_EVAL_TEMPLATE
+from llama_index.core.evaluation.relevancy import DEFAULT_REFINE_TEMPLATE as DEFAULT_REL_REFINE_TEMPLATE
+from llama_index.core.extractors import QuestionsAnsweredExtractor
 from llama_index.core.ingestion import IngestionPipeline
+from llama_index.core.llms.callbacks import llm_completion_callback
 from llama_index.core.node_parser import SentenceSplitter
-from llama_index.core.postprocessor import SimilarityPostprocessor
 from llama_index.core.prompts.base import PromptTemplate
 from llama_index.core.prompts.prompt_type import PromptType
-from llama_index.core.response_synthesizers import ResponseMode, get_response_synthesizer
+from llama_index.core.response_synthesizers import ResponseMode
 from llama_index.core.schema import BaseNode, MetadataMode, TextNode
+from llama_index.core.storage.docstore import SimpleDocumentStore
+from llama_index.core.storage.storage_context import DEFAULT_PERSIST_DIR as STORAGE_CONTEXT_DEFAULT_PERSIST_DIR
 from llama_index.core.utils import get_tqdm_iterable
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.langchain import LangChainLLM
@@ -34,8 +42,34 @@ from heavyiq.logging_utils import get_heavyiq_logger
 
 nest_asyncio.apply()
 
-RAW_LLM = get_llm_by_type(LLMType.DEFAULT)
-LLM = LangChainLLM(llm=RAW_LLM)
+
+class OverridedLangChainLLM(LangChainLLM):
+    """
+    Ovverrided to support async method (ainvoke).
+    """
+
+    @llm_completion_callback()
+    def complete(self, prompt: str, formatted: bool = False, **kwargs: Any) -> CompletionResponse:
+        if not formatted:
+            prompt = self.completion_to_prompt(prompt)
+
+        output_str = self._llm.invoke(prompt, **kwargs)
+        return CompletionResponse(text=output_str)
+
+    @llm_completion_callback()
+    async def acomplete(self, prompt: str, formatted: bool = False, **kwargs: Any) -> CompletionResponse:
+        if not formatted:
+            prompt = self.completion_to_prompt(prompt)
+
+        output_str = await self._llm.ainvoke(prompt, **kwargs)
+        return CompletionResponse(text=output_str)
+
+
+@lru_cache
+def get_llm() -> LangChainLLM:
+    return OverridedLangChainLLM(llm=get_llm_by_type(LLMType.DEFAULT, temperature=0.1, max_tokens=512))
+
+
 node_parser = SentenceSplitter(chunk_size=1024, chunk_overlap=128, paragraph_separator="\n\n")
 logger = get_heavyiq_logger()
 
@@ -77,10 +111,7 @@ QUESTION_TMPL = """Here is the context:
 Given the contextual information, \
 generate {num_questions} question and answer pairs that this context can provide \
 specific answers to which are unlikely to be found elsewhere.
-
-Higher-level summaries of surrounding context may be provided \
-as well. Try using these summaries to generate better questions \
-that this context can answer."""
+"""
 
 
 LLAMA3_USER_TMPL = """<|begin_of_text|><|start_header_id|>user<|end_header_id|>
@@ -95,6 +126,10 @@ PHI3_USER_TMPL = """<|user|>
 TEMPLATE_TO_USE = PHI3_USER_TMPL
 QUESTION_PROMPT_TMPL = TEMPLATE_TO_USE.format(user_message=QUESTION_TMPL)
 
+FAITH_EVAL_TEMPLATE = TEMPLATE_TO_USE.format(user_message=DEFAULT_FAITH_EVAL_TEMPLATE.template)
+FAITH_REFINE_TEMPLATE = TEMPLATE_TO_USE.format(user_message=DEFAULT_FAITH_REFINE_TEMPLATE.template)
+REL_EVAL_TEMPLATE = TEMPLATE_TO_USE.format(user_message=DEFAULT_REL_EVAL_TEMPLATE.template)
+REL_REFINE_TEMPLATE = TEMPLATE_TO_USE.format(user_message=DEFAULT_REL_REFINE_TEMPLATE.template)
 
 DEFAULT_TEXT_QA_PROMPT_TMPL = (
     "Context information is below.\n"
@@ -196,8 +231,8 @@ def read_url(url: str) -> list[BaseNode]:
 async def transform(nodes: list[BaseNode]) -> list[BaseNode]:
     extractors = [
         QuestionsAnsweredExtractor(
-            questions=3,
-            llm=LLM,
+            questions=5,
+            llm=get_llm(),
             prompt_template=QUESTION_PROMPT_TMPL,
             metadata_mode=MetadataMode.EMBED,
             num_workers=8,
@@ -257,30 +292,72 @@ async def insert(file_path: str):
         nodes = read_pdf(file_path)
         splitted_nodes = await transform(nodes)
         pickle_nodes(file_path, splitted_nodes)
-    with open("out.txt", "w") as w:
-        txt = ""
-        for n in splitted_nodes:
-            txt += n.get_content(metadata_mode=MetadataMode.ALL)
-            txt += "=" * 200
-        w.write(txt)
-    print("Started ingesting nodes to vectorDB")
-    ingest(splitted_nodes)
-    print("successfully added nodes to index.")
+
+    docstore = SimpleDocumentStore(namespace="documents")
+    await docstore.async_add_documents(splitted_nodes)
+    storage_context = StorageContext.from_defaults(
+        docstore=docstore,
+        vector_store=get_vectorstore(
+            COLLECTION_NAME,
+        ),
+    )
+    # this adds vectoreindex to storage_context
+    VectorStoreIndex(
+        splitted_nodes,
+        storage_context=storage_context,
+        show_progress=True,
+        use_async=True,
+        insert_batch_size=166,
+        embed_model=get_hf_embeddings(),
+    )
+    storage_context.persist()
+
+
+async def evaluate(query: str, response: RESPONSE_TYPE) -> dict:
+    faithfulness_evaluator = FaithfulnessEvaluator(
+        llm=get_llm(), eval_template=FAITH_EVAL_TEMPLATE, refine_template=FAITH_REFINE_TEMPLATE
+    )
+    relevancy_evaluator = RelevancyEvaluator(
+        llm=get_llm(), eval_template=REL_EVAL_TEMPLATE, refine_template=REL_REFINE_TEMPLATE
+    )
+    runner = BatchEvalRunner(
+        {"faithfulness": faithfulness_evaluator, "relevancy": relevancy_evaluator},
+        workers=2,
+    )
+    eval_results = await runner.aevaluate_responses([query], [response])
+    return eval_results
 
 
 async def ask(file_path: str, question: str):
-    if not is_pickle_path_exists(file_path):
-        print("Do insert before asking...")
-        sys.exit(0)
-    index = get_or_create_index(COLLECTION_NAME, use_async=True)
+    storage_context = StorageContext.from_defaults(
+        persist_dir=STORAGE_CONTEXT_DEFAULT_PERSIST_DIR,
+        vector_store=get_vectorstore(
+            COLLECTION_NAME,
+        ),
+    )
+    index = load_index_from_storage(
+        storage_context=storage_context, embed_model=get_hf_embeddings(), show_progress=True
+    )
     engine = index.as_query_engine(
-        llm=LLM,
+        llm=get_llm(),
         similarity_top_k=1,
         response_mode=ResponseMode.SIMPLE_SUMMARIZE,
         text_qa_template=DEFAULT_TEXT_QA_PROMPT,
     )
-    response = engine.query(question)
-    print(response.response)
+    response = await engine.aquery(question)
+    answer = response.response
+    print(answer)
+    print("=" * 100)
+    print("Source:")
+    print(response.source_nodes[0].get_content(metadata_mode=MetadataMode.ALL))
+    print("=" * 100)
+    relevancy_evaluator = RelevancyEvaluator(
+        llm=get_llm(), eval_template=REL_EVAL_TEMPLATE, refine_template=REL_REFINE_TEMPLATE
+    )
+    relevancy_result = await relevancy_evaluator.aevaluate_response(query=question, response=response)
+    print(
+        f"Relevancy Evaluator-> passing: {relevancy_result.passing}, score: {relevancy_result.score}, feedback: {relevancy_result.feedback}"
+    )
 
 
 async def main(file_path: str, question: str | None = None, action: Literal["ask", "insert"] = "ask"):
