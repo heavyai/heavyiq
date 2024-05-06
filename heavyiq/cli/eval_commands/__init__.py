@@ -343,7 +343,7 @@ async def run_config_model_on_auto_questions(
     eval_str = f"eval_{eval_id}"
     logger.info(f"Dataset ID: {eval_id}")
     has_id: bool = True
-    processor_count = 30
+    processor_count = batch_size
 
     async def producer(queue: asyncio.Queue, input_file_path: str):
         """
@@ -380,10 +380,12 @@ async def run_config_model_on_auto_questions(
                 break
 
             if has_id:
-                query_id, db_id, question, gold_query = item
+                query_id, db_id, question, gold_query, *optional_gold_queries = item
             else:
                 query_id = None
-                db_id, question, gold_query = item
+                db_id, question, gold_query, *optional_gold_queries = item
+
+            logger.info(f'Processing "{question}"...')
 
             chain_inputs = {
                 "query_id": query_id,
@@ -391,6 +393,7 @@ async def run_config_model_on_auto_questions(
                 "question": question,
                 "sql": gold_query,
                 "enable_query_stats": enable_query_stats,
+                "gold_queries": optional_gold_queries,
             }
 
             db = await HeavyDB.from_env_async(db_id)
@@ -398,8 +401,6 @@ async def run_config_model_on_auto_questions(
                 chain_output = await chain.ainvoke(
                     chain_inputs, config={"configurable": {"llm_temperature": temperature}}
                 )
-            # data = chain_output
-            # values_list = list(data.values())
             query_stats = chain_output["query_stats"].values()
             if not query_stats:
                 query_stats = [None, None, None, None, None]
