@@ -15,7 +15,7 @@ from llama_index.core import StorageContext, VectorStoreIndex, load_index_from_s
 from llama_index.core.base.embeddings.base import BaseEmbedding
 from llama_index.core.base.llms.types import CompletionResponse
 from llama_index.core.base.response.schema import RESPONSE_TYPE
-from llama_index.core.evaluation import BatchEvalRunner, FaithfulnessEvaluator, RelevancyEvaluator
+from llama_index.core.evaluation import BatchEvalRunner, EvaluationResult, FaithfulnessEvaluator, RelevancyEvaluator
 from llama_index.core.evaluation.faithfulness import DEFAULT_EVAL_TEMPLATE as DEFAULT_FAITH_EVAL_TEMPLATE
 from llama_index.core.evaluation.faithfulness import DEFAULT_REFINE_TEMPLATE as DEFAULT_FAITH_REFINE_TEMPLATE
 from llama_index.core.evaluation.relevancy import DEFAULT_EVAL_TEMPLATE as DEFAULT_REL_EVAL_TEMPLATE
@@ -26,7 +26,7 @@ from llama_index.core.llms.callbacks import llm_completion_callback
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.prompts.base import PromptTemplate
 from llama_index.core.prompts.prompt_type import PromptType
-from llama_index.core.response_synthesizers import ResponseMode
+from llama_index.core.response_synthesizers import ResponseMode, get_response_synthesizer
 from llama_index.core.schema import BaseNode, MetadataMode, TextNode
 from llama_index.core.storage.docstore import SimpleDocumentStore
 from llama_index.core.storage.storage_context import DEFAULT_PERSIST_DIR as STORAGE_CONTEXT_DEFAULT_PERSIST_DIR
@@ -44,10 +44,6 @@ nest_asyncio.apply()
 
 
 class OverridedLangChainLLM(LangChainLLM):
-    """
-    Ovverrided to support async method (ainvoke).
-    """
-
     @llm_completion_callback()
     def complete(self, prompt: str, formatted: bool = False, **kwargs: Any) -> CompletionResponse:
         if not formatted:
@@ -328,7 +324,7 @@ async def evaluate(query: str, response: RESPONSE_TYPE) -> dict:
     return eval_results
 
 
-async def ask(file_path: str, question: str):
+async def ask(file_path: str, question: str, do_evaluate: bool = True) -> tuple[RESPONSE_TYPE, None | EvaluationResult]:
     storage_context = StorageContext.from_defaults(
         persist_dir=STORAGE_CONTEXT_DEFAULT_PERSIST_DIR,
         vector_store=get_vectorstore(
@@ -345,28 +341,43 @@ async def ask(file_path: str, question: str):
         text_qa_template=DEFAULT_TEXT_QA_PROMPT,
     )
     response = await engine.aquery(question)
+    relevancy_result = None
+    if do_evaluate:
+        relevancy_evaluator = RelevancyEvaluator(
+            llm=get_llm(), eval_template=REL_EVAL_TEMPLATE, refine_template=REL_REFINE_TEMPLATE
+        )
+        relevancy_result = await relevancy_evaluator.aevaluate_response(query=question, response=response)
+    return response, relevancy_result
+
+
+async def print_ask(file_path: str, question: str, do_evaluate: bool = True) -> None:
+    response, relevancy_result = await ask(file_path=file_path, question=question, do_evaluate=do_evaluate)
     answer = response.response
     print(answer)
     print("=" * 100)
     print("Source:")
     print(response.source_nodes[0].get_content(metadata_mode=MetadataMode.ALL))
     print("=" * 100)
-    relevancy_evaluator = RelevancyEvaluator(
-        llm=get_llm(), eval_template=REL_EVAL_TEMPLATE, refine_template=REL_REFINE_TEMPLATE
-    )
-    relevancy_result = await relevancy_evaluator.aevaluate_response(query=question, response=response)
     print(
         f"Relevancy Evaluator-> passing: {relevancy_result.passing}, score: {relevancy_result.score}, feedback: {relevancy_result.feedback}"
     )
 
 
-async def main(file_path: str, question: str | None = None, action: Literal["ask", "insert"] = "ask"):
+async def main(
+    file_path: str,
+    question: str | None = None,
+    action: Literal["ask", "insert", "node"] = "ask",
+    return_node: bool = False,
+):
     out = None
     if action == "ask":
         assert question
         out = await ask(file_path, question)
     elif action == "insert":
         out = await insert(file_path)
+    elif action == "node":
+        splitted_nodes = unpickle_nodes(file_path)
+        print(splitted_nodes[3].get_content(metadata_mode=MetadataMode.ALL))
     if out:
         pass
 
