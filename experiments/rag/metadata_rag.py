@@ -27,12 +27,13 @@ from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.prompts.base import PromptTemplate
 from llama_index.core.prompts.prompt_type import PromptType
 from llama_index.core.response_synthesizers import ResponseMode, get_response_synthesizer
-from llama_index.core.schema import BaseNode, MetadataMode, TextNode
+from llama_index.core.schema import BaseNode, Document, MetadataMode, TextNode
 from llama_index.core.storage.docstore import SimpleDocumentStore
 from llama_index.core.storage.storage_context import DEFAULT_PERSIST_DIR as STORAGE_CONTEXT_DEFAULT_PERSIST_DIR
 from llama_index.core.utils import get_tqdm_iterable
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.langchain import LangChainLLM
+from llama_index.readers.smart_pdf_loader import SmartPDFLoader
 from llama_index.readers.web.simple_web.base import SimpleWebPageReader
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
@@ -66,10 +67,11 @@ def get_llm() -> LangChainLLM:
     return OverridedLangChainLLM(llm=get_llm_by_type(LLMType.DEFAULT, temperature=0.1, max_tokens=512))
 
 
-node_parser = SentenceSplitter(chunk_size=1024, chunk_overlap=128, paragraph_separator="\n\n")
+node_parser = SentenceSplitter(chunk_size=1024, chunk_overlap=128)
 logger = get_heavyiq_logger()
 
 COLLECTION_NAME = "documents"
+llmsherpa_api_url = "http://localhost:5010/api/parseDocument?renderFormat=all"
 file_path = "sources/rag_documents/flight_1/heavydb.pdf"
 pickle_file_path = "pickle/"
 doc = fitz.open(file_path)
@@ -126,7 +128,6 @@ FAITH_EVAL_TEMPLATE = TEMPLATE_TO_USE.format(user_message=DEFAULT_FAITH_EVAL_TEM
 FAITH_REFINE_TEMPLATE = TEMPLATE_TO_USE.format(user_message=DEFAULT_FAITH_REFINE_TEMPLATE.template)
 REL_EVAL_TEMPLATE = TEMPLATE_TO_USE.format(user_message=DEFAULT_REL_EVAL_TEMPLATE.template)
 REL_REFINE_TEMPLATE = TEMPLATE_TO_USE.format(user_message=DEFAULT_REL_REFINE_TEMPLATE.template)
-
 DEFAULT_TEXT_QA_PROMPT_TMPL = (
     "Context information is below.\n"
     "---------------------\n"
@@ -214,6 +215,30 @@ def read_pdf(file_path: str) -> list[BaseNode]:
     return nodes
 
 
+def read_pdf_smart(file_or_url_path: str) -> list[Document]:
+    """
+    Create Document for each section chunk.
+    """
+    pdf_loader = SmartPDFLoader(llmsherpa_api_url=llmsherpa_api_url)
+    doc = pdf_loader.pdf_reader.read_pdf(file_or_url_path)
+    documents, extra_info = [], {"file_name": file_or_url_path.split("/")[-1]}
+    for section in doc.sections():
+        # section info
+        chunk = f"{section.to_context_text()}\n\n"
+        # store child types involved (ie. para, table, list)
+        chunk_types: list[str] = []
+        for child in section.children:
+            chunk += child.to_context_text(include_section_info=False)
+            chunk_types.append(child.tag)
+        document = Document(
+            text=chunk,
+            extra_info={**extra_info, "chunk_types": ",".join(set(chunk_types))},
+        )
+        documents.append(document)
+
+    return documents
+
+
 def read_url(url: str) -> list[BaseNode]:
     """
     Reads a web page, converts it to text, splits into chunks.
@@ -280,13 +305,22 @@ def unpickle_nodes(file_path: str) -> list[BaseNode] | None:
     return nodes
 
 
-async def insert(file_path: str):
+async def insert(file_path: str, pdf_parser: Literal["pymupdf", "llmsherpa"] = "llmsherpa"):
     if is_pickle_path_exists(file_path):
         logger.info("Unpacking nodes from pickle file.")
         splitted_nodes = unpickle_nodes(file_path)
     else:
-        nodes = read_pdf(file_path)
-        splitted_nodes = await transform(nodes)
+        if pdf_parser == "pymupdf":
+            nodes = read_pdf(file_path)
+            splitted_nodes = await transform(nodes)
+        elif pdf_parser == "llmsherpa":
+            nodes = read_pdf_smart(file_path)
+            extractors = [
+                node_parser,
+                get_hf_embeddings(),
+            ]
+            pipeline = IngestionPipeline(transformations=[*extractors])
+            splitted_nodes = await pipeline.arun(nodes=nodes, in_place=False, show_progress=True)
         pickle_nodes(file_path, splitted_nodes)
 
     docstore = SimpleDocumentStore(namespace="documents")
@@ -294,7 +328,7 @@ async def insert(file_path: str):
     storage_context = StorageContext.from_defaults(
         docstore=docstore,
         vector_store=get_vectorstore(
-            COLLECTION_NAME,
+            "sherpa",
         ),
     )
     # this adds vectoreindex to storage_context
@@ -328,7 +362,7 @@ async def ask(file_path: str, question: str, do_evaluate: bool = True) -> tuple[
     storage_context = StorageContext.from_defaults(
         persist_dir=STORAGE_CONTEXT_DEFAULT_PERSIST_DIR,
         vector_store=get_vectorstore(
-            COLLECTION_NAME,
+            "sherpa",
         ),
     )
     index = load_index_from_storage(
@@ -336,7 +370,7 @@ async def ask(file_path: str, question: str, do_evaluate: bool = True) -> tuple[
     )
     engine = index.as_query_engine(
         llm=get_llm(),
-        similarity_top_k=1,
+        similarity_top_k=2,
         response_mode=ResponseMode.SIMPLE_SUMMARIZE,
         text_qa_template=DEFAULT_TEXT_QA_PROMPT,
     )
@@ -356,7 +390,9 @@ async def print_ask(file_path: str, question: str, do_evaluate: bool = True) -> 
     print(answer)
     print("=" * 100)
     print("Source:")
-    print(response.source_nodes[0].get_content(metadata_mode=MetadataMode.ALL))
+    for k in response.source_nodes:
+        print(k.get_content())
+        print("-" * 100)
     print("=" * 100)
     print(
         f"Relevancy Evaluator-> passing: {relevancy_result.passing}, score: {relevancy_result.score}, feedback: {relevancy_result.feedback}"
@@ -372,12 +408,14 @@ async def main(
     out = None
     if action == "ask":
         assert question
-        out = await ask(file_path, question)
+        out = await print_ask(file_path, question)
     elif action == "insert":
         out = await insert(file_path)
     elif action == "node":
         splitted_nodes = unpickle_nodes(file_path)
-        print(splitted_nodes[3].get_content(metadata_mode=MetadataMode.ALL))
+        for n in splitted_nodes:
+            print(n.get_content(metadata_mode=MetadataMode.ALL))
+            print("=" * 100)
     if out:
         pass
 
