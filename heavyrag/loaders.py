@@ -13,7 +13,7 @@ def get_meta(file_path: str) -> dict:
     Helps to form metadata from the passed filepath.
     """
     splits = file_path.split("/")
-    return {"file_path": file_path, "dbname": splits[-2], "filename": splits[-1], "type": "document"}
+    return {"file_path": file_path, "dbname": splits[-2], "name": splits[-1], "type": "document"}
 
 
 def _exclude_metadata(documents: list[Document]) -> list[Document]:
@@ -28,7 +28,7 @@ def _exclude_metadata(documents: list[Document]) -> list[Document]:
             [
                 "file_path",
                 "dbname",
-                "filename",
+                "name",
                 "type",
             ]
         )
@@ -36,7 +36,7 @@ def _exclude_metadata(documents: list[Document]) -> list[Document]:
             [
                 "file_path",
                 "dbname",
-                "filename",
+                "name",
                 "type",
             ]
         )

@@ -22,8 +22,8 @@ class OverrideSmartPDFLoader(SmartPDFLoader):
         pdf_path_or_url = str(pdf_path_or_url.resolve()) if isinstance(pdf_path_or_url, PosixPath) else pdf_path_or_url
         doc = self.pdf_reader.read_pdf(pdf_path_or_url)
         extra_info = extra_info or {}
-        if "filename" not in extra_info:
-            extra_info["filename"] = pdf_path_or_url.split("/")[-1]
+        if "name" not in extra_info:
+            extra_info["name"] = pdf_path_or_url.split("/")[-1]
         documents = []
         for section in doc.sections():
             # section info

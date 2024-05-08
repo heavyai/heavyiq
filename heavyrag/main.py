@@ -1,10 +1,17 @@
 import asyncio
 from collections import defaultdict
 
+from llama_index.core.base.response.schema import RESPONSE_TYPE
+from llama_index.core.evaluation import EvaluationResult
 from llama_index.core.indices.base import BaseIndex
+from llama_index.core.response_synthesizers import ResponseMode
 
+from heavyrag.evaluate import aevaluate_response_by_relevancy
+from heavyrag.filters import get_document_filter_matches
 from heavyrag.index import acreate_index_and_insert_nodes, get_index
+from heavyrag.llm import get_llm
 from heavyrag.loaders import aload_file, aload_files_from_directory
+from heavyrag.prompts import TEXT_QA_PROMPT
 from heavyrag.transform import atransform
 
 
@@ -48,3 +55,31 @@ async def ainsert_document(filepath: str, heavydb_name: str) -> BaseIndex:
         index.insert_nodes(nodes=nodes, show_progress=True)
 
     return index
+
+
+async def ask_document(
+    question: str, heavydb_name: str, file_name: str | None = None, do_evaluate: bool = True
+) -> tuple[RESPONSE_TYPE, EvaluationResult | None]:
+    """
+    Ask questions about a document or a group of documents mapped to a particular database.
+    """
+    index = get_index(collection_name=heavydb_name)
+    if not index:
+        raise ValueError(f"VectorStoreIndex not found {heavydb_name} collection.")
+
+    filters = None
+    if file_name:
+        filters = get_document_filter_matches(file_name=file_name)
+
+    engine = index.as_query_engine(
+        llm=get_llm(),
+        filters=filters,
+        similarity_top_k=2,
+        response_mode=ResponseMode.SIMPLE_SUMMARIZE,
+        text_qa_template=TEXT_QA_PROMPT,
+    )
+    response, eval_result = await engine.aquery(question), None
+    if do_evaluate:
+        eval_result = await aevaluate_response_by_relevancy(question=question, response=response)
+
+    return response, eval_result
