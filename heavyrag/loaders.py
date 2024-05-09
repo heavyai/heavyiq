@@ -1,9 +1,13 @@
 # Module for loading documents using various readers such as PDFReader, DatabasReader, etc
+from itertools import chain
+
 from llama_index.core import SimpleDirectoryReader
 from llama_index.core.schema import Document
 
 from heavyiq.config import get_config
-from heavyrag.readers import OverrideSmartPDFLoader, TxtFileReader
+from heavyiq.langchain.heavydb import HeavyDB
+from heavyiq.utils import semaphore_gather
+from heavyrag.readers import HeavyDBTableReader, OverrideSmartPDFLoader, TxtFileReader
 
 CONFIG = get_config()
 
@@ -75,3 +79,24 @@ async def aload_file(filepath: str) -> list[Document]:
     assert reader, "Invalid file to read!"
     documents = await reader.aload_data(filepath, extra_info=get_meta(filepath))
     return _exclude_metadata(documents)
+
+
+async def aload_table(heavydb: HeavyDB, table_name: str) -> list[Document]:
+    """
+    Load HeavyDB table.
+    """
+    reader = HeavyDBTableReader(heavydb=heavydb)
+    documents = await reader.aload_data(table_name=table_name)
+    return _exclude_metadata(documents)
+
+
+async def aload_tables(heavydb: HeavyDB, exlude_tables: list[str] | None = None) -> list[Document]:
+    """
+    Load all tables.
+    """
+    exlude_tables = exlude_tables or []
+    reader = HeavyDBTableReader(heavydb=heavydb)
+    tasks = [reader.aload_data(table_name=i) for i in heavydb.get_usable_table_names() if i not in exlude_tables]
+    result = await semaphore_gather(5, tasks)  # run only 5 tasks at a time
+    flattened_list = list(chain.from_iterable(result))
+    return _exclude_metadata(flattened_list)

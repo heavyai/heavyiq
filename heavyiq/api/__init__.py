@@ -59,6 +59,36 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
         set_llm_cache(InMemoryLLMCache())
 
 
+def include_rag_routers(app: FastAPI) -> None:
+    """
+    Include RAG routers
+    """
+    from heavyiq.rag.router import doc_router, table_router
+
+    app.include_router(
+        doc_router,
+        prefix="/rag/documents",
+        tags=["rag.documents"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "model": ErrorResponse,
+            }
+        },
+    )
+    app.include_router(
+        table_router,
+        prefix="/rag/tables",
+        tags=["rag.tables"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "model": ErrorResponse,
+            }
+        },
+    )
+
+
 def create_app(config_path: str = "./config.toml") -> FastAPI:
     """
     create and return a FastAPI instance.
@@ -164,6 +194,9 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
             }
         },
     )
+    # RAG routers
+    include_rag_routers(app)
+
     if config.enable_debug_endpoints:
         from heavyiq.api.routes.debug_router import debug_router
         from heavyiq.api.routes.runnable_router import runnable_router

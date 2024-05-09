@@ -17,7 +17,7 @@ def format_prompt(prompt_template: str) -> str:
     return RAG_TEMPLATE.format(
         start_token=CONFIG.custom_llm_api_rag_prompt_start_token,
         user_message=prompt_template,
-        end_token=CONFIG.custom_llm_api_rag_prompt_start_token,
+        end_token=CONFIG.custom_llm_api_rag_prompt_end_token,
     )
 
 
@@ -26,3 +26,21 @@ REL_REFINE_TEMPLATE = format_prompt(prompt_template=DEFAULT_REL_REFINE_TEMPLATE.
 
 TEXT_QA_PROMPT_TMPL = format_prompt(prompt_template=DEFAULT_TEXT_QA_PROMPT_TMPL)
 TEXT_QA_PROMPT = PromptTemplate(TEXT_QA_PROMPT_TMPL, prompt_type=PromptType.QUESTION_ANSWER)
+
+
+DEFAULT_REFINE_TABLE_NAME_TMPL = (
+    "We have provided multiple table schemas with optional sample data below. "
+    "---------------------\n"
+    "{context_str}\n"
+    "---------------------\n"
+    "We have also provided the relevant tables found below. "
+    "{existing_answer}\n"
+    "---------------------\n"
+    "Given the table schemas and the list of tables,"
+    "you have to pick the possible tables from the above tables list"
+    "which are likely to generate results for the input question: {query_str}\n"
+    "Provide the final list of tables in comma seprated format."
+)
+REFINE_TABLE_NAME_PROMPT = PromptTemplate(
+    format_prompt(DEFAULT_REFINE_TABLE_NAME_TMPL), prompt_type=PromptType.TABLE_CONTEXT
+)

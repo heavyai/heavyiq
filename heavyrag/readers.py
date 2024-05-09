@@ -1,8 +1,11 @@
 from pathlib import PosixPath
+from typing import Any, List
 
 from llama_index.core.readers.base import BaseReader
 from llama_index.core.schema import Document
 from llama_index.readers.smart_pdf_loader import SmartPDFLoader
+
+from heavyiq.langchain.heavydb import HeavyDB
 
 
 class OverrideSmartPDFLoader(SmartPDFLoader):
@@ -52,3 +55,26 @@ class TxtFileReader(BaseReader):
             text = f.read()
         # load_data returns a list of Document objects
         return [Document(text=text, extra_info=extra_info or {})]
+
+
+class HeavyDBTableReader(BaseReader):
+    """
+    Supposed to read HeavyDB table.
+    """
+
+    def __init__(self, heavydb: HeavyDB, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.heavydb = heavydb
+
+    async def aload_data(self, table_name: str, extra_info: dict | None = None) -> List[Document]:
+        text = await self.heavydb.aget_single_table_info(
+            table_name=table_name,
+            include_samples=True,
+            include_top_k=False,
+            include_timestamp=False,
+            include_comments=True,
+        )
+        extra_info = extra_info or {}
+        extra_info["dbname"] = self.heavydb._dbname
+        extra_info.update({"name": table_name, "type": "table"})
+        return [Document(text=text, extra_info=extra_info)]

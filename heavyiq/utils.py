@@ -4,7 +4,7 @@ from enum import Enum
 from multiprocessing import Manager
 from multiprocessing.managers import SyncManager
 from pathlib import Path
-from typing import Any, Generic, Optional, TypeVar
+from typing import Any, Awaitable, Generic, Optional, TypeVar
 
 import aiofiles
 from fastapi.concurrency import run_in_threadpool
@@ -287,3 +287,13 @@ async def aread_file(file_path: str) -> str:
     """
     async with aiofiles.open(file_path, mode="r") as file:
         return await file.read()
+
+
+async def semaphore_gather(num: int, coros: list[Awaitable], return_exceptions: bool = False) -> Any:
+    semaphore = asyncio.Semaphore(num)
+
+    async def _wrap_coro(coro: Awaitable) -> Any:
+        async with semaphore:
+            return await coro
+
+    return await asyncio.gather(*(_wrap_coro(coro) for coro in coros), return_exceptions=return_exceptions)

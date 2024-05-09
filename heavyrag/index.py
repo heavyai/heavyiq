@@ -1,4 +1,6 @@
 # Module for creating various indexes
+from functools import lru_cache
+
 import chromadb
 from llama_index.core import StorageContext, VectorStoreIndex, load_index_from_storage
 from llama_index.core.schema import BaseNode, IndexNode
@@ -53,6 +55,7 @@ def get_or_create_index(
     return index
 
 
+@lru_cache
 def get_index(collection_name: str) -> VectorStoreIndex | None:
     """
     Get index only by collection name.

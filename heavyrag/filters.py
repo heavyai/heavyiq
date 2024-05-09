@@ -4,6 +4,8 @@ from llama_index.core.vector_stores import FilterCondition, FilterOperator, Meta
 
 table_filter = MetadataFilter(key="type", operator=FilterOperator.EQ, value="table")
 document_filter = MetadataFilter(key="type", operator=FilterOperator.EQ, value="document")
+table_filters = MetadataFilters(filters=[table_filter])
+document_filters = MetadataFilters(filters=[document_filter])
 
 
 def get_table_filter_matches(table_name: str) -> MetadataFilters:
