@@ -1258,22 +1258,28 @@ class HeavyDB:
             lower_literal = literal["literal"].lower()
             lower_literal_prefix = re.split(r'[ ,:]+', lower_literal)[0]
 
-            prefix_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, num_str_values FROM distinct_values WHERE lower_attr ILIKE '{lower_literal_prefix}%' ORDER BY num_str_values DESC LIMIT 1;"
+            prefix_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, num_str_values FROM distinct_values WHERE lower_attr ILIKE '{lower_literal_prefix}%' ORDER BY num_str_values DESC LIMIT 2;"
 
             async with self.alock:
                 cursor = await run_in_threadpool(self._conn.execute, prefix_query)
             prefix_rows = cursor.fetchall()
 
             num_prefix_rows = len(prefix_rows)
+            self.logger.debug(f"Num prefix matches: {num_prefix_rows}")
 
             if num_prefix_rows > 0:
-                altered_literal["literal"] = f"{lower_literal_prefix}%"
+                if num_prefix_rows > 1:
+                    # Multiple prefix matches, use string prefix
+                    altered_literal["literal"] = f"{lower_literal_prefix}%"
+                else:
+                    # Only one prefix match, use the full matched string
+                    altered_literal["literal"] = prefix_rows[0][0]
                 if literal["operator"] in ("<>", "!=", "NOT LIKE", "NOT PG_ILIKE", "NOT ILIKE", "NOT PG_ILIKE"):
                     altered_literal["operator"] = "NOT ILIKE"
                 else:
                     altered_literal["operator"] = "ILIKE"
                 return altered_literal
-
+            # If we are here, there were no prefix matches so we do fuzzy similarity search
             similarity_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) AS subset_distance, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') AS absolute_distance, ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) AS abs_length_difference, num_str_values FROM distinct_values WHERE LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) < 5 AND CAST(LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') AS DOUBLE) / NULLIF(LENGTH('{lower_literal}'), 0) < 0.3 ORDER BY subset_distance ASC, abs_length_difference ASC, num_str_values DESC LIMIT 2;"
 
             async with self.alock:
@@ -1522,23 +1528,28 @@ class HeavyDB:
             lower_literal = literal["literal"].lower()
             lower_literal_prefix = re.split(r'[ ,:]+', lower_literal)[0]
 
-            prefix_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, num_str_values FROM distinct_values WHERE lower_attr ILIKE '{lower_literal_prefix}%' ORDER BY num_str_values DESC LIMIT 1;"
+            prefix_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, num_str_values FROM distinct_values WHERE lower_attr ILIKE '{lower_literal_prefix}%' ORDER BY num_str_values DESC LIMIT 2;"
 
             with self.lock:
                 cursor = self._conn.execute(prefix_query)
             prefix_rows = cursor.fetchall()
 
             num_prefix_rows = len(prefix_rows)
-            self.logger.debug(f"Num prefix matches: {num_prefix_rows}")
 
             if num_prefix_rows > 0:
-                altered_literal["literal"] = f"{lower_literal_prefix}%"
+                if num_prefix_rows > 1:
+                    # Multiple prefix matches, use string prefix
+                    altered_literal["literal"] = f"{lower_literal_prefix}%"
+                else:
+                    # Only one prefix match, use the full matched string
+                    altered_literal["literal"] = prefix_rows[0][0]
                 if literal["operator"] in ("<>", "!=", "NOT LIKE", "NOT PG_ILIKE", "NOT ILIKE", "NOT PG_ILIKE"):
                     altered_literal["operator"] = "NOT ILIKE"
                 else:
                     altered_literal["operator"] = "ILIKE"
                 return altered_literal
 
+            # If we are here, there were no prefix matches so we do fuzzy similarity search
             similarity_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) AS subset_distance, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') AS absolute_distance, ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) AS abs_length_difference, num_str_values FROM distinct_values WHERE LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) < 5 AND CAST(LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') AS DOUBLE) / NULLIF(LENGTH('{lower_literal}'), 0) < 0.3 ORDER BY subset_distance ASC, abs_length_difference ASC, num_str_values DESC LIMIT 2;"
 
             with self.lock:
