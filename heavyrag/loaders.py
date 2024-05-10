@@ -3,6 +3,7 @@ from itertools import chain
 
 from llama_index.core import SimpleDirectoryReader
 from llama_index.core.schema import Document
+from llama_index.readers.file import PDFReader
 
 from heavyiq.config import get_config
 from heavyiq.langchain.heavydb import HeavyDB
@@ -59,7 +60,8 @@ async def aload_files_from_directory(source_dir: str) -> list[Document]:
         required_exts=[".pdf", ".txt"],
         file_extractor={
             ".txt": TxtFileReader(),
-            ".pdf": OverrideSmartPDFLoader(llmsherpa_api_url=CONFIG.rag_document_pdf_parser_url),
+            # ".pdf": OverrideSmartPDFLoader(llmsherpa_api_url=CONFIG.rag_document_pdf_parser_url),
+            ".pdf": PDFReader(),
         },
         file_metadata=get_meta,
     )
@@ -75,7 +77,7 @@ async def aload_file(filepath: str) -> list[Document]:
     if filepath.endswith(".txt"):
         reader = TxtFileReader()
     elif filepath.endswith(".pdf"):
-        reader = OverrideSmartPDFLoader(llmsherpa_api_url=CONFIG.rag_document_pdf_parser_url)
+        reader = PDFReader()
     assert reader, "Invalid file to read!"
     documents = await reader.aload_data(filepath, extra_info=get_meta(filepath))
     return _exclude_metadata(documents)

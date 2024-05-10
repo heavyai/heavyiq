@@ -4,14 +4,13 @@ from langchain.schema import StrOutputParser
 from langchain.schema.runnable import Runnable, RunnableLambda, RunnablePassthrough
 
 from heavyiq.langchain.heavydb import get_config, get_db
-from heavyiq.langchain.index import aget_heavydb_index
-from heavyiq.langchain.index.utils import SearchType
 from heavyiq.langchain.llms import LLMType, is_using_custom_trained_llm
 from heavyiq.langchain.utils import aget_table_info_wrt_token_limit
 from heavyiq.lcel.chains.utils import configure_step, get_value_from_runnable_binding
 from heavyiq.lcel.llms import llm_runnable
 from heavyiq.lcel.prompts import to_tables_prompt_runnable
 from heavyiq.lcel.types import TableChainInputType, TableChainOutputType
+from heavyrag.main import determine_table_names
 
 # llm
 nl_to_tables_llm_rbl = llm_runnable.with_config(
@@ -38,11 +37,7 @@ async def get_tables(inputs: dict, use_rag: bool = False) -> list[str]:
     found_tables: list[str] = []
 
     if (len(allowed_tables) > config.allowed_tables_max_count_nl_to_tables) or use_rag:
-        heavydb_index = await aget_heavydb_index(session=inputs["session_id"])
-        found_tables = await heavydb_index.asimple_search_for_table_names(
-            inputs["question"],
-            allowable_tables=allowed_tables,
-        )
+        found_tables = await determine_table_names(question=inputs["question"], heavydb=db)
 
     return found_tables or allowed_tables
 

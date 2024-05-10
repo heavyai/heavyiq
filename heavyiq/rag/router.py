@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 
-from fastapi import APIRouter, Body, Depends, Form, UploadFile
+from fastapi import APIRouter, Body, Depends, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session as Session
 
 from heavyiq.config import get_config
@@ -9,12 +9,13 @@ from heavyiq.langchain import HeavyDB
 from heavyiq.rag.models import (
     AskDocumentRequest,
     AskDocumentResponse,
+    AskFactsRequest,
+    AskFactsResponse,
     BaseModelWithSessionID,
     ListFilesResponse,
-    TableNamesRequest,
 )
 from heavyrag.ingest import adelete_document, ainsert_document
-from heavyrag.main import ask_document, determine_table_names
+from heavyrag.main import ask_document, ask_facts, determine_table_names
 
 CONFIG = get_config()
 doc_router = APIRouter()
@@ -82,25 +83,10 @@ async def delete_file(file_name: str, collection_name: str = Depends(get_collect
         source_dir = f"{CONFIG.rag_documents_source_dir}/{collection_name}/{file_name}"
         # delete actual file
         Path(source_dir).unlink()
-    except Exception as e:
-        raise e
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"{file_name} not found!")
 
     return {"message": f"Document {file_name} has been deleted."}
-
-
-# @doc_router.post("/sync_index/")
-# async def sync_index(
-#     session: Session = Depends(get_db), collection_name: str = Depends(get_collection_name)
-# ) -> dict[str, str]:
-#     """
-#     Helps to sync the doucment index.
-#     This involves cheking of any newly added documents on documents table and then
-#     it tries to transform each document to nodes, finally add those
-#     nodes into the index.
-#     """
-#     reader = DocumentDatabaseReader(engine=engine)
-#     sync_doc_index(reader, collection_name)
-#     return {"status": "succcess"}
 
 
 @doc_router.post("/ask", response_model=AskDocumentResponse)
@@ -121,7 +107,29 @@ async def ask_about_document(
     return AskDocumentResponse(
         answer=response.response,
         metadata=response.metadata,
-        sources=[i.get_content() for i in response.source_nodes],
+        sources=[i.get_content(metadata_mode="all") for i in response.source_nodes],
+        passing=passing,
+        score=score,
+    )
+
+
+@doc_router.post("/ask_facts", response_model=AskFactsResponse)
+async def ask_about_facts(
+    request: AskFactsRequest, collection_name: str = Depends(get_collection_name)
+) -> AskFactsResponse:
+    """
+    Ask questions regrading the uploaded docs.
+    """
+    response, eval_result = await ask_facts(question=request.question, heavydb_name=collection_name, do_evaluate=True)
+    passing, score = None, None
+    if eval_result:
+        passing = eval_result.passing
+        score = eval_result.score
+
+    return AskFactsResponse(
+        answer=response.response,
+        metadata=response.metadata,
+        sources=[i.get_content(metadata_mode="all") for i in response.source_nodes],
         passing=passing,
         score=score,
     )

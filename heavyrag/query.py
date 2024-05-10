@@ -26,13 +26,6 @@ async def get_table_node_ids(index: VectorStoreIndex, table_name: str) -> list[s
     return result.ids
 
 
-async def delete_table_nodes(index: VectorStoreIndex, table_name: str) -> None:
-    """
-    Delete all the nodes associated with a table.
-    """
-    index.vector_store._collection.delete(where={"name": table_name, "type": "table"})
-
-
 async def has_document_node(index: VectorStoreIndex, file_name: str) -> bool:
     """
     Check if there's any docuemnt node exists for the passed file_name.

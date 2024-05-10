@@ -72,3 +72,7 @@ class TableNamesRequest(BaseModelWithSessionID):
         json_schema_extra = {
             "examples": [{"session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "question": "What is NLP?"}]
         }
+
+
+AskFactsRequest = TableNamesRequest
+AskFactsResponse = AskDocumentResponse

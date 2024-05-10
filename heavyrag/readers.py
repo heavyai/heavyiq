@@ -3,6 +3,7 @@ from typing import Any, List
 
 from llama_index.core.readers.base import BaseReader
 from llama_index.core.schema import Document
+from llama_index.readers.file import PDFReader
 from llama_index.readers.smart_pdf_loader import SmartPDFLoader
 
 from heavyiq.langchain.heavydb import HeavyDB

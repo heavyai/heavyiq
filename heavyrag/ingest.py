@@ -2,13 +2,17 @@
 import asyncio
 from collections import defaultdict
 
+from chromadb import Collection
+from chromadb.api import segment
+from chromadb.db.mixins import embeddings_queue
+from chromadb.utils.batch_utils import create_batches
 from llama_index.core import VectorStoreIndex
 from llama_index.core.indices.base import BaseIndex
 
 from heavyiq.langchain.heavydb import HeavyDB
 from heavyrag.index import acreate_index_and_insert_nodes, get_index, get_or_create_index
 from heavyrag.loaders import aload_file, aload_files_from_directory, aload_table, aload_tables
-from heavyrag.query import any_table_node, delete_table_nodes, has_table_node
+from heavyrag.query import any_table_node, has_table_node
 from heavyrag.transform import atransform
 
 
@@ -76,14 +80,44 @@ async def ainsert_tables(heavydb: HeavyDB) -> BaseIndex:
     return index
 
 
-async def adelete_document(file_name: str, heavydb_name: str) -> None:
+def delete_nodes(collection: Collection, where: dict, batch_size: int = 166) -> bool:
     """
-    Delete all nodes assocuate with a particular document.
+    Helps to delete nodes.
+    """
+    ids = collection.get(where=where)["ids"]
+    if not ids:
+        return False
+
+    doc_count = len(ids)
+    if doc_count < batch_size:
+        collection.delete(ids=ids)
+        return True
+
+    for i in range(0, len(ids), batch_size):
+        batched_ids = ids[i : i + batch_size]
+        collection.delete(ids=batched_ids)
+
+    return True
+
+
+async def adelete_document(file_name: str, heavydb_name: str) -> bool:
+    """
+    Delete all nodes associate with a particular document.
     """
     index = get_index(collection_name=heavydb_name)
     if not index:
-        return None
-    index.vector_store._collection.delete(where={"name": file_name, "type": "document"})
+        return False
+
+    collection = index.vector_store._collection
+    return delete_nodes(collection=collection, where={"$and": [{"name": file_name}, {"type": "document"}]})
+
+
+async def delete_table_nodes(index: VectorStoreIndex, table_name: str) -> bool:
+    """
+    Delete all the nodes associated with a table.
+    """
+    collection = index.vector_store._collection
+    return delete_nodes(collection=collection, where={"$and": [{"name": table_name}, {"type": "table"}]})
 
 
 async def sync_table_index(heavydb: HeavyDB, force_sync: bool = False) -> VectorStoreIndex:

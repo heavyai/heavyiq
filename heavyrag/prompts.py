@@ -28,6 +28,17 @@ TEXT_QA_PROMPT_TMPL = format_prompt(prompt_template=DEFAULT_TEXT_QA_PROMPT_TMPL)
 TEXT_QA_PROMPT = PromptTemplate(TEXT_QA_PROMPT_TMPL, prompt_type=PromptType.QUESTION_ANSWER)
 
 
+FACTS_PROMPT_TMPL = (
+    "Context information is below.\n"
+    "---------------------\n"
+    "{context_str}\n"
+    "---------------------\n"
+    "Given the context information and not prior knowledge, "
+    "Retrieve facts relevant to the query.\n"
+    "Query: {query_str}\n"
+    "Answer: "
+)
+
 DEFAULT_REFINE_TABLE_NAME_TMPL = (
     "We have provided multiple table schemas with optional sample data below. "
     "---------------------\n"
@@ -44,3 +55,4 @@ DEFAULT_REFINE_TABLE_NAME_TMPL = (
 REFINE_TABLE_NAME_PROMPT = PromptTemplate(
     format_prompt(DEFAULT_REFINE_TABLE_NAME_TMPL), prompt_type=PromptType.TABLE_CONTEXT
 )
+FACTS_QA_PROMPT = PromptTemplate(format_prompt(FACTS_PROMPT_TMPL), prompt_type=PromptType.QUESTION_ANSWER)
