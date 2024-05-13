@@ -1181,7 +1181,7 @@ class HeavyDB:
             col_id = (db, table, column)
             result[id] = col_id
 
-        self.logger.debug("Extracted column mappings: {result}")
+        self.logger.debug(f"Extracted column mappings: {result}")
         return result
 
     async def aextract_string_literal_ops(self, detailed_query_plan: str) -> dict[str, tuple[str, str]]:
@@ -1201,7 +1201,7 @@ class HeavyDB:
                 op = f"NOT {op}"
             result[id] = (op, literal)
 
-        self.logger.debug("Extracted string literal operations: {result}")
+        self.logger.debug(f"Extracted string literal operations: {result}")
         return result
 
     async def aget_string_literal_ops(self, query: str) -> list[StringLiteralOp]:
@@ -1267,49 +1267,77 @@ class HeavyDB:
 
             async with self.alock:
                 cursor = await run_in_threadpool(self._conn.execute, prefix_query)
-            prefix_rows = cursor.fetchall()
+            prefix_matches = cursor.fetchall()
 
-            num_prefix_rows = len(prefix_rows)
-            self.logger.debug(f"Num prefix matches: {num_prefix_rows}")
+            num_prefix_matches = len(prefix_matches)
+            self.logger.debug(f"Num prefix matches: {num_prefix_matches}")
 
-            if num_prefix_rows > 0 and num_prefix_rows <= 5:
-                if num_prefix_rows > 1:
-                    # Multiple prefix matches, use string prefix
-                    altered_literal["literal"] = f"{lower_literal_prefix}%"
-                else:
-                    # Only one prefix match, use the full matched string
-                    altered_literal["literal"] = prefix_rows[0][0]
-                if literal["operator"] in ("<>", "!=", "NOT LIKE", "NOT PG_ILIKE", "NOT ILIKE", "NOT PG_ILIKE"):
-                    altered_literal["operator"] = "NOT ILIKE"
-                else:
-                    altered_literal["operator"] = "ILIKE"
-                return altered_literal
-            # If we are here, there were no prefix matches so we do fuzzy similarity search
             similarity_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) AS subset_distance, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') AS absolute_distance, ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) AS abs_length_difference, num_str_values FROM distinct_values WHERE LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) < 5 AND CAST(LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') AS DOUBLE) / NULLIF(LENGTH('{lower_literal}'), 0) < 0.3 ORDER BY subset_distance ASC, abs_length_difference ASC, num_str_values DESC LIMIT 2;"
 
             async with self.alock:
                 cursor = await run_in_threadpool(self._conn.execute, similarity_query)
-            similarity_rows = cursor.fetchall()
+            similarity_matches = cursor.fetchall()
 
-            num_similarity_rows = len(similarity_rows)
-            self.logger.debug(f"Num similarity matches: {num_similarity_rows}")
-            self.logger.debug(f"Similarity matches: {similarity_rows}")
+            num_similarity_matches = len(similarity_matches)
 
-            if num_similarity_rows > 0:
+            self.logger.debug(f"Num similarity matches: {num_similarity_matches}")
+            self.logger.debug(f"Similarity matches: {similarity_matches}")
+
+            if num_prefix_matches > 0 and num_prefix_matches <= 5:
+                prefix_set = set() 
+                for prefix_match in prefix_matches:
+                    prefix_set.add(prefix_match[0])
+                num_similarity_prefix_overlaps = 0
+                for similarity_match in similarity_matches:
+                    if similarity_match[0] in prefix_set:
+                        num_similarity_prefix_overlaps += 1
+                self.logger.debug(f"Num Similarity Prefix overlaps: {num_similarity_prefix_overlaps}")
+                if num_similarity_prefix_overlaps != 1:
+                    if num_prefix_matches > 1:
+                        # Multiple prefix matches, use string prefix
+                        altered_literal["literal"] = f"{lower_literal_prefix}%"
+                    else:
+                        # Only one prefix match, use the full matched string
+                        altered_literal["literal"] = prefix_matches[0][0]
+                    if literal["operator"] in ("<>", "!=", "NOT LIKE", "NOT PG_ILIKE", "NOT ILIKE", "NOT PG_ILIKE"):
+                        altered_literal["operator"] = "NOT ILIKE"
+                    else:
+                        altered_literal["operator"] = "ILIKE"
+                    return altered_literal
+
+            # If we are here, we do fuzzy similarity search
+
+            if num_similarity_matches > 0:
                 if (
-                    num_similarity_rows > 1
-                    and similarity_rows[0][1] == 0
-                    and similarity_rows[0][1] == similarity_rows[1][1]
+                    num_similarity_matches > 1
+                    and similarity_matches[0][1] == 0
+                    and similarity_matches[0][1] == similarity_matches[1][1]
                 ):
+
                     # Here there are at least two matches such that the user-provided literal is a full substring of
                     # the column value. In this case, we will match against all strings that our string literal
                     # is a substring of
                     altered_literal["literal"] = f"%{lower_literal}%"
                 else:
-                    # There was only one match, or two matches and at least one did have a 0 distance score, so pick the
-                    # top returned value (we've sorted in ascending order by score and descending order by number
-                    # of string matches)
-                    altered_literal["literal"] = str(similarity_rows[0][0])
+                    # There was only one match, or two matches, so pick the
+                    # top returned value. In the case of a tie, pick the prefix match if it exists (we've sorted in ascending order by score and descending order by number
+                    if num_similarity_matches > 1 and similarity_matches[0][1] == similarity_matches[1][1]:
+                        def matching_prefix_length(s1, s2):
+                            match_length = 0
+                            for c1, c2 in zip(s1, s2):
+                                if c1 == c2:
+                                    match_length += 1
+                                else:
+                                    break
+                            return match_length
+                        prefix_match_len_1 = matching_prefix_length(lower_literal, similarity_matches[0][0]) 
+                        prefix_match_len_2 = matching_prefix_length(lower_literal, similarity_matches[1][0]) 
+                        if prefix_match_len_1 >= prefix_match_len_2:
+                            altered_literal["literal"] = str(similarity_matches[0][0])
+                        else:
+                            altered_literal["literal"] = str(similarity_matches[1][0])
+                    else:
+                        altered_literal["literal"] = str(similarity_matches[0][0])
             if literal["operator"] in ("<>", "!=", "NOT LIKE", "NOT PG_ILIKE", "NOT ILIKE", "NOT PG_ILIKE"):
                 altered_literal["operator"] = "NOT ILIKE"
             else:
@@ -1531,59 +1559,89 @@ class HeavyDB:
                     altered_literal["operator"] = "ILIKE"
                 return altered_literal
         elif total_count == 0:
-
             lower_literal = literal["literal"].lower()
             lower_literal_prefix = re.split(r'[ ,:]+', lower_literal)[0]
+            using_lower_literal_prefix = False if lower_literal_prefix == lower_literal else True
+            prefix_condition = f"lower_attr ILIKE '{lower_literal_prefix}' OR lower_attr ILIKE '{lower_literal_prefix} %'" if using_lower_literal_prefix else f"lower_attr ILIKE '{lower_literal_prefix}%'"
 
-            prefix_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, num_str_values FROM distinct_values WHERE lower_attr ILIKE '{lower_literal_prefix}%' ORDER BY num_str_values DESC LIMIT 2;"
-
+            prefix_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, num_str_values FROM distinct_values WHERE {prefix_condition} ORDER BY num_str_values DESC LIMIT 10;"
             with self.lock:
                 cursor = self._conn.execute(prefix_query)
-            prefix_rows = cursor.fetchall()
+            prefix_matches = cursor.fetchall()
 
-            num_prefix_rows = len(prefix_rows)
+            num_prefix_matches = len(prefix_matches)
+            self.logger.debug(f"Num prefix matches: {num_prefix_matches}")
+            self.logger.debug(f"Prefix matches: {prefix_matches}")
 
-            if num_prefix_rows > 0:
-                if num_prefix_rows > 1:
-                    # Multiple prefix matches, use string prefix
-                    altered_literal["literal"] = f"{lower_literal_prefix}%"
-                else:
-                    # Only one prefix match, use the full matched string
-                    altered_literal["literal"] = prefix_rows[0][0]
-                if literal["operator"] in ("<>", "!=", "NOT LIKE", "NOT PG_ILIKE", "NOT ILIKE", "NOT PG_ILIKE"):
-                    altered_literal["operator"] = "NOT ILIKE"
-                else:
-                    altered_literal["operator"] = "ILIKE"
-                return altered_literal
-
-            # If we are here, there were no prefix matches so we do fuzzy similarity search
             similarity_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) AS subset_distance, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') AS absolute_distance, ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) AS abs_length_difference, num_str_values FROM distinct_values WHERE LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) < 5 AND CAST(LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') AS DOUBLE) / NULLIF(LENGTH('{lower_literal}'), 0) < 0.3 ORDER BY subset_distance ASC, abs_length_difference ASC, num_str_values DESC LIMIT 2;"
 
             with self.lock:
                 cursor = self._conn.execute(similarity_query)
-            similarity_rows = cursor.fetchall()
+            similarity_matches = cursor.fetchall()
 
-            num_similarity_rows = len(similarity_rows)
+            num_similarity_matches = len(similarity_matches)
 
-            if num_similarity_rows > 0:
+            self.logger.debug(f"Num similarity matches: {num_similarity_matches}")
+            self.logger.debug(f"Similarity matches: {similarity_matches}")
+
+            if num_prefix_matches > 0 and num_prefix_matches <= 5:
+                prefix_set = set() 
+                for prefix_match in prefix_matches:
+                    prefix_set.add(prefix_match[0])
+                num_similarity_prefix_overlaps = 0
+                for similarity_match in similarity_matches:
+                    if similarity_match[0] in prefix_set:
+                        num_similarity_prefix_overlaps += 1
+                self.logger.debug(f"Num Similarity Prefix overlaps: {num_similarity_prefix_overlaps}")
+                if num_similarity_prefix_overlaps != 1:
+                    if num_prefix_matches > 1:
+                        # Multiple prefix matches, use string prefix
+                        altered_literal["literal"] = f"{lower_literal_prefix}%"
+                    else:
+                        # Only one prefix match, use the full matched string
+                        altered_literal["literal"] = prefix_matches[0][0]
+                    if literal["operator"] in ("<>", "!=", "NOT LIKE", "NOT PG_ILIKE", "NOT ILIKE", "NOT PG_ILIKE"):
+                        altered_literal["operator"] = "NOT ILIKE"
+                    else:
+                        altered_literal["operator"] = "ILIKE"
+                    return altered_literal
+
+            # If we are here, we do fuzzy similarity search
+            if num_similarity_matches > 0:
                 if (
-                    num_similarity_rows > 1
-                    and similarity_rows[0][1] == 0
-                    and similarity_rows[0][1] == similarity_rows[1][1]
+                    num_similarity_matches > 1
+                    and similarity_matches[0][1] == 0
+                    and similarity_matches[0][1] == similarity_matches[1][1]
                 ):
+
                     # Here there are at least two matches such that the user-provided literal is a full substring of
                     # the column value. In this case, we will match against all strings that our string literal
                     # is a substring of
                     altered_literal["literal"] = f"%{lower_literal}%"
                 else:
-                    # There was only one match, or two matches and at least one did have a 0 distance score, so pick the
-                    # top returned value (we've sorted in ascending order by score and descending order by number
-                    # of string matches)
-                    altered_literal["literal"] = str(similarity_rows[0][0])
-                if literal["operator"] == "<>":
-                    altered_literal["operator"] = "NOT ILIKE"
-                else:
-                    altered_literal["operator"] = "ILIKE"
+                    # There was only one match, or two matches, so pick the
+                    # top returned value. In the case of a tie, pick the prefix match if it exists (we've sorted in ascending order by score and descending order by number
+                    if num_similarity_matches > 1 and similarity_matches[0][1] == similarity_matches[1][1]:
+                        def matching_prefix_length(s1, s2):
+                            match_length = 0
+                            for c1, c2 in zip(s1, s2):
+                                if c1 == c2:
+                                    match_length += 1
+                                else:
+                                    break
+                            return match_length
+                        prefix_match_len_1 = matching_prefix_length(lower_literal, similarity_matches[0][0]) 
+                        prefix_match_len_2 = matching_prefix_length(lower_literal, similarity_matches[1][0]) 
+                        if prefix_match_len_1 >= prefix_match_len_2:
+                            altered_literal["literal"] = str(similarity_matches[0][0])
+                        else:
+                            altered_literal["literal"] = str(similarity_matches[1][0])
+                    else:
+                        altered_literal["literal"] = str(similarity_matches[0][0])
+            if literal["operator"] in ("<>", "!=", "NOT LIKE", "NOT PG_ILIKE", "NOT ILIKE", "NOT PG_ILIKE"):
+                altered_literal["operator"] = "NOT ILIKE"
+            else:
+                altered_literal["operator"] = "ILIKE"
             return altered_literal
 
         return altered_literal
