@@ -1181,14 +1181,14 @@ class HeavyDB:
             col_id = (db, table, column)
             result[id] = col_id
 
-        self.logger.debug("Finished extracting column mappings")
+        self.logger.debug("Extracted column mappings: {result}")
         return result
 
     async def aextract_string_literal_ops(self, detailed_query_plan: str) -> dict[str, tuple[str, str]]:
         self.logger.debug(f"Extracting string literal operations from query plan: {detailed_query_plan}")
         result = {}
-        pattern1 = r"(NOT\()?(LIKE|PG_ILIKE|>=|<=|<>|=)\(\$(\d+), '((?:''|[\w -])+)'\)"
-        pattern2 = r"(NOT\()?(LIKE|PG_ILIKE|>=|<=|<>|=)\('((?:''|[\w -])+)', \$(\d+)\)"
+        pattern1 = r"(NOT\()?(LIKE|PG_ILIKE|>=|<=|<>|=)\(\$(\d+), '((?:''|[\w .-])+)'\)"
+        pattern2 = r"(NOT\()?(LIKE|PG_ILIKE|>=|<=|<>|=)\('((?:''|[\w .-])+)', \$(\d+)\)"
 
         matches1 = re.findall(pattern1, detailed_query_plan)
         matches2 = re.findall(pattern2, detailed_query_plan)
@@ -1201,7 +1201,7 @@ class HeavyDB:
                 op = f"NOT {op}"
             result[id] = (op, literal)
 
-        self.logger.debug("Finished extracting string literal operations")
+        self.logger.debug("Extracted string literal operations: {result}")
         return result
 
     async def aget_string_literal_ops(self, query: str) -> list[StringLiteralOp]:
@@ -1290,6 +1290,8 @@ class HeavyDB:
             similarity_rows = cursor.fetchall()
 
             num_similarity_rows = len(similarity_rows)
+            self.logger.debug(f"Num similarity matches: {num_similarity_rows}")
+            self.logger.debug(f"Similarity matches: {similarity_rows}")
 
             if num_similarity_rows > 0:
                 if (
