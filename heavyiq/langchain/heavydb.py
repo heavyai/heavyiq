@@ -1260,8 +1260,10 @@ class HeavyDB:
         elif total_count == 0:
             lower_literal = literal["literal"].lower()
             lower_literal_prefix = re.split(r'[ ,:]+', lower_literal)[0]
+            using_lower_literal_prefix = False if lower_literal_prefix == lower_literal else True
+            prefix_condition = f"lower_attr ILIKE '{lower_literal_prefix}' OR lower_attr ILIKE '{lower_literal_prefix} %'" if using_lower_literal_prefix else f"lower_attr ILIKE '{lower_literal_prefix}%'"
 
-            prefix_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, num_str_values FROM distinct_values WHERE lower_attr ILIKE '{lower_literal_prefix}%' ORDER BY num_str_values DESC LIMIT 2;"
+            prefix_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, num_str_values FROM distinct_values WHERE {prefix_condition} ORDER BY num_str_values DESC LIMIT 10;"
 
             async with self.alock:
                 cursor = await run_in_threadpool(self._conn.execute, prefix_query)
@@ -1270,7 +1272,7 @@ class HeavyDB:
             num_prefix_rows = len(prefix_rows)
             self.logger.debug(f"Num prefix matches: {num_prefix_rows}")
 
-            if num_prefix_rows > 0:
+            if num_prefix_rows > 0 and num_prefix_rows <= 5:
                 if num_prefix_rows > 1:
                     # Multiple prefix matches, use string prefix
                     altered_literal["literal"] = f"{lower_literal_prefix}%"
