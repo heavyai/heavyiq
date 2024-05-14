@@ -23,15 +23,10 @@ from heavyiq.langchain.heavydb import heavydb_context
 from heavyiq.langchain.llms import LLMType, get_llm_by_type
 from heavyiq.logging_utils import get_heavyiq_logger
 
-from .utils import (
-    aextract_tables_from_query,
-    awrite_eval_results_header,
-    awrite_eval_results_row,
-    check_predicted_query_equals_gold_query,
-    compute_prob_stats,
-    sql_rate_reply,
-    summarize_eval_results,
-)
+from .utils import (aextract_tables_from_query, awrite_eval_results_header,
+                    awrite_eval_results_row,
+                    check_predicted_query_equals_gold_query,
+                    compute_prob_stats, sql_rate_reply, summarize_eval_results)
 
 
 @click.group()
@@ -498,16 +493,28 @@ async def run_config_model_on_auto_questions(
 @eval.command()
 @coro
 @click.option("--temperature", default=0.0, help="Temperature for LLM (Defaults to 0.0)", type=float)
-@click.option("--verbose", default=False, help="Verbose output", type=bool)
+@click.option("--n", default=1, help="number of generations", type=int)
+@click.option("--verbose", "-v", is_flag=True, help="Verbose output")
+@click.option("--generate", "-g", is_flag=True, help="Pick an sql query from the list of generated sql queries")
 @click.argument("eval_dataset_csv", type=str)
 @click.pass_context  # type: ignore
 async def run_config_model_on_questions_lcel(
-    ctx: click.Context, eval_dataset_csv: str, temperature: float, verbose: bool
+    ctx: click.Context,
+    eval_dataset_csv: str,
+    generate: bool,
+    verbose: bool,
+    n: int,
+    temperature: float,
 ):
     """
     Run config model on questions using lcel approach.
     """
-    from heavyiq.lcel.chains import sql_chain
+    from heavyiq.lcel.chains import sql_chain, sql_gen_chain
+
+    if generate:
+        chain = sql_gen_chain
+    else:
+        chain = sql_chain
 
     set_verbose(verbose)
     logger = get_heavyiq_logger()
@@ -553,7 +560,10 @@ async def run_config_model_on_questions_lcel(
         out: dict = {"query": None, "error": None}
         async with heavydb_context(db):
             tables = await aextract_tables_from_query(db, gold_query)
-            out = await sql_chain.ainvoke({"question": question, "tables": tables, "session_id": db._conn._session})
+            out = await chain.ainvoke(
+                {"question": question, "tables": tables, "session_id": db._conn._session},
+                config={"configurable": {"llm_n": n, "llm_temperature": temperature}},
+            )
         return out["query"], out["error"]
 
     async def processor(input_queue: asyncio.Queue, output_queue: asyncio.Queue, processor_id: int):
