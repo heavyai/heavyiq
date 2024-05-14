@@ -23,10 +23,15 @@ from heavyiq.langchain.heavydb import heavydb_context
 from heavyiq.langchain.llms import LLMType, get_llm_by_type
 from heavyiq.logging_utils import get_heavyiq_logger
 
-from .utils import (aextract_tables_from_query, awrite_eval_results_header,
-                    awrite_eval_results_row,
-                    check_predicted_query_equals_gold_query,
-                    compute_prob_stats, sql_rate_reply, summarize_eval_results)
+from .utils import (
+    aextract_tables_from_query,
+    awrite_eval_results_header,
+    awrite_eval_results_row,
+    check_predicted_query_equals_gold_query,
+    compute_prob_stats,
+    sql_rate_reply,
+    summarize_eval_results,
+)
 
 
 @click.group()
@@ -509,10 +514,11 @@ async def run_config_model_on_questions_lcel(
     """
     Run config model on questions using lcel approach.
     """
-    from heavyiq.lcel.chains import sql_chain, sql_gen_chain
+    from heavyiq.lcel.chains import sql_chain
+    from heavyiq.lcel.chains.heavydb.sql_gen_chain import filter_valid_queries_chain
 
     if generate:
-        chain = sql_gen_chain
+        chain = filter_valid_queries_chain
     else:
         chain = sql_chain
 
@@ -546,7 +552,7 @@ async def run_config_model_on_questions_lcel(
         for _ in range(processor_count):
             await queue.put(None)
 
-    async def predict_query(question: str, gold_query: str, db: HeavyDB) -> tuple[str, str]:
+    async def predict_query(question: str, gold_query: str, db: HeavyDB) -> tuple[list[str], str]:
         """
         Predicts the target query.
 
@@ -564,7 +570,9 @@ async def run_config_model_on_questions_lcel(
                 {"question": question, "tables": tables, "session_id": db._conn._session},
                 config={"configurable": {"llm_n": n, "llm_temperature": temperature}},
             )
-        return out["query"], out["error"]
+            if generate:
+                return out, ""
+        return [out["query"]], out["error"]
 
     async def processor(input_queue: asyncio.Queue, output_queue: asyncio.Queue, processor_id: int):
         """
@@ -589,10 +597,13 @@ async def run_config_model_on_questions_lcel(
                 db_id, question, gold_query, *optional_gold_queries = item
 
             db = await HeavyDB.from_env_async(db_id)
-            pred_query, query_error = await predict_query(question, gold_query, db)
+            pred_queries, query_error = await predict_query(question, gold_query, db)
 
             if not query_error:
-                try:
+                final_query, eval_res = "", {}
+                for pred_query in pred_queries:
+                    final_query = pred_query
+
                     gold_queries = [gold_query] + optional_gold_queries
                     for gold in gold_queries:
                         if not gold:
@@ -604,8 +615,11 @@ async def run_config_model_on_questions_lcel(
                     if eval_res.get("error"):
                         del db
                         db = await HeavyDB.from_env_async(db_id)
-                    query_stats = await db.aquery_stats(pred_query)
+                    elif eval_res.get("success"):
+                        break
 
+                try:
+                    query_stats = await db.aquery_stats(final_query)
                 except Exception as e:
                     eval_res_success = False
                     eval_res_status = "failed_to_generate_sql"
