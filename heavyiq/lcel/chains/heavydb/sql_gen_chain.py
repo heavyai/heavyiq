@@ -13,7 +13,7 @@ from heavyiq.lcel.llms import llm_runnable
 from heavyiq.lcel.runnables.base import LLMGenerationRunnable, SessionRunnable
 
 llm = llm_runnable.with_config(
-    configurable={"llm": "nl_to_sql", "llm_temperature": 0.7, "llm_n": 5}, config={"tags": ["nl_to_sql_gen_llm"]}  # type: ignore
+    configurable={"llm": "nl_to_sql_gen", "llm_temperature": 0.7, "llm_n": 5}, config={"tags": ["nl_to_sql_gen_llm"]}  # type: ignore
 )
 model = configure_step(LLMGenerationRunnable(llm), run_name="Call LLM", step="Calling LLM.")
 

@@ -54,6 +54,9 @@ llm_runnable = (
         tables_to_questions=partial(
             make_llm_configurable, LLMType.TABLES_TO_QUESTIONS, default_temperature=0.0, **llm_configurable_fields
         ),  # type: ignore
+        nl_to_sql_gen=partial(
+            make_llm_configurable, LLMType.NL_TO_SQL_GEN, default_temperature=0.0, **llm_configurable_fields
+        ),
         default_llm=partial(make_llm_configurable, LLMType.DEFAULT, default_temperature=0.0, **llm_configurable_fields),  # type: ignore
     )
     .configurable_fields(

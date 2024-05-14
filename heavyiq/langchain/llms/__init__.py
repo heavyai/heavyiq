@@ -20,6 +20,7 @@ class LLMType(Enum):
     DEFAULT = "default"
     NL_TO_SQL = "nl_to_sql"
     NL_TO_SQL_COT = "nl_to_sql_cot"
+    NL_TO_SQL_GEN = "nl_to_sql_gen"  # nl to sql gen model used to multiple sql queries with beam search off
     NL_TO_SQL_ERROR = "nl_to_sql_error"
     NL_TO_SQL_COT_ERROR = "nl_to_sql_cot_error"
     SQL_TO_ANSWER = "sql_to_answer"
@@ -62,7 +63,10 @@ def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str
         model_kwargs["use_beam_search"] = True
         kwargs["best_of"] = config.custom_llm_api_vllm_beam_width
         kwargs["n"] = 1
-    if model_type in [LLMType.NL_TO_SQL, LLMType.NL_TO_SQL_ERROR]:
+    if model_type == LLMType.NL_TO_SQL_GEN:
+        # set best_of = 1 for sql generations
+        kwargs["best_of"] = 1
+    if model_type in [LLMType.NL_TO_SQL, LLMType.NL_TO_SQL_GEN, LLMType.NL_TO_SQL_ERROR]:
         kwargs["max_tokens"] = config.custom_llm_api_vllm_max_tokens
     return kwargs, {"extra_body": model_kwargs} if model_kwargs else {}
 
@@ -86,6 +90,7 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
             LLMType.NL_TO_TABLES: config.openai_gpt_model_nl_to_tables,
             LLMType.INSTRUCT: config.openai_gpt_model_instruct,
             LLMType.TABLES_TO_QUESTIONS: config.openai_gpt_model_tables_to_questions,
+            LLMType.NL_TO_SQL_GEN: config.openai_gpt_model_nl_to_sql,  # use the same nl to sql model
         }
         model_name: str = openai_llm_mapping[LLMType.DEFAULT] if openai_llm_mapping[model_type] is None else openai_llm_mapping[model_type]  # type: ignore
         return get_openai_llm_by_model_name(model=model_name, **kwargs)
@@ -110,6 +115,10 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
                 config.custom_llm_api_tables_to_questions_base,
                 config.custom_llm_api_tables_to_questions_context_window,
             ),  # uses the default model and context window
+            LLMType.NL_TO_SQL_GEN: (
+                config.custom_llm_api_nl_to_sql_base,
+                config.custom_llm_api_nl_to_sql_context_window,
+            ),
         }
         if model_type == LLMType.NL_TO_SQL_ERROR:
             found_key = LLMType.DEFAULT
