@@ -648,9 +648,6 @@ async def run_config_model_on_questions_lcel(
                                 genid,
                             )
                         )
-                        # one of the predicted query gets succeded then stop calculating the rest queries
-                        if eval_res.get("success"):
-                            break
                 else:
                     # this gets executed with and without generate option
                     final_query, eval_res = "", {}
