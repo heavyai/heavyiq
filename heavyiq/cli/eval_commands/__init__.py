@@ -500,12 +500,16 @@ async def run_config_model_on_auto_questions(
 @click.option("--temperature", default=0.0, help="Temperature for LLM (Defaults to 0.0)", type=float)
 @click.option("--n", default=1, help="number of generations", type=int)
 @click.option("--verbose", "-v", is_flag=True, help="Verbose output")
-@click.option("--generate", "-g", is_flag=True, help="Pick an sql query from the list of generated sql queries")
+@click.option(
+    "--generate", "-g", is_flag=True, help="-g alone should pick an sql query from the list of generated sql queries"
+)
+@click.option("--expand", "-e", is_flag=True, help="Expand and write the generated sql queries into multiple rows")
 @click.argument("eval_dataset_csv", type=str)
 @click.pass_context  # type: ignore
 async def run_config_model_on_questions_lcel(
     ctx: click.Context,
     eval_dataset_csv: str,
+    expand: bool,
     generate: bool,
     verbose: bool,
     n: int,
@@ -583,7 +587,6 @@ async def run_config_model_on_questions_lcel(
             item = await input_queue.get()
 
             if item is None:
-                print(f"Processor {processor_id} stopped!")
                 await output_queue.put(None)
                 await asyncio.sleep(0.1)
                 input_queue.task_done()
@@ -598,59 +601,127 @@ async def run_config_model_on_questions_lcel(
 
             db = await HeavyDB.from_env_async(db_id)
             pred_queries, query_error = await predict_query(question, gold_query, db)
+            pred_queries = set(pred_queries)  # remove duplicates
+
+            output_items = []
 
             if not query_error:
-                final_query, eval_res = "", {}
-                for pred_query in pred_queries:
-                    final_query = pred_query
+                if generate and expand:
+                    for genid, pred_query in enumerate(pred_queries, start=1):
+                        gold_queries = [gold_query] + optional_gold_queries
+                        for gold in gold_queries:
+                            if not gold:
+                                continue
+                            if check_predicted_query_equals_gold_query(pred_query, gold):
+                                gold_query = gold
+                                break
+                        eval_res = await sql_rate_reply(gold_query, pred_query, db=db, question=question)
+                        if eval_res.get("error"):
+                            del db
+                            db = await HeavyDB.from_env_async(db_id)
+                        try:
+                            query_stats = await db.aquery_stats(pred_query)
+                        except Exception as e:
+                            eval_res_success = False
+                            eval_res_status = "failed_to_generate_sql"
+                            error = f"Failed to calculate query stats, {e}"
+                            eval_res_error = error
+                            logger.error(error)
+                        else:
+                            eval_res_success = eval_res["success"]
+                            eval_res_status = eval_res["status"]
+                            eval_res_error = eval_res["error"]
+                            logger.info(f"Evaluation Success: {eval_res['success']}")
 
-                    gold_queries = [gold_query] + optional_gold_queries
-                    for gold in gold_queries:
-                        if not gold:
-                            continue
-                        if check_predicted_query_equals_gold_query(pred_query, gold):
-                            gold_query = gold
+                        output_items.append(
+                            (
+                                query_id,
+                                db_id,
+                                question,
+                                gold_query,
+                                pred_query,
+                                eval_res_success,
+                                eval_res_status,
+                                eval_res_error,
+                                prob_stats,
+                                query_stats,
+                                genid,
+                            )
+                        )
+                        # one of the predicted query gets succeded then stop calculating the rest queries
+                        if eval_res.get("success"):
                             break
-                    eval_res = await sql_rate_reply(gold_query, pred_query, db=db, question=question)
-                    if eval_res.get("error"):
-                        del db
-                        db = await HeavyDB.from_env_async(db_id)
-                    elif eval_res.get("success"):
-                        break
-
-                try:
-                    query_stats = await db.aquery_stats(final_query)
-                except Exception as e:
-                    eval_res_success = False
-                    eval_res_status = "failed_to_generate_sql"
-                    error = f"Failed to calculate query stats, {e}"
-                    eval_res_error = error
-                    logger.error(error)
                 else:
-                    eval_res_success = eval_res["success"]
-                    eval_res_status = eval_res["status"]
-                    eval_res_error = eval_res["error"]
-                    logger.info(f"Evaluation Success: {eval_res['success']}")
+                    # this gets executed with and without generate option
+                    final_query, eval_res = "", {}
+                    for pred_query in pred_queries:
+                        final_query = pred_query
+
+                        gold_queries = [gold_query] + optional_gold_queries
+                        for gold in gold_queries:
+                            if not gold:
+                                continue
+                            if check_predicted_query_equals_gold_query(pred_query, gold):
+                                gold_query = gold
+                                break
+                        eval_res = await sql_rate_reply(gold_query, pred_query, db=db, question=question)
+                        if eval_res.get("error"):
+                            del db
+                            db = await HeavyDB.from_env_async(db_id)
+                        elif eval_res.get("success"):
+                            break
+
+                    try:
+                        query_stats = await db.aquery_stats(final_query)
+                    except Exception as e:
+                        eval_res_success = False
+                        eval_res_status = "failed_to_generate_sql"
+                        error = f"Failed to calculate query stats, {e}"
+                        eval_res_error = error
+                        logger.error(error)
+                    else:
+                        eval_res_success = eval_res["success"]
+                        eval_res_status = eval_res["status"]
+                        eval_res_error = eval_res["error"]
+                        logger.info(f"Evaluation Success: {eval_res['success']}")
+                    output_items.append(
+                        (
+                            query_id,
+                            db_id,
+                            question,
+                            gold_query,
+                            pred_query,
+                            eval_res_success,
+                            eval_res_status,
+                            eval_res_error,
+                            prob_stats,
+                            query_stats,
+                        )
+                    )
             else:
                 eval_res_success = False
                 eval_res_status = "failed_to_generate_sql"
                 eval_res_error = query_error
+                pred_query = next(iter(pred_queries))
                 logger.error("Error occurs while predicting the query.")
 
-            output_item = (
-                query_id,
-                db_id,
-                question,
-                gold_query,
-                pred_query,
-                eval_res_success,
-                eval_res_status,
-                eval_res_error,
-                prob_stats,
-                query_stats,
-            )
+                output_items.append(
+                    (
+                        query_id,
+                        db_id,
+                        question,
+                        gold_query,
+                        pred_query,
+                        eval_res_success,
+                        eval_res_status,
+                        eval_res_error,
+                        prob_stats,
+                        query_stats,
+                    )
+                )
 
-            await output_queue.put(output_item)
+            for output_item in output_items:
+                await output_queue.put(output_item)
             await asyncio.sleep(0.1)
             input_queue.task_done()
 
@@ -669,14 +740,29 @@ async def run_config_model_on_questions_lcel(
             eval_res_error,
             prob_stats,
             query_stats,
+            *gen_id,
         ) = item
         row_data = []
         if query_id:
             row_data.append(query_id)
 
-        row_data.extend(
-            [db_id, question, gold_query, pred_query, eval_res_success, eval_res_status, eval_res_error or ""]
-        )
+        if gen_id:
+            row_data.extend(
+                [
+                    db_id,
+                    gen_id[0],
+                    question,
+                    gold_query,
+                    pred_query,
+                    eval_res_success,
+                    eval_res_status,
+                    eval_res_error or "",
+                ]
+            )
+        else:
+            row_data.extend(
+                [db_id, question, gold_query, pred_query, eval_res_success, eval_res_status, eval_res_error or ""]
+            )
         row_data = [str(item).replace("\n", " ").replace("\r", " ") for item in row_data]
         return row_data
 
@@ -690,6 +776,8 @@ async def run_config_model_on_questions_lcel(
 
             # write header
             header_data = ["db_id", "question", "gold_query", "pred_query", "success", "status", "error"]
+            if generate and expand:
+                header_data = ["db_id", "gen_id", "question", "gold_query", "pred_query", "success", "status", "error"]
             if has_id:
                 header_data = ["id"] + header_data
             if enable_query_stats:
