@@ -15,7 +15,8 @@ from langchain_core.tracers.langchain import LangChainTracer
 from langchain_core.tracers.schemas import Run
 from transformers import AutoTokenizer, LlamaTokenizer
 
-from heavyiq.config import HeavyIQConfig, change_iq_config_for_free_edition, get_config
+from heavyiq.config import (HeavyIQConfig, change_iq_config_for_free_edition,
+                            get_config)
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.heavydb import get_db
 from heavyiq.langchain.llms import LLMType, get_vllm_model_name
@@ -53,8 +54,8 @@ def enable_telemetrics_for_free_edition() -> bool:
 
     global is_langsmith_active
     os.environ["LANGCHAIN_TRACING_V2"] = "true"
-    os.environ["LANGCHAIN_API_KEY"] = "ls__05a28e5a4254408db4beeb06252af343"
-    os.environ["LANGCHAIN_PROJECT"] = "free-8-0-0"
+    os.environ["LANGCHAIN_API_KEY"] = "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"
+    os.environ["LANGCHAIN_PROJECT"] = "heavyai-free"
     is_langsmith_active = True
 
     return True
