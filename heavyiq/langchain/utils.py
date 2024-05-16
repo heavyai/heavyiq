@@ -54,7 +54,7 @@ def enable_telemetrics_for_free_edition() -> bool:
 
     global is_langsmith_active
     os.environ["LANGCHAIN_TRACING_V2"] = "true"
-    os.environ["LANGCHAIN_API_KEY"] = "ls__05a28e5a4254408db4beeb06252af343"
+    os.environ["LANGCHAIN_API_KEY"] = "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"
     os.environ["LANGCHAIN_PROJECT"] = "heavyai-free"
     is_langsmith_active = True
 
