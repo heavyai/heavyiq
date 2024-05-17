@@ -4,7 +4,7 @@ from enum import Enum
 from multiprocessing import Manager
 from multiprocessing.managers import SyncManager
 from pathlib import Path
-from typing import Any, Generic, Optional, TypeVar
+from typing import Any, Generic, Optional, Sequence, TypeVar
 
 import aiofiles
 from fastapi.concurrency import run_in_threadpool
@@ -196,6 +196,21 @@ class LRUCache(Generic[KT, VT]):
 
         return keys_found
 
+    def get_key_contains(self, partial_key: str, key_prefix: KT | None = None) -> list[KT]:
+        """
+        Grab the keys which contain a particular string.
+        """
+        keys_found = []
+        if key_prefix:
+            matched_keys = self.get_key_starts_with(key_prefix)
+        else:
+            matched_keys = self.cache.keys()
+        for key in matched_keys:
+            if partial_key in key:  # type: ignore
+                keys_found.append(key)
+
+        return keys_found
+
     def delete_by_key_prefix(self, key_prefix: KT) -> None:
         """
         Deletes all the caches by key prefix.
@@ -251,6 +266,65 @@ class LRUCache(Generic[KT, VT]):
         del self.cache[lru_key]
         # Remove the least recently used key from the front of the order list
         self.order.pop(0)
+
+
+class TablesCache(Generic[KT, VT]):
+    """
+    Helps to store schema related to multiple tables in LRUCache.
+    """
+
+    _instance: "TablesCache[KT, VT]" = None
+
+    def __new__(cls: type["TablesCache"]) -> "TablesCache":
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._cache = LRUCache[KT, VT](capacity=200, manager=Manager())  # type: ignore[attr-defined]
+        return cls._instance
+
+    def __init__(self) -> None:
+        # Ensure the constructor does not reinitialize the instance
+        if not hasattr(self, "_cache"):
+            self._cache: LRUCache[KT, VT]  # Define the type of cache
+        self.key_prefix = "tables_cache"
+
+    @property
+    def cache(self) -> LRUCache:
+        return self._instance._cache
+
+    def form_key(self, database: str, tables: Sequence[str]) -> str:
+        """
+        Form cache key from the sequence of tables.
+        """
+        sorted_tables = []
+        if isinstance(tables, set):
+            sorted_tables = sorted(list(tables))
+        else:
+            sorted_tables = sorted(tables)
+
+        return f"{self.key_prefix}.{database}.{','.join(sorted_tables)}"
+
+    def delete(self, key: KT):
+        """
+        Helps to delete a particular cache.
+        """
+        self.cache.delete(key)
+
+    def get(self, key: KT) -> VT | None:
+        return self.cache.get(key)
+
+    def put(self, key: KT, value: VT) -> None:
+        return self.cache.put(key, value)
+
+    def delete_by_table_name(self, database: str, table_name: str):
+        """
+        Delete all the caches associated with a table name.
+        """
+        keys_found = self.cache.get_key_contains(partial_key=table_name, key_prefix=f"{self.key_prefix}.{database}.")
+        for key in keys_found:
+            self.delete(key)
+
+
+TABLES_CACHE = TablesCache[str, str]()
 
 
 async def is_path_exists(path: str) -> bool:

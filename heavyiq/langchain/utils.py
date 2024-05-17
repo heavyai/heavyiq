@@ -20,7 +20,7 @@ from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.heavydb import get_db
 from heavyiq.langchain.llms import LLMType, get_vllm_model_name
 from heavyiq.logging_utils import get_heavyiq_logger
-from heavyiq.utils import SharedDictSingleton
+from heavyiq.utils import TABLES_CACHE, SharedDictSingleton
 
 is_langsmith_active = False
 
@@ -222,6 +222,7 @@ async def refresh_cache_for_tables(session: str, tables: Sequence[str]):
                     table, callback=update_table_index_on_schema_change_callback
                 ),
             )
+            TABLES_CACHE.delete_by_table_name(database=heavydb._dbname, table_name=table)
 
     # if any of the table schema gets changed, then clear it's table_info cache
     if True in do_refresh_results:
@@ -239,13 +240,25 @@ async def aget_table_info_wrt_token_limit(
     llm: BaseLanguageModel,
     session: str,
     prompt: BasePromptTemplate | BaseChatPromptTemplate,
-    table_names_to_use: list[str] | None,
+    table_names_to_use: list[str],
     caller: LLMType = LLMType.NL_TO_SQL,
 ) -> str:
     """
     Gets the info of all the tables with respect to the token limit async.
     """
-    config = get_config()
+    logger, config = get_heavyiq_logger(), get_config()
+    # refresh-cache
+    table_names_tuple = tuple(table_names_to_use)
+    await refresh_cache_for_tables(session, table_names_tuple)
+
+    # check for table info cached
+    heavydb = await get_db(session)
+    cache_key = TABLES_CACHE.form_key(database=heavydb._dbname, tables=table_names_tuple)
+    cached_tables_info = TABLES_CACHE.get(cache_key)
+    if cached_tables_info:
+        logger.info(f"[Cached]: Returning tables_info for {table_names_tuple} tables from shared cache")
+        return cached_tables_info
+
     if config.custom_llm_type is None or config.custom_llm_type == "AZURE":
         token_limit = get_token_limit(llm.model_name)  # type: ignore
         token_counter = llm.get_num_tokens
@@ -271,10 +284,6 @@ async def aget_table_info_wrt_token_limit(
         if caller == LLMType.NL_TO_TABLES
         else config.top_k_max_str_col_count_nl_to_sql
     )
-
-    # refresh-cache
-    table_names_tuple = tuple(table_names_to_use)
-    await refresh_cache_for_tables(session, table_names_tuple)
 
     # decides whether to include top-k or not
     disable_top_k = False
@@ -304,6 +313,9 @@ async def aget_table_info_wrt_token_limit(
             break
     else:  # executed if the loop finished normally (no break)
         raise RuntimeError("Couldn't find suitable prompt provided token limit")
+
+    # store the combined table_info in cache
+    TABLES_CACHE.put(cache_key, table_info)
 
     return table_info
 
