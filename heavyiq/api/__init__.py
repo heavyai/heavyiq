@@ -65,15 +65,11 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
 
     :return FastAPI: instance of fastapi with custom openapi scehma.
     """
-    global _no_config_provided
     try:
         with open(config_path, "r") as f:
             if "[iq]" not in f.read():
-                _no_config_provided = True
                 print("No HeavyIQ configuration options detected; using defaults.")
                 # return stripped_down_api()
-            else:
-                _no_config_provided = False
     except Exception:
         print("Provided config path is not valid; service disabled.")
         return stripped_down_api()

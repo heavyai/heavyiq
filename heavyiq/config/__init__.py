@@ -118,6 +118,8 @@ def change_iq_config_for_free_edition() -> bool:
     """
 
     keys_to_change = {
+        "heavydb_port": 6274,
+        "custom_llm_type": "API_VLLM",
         "custom_llm_api_base": "https://community.heavylm/heavy.ai/v1", # base url of API",
         "custom_llm_api_nl_to_sql_base": "https://community.heavylm/heavy.ai/v1",
         "custom_llm_api_sql_to_answer_base": "https://community.heavylm/heavy.ai/v1",
@@ -127,16 +129,6 @@ def change_iq_config_for_free_edition() -> bool:
     }
 
     change_success = change_iq_config(keys_to_change)
-
-    global _no_config_provided
-    if _no_config_provided == True:
-        print("No config provided, using defaults")
-        # Additional things to override if no config was provided and it's the free edition
-        no_config_defaults = {
-            "heavydb_port": 6274,
-            "custom_llm_type": "API_VLLM",
-        }
-        change_iq_config(no_config_defaults)
 
     global _config
     validate_config(_config)
