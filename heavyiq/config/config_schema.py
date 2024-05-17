@@ -54,25 +54,25 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     custom_llm_type: Optional[str] = None
     """ 'API' or 'API_VLLM' or 'AZURE' """
     custom_llm_api_base: str = ""  # LLMType.DEFAULT
-    custom_llm_api_context_window: int = 16128  # LLMType.DEFAULT
+    custom_llm_api_context_window: int = 15552  # LLMType.DEFAULT
     custom_llm_api_nl_to_sql_base: Optional[str] = None  # LLMType.NL_TO_SQL
-    custom_llm_api_nl_to_sql_context_window: int = 16128  # LLMType.NL_TO_SQL
+    custom_llm_api_nl_to_sql_context_window: int = 15552  # LLMType.NL_TO_SQL
     custom_llm_api_nl_to_sql_error_base: Optional[str] = None  # LLMType.NL_TO_SQL_ERROR
-    custom_llm_api_nl_to_sql_error_context_window: int = 16128  # LLMType.NL_TO_SQL_ERROR
+    custom_llm_api_nl_to_sql_error_context_window: int = 15552  # LLMType.NL_TO_SQL_ERROR
     custom_llm_api_sql_to_answer_base: Optional[str] = None  # LLMType.SQL_TO_ANSWER
-    custom_llm_api_sql_to_answer_context_window: int = 16128  # LLMType.SQL_TO_ANSWER
+    custom_llm_api_sql_to_answer_context_window: int = 15552  # LLMType.SQL_TO_ANSWER
     custom_llm_api_nl_to_tables_base: Optional[str] = None  # LLMType.NL_TO_TABLES
-    custom_llm_api_nl_to_tables_context_window: int = 16128  # LLMType.NL_TO_TABLES
+    custom_llm_api_nl_to_tables_context_window: int = 15552  # LLMType.NL_TO_TABLES
     custom_llm_api_tables_to_questions_base: Optional[str] = None  # LLMType.TABLES_TO_QUESTIONS
-    custom_llm_api_tables_to_questions_context_window: int = 16128  # LLMType.TABLES_TO_QUESTIONS
+    custom_llm_api_tables_to_questions_context_window: int = 15552  # LLMType.TABLES_TO_QUESTIONS
     custom_llm_api_instruct_base: Optional[str] = None  # LLMType.INSTRUCT
-    custom_llm_api_instruct_context_window: int = 16128  # LLMType.INSTRUCT
+    custom_llm_api_instruct_context_window: int = 15552  # LLMType.INSTRUCT
     custom_llm_api_instruct_prompt_start_token: str = "<|prompt|>\n"
     custom_llm_api_instruct_prompt_end_token: str = "\n<|answer|>\n"
     custom_llm_api_tables_to_questions_prompt_token: str = "<|table question prompt|>"
     custom_llm_api_tables_to_questions_answer_token: str = "<|table question answer|>"
     custom_llm_api_vllm_beam_width: int = 2
-    custom_llm_api_vllm_max_tokens: int = 512
+    custom_llm_api_vllm_max_tokens: int = 768
     custom_llm_azure_openai_api_version: str = "2023-03-15-preview"
     custom_llm_azure_openai_api_base: str = ""
     custom_llm_azure_deployment_name: str = ""
@@ -80,8 +80,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     enable_logprobs: bool = False
     custom_llm_logprobs_limit: int = 1
     # top-k
-    top_k_max_str_col_count_nl_to_sql: int = 50
-    top_k_max_str_col_count_nl_to_tables: int = 50
+    top_k_max_str_col_count_nl_to_sql: int = 200
+    top_k_max_str_col_count_nl_to_tables: int = 100
     # table order in prompt
     sort_prompt_tables_desc: bool = True
     # whether to include timestamp text on table prompt
