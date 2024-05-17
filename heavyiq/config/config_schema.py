@@ -4,6 +4,7 @@ from .overrides import OverrideBaseConfig
 
 
 class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
+    disabled: bool = False
     port: int = 6275
     data: Optional[str] = None
     openai_api_key: Optional[str] = None
@@ -134,4 +135,4 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
 
 class AppConfig(OverrideBaseConfig):  # type: ignore
     data: Optional[str] = None
-    iq: HeavyIQConfig
+    iq: Optional[HeavyIQConfig] = HeavyIQConfig()

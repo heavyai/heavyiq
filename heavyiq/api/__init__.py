@@ -13,15 +13,15 @@ from starlette.exceptions import HTTPException
 from heavyiq.api.handlers import exception_handler as exh
 from heavyiq.api.middlewares import AsyncLoggingMiddleware
 from heavyiq.api.models.error import ErrorResponse
-from heavyiq.api.routes import bgrouter, defaultrouter, iqrouter, lcelrouter, llmrouter, streamrouter
+from heavyiq.api.routes import (bgrouter, defaultrouter, iqrouter, lcelrouter,
+                                llmrouter, streamrouter)
 from heavyiq.config import HeavyIQConfig, get_config
-from heavyiq.langchain.exceptions import (
-    GenerateTableMetadataException,
-    NLtoAnswerException,
-    NLtoSQLException,
-    NLtoTableException,
-)
-from heavyiq.langchain.utils import InMemoryLLMCache, enable_telemetrics_for_free_edition, init_telemetrics
+from heavyiq.langchain.exceptions import (GenerateTableMetadataException,
+                                          NLtoAnswerException,
+                                          NLtoSQLException, NLtoTableException)
+from heavyiq.langchain.utils import (InMemoryLLMCache,
+                                     enable_telemetrics_for_free_edition,
+                                     init_telemetrics)
 from heavyiq.logging_utils import get_heavyiq_logger, init_logs
 from heavyiq.utils import SharedDictSingleton
 
@@ -65,16 +65,26 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
 
     :return FastAPI: instance of fastapi with custom openapi scehma.
     """
+    global _no_config_provided
     try:
         with open(config_path, "r") as f:
             if "[iq]" not in f.read():
-                print("No HeavyIQ configuration options detected; service disabled.")
-                return stripped_down_api()
+                _no_config_provided = True
+                print("No HeavyIQ configuration options detected; using defaults.")
+                # return stripped_down_api()
+            else:
+                _no_config_provided = False
     except Exception:
         print("Provided config path is not valid; service disabled.")
         return stripped_down_api()
 
     config = get_config(config_path)  # loads config using specified path
+    
+    # If IQ disabled in the config, don't go any further
+    if config and config.disabled == True:
+        # Figure out how to actually exit
+        raise Exception("App disabled from config.toml, exiting.")
+
     init_logs()  # initializes logs using config
     init_telemetrics()  # initializes langsmith
 
@@ -193,6 +203,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
             """
             This enables langsmith telemetrics for the free license by polling a shared multiprocessing dict.
             """
+
             shared_dict, max_retries, retry_count = SharedDictSingleton(), 20, 0
             while retry_count < max_retries:
                 retry_count += 1
@@ -201,6 +212,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
                 if not license_edition:
                     continue
                 logger.info(f"Found HeavyAI license edition, license_type: {license_edition}")
+                
                 if license_edition == "free":
                     logger.info("Enabling langsmith telemetrics for free edition.")
                     done = enable_telemetrics_for_free_edition()
@@ -215,6 +227,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         # run a background task to check license_edition got cached or not
         # if yes, and it's a free edition then enable langsmith telemetry
         asyncio.create_task(enable_telemetrics_for_free_license_daemon())
+        
 
     @app.on_event("shutdown")
     async def shutdown():
