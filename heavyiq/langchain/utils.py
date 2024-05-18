@@ -212,10 +212,13 @@ async def refresh_cache_for_tables(session: str, tables: Sequence[str]):
     """
     Check and refresh caches asscociated with the tables.
     """
-    heavydb = await get_db(session)
+    from heavyiq.logging_utils import get_heavyiq_logger
+
+    heavydb, logger = await get_db(session), get_heavyiq_logger()
     do_refresh_results = await asyncio.gather(*[heavydb.should_refresh_table_cache(table) for table in tables])
     for table, refresh_status in zip(tables, do_refresh_results):
         if refresh_status:
+            logger.info(f"Schema change detected for {table}, so resetting all the relevant caches.")
             # schema change detected
             await asyncio.gather(
                 heavydb.delete_table_cache(table),
@@ -299,6 +302,7 @@ async def aget_table_info_wrt_token_limit(
             logger.info(f"[Cached]: Returning combined tables_info for {table_names_tuple} tables from shared cache")
             return table_info
 
+    logger.info(f"Calculating tables_info for {table_names_tuple} tables...")
     top_k_max_str_column_count = (
         config.top_k_max_str_col_count_nl_to_tables
         if caller == LLMType.NL_TO_TABLES
@@ -334,19 +338,23 @@ async def aget_table_info_wrt_token_limit(
     else:  # executed if the loop finished normally (no break)
         raise RuntimeError("Couldn't find suitable prompt provided token limit")
 
-    # store the combined table_info in cache
+    # store the combined or single table_info in cache
     TABLES_CACHE.put(cache_key, table_info)
 
-    # do a per table cache only if the table_options == {"include_samples": False},
-    # so that it always stores the maximum metadata
-    if options == {"include_samples": False}:
-        # store the table_info per table in cache
+    if len(table_names_tuple) > 1:
+        # do a per table cache when table len > 1
         table_info_split = re.split(r"\n(?=CREATE TABLE)", table_info)
         for info in table_info_split:
             table_name = re.search(r"^CREATE TABLE (\w+)", info).group(1)
             key = TABLES_CACHE.form_key(database=heavydb._dbname, tables=(table_name,))
-            if TABLES_CACHE.get(key) is None:
-                TABLES_CACHE.put(key, info.strip())
+            existing_data = TABLES_CACHE.get(key)
+            current_data = info.strip()
+            # always populate the cache with larger data
+            if existing_data:
+                if len(existing_data) < current_data:
+                    TABLES_CACHE.put(key, current_data)
+            else:
+                TABLES_CACHE.put(key, current_data)
 
     return table_info
 
