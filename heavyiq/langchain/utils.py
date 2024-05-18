@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 from typing import Any, Callable, Sequence
 
 from async_lru import alru_cache
@@ -251,13 +252,24 @@ async def aget_table_info_wrt_token_limit(
     table_names_tuple = tuple(table_names_to_use)
     await refresh_cache_for_tables(session, table_names_tuple)
 
-    # check for table info cached
+    # check for combined tables cache
     heavydb = await get_db(session)
     cache_key = TABLES_CACHE.form_key(database=heavydb._dbname, tables=table_names_tuple)
     cached_tables_info = TABLES_CACHE.get(cache_key)
     if cached_tables_info:
         logger.info(f"[Cached]: Returning tables_info for {table_names_tuple} tables from shared cache")
         return cached_tables_info
+    # check for per table cache
+    tables_cache, table_info = [], None
+    if len(table_names_tuple) > 1:
+        for table in table_names_tuple:
+            key = TABLES_CACHE.form_key(database=heavydb._dbname, tables=(table,))
+            table_cache = TABLES_CACHE.get(key)
+            if not table_cache:
+                break
+            tables_cache.append(table_cache)
+        else:
+            table_info = "\n\n".join(tables_cache)
 
     if config.custom_llm_type is None or config.custom_llm_type == "AZURE":
         token_limit = get_token_limit(llm.model_name)  # type: ignore
@@ -278,6 +290,14 @@ async def aget_table_info_wrt_token_limit(
             {"include_samples": False, "include_timestamp": False, "include_top_k": False},
             {"include_samples": False, "include_timestamp": False, "include_top_k": False, "include_comments": False},
         ]
+
+    if table_info:
+        # check for the cached table info length lesser than the model's context width or not
+        formatted_prompt = prompt.format(table_info=table_info)
+        prompt_tokens = await run_in_threadpool(token_counter, formatted_prompt)
+        if prompt_tokens <= token_limit:
+            logger.info(f"[Cached]: Returning combined tables_info for {table_names_tuple} tables from shared cache")
+            return table_info
 
     top_k_max_str_column_count = (
         config.top_k_max_str_col_count_nl_to_tables
@@ -316,6 +336,17 @@ async def aget_table_info_wrt_token_limit(
 
     # store the combined table_info in cache
     TABLES_CACHE.put(cache_key, table_info)
+
+    # do a per table cache only if the table_options == {"include_samples": False},
+    # so that it always stores the maximum metadata
+    if options == {"include_samples": False}:
+        # store the table_info per table in cache
+        table_info_split = re.split(r"\n(?=CREATE TABLE)", table_info)
+        for info in table_info_split:
+            table_name = re.search(r"^CREATE TABLE (\w+)", info).group(1)
+            key = TABLES_CACHE.form_key(database=heavydb._dbname, tables=(table_name,))
+            if TABLES_CACHE.get(key) is None:
+                TABLES_CACHE.put(key, info.strip())
 
     return table_info
 

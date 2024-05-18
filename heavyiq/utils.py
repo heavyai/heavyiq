@@ -1,5 +1,6 @@
 import asyncio
 import re
+import threading
 from enum import Enum
 from multiprocessing import Manager
 from multiprocessing.managers import SyncManager
@@ -274,6 +275,7 @@ class TablesCache(Generic[KT, VT]):
     """
 
     _instance: "TablesCache[KT, VT]" = None
+    _lock: threading.Lock = threading.Lock()
 
     def __new__(cls: type["TablesCache"]) -> "TablesCache":
         if cls._instance is None:
@@ -307,13 +309,16 @@ class TablesCache(Generic[KT, VT]):
         """
         Helps to delete a particular cache.
         """
-        self.cache.delete(key)
+        with self._lock:
+            self.cache.delete(key)
 
     def get(self, key: KT) -> VT | None:
-        return self.cache.get(key)
+        with self._lock:
+            return self.cache.get(key)
 
     def put(self, key: KT, value: VT) -> None:
-        return self.cache.put(key, value)
+        with self._lock:
+            return self.cache.put(key, value)
 
     def delete_by_table_name(self, database: str, table_name: str):
         """
