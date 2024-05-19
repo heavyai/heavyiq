@@ -102,6 +102,7 @@ VT = TypeVar("VT")  # Value type
 class SharedDictSingleton(Generic[KT, VT]):
     _instance: "SharedDictSingleton[KT, VT]" = None
     _lock: asyncio.Lock = asyncio.Lock()
+    _sync_lock: threading.Lock = threading.Lock()
 
     class Keys(Enum):
         HeavyDBLicenseEdition = "heavydb_license_edition"
@@ -135,16 +136,19 @@ class SharedDictSingleton(Generic[KT, VT]):
                 pass
 
     def sget(self, key: KT) -> Any:  # sync get where manager.Dict().get and put are atomic, thus avoids race-conditions
-        return self._shared_dict.get(key)  # type: ignore
+        with self._sync_lock:
+            return self._shared_dict.get(key)  # type: ignore
 
     def sput(self, key: KT, value: VT) -> None:
-        self._shared_dict[key] = value  # type: ignore
+        with self._sync_lock:
+            self._shared_dict[key] = value  # type: ignore
 
     def sdelete(self, key: KT) -> None:
-        try:
-            del self._shared_dict[key]  # type: ignore
-        except KeyError:
-            pass
+        with self._sync_lock:
+            try:
+                del self._shared_dict[key]  # type: ignore
+            except KeyError:
+                pass
 
     def get_last_schema_modification_check_time(self, table: str) -> float | None:
         """

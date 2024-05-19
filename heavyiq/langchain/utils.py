@@ -254,11 +254,8 @@ async def refresh_cache_for_tables(session: str, tables: Sequence[str]) -> None:
             (False, False, False, True),
             (False, False, False, False),
         ]
-        tables_to_check_tuple = tuple(sorted(tables_to_check))
         for w, x, y, z in options_list:
-            aget_table_info_from_cache_or_calculate.cache_invalidate(
-                heavydb._conn._session, tables_to_check_tuple, w, x, y, z
-            )
+            aget_table_info_from_cache_or_calculate.cache_invalidate(heavydb._conn._session, tables, w, x, y, z)
 
 
 async def aget_table_info_wrt_token_limit(
@@ -273,9 +270,9 @@ async def aget_table_info_wrt_token_limit(
     """
     logger, config = get_heavyiq_logger(), get_config()
     # refresh-cache
-    table_names_tuple = tuple(table_names_to_use)
+    table_names_tuple = tuple(sorted(table_names_to_use))
     # pass sorted tables tuple to refresh_cache_for_tables method is decorated by alru_cache
-    await refresh_cache_for_tables(session, tuple(sorted(table_names_to_use)))
+    await refresh_cache_for_tables(session, table_names_tuple)
 
     # check for combined tables cache
     heavydb = await get_db(session)
@@ -373,7 +370,7 @@ async def aget_table_info_wrt_token_limit(
             current_data = info.strip()
             # always populate the cache with larger data
             if existing_data:
-                if len(existing_data) < current_data:
+                if len(existing_data) < len(current_data):
                     TABLES_CACHE.put(key, current_data)
             else:
                 TABLES_CACHE.put(key, current_data)
