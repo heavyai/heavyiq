@@ -1,4 +1,5 @@
 import asyncio
+import sys
 from typing import Any
 
 from asgi_correlation_id import CorrelationIdMiddleware
@@ -59,27 +60,31 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
         set_llm_cache(InMemoryLLMCache())
 
 
+_config_provided = True
 def create_app(config_path: str = "./config.toml") -> FastAPI:
     """
     create and return a FastAPI instance.
 
     :return FastAPI: instance of fastapi with custom openapi scehma.
     """
+    global _config_provided
     try:
         with open(config_path, "r") as f:
             if "[iq]" not in f.read():
                 print("No HeavyIQ configuration options detected; using defaults.")
+                _config_provided = False
                 # return stripped_down_api()
     except Exception:
-        print("Provided config path is not valid; service disabled.")
-        return stripped_down_api()
+        print("Provided config path is not valid.")
+        _config_provided = False
 
-    config = get_config(config_path)  # loads config using specified path
+    config = get_config(config_path, _config_provided)  # loads config using specified path
     
     # If IQ disabled in the config, don't go any further
     if config and config.disabled == True:
         # Figure out how to actually exit
-        raise Exception("App disabled from config.toml, exiting.")
+        print("App disabled from config.toml, exiting.")
+        sys.exit()
 
     init_logs()  # initializes logs using config
     init_telemetrics()  # initializes langsmith
@@ -192,8 +197,8 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         """
         Code to be executed when application starts.
         """
-        import heavyiq.lcel.chains
         from heavyiq.logging_utils import heavyiq_logger as logger
+        global _config_provided
 
         async def enable_telemetrics_for_free_license_daemon():
             """
@@ -207,6 +212,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
                 license_edition = await shared_dict.get(SharedDictSingleton.Keys.HeavyDBLicenseEdition.name)
                 if not license_edition:
                     continue
+
                 logger.info(f"Found HeavyAI license edition, license_type: {license_edition}")
                 
                 if license_edition == "free":
@@ -216,8 +222,14 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
                         logger.info("Successfully changed langsmith telemetrics and HeavyIQ configs for free edition.")
                     else:
                         logger.error("Failed to change langsmith telemetrics and HeavyIQ configs for free edition.")
+                else:
+                    if not _config_provided:
+                        logger.error("Config must be provided when license edition is not free")
+                        sys.exit()
+                        
                 break
             else:
+                # TODO: Might need to fail here
                 logger.error(f"Failed to check HeavyAI license edition after {max_retries*2} seconds.")
 
         # run a background task to check license_edition got cached or not

@@ -3,7 +3,7 @@ import threading
 from typing import Any
 from urllib.parse import urlparse
 
-from confz import FileSource
+from confz import DataSource, FileSource
 from heavydb.thrift.Heavy import Client  # type: ignore
 from heavydb.thrift.ttypes import TLicenseInfo
 from openai import OpenAI
@@ -38,49 +38,51 @@ def validate_config(iq: HeavyIQConfig) -> AppConfig:
     Validates app config after it's creation.
     This involves basic validation of configs and creation of directory mentioned if not exists.
     """
-
-    if iq == HeavyIQConfig():
-        print("No config provided. Skipping validation until license is loaded and config updated per edition used.")
-    else:
-        if iq.custom_llm_type is None or iq.custom_llm_type == "AZURE":
-            if iq.custom_llm_type == "AZURE" and (
-                iq.custom_llm_azure_deployment_name.strip() == ""
-                or iq.custom_llm_azure_openai_api_base.strip() == ""
-                or iq.custom_llm_azure_openai_api_version.strip() == ""
-            ):
-                raise ValueError(
-                    "Custom LLM type is set to 'AZURE', but deployment name or API base URL or API Version is not set."
-                )
-            openai_client = OpenAI(api_key=iq.openai_api_key)
-            if iq.custom_llm_type is None:
-                try:
-                    openai_client.models.list()
-                except Exception as e:
-                    raise ValueError(f"Unable to communicate with OpenAI API: {e}")
-        elif iq.custom_llm_type == "API":
-            if iq.custom_llm_api_base.strip() == "":
-                raise ValueError("Custom LLM type is set to 'API', but API base URL is not set.")
-        elif iq.custom_llm_type == "API_VLLM":
-            if iq.custom_llm_api_base.strip() == "":
-                raise ValueError("Custom LLM type is set to 'API_VLLM', but API base URL is not set.")
-        else:
+    if iq.custom_llm_type is None or iq.custom_llm_type == "AZURE":
+        if iq.custom_llm_type == "AZURE" and (
+            iq.custom_llm_azure_deployment_name.strip() == ""
+            or iq.custom_llm_azure_openai_api_base.strip() == ""
+            or iq.custom_llm_azure_openai_api_version.strip() == ""
+        ):
             raise ValueError(
-                f"Invalid custom LLM type (valid options are AZURE or API or API_VLLM): {iq.custom_llm_type}"
+                "Custom LLM type is set to 'AZURE', but deployment name or API base URL or API Version is not set."
             )
+        openai_client = OpenAI(api_key=iq.openai_api_key)
+        if iq.custom_llm_type is None:
+            try:
+                openai_client.models.list()
+            except Exception as e:
+                raise ValueError(f"Unable to communicate with OpenAI API: {e}")
+    elif iq.custom_llm_type == "API":
+        if iq.custom_llm_api_base.strip() == "":
+            raise ValueError("Custom LLM type is set to 'API', but API base URL is not set.")
+    elif iq.custom_llm_type == "API_VLLM":
+        if iq.custom_llm_api_base.strip() == "":
+            raise ValueError("Custom LLM type is set to 'API_VLLM', but API base URL is not set.")
+    else:
+        raise ValueError(
+            f"Invalid custom LLM type (valid options are AZURE or API or API_VLLM): {iq.custom_llm_type}"
+        )
     
 
     return iq
 
 
-def get_config(file: str = "./config.toml") -> HeavyIQConfig:
+def get_config(file: str = "./config.toml", config_provided = True) -> HeavyIQConfig:
     """If called with a non-default file path, must be called before importing any other modules that use the config."""
     global _config
 
     with _config_lock:
         if _config:
             return _config
-        app_config: AppConfig = AppConfig(config_sources=FileSource(file=file))  # type: ignore
-        validate_config(app_config.iq)
+        
+        app_config: AppConfig
+        if config_provided:
+            app_config = AppConfig(config_sources=FileSource(file=file))  # type: ignore
+            validate_config(app_config.iq)
+        else:
+            app_config = AppConfig(config_sources=DataSource({}))
+            print("Skipping validation until license is loaded and config updated per edition used.")
 
         # Data setup things, move out of validate method
         if app_config.iq.data is None:
