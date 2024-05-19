@@ -1,9 +1,8 @@
 import os
 import threading
 from typing import Any
-from urllib.parse import urlparse
 
-from confz import DataSource, FileSource
+from confz import FileSource
 from heavydb.thrift.Heavy import Client  # type: ignore
 from heavydb.thrift.ttypes import TLicenseInfo
 from openai import OpenAI
@@ -81,7 +80,7 @@ def get_config(file: str = "./config.toml", config_provided = True) -> HeavyIQCo
             app_config = AppConfig(config_sources=FileSource(file=file))  # type: ignore
             validate_config(app_config.iq)
         else:
-            app_config = AppConfig(config_sources=DataSource({}))
+            app_config = AppConfig()
             print("Skipping validation until license is loaded and config updated per edition used.")
 
         # Data setup things, move out of validate method
