@@ -1,6 +1,7 @@
 import asyncio
 import os
 import re
+from datetime import datetime, timedelta
 from typing import Any, Callable, Sequence
 
 from async_lru import alru_cache
@@ -208,15 +209,32 @@ async def update_table_index_on_schema_change_callback(heavydb: HeavyDB, table: 
 
 
 @alru_cache(maxsize=127, ttl=60 * 10)
-async def refresh_cache_for_tables(session: str, tables: Sequence[str]):
+async def refresh_cache_for_tables(session: str, tables: Sequence[str]) -> None:
     """
     Check and refresh caches asscociated with the tables.
     """
     from heavyiq.logging_utils import get_heavyiq_logger
 
-    heavydb, logger = await get_db(session), get_heavyiq_logger()
-    do_refresh_results = await asyncio.gather(*[heavydb.should_refresh_table_cache(table) for table in tables])
-    for table, refresh_status in zip(tables, do_refresh_results):
+    heavydb, logger, shared_dict = await get_db(session), get_heavyiq_logger(), SharedDictSingleton()
+
+    tables_to_check = []
+    for table in tables:
+        last_check_tmstp = shared_dict.get_last_schema_modification_check_time(table)
+        if not last_check_tmstp:
+            tables_to_check.append(table)
+            continue
+        # do table schema check only if the difference between current_tmstp and last schema check time
+        # for that table is greater than 10 mins
+        if datetime.now() > (datetime.fromtimestamp(last_check_tmstp) + timedelta(minutes=10)):
+            tables_to_check.append(table)
+
+    if not tables_to_check:
+        return None
+
+    logger.info(f"Checking table schema change for {tables_to_check} tables.")
+    do_refresh_results = await asyncio.gather(*[heavydb.should_refresh_table_cache(table) for table in tables_to_check])
+    for table, refresh_status in zip(tables_to_check, do_refresh_results):
+        shared_dict.put_last_schema_modification_check_time(table)
         if refresh_status:
             logger.info(f"Schema change detected for {table}, so resetting all the relevant caches.")
             # schema change detected
@@ -236,8 +254,11 @@ async def refresh_cache_for_tables(session: str, tables: Sequence[str]):
             (False, False, False, True),
             (False, False, False, False),
         ]
+        tables_to_check_tuple = tuple(sorted(tables_to_check))
         for w, x, y, z in options_list:
-            aget_table_info_from_cache_or_calculate.cache_invalidate(heavydb._conn._session, tables, w, x, y, z)
+            aget_table_info_from_cache_or_calculate.cache_invalidate(
+                heavydb._conn._session, tables_to_check_tuple, w, x, y, z
+            )
 
 
 async def aget_table_info_wrt_token_limit(
@@ -253,7 +274,8 @@ async def aget_table_info_wrt_token_limit(
     logger, config = get_heavyiq_logger(), get_config()
     # refresh-cache
     table_names_tuple = tuple(table_names_to_use)
-    await refresh_cache_for_tables(session, table_names_tuple)
+    # pass sorted tables tuple to refresh_cache_for_tables method is decorated by alru_cache
+    await refresh_cache_for_tables(session, tuple(sorted(table_names_to_use)))
 
     # check for combined tables cache
     heavydb = await get_db(session)

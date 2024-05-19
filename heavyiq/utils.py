@@ -1,6 +1,7 @@
 import asyncio
 import re
 import threading
+from datetime import datetime
 from enum import Enum
 from multiprocessing import Manager
 from multiprocessing.managers import SyncManager
@@ -144,6 +145,18 @@ class SharedDictSingleton(Generic[KT, VT]):
             del self._shared_dict[key]  # type: ignore
         except KeyError:
             pass
+
+    def get_last_schema_modification_check_time(self, table: str) -> float | None:
+        """
+        Retrieves the timestamp of the last schema modification check for a specified database table.
+        """
+        return self.sget(f"last_table_schema_change_check_{table}")  # type: ignore
+
+    def put_last_schema_modification_check_time(self, table: str) -> None:
+        """
+        Updates the timestamp of the last schema modification check for a specified database table.
+        """
+        self.sput(f"last_table_schema_change_check_{table}", datetime.now().timestamp())  # type: ignore
 
 
 class LRUCache(Generic[KT, VT]):
