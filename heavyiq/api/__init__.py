@@ -228,7 +228,6 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
                         
                 break
             else:
-                # TODO: Might need to fail here
                 logger.error(f"Failed to check HeavyAI license edition after {max_retries*2} seconds.")
 
         # run a background task to check license_edition got cached or not
