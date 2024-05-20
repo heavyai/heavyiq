@@ -149,7 +149,6 @@ def get_table_info_wrt_token_limit(
     return table_info
 
 
-# @alru_cache(maxsize=127, ttl=60 * 10)  # typed=True and passing kwargs seems buggy in async lru
 async def aget_table_info_from_cache_or_calculate(
     session: str,
     tables: Sequence[str],
@@ -232,27 +231,16 @@ async def refresh_cache_for_tables(session: str, tables: Sequence[str]) -> None:
     if not tables_to_check:
         return None
 
-    logger.info(f"Checking table schema change for {tables_to_check} tables.")
+    logger.debug(f"Checking table schema change for {tables_to_check} tables.")
     do_refresh_results = await asyncio.gather(*[heavydb.should_refresh_table_cache(table) for table in tables_to_check])
     for table, refresh_status in zip(tables_to_check, do_refresh_results):
         shared_dict.put_last_schema_modification_check_time(table)
         if refresh_status:
-            logger.info(f"Schema change detected for {table}, so resetting all the relevant caches.")
+            logger.debug(f"Schema change detected for {table}, so resetting all the relevant caches.")
             # schema change detected
             await heavydb.delete_table_cache(table)
             asyncio.create_task(update_table_index_on_schema_change_callback(heavydb._conn._session, table))
             TABLES_CACHE.delete_by_table_name(database=heavydb._dbname, table_name=table)
-
-    # if any of the table schema gets changed, then clear it's table_info cache
-    # if True in do_refresh_results:
-    #     options_list = [
-    #         (False, True, True, True),
-    #         (False, False, True, True),
-    #         (False, False, False, True),
-    #         (False, False, False, False),
-    #     ]
-    #     for w, x, y, z in options_list:
-    #         aget_table_info_from_cache_or_calculate.cache_invalidate(heavydb._conn._session, tables, w, x, y, z)
 
 
 async def aget_table_info_wrt_token_limit(
@@ -276,7 +264,7 @@ async def aget_table_info_wrt_token_limit(
     cache_key = TABLES_CACHE.form_key(database=heavydb._dbname, tables=table_names_tuple)
     cached_tables_info = TABLES_CACHE.get(cache_key)
     if cached_tables_info:
-        logger.info(f"[Cached]: Returning tables_info for {table_names_tuple} tables from shared cache")
+        logger.debug(f"[Cached]: Returning tables_info for {table_names_tuple} tables from shared cache")
         return cached_tables_info
     # check for per table cache
     tables_cache, table_info = [], None
@@ -315,10 +303,10 @@ async def aget_table_info_wrt_token_limit(
         formatted_prompt = prompt.format(table_info=table_info)
         prompt_tokens = await run_in_threadpool(token_counter, formatted_prompt)
         if prompt_tokens <= token_limit:
-            logger.info(f"[Cached]: Returning combined tables_info for {table_names_tuple} tables from shared cache")
+            logger.debug(f"[Cached]: Returning combined tables_info for {table_names_tuple} tables from shared cache")
             return table_info
 
-    logger.info(f"Calculating tables_info for {table_names_tuple} tables...")
+    logger.debug(f"Calculating tables_info for {table_names_tuple} tables...")
     top_k_max_str_column_count = (
         config.top_k_max_str_col_count_nl_to_tables
         if caller == LLMType.NL_TO_TABLES
