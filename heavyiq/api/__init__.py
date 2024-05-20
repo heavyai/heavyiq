@@ -73,7 +73,6 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
             if "[iq]" not in f.read():
                 print("No HeavyIQ configuration options detected; using defaults.")
                 _config_provided = False
-                # return stripped_down_api()
     except Exception:
         print("Provided config path is not valid.")
         _config_provided = False

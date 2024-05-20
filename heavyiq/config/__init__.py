@@ -109,7 +109,6 @@ def change_iq_config(dict_: dict[str, Any]) -> bool:
         for key, value in dict_.items():
             setattr(_config, key, value)
 
-
     return True
 
 
