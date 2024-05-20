@@ -4,6 +4,7 @@ from .overrides import OverrideBaseConfig
 
 
 class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
+    disabled: bool = False
     port: int = 6275
     data: Optional[str] = None
     openai_api_key: Optional[str] = None
@@ -51,7 +52,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     enable_debug_endpoints: bool = False
     enable_llm_cache: bool = False
     # CUSTOM LLM
-    custom_llm_type: Optional[str] = None
+    custom_llm_type: Optional[str] = "API_VLLM"
+
     """ 'API' or 'API_VLLM' or 'AZURE' """
     custom_llm_api_base: str = ""  # LLMType.DEFAULT
     custom_llm_api_context_window: int = 15552  # LLMType.DEFAULT
@@ -134,4 +136,4 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
 
 class AppConfig(OverrideBaseConfig):  # type: ignore
     data: Optional[str] = None
-    iq: HeavyIQConfig
+    iq: Optional[HeavyIQConfig] = HeavyIQConfig()
