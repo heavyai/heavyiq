@@ -149,7 +149,7 @@ def get_table_info_wrt_token_limit(
     return table_info
 
 
-@alru_cache(maxsize=127, ttl=60 * 10)  # typed=True and passing kwargs seems buggy in async lru
+# @alru_cache(maxsize=127, ttl=60 * 10)  # typed=True and passing kwargs seems buggy in async lru
 async def aget_table_info_from_cache_or_calculate(
     session: str,
     tables: Sequence[str],
@@ -244,15 +244,15 @@ async def refresh_cache_for_tables(session: str, tables: Sequence[str]) -> None:
             TABLES_CACHE.delete_by_table_name(database=heavydb._dbname, table_name=table)
 
     # if any of the table schema gets changed, then clear it's table_info cache
-    if True in do_refresh_results:
-        options_list = [
-            (False, True, True, True),
-            (False, False, True, True),
-            (False, False, False, True),
-            (False, False, False, False),
-        ]
-        for w, x, y, z in options_list:
-            aget_table_info_from_cache_or_calculate.cache_invalidate(heavydb._conn._session, tables, w, x, y, z)
+    # if True in do_refresh_results:
+    #     options_list = [
+    #         (False, True, True, True),
+    #         (False, False, True, True),
+    #         (False, False, False, True),
+    #         (False, False, False, False),
+    #     ]
+    #     for w, x, y, z in options_list:
+    #         aget_table_info_from_cache_or_calculate.cache_invalidate(heavydb._conn._session, tables, w, x, y, z)
 
 
 async def aget_table_info_wrt_token_limit(
