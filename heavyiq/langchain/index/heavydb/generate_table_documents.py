@@ -178,10 +178,12 @@ async def acreate_and_write_table_custom_document(heavydb: HeavyDB, table: str) 
         table (str): The name of the table for which the document is to be created and written.
     """
     logger, config = get_heavyiq_logger(), get_config()
-    table_info = await heavydb.aget_table_info(
-        [table],
+    table_info = await heavydb.aget_single_table_info(
+        table,
         include_samples=config.include_samples_in_custom_table_document_generation,
         include_top_k=config.include_top_k_in_custom_table_document_generation,
+        include_timestamp=True,
+        include_comments=True,
     )
     file_path = f"table_documents/{table}.txt"
     await awrite_to_file(file_path, table_info)

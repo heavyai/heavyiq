@@ -179,12 +179,12 @@ async def aget_table_info_from_cache_or_calculate(
     return table_info
 
 
-async def update_table_index_on_schema_change_callback(heavydb: HeavyDB, table: str):
+async def update_table_index_on_schema_change_callback(session: str, table: str):
     """
     Callback coroutine which gets executed on table schema change.
     This function helps re-genrate table document and then reindex it's metadata on chromadb vectorstore index.
     """
-    from heavyiq.langchain.index.heavydb import aget_heavydb_index
+    from heavyiq.langchain.index.heavydb.create_index import acreate_index_if_nonexistent
 
     logger, shared_dict = get_heavyiq_logger(), SharedDictSingleton()  # type: ignore
     key = f"is_background_index_update_for_{table}_table_in_progress"
@@ -195,9 +195,10 @@ async def update_table_index_on_schema_change_callback(heavydb: HeavyDB, table: 
         return
 
     try:
+        heavydb = await HeavyDB.from_session_async(session_id=session)
         await shared_dict.put(key, True)
         await asyncio.sleep(1)
-        index = await aget_heavydb_index()
+        index = await acreate_index_if_nonexistent(session)
         logger.debug("Regenerating the table document and subsequently re-indexing it in ChromaDB VectorStore.")
         await index.agenerate_and_reindex_table_document(heavydb, table)
     except Exception as e:
@@ -208,7 +209,7 @@ async def update_table_index_on_schema_change_callback(heavydb: HeavyDB, table: 
         await shared_dict.delete(key)
 
 
-@alru_cache(maxsize=127, ttl=60 * 10)
+@alru_cache(maxsize=127, ttl=60 * 2)
 async def refresh_cache_for_tables(session: str, tables: Sequence[str]) -> None:
     """
     Check and refresh caches asscociated with the tables.
@@ -238,12 +239,8 @@ async def refresh_cache_for_tables(session: str, tables: Sequence[str]) -> None:
         if refresh_status:
             logger.info(f"Schema change detected for {table}, so resetting all the relevant caches.")
             # schema change detected
-            await asyncio.gather(
-                heavydb.delete_table_cache(table),
-                heavydb.trigger_table_schema_change_callback(
-                    table, callback=update_table_index_on_schema_change_callback
-                ),
-            )
+            await heavydb.delete_table_cache(table)
+            asyncio.create_task(update_table_index_on_schema_change_callback(heavydb._conn._session, table))
             TABLES_CACHE.delete_by_table_name(database=heavydb._dbname, table_name=table)
 
     # if any of the table schema gets changed, then clear it's table_info cache

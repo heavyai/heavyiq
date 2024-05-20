@@ -23,7 +23,8 @@ from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
 from heavyiq.langchain.heavydb_utils import DB_KEYWORDS
-from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
+from heavyiq.utils import (LRUCache, calc_query_stats, is_destructive_sql,
+                           rate_sql_complexity, strip_sql_comments)
 
 
 class CustomColumnDetails(NamedTuple):
@@ -767,7 +768,7 @@ class HeavyDB:
         if schema_change_callback:
             # run the callback as background task
             self.logger.debug(f"Schema change detected, callback initiated for {table} table.")
-            asyncio.create_task(schema_change_callback(self, table))
+            asyncio.create_task(schema_change_callback(self._conn._session, table))
 
     async def check_and_invalidate_table_cache(self, table: str) -> None:
         """
