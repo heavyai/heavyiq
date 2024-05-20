@@ -23,8 +23,7 @@ from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
 from heavyiq.langchain.heavydb_utils import DB_KEYWORDS
-from heavyiq.utils import (LRUCache, calc_query_stats, is_destructive_sql,
-                           rate_sql_complexity, strip_sql_comments)
+from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
 
 
 class CustomColumnDetails(NamedTuple):
@@ -761,7 +760,6 @@ class HeavyDB:
         self._aget_table_details.cache_invalidate(table)
         self._aget_column_details.cache_invalidate(table)
         self.aget_text_columns.cache_invalidate(table)
-        self._aget_raw_table_schema_from_thrift.cache_invalidate(table)
 
     async def trigger_table_schema_change_callback(self, table: str, callback: Callable | None = None):
         schema_change_callback = callback or self.table_schema_change_callback
@@ -820,11 +818,15 @@ class HeavyDB:
             column_details = await run_in_threadpool(self._conn.get_column_details, table)
         return column_details
 
-    async def _aget_table_custom_details(self, table: str) -> CustomTableDetails:
+    async def _aget_table_custom_details(self, table: str, use_cache: bool = True) -> CustomTableDetails:
         """
         Return custom details of a heavyDB table.
         """
-        table_details = await self._aget_table_details(table)
+        if use_cache:
+            table_details = await self._aget_table_details(table)
+        else:
+            async with self.alock:
+                table_details = await run_in_threadpool(self._conn.get_table_details, table)
         table_comment = table_details.comment or ""
         columns: list[ColumnDetails] = _extract_column_details(table_details.row_desc)
         column_name_comments_mapping = {x.col_name: x.comment or "" for x in table_details.row_desc}
@@ -849,14 +851,13 @@ class HeavyDB:
         ]
         return CustomTableDetails(name=table, columns=custom_columns, comment=table_comment)
 
-    @alru_cache(ttl=60)
     async def _aget_raw_table_schema_from_thrift(
         self, table: str, include_top_k: bool = True, include_timestamp: bool = True, include_comments: bool = True
     ) -> str:
         """
-        Method used to form table_schema from `get_table_details` thrift endpoint.
+        Method used to form table_schema from `get_table_details` thrift endpoint without re-using any cache value.
         """
-        table_details: CustomTableDetails = await self._aget_table_custom_details(table)
+        table_details: CustomTableDetails = await self._aget_table_custom_details(table, use_cache=False)
         config = get_config()
         table_name = f'"{table_details.name}"' if table_details.name.upper() in DB_KEYWORDS else f"{table_details.name}"
         schema_stmt = (
@@ -1260,9 +1261,13 @@ class HeavyDB:
                 return altered_literal
         elif total_count == 0:
             lower_literal = literal["literal"].lower()
-            lower_literal_prefix = re.split(r'[ ,:]+', lower_literal)[0]
+            lower_literal_prefix = re.split(r"[ ,:]+", lower_literal)[0]
             using_lower_literal_prefix = False if lower_literal_prefix == lower_literal else True
-            prefix_condition = f"lower_attr ILIKE '{lower_literal_prefix}' OR lower_attr ILIKE '{lower_literal_prefix} %'" if using_lower_literal_prefix else f"lower_attr ILIKE '{lower_literal_prefix}%'"
+            prefix_condition = (
+                f"lower_attr ILIKE '{lower_literal_prefix}' OR lower_attr ILIKE '{lower_literal_prefix} %'"
+                if using_lower_literal_prefix
+                else f"lower_attr ILIKE '{lower_literal_prefix}%'"
+            )
 
             prefix_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, num_str_values FROM distinct_values WHERE {prefix_condition} ORDER BY num_str_values DESC LIMIT 10;"
 
@@ -1285,7 +1290,7 @@ class HeavyDB:
             self.logger.debug(f"Similarity matches: {similarity_matches}")
 
             if num_prefix_matches > 0 and num_prefix_matches <= 5:
-                prefix_set = set() 
+                prefix_set = set()
                 for prefix_match in prefix_matches:
                     prefix_set.add(prefix_match[0])
                 num_similarity_prefix_overlaps = 0
@@ -1323,6 +1328,7 @@ class HeavyDB:
                     # There was only one match, or two matches, so pick the
                     # top returned value. In the case of a tie, pick the prefix match if it exists (we've sorted in ascending order by score and descending order by number
                     if num_similarity_matches > 1 and similarity_matches[0][1] == similarity_matches[1][1]:
+
                         def matching_prefix_length(s1, s2):
                             match_length = 0
                             for c1, c2 in zip(s1, s2):
@@ -1331,8 +1337,9 @@ class HeavyDB:
                                 else:
                                     break
                             return match_length
-                        prefix_match_len_1 = matching_prefix_length(lower_literal, similarity_matches[0][0]) 
-                        prefix_match_len_2 = matching_prefix_length(lower_literal, similarity_matches[1][0]) 
+
+                        prefix_match_len_1 = matching_prefix_length(lower_literal, similarity_matches[0][0])
+                        prefix_match_len_2 = matching_prefix_length(lower_literal, similarity_matches[1][0])
                         if prefix_match_len_1 >= prefix_match_len_2:
                             altered_literal["literal"] = str(similarity_matches[0][0])
                         else:
@@ -1561,9 +1568,13 @@ class HeavyDB:
                 return altered_literal
         elif total_count == 0:
             lower_literal = literal["literal"].lower()
-            lower_literal_prefix = re.split(r'[ ,:]+', lower_literal)[0]
+            lower_literal_prefix = re.split(r"[ ,:]+", lower_literal)[0]
             using_lower_literal_prefix = False if lower_literal_prefix == lower_literal else True
-            prefix_condition = f"lower_attr ILIKE '{lower_literal_prefix}' OR lower_attr ILIKE '{lower_literal_prefix} %'" if using_lower_literal_prefix else f"lower_attr ILIKE '{lower_literal_prefix}%'"
+            prefix_condition = (
+                f"lower_attr ILIKE '{lower_literal_prefix}' OR lower_attr ILIKE '{lower_literal_prefix} %'"
+                if using_lower_literal_prefix
+                else f"lower_attr ILIKE '{lower_literal_prefix}%'"
+            )
 
             prefix_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, num_str_values FROM distinct_values WHERE {prefix_condition} ORDER BY num_str_values DESC LIMIT 10;"
             with self.lock:
@@ -1586,7 +1597,7 @@ class HeavyDB:
             self.logger.debug(f"Similarity matches: {similarity_matches}")
 
             if num_prefix_matches > 0 and num_prefix_matches <= 5:
-                prefix_set = set() 
+                prefix_set = set()
                 for prefix_match in prefix_matches:
                     prefix_set.add(prefix_match[0])
                 num_similarity_prefix_overlaps = 0
@@ -1623,6 +1634,7 @@ class HeavyDB:
                     # There was only one match, or two matches, so pick the
                     # top returned value. In the case of a tie, pick the prefix match if it exists (we've sorted in ascending order by score and descending order by number
                     if num_similarity_matches > 1 and similarity_matches[0][1] == similarity_matches[1][1]:
+
                         def matching_prefix_length(s1, s2):
                             match_length = 0
                             for c1, c2 in zip(s1, s2):
@@ -1631,8 +1643,9 @@ class HeavyDB:
                                 else:
                                     break
                             return match_length
-                        prefix_match_len_1 = matching_prefix_length(lower_literal, similarity_matches[0][0]) 
-                        prefix_match_len_2 = matching_prefix_length(lower_literal, similarity_matches[1][0]) 
+
+                        prefix_match_len_1 = matching_prefix_length(lower_literal, similarity_matches[0][0])
+                        prefix_match_len_2 = matching_prefix_length(lower_literal, similarity_matches[1][0])
                         if prefix_match_len_1 >= prefix_match_len_2:
                             altered_literal["literal"] = str(similarity_matches[0][0])
                         else:
