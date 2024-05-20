@@ -119,7 +119,6 @@ def change_iq_config_for_free_edition() -> bool:
 
     keys_to_change = {
         "heavydb_port": 6274,
-        "custom_llm_type": "API_VLLM",
         "custom_llm_api_base": "https://community.heavylm.heavy.ai/v1", # base url of API",
         "custom_llm_api_nl_to_sql_base": "https://community.heavylm.heavy.ai/v1",
         "custom_llm_api_sql_to_answer_base": "https://community.heavylm.heavy.ai/v1",
