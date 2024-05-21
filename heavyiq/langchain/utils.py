@@ -213,9 +213,13 @@ async def refresh_cache_for_tables(session: str, tables: Sequence[str]) -> None:
     """
     Check and refresh caches asscociated with the tables.
     """
-    from heavyiq.logging_utils import get_heavyiq_logger
 
-    heavydb, logger, shared_dict = await get_db(session), get_heavyiq_logger(), SharedDictSingleton()
+    heavydb, logger, shared_dict, config = (
+        await get_db(session),
+        get_heavyiq_logger(),
+        SharedDictSingleton(),
+        get_config(),
+    )
 
     tables_to_check = []
     for table in tables:
@@ -225,7 +229,9 @@ async def refresh_cache_for_tables(session: str, tables: Sequence[str]) -> None:
             continue
         # do table schema check only if the difference between current_tmstp and last schema check time
         # for that table is greater than 10 mins
-        if datetime.now() > (datetime.fromtimestamp(last_check_tmstp) + timedelta(minutes=10)):
+        if datetime.now() > (
+            datetime.fromtimestamp(last_check_tmstp) + timedelta(minutes=config.table_schema_check_interval_minutes)
+        ):
             tables_to_check.append(table)
 
     if not tables_to_check:
