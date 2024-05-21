@@ -171,6 +171,7 @@ class LRUCache(Generic[KT, VT]):
 
     def __init__(self, capacity: int = 100, manager: SyncManager | None = None) -> None:
         self.capacity: int = capacity
+        self._lock: threading.Lock = threading.Lock()
         if manager:
             # this should create seperate manager processes if manager isn't passed
             # thread safe/process-safe shared dict which holds the key, value pair
@@ -185,21 +186,23 @@ class LRUCache(Generic[KT, VT]):
         """
         Returns the value of passed dict key if exists else return None.
         """
-        if key in self.cache:
-            # Move the key to the end (most recently used) in the order list
-            self.move_to_end(key)
-            return self.cache[key]
-        return None
+        with self._lock:
+            if key in self.cache:
+                # Move the key to the end (most recently used) in the order list
+                self.move_to_end(key)
+                return self.cache[key]
+            return None
 
     def delete(self, key: KT) -> None:
         """
         Deletes the key and it's associated value from the cache dict.
         """
-        try:
-            del self.cache[key]
-            self.order.remove(key)
-        except KeyError:
-            pass
+        with self._lock:
+            try:
+                del self.cache[key]
+                self.order.remove(key)
+            except KeyError:
+                pass
 
     def get_key_starts_with(self, key_prefix: KT) -> list[KT]:
         """
@@ -250,18 +253,19 @@ class LRUCache(Generic[KT, VT]):
         """
         Helps to put the given key, value pair on the manager.Dict.
         """
-        if key in self.cache:
-            # If the key already exists, update its value and move it to the end
-            self.cache[key] = value
-            self.move_to_end(key)
-        else:
-            if len(self.cache) >= self.capacity:
-                # If cache is full, evict the least recently used item
-                self.evict_lru()
-            # Add the new key-value pair
-            self.cache[key] = value
-            # Add the key to the end (most recently used) in the order list
-            self.order.append(key)
+        with self._lock:
+            if key in self.cache:
+                # If the key already exists, update its value and move it to the end
+                self.cache[key] = value
+                self.move_to_end(key)
+            else:
+                if len(self.cache) >= self.capacity:
+                    # If cache is full, evict the least recently used item
+                    self.evict_lru()
+                # Add the new key-value pair
+                self.cache[key] = value
+                # Add the key to the end (most recently used) in the order list
+                self.order.append(key)
 
     def move_to_end(self, key: KT):
         """

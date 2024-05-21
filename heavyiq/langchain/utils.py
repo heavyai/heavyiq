@@ -208,7 +208,6 @@ async def update_table_index_on_schema_change_callback(session: str, table: str)
         await shared_dict.delete(key)
 
 
-@alru_cache(maxsize=127, ttl=60 * 2)
 async def refresh_cache_for_tables(session: str, tables: Sequence[str]) -> None:
     """
     Check and refresh caches asscociated with the tables.
@@ -237,12 +236,12 @@ async def refresh_cache_for_tables(session: str, tables: Sequence[str]) -> None:
     if not tables_to_check:
         return None
 
-    logger.debug(f"Checking table schema change for {tables_to_check} tables.")
+    logger.info(f"Checking table schema change for {tables_to_check} tables.")
     do_refresh_results = await asyncio.gather(*[heavydb.should_refresh_table_cache(table) for table in tables_to_check])
     for table, refresh_status in zip(tables_to_check, do_refresh_results):
         shared_dict.put_last_schema_modification_check_time(table)
         if refresh_status:
-            logger.debug(f"Schema change detected for {table}, so resetting all the relevant caches.")
+            logger.info(f"Schema change detected for {table}, so resetting all the relevant caches.")
             # schema change detected
             await heavydb.delete_table_cache(table)
             asyncio.create_task(update_table_index_on_schema_change_callback(heavydb._conn._session, table))
@@ -270,7 +269,7 @@ async def aget_table_info_wrt_token_limit(
     cache_key = TABLES_CACHE.form_key(database=heavydb._dbname, tables=table_names_tuple)
     cached_tables_info = TABLES_CACHE.get(cache_key)
     if cached_tables_info:
-        logger.debug(f"[Cached]: Returning tables_info for {table_names_tuple} tables from shared cache")
+        logger.info(f"[Cached]: Returning tables_info for {table_names_tuple} tables from shared cache")
         return cached_tables_info
     # check for per table cache
     tables_cache, table_info = [], None
@@ -309,10 +308,10 @@ async def aget_table_info_wrt_token_limit(
         formatted_prompt = prompt.format(table_info=table_info)
         prompt_tokens = await run_in_threadpool(token_counter, formatted_prompt)
         if prompt_tokens <= token_limit:
-            logger.debug(f"[Cached]: Returning combined tables_info for {table_names_tuple} tables from shared cache")
+            logger.info(f"[Cached]: Returning combined tables_info for {table_names_tuple} tables from shared cache")
             return table_info
 
-    logger.debug(f"Calculating tables_info for {table_names_tuple} tables...")
+    logger.info(f"Calculating tables_info for {table_names_tuple} tables...")
     top_k_max_str_column_count = (
         config.top_k_max_str_col_count_nl_to_tables
         if caller == LLMType.NL_TO_TABLES

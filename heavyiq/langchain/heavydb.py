@@ -710,7 +710,7 @@ class HeavyDB:
         Returns:
             bool: True if the table cache should be refreshed, False otherwise.
         """
-        self.logger.debug(f"Checking for {table} table cache refresh...")
+        self.logger.info(f"Checking for {table} table cache refresh...")
         cache_key = f"{self._dbname}.{table}"
         keys_found = self.table_schema_cache.get_key_starts_with(cache_key)
 
@@ -718,16 +718,23 @@ class HeavyDB:
         # async_lru cache value (shorter cache) for the same table
         most_recent_key_args = None
         if keys_found:
-            most_recent_key = keys_found[-1]
-            cached_schema = self.table_schema_cache.get(most_recent_key)
-            if cached_schema is None:
-                # no entry for the table on cache, so return False
+            most_recent_key = None
+            for key in keys_found[::-1]:
+                cached_schema = self.table_schema_cache.get(key)
+                if cached_schema:
+                    self.logger.info(f"Found a most recent key for : {table}")
+                    most_recent_key = key
+                    break
+
+            if most_recent_key is None:
+                self.logger.info(f"most recent key is none : {table}")
                 return False
 
             _, _, x, y, z = most_recent_key.split(".")
             most_recent_key_args = tuple([True if i == "True" else False for i in [x, y, z]])
         else:
             # no keys found to compare, so return False
+            self.logger.info(f"no keys found for table : {table}")
             return False
 
         # check for any diff in current schema and cached schema
@@ -738,17 +745,17 @@ class HeavyDB:
             current_schema = await self._aget_raw_table_schema_from_thrift(table)
 
         if cached_schema == current_schema:
-            self.logger.debug(f"Table {table} schema unchanged.")
+            self.logger.info(f"Table {table} schema unchanged.")
             return False
 
-        self.logger.debug(f"Table {table} schema changed, invalidating table caches...")
+        self.logger.info(f"Table {table} schema changed, invalidating table caches...")
         return True
 
     async def delete_table_cache(self, table: str) -> None:
         """
         Deletes all the cache entries associated with a particular table which includes top-k, sample_rows, schema, etc.
         """
-        self.logger.debug(f"Deleteing all caches for the table {table}")
+        self.logger.info(f"Deleteing all caches for the table {table}")
         cache_key = f"{self._dbname}.{table}"
         self.table_schema_cache.delete_by_key_prefix(cache_key)
         self.top_k_cache.delete(cache_key)
@@ -934,9 +941,11 @@ class HeavyDB:
         cache_key = f"{self._dbname}.{table}.{include_top_k}.{include_timestamp}.{include_comments}"
         cached_value = self.table_schema_cache.get(cache_key)
         if cached_value is not None:
-            self.logger.debug(f"Got schema for table {table} from cache")
+            self.logger.info(f"cache key -> {cache_key}")
+            self.logger.info(f"Got schema for table {table} from cache")
             return cached_value
         # Get table schema from thrift endpoint
+        self.logger.info(f"Fetching the schema for {table} table")
         table_schema = await self._aget_raw_table_schema_from_thrift(
             table, include_top_k=include_top_k, include_timestamp=include_timestamp, include_comments=include_comments
         )
