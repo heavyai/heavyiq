@@ -514,7 +514,7 @@ class HeavyDB:
         top_k_statement = f'SELECT {column}, COUNT(*) as cnt FROM "{table}" WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {cardinality_threshold + 1};'
         with self.lock:
             cursor = self._conn.execute(top_k_statement)
-        top_k_res: list[str] = [str(v[0]) for v in cursor.fetchall()]
+        top_k_res: list[str] = [str(v[0]).replace('\n', ' ') for v in cursor.fetchall()]
         is_high_cardinality = len(top_k_res) > cardinality_threshold
         if is_high_cardinality:
             # high-cardinality, return sample
@@ -693,7 +693,7 @@ class HeavyDB:
         top_k_statement = f'SELECT {column}, COUNT(*) as cnt FROM "{table}" WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {cardinality_threshold + 1};'
         async with self.alock:
             cursor = await run_in_threadpool(self._conn.execute, top_k_statement)
-        top_k_res: list[str] = [str(v[0]) for v in cursor.fetchall()]
+        top_k_res: list[str] = [str(v[0]).replace('\n', ' ') for v in cursor.fetchall()]
         is_high_cardinality = len(top_k_res) > cardinality_threshold
         if is_high_cardinality:
             # high-cardinality, return sample
