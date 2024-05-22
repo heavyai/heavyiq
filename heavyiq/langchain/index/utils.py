@@ -28,10 +28,14 @@ def get_or_download_hf_model() -> HuggingFaceEmbeddings:
         logger.debug("Initializing HF model embeddings from cache...")
     else:
         logger.debug("Downloading HF model embeddings...")
+    model_kwargs = {"device": "cpu"}
+    encode_kwargs = {"normalize_embeddings": False}
     hf_model = HuggingFaceEmbeddings(
         model_name=config.huggingface_embed_model,
         cache_folder=config.huggingface_model_cache_folder,
         multi_process=config.huggingface_embed_documents_parallel,
+        model_kwargs=model_kwargs,
+        encode_kwargs=encode_kwargs,
     )
     logger.debug("Initialized HuggingFace embeddings!")
     return hf_model
