@@ -517,7 +517,6 @@ def custom_model_tokenizer_decode(token_ids: list[int]) -> str:
     return get_tokenizer().decode(token_ids, skip_special_tokens=True)
 
 
-@alru_cache(maxsize=127, ttl=60 * 10)
 async def get_all_text_column_count(session: str, tables: Sequence[str]) -> int:
     """
     Returns the count of all the text columns available in the tables.

@@ -23,7 +23,8 @@ from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
 from heavyiq.langchain.heavydb_utils import DB_KEYWORDS
-from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
+from heavyiq.utils import (LRUCache, calc_query_stats, is_destructive_sql,
+                           rate_sql_complexity, strip_sql_comments)
 
 
 class CustomColumnDetails(NamedTuple):
@@ -816,7 +817,7 @@ class HeavyDB:
             table_details = await run_in_threadpool(self._conn.get_table_details, table)
         return table_details
 
-    @alru_cache(ttl=60 * 10)  # store atleast for 10 mins
+    @alru_cache(ttl=60)  # store atleast for 10 secs
     async def _aget_column_details(self, table: str) -> list[ColumnDetails]:
         """
         Get table column details through thrift endpoint.
