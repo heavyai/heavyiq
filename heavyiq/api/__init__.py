@@ -48,7 +48,7 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
     # always create a HeavyDB's multiprocessing.Manager instance (which was being used for shared cache) before gunicorn process fork
     # if we let it to happen on each worker process at the time of http request then
     # we might endup in request pending issue.
-    HeavyDB.get_manager()
+    HeavyDB.initialize()
 
     # w.r.t memory into consideration, we don't need to initialize/download HF model embeddings at the first place(ie. before process fork).
     # We could make it happen on the fork/child process since the models are going to be stored inside a cache dir.

@@ -176,6 +176,18 @@ class HeavyDB:
         return cls._manager
 
     @classmethod
+    def initialize(cls: type[HeavyDB]) -> None:
+        """
+        Initializes all the inter-process caches.
+        """
+        cls.get_top_k_cache()
+        cls.get_sample_rows_cache()
+        cls.get_table_schema_cache()
+        cls.get_table_text_columns_count_cache()
+        cls.get_table_total_row_count_cache()
+        cls.get_timestamp_cache()
+
+    @classmethod
     def get_top_k_cache(cls: type[HeavyDB]) -> LRUCache[str, str]:
         if cls._top_k_cache is None:
             cls._top_k_cache = LRUCache[str, str](manager=cls.get_manager())
@@ -677,7 +689,7 @@ class HeavyDB:
         # if there are < (threshold + 1) values, it's low cardinality and we can return all of them
         # if there are >= (threshold + 1) values, it's high cardinality and we need to sample the top high_cardinality_sample
         """Get the top k values for a column."""
-        self.logger.debug(f"Getting top k values for column {column} in table {table}")
+        self.logger.info(f"Getting top k values for column {column} in table {table}")
         top_k_statement = f'SELECT {column}, COUNT(*) as cnt FROM "{table}" WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {cardinality_threshold + 1};'
         async with self.alock:
             cursor = await run_in_threadpool(self._conn.execute, top_k_statement)
