@@ -102,7 +102,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     # llm api-key
     heavylm_api_key: Optional[str] = None
     # how often a table schema change check should happen in minutes
-    table_schema_check_interval_minutes: int = 2
+    table_schema_check_interval_minutes: int = 1
     # prompts
     # nl to sql
     custom_prompt_nl_to_sql_start_token: str = "<|sql prompt|>\n"
