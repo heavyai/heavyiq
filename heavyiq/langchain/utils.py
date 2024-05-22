@@ -208,6 +208,18 @@ async def update_table_index_on_schema_change_callback(session: str, table: str)
         await shared_dict.delete(key)
 
 
+async def should_refresh_table_cache(heavydb: HeavyDB, table: str) -> bool:
+    key = TABLES_CACHE.form_key(database=heavydb._dbname, tables=(table,))
+    out = TABLES_CACHE.get(key)
+    if not out:
+        return False
+    metadata, existing_data = out
+    current_data = await heavydb._aget_raw_table_schema_from_thrift(table, *metadata)
+    if current_data.strip() == existing_data.strip():
+        return False
+    return True
+
+
 async def refresh_cache_for_tables(session: str, tables: Sequence[str]) -> None:
     """
     Check and refresh caches asscociated with the tables.
@@ -237,15 +249,17 @@ async def refresh_cache_for_tables(session: str, tables: Sequence[str]) -> None:
         return None
 
     logger.info(f"Checking table schema change for {tables_to_check} tables.")
-    do_refresh_results = await asyncio.gather(*[heavydb.should_refresh_table_cache(table) for table in tables_to_check])
+    do_refresh_results = await asyncio.gather(
+        *[should_refresh_table_cache(heavydb, table) for table in tables_to_check]
+    )
     for table, refresh_status in zip(tables_to_check, do_refresh_results):
         shared_dict.put_last_schema_modification_check_time(table)
         if refresh_status:
             logger.info(f"Schema change detected for {table}, so resetting all the relevant caches.")
             # schema change detected
             await heavydb.delete_table_cache(table)
-            asyncio.create_task(update_table_index_on_schema_change_callback(heavydb._conn._session, table))
             TABLES_CACHE.delete_by_table_name(database=heavydb._dbname, table_name=table)
+            asyncio.create_task(update_table_index_on_schema_change_callback(heavydb._conn._session, table))
 
 
 async def aget_table_info_wrt_token_limit(
@@ -267,19 +281,19 @@ async def aget_table_info_wrt_token_limit(
     # check for combined tables cache
     heavydb = await get_db(session)
     cache_key = TABLES_CACHE.form_key(database=heavydb._dbname, tables=table_names_tuple)
-    cached_tables_info = TABLES_CACHE.get(cache_key)
-    if cached_tables_info:
+    out = TABLES_CACHE.get(cache_key)
+    if out:
         logger.info(f"[Cached]: Returning tables_info for {table_names_tuple} tables from shared cache")
-        return cached_tables_info
+        return out[1]
     # check for per table cache
     tables_cache, table_info = [], None
     if len(table_names_tuple) > 1:
         for table in table_names_tuple:
             key = TABLES_CACHE.form_key(database=heavydb._dbname, tables=(table,))
-            table_cache = TABLES_CACHE.get(key)
-            if not table_cache:
+            out = TABLES_CACHE.get(key)
+            if not out:
                 break
-            tables_cache.append(table_cache)
+            tables_cache.append(out[1])
         else:
             table_info = "\n\n".join(tables_cache)
 
@@ -348,7 +362,8 @@ async def aget_table_info_wrt_token_limit(
         raise RuntimeError("Couldn't find suitable prompt provided token limit")
 
     # store the combined or single table_info in cache
-    TABLES_CACHE.put(cache_key, table_info)
+    cache_metadata = (include_top_k, include_timestamp, include_comments)
+    TABLES_CACHE.put(cache_key, (cache_metadata, table_info))
 
     if len(table_names_tuple) > 1:
         # do a per table cache when table len > 1
@@ -356,14 +371,14 @@ async def aget_table_info_wrt_token_limit(
         for info in table_info_split:
             table_name = re.search(r"^CREATE TABLE (\w+)", info).group(1)
             key = TABLES_CACHE.form_key(database=heavydb._dbname, tables=(table_name,))
-            existing_data = TABLES_CACHE.get(key)
+            out = TABLES_CACHE.get(key)
             current_data = info.strip()
             # always populate the cache with larger data
-            if existing_data:
-                if len(existing_data) < len(current_data):
-                    TABLES_CACHE.put(key, current_data)
+            if out:
+                if len(out[1]) < len(current_data):
+                    TABLES_CACHE.put(key, (cache_metadata, current_data))
             else:
-                TABLES_CACHE.put(key, current_data)
+                TABLES_CACHE.put(key, (cache_metadata, current_data))
 
     return table_info
 
