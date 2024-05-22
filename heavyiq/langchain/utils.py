@@ -208,16 +208,72 @@ async def update_table_index_on_schema_change_callback(session: str, table: str)
         await shared_dict.delete(key)
 
 
+TABLE_SCHEMA_ONLY_RGX: re.Pattern = re.compile(r"(?is)^create table .*?\);(?=\n|$)")
+TABLE_COMMENT_RGX: re.Pattern = re.compile(r"(?i)create table (\w+)\s*(?:/\*(.+)\*/)?\s*")
+TABLE_COLUMN_RGX: re.Pattern = re.compile(r"^(\w+)\s+([^()]*?)(?:\([^)]+\))?\s*(?:/\*\s*(.*?)\s*\*/)?\s*$")
+
+
+def retrieve_schema_details(schema: str) -> dict:
+    """
+    Retrieve schema details from a schema string.
+    """
+    # grab only the create schema stmt
+    schema = TABLE_SCHEMA_ONLY_RGX.search(schema).group()
+    # strip column metadata like top-k and timestamp values
+    lines = schema.split("\n")
+    num_lines = len(lines)
+    table_name, columns, table_comment = None, [], None
+
+    for i, line in enumerate(lines, start=1):
+        if i == 1:
+            # first line
+            table_name, table_comment = TABLE_COMMENT_RGX.search(line).groups()
+        elif i == num_lines:
+            # last line
+            raw_line = line.split(");")[0]
+            column_details = TABLE_COLUMN_RGX.search(raw_line).groups()
+            columns.append((column_details[0], column_details[1].strip(), column_details[2]))
+        else:
+            column_details = TABLE_COLUMN_RGX.search(line).groups()
+            columns.append((column_details[0], column_details[1].strip(), column_details[2]))
+
+    return {"name": table_name, "comment": table_comment, "columns": columns}
+
+
+def is_cached_schema_equals_current_schema(cached_schema: str, current_schema: str) -> bool:
+    """
+    Helps to compare the table's cached schema (which may contain table and column metadata) with the curent schema (without metadata).
+    """
+    cached_schema_details = retrieve_schema_details(cached_schema)
+    current_schema_details = retrieve_schema_details(current_schema)
+
+    if (cached_schema_details["name"] != current_schema_details["name"]) or (
+        cached_schema_details["comment"] != current_schema_details["comment"]
+    ):
+        return False
+
+    cached_columns, current_columns = cached_schema_details["columns"], current_schema_details["columns"]
+    if len(cached_columns) != len(current_columns):
+        return False
+
+    return cached_columns == current_columns
+
+
 async def should_refresh_table_cache(heavydb: HeavyDB, table: str) -> bool:
+    """
+    Decides whether to refresh table cache or not.
+    """
     key = TABLES_CACHE.form_key(database=heavydb._dbname, tables=(table,))
     out = TABLES_CACHE.get(key)
     if not out:
         return False
-    metadata, existing_data = out
-    current_data = await heavydb._aget_raw_table_schema_from_thrift(table, *metadata)
-    if current_data.strip() == existing_data.strip():
-        return False
-    return True
+    _, existing_data = out
+
+    current_data = await heavydb._aget_raw_table_schema_from_thrift(
+        table, include_top_k=False, include_timestamp=False, include_comments=True
+    )
+
+    return not (is_cached_schema_equals_current_schema(existing_data, current_data))
 
 
 async def refresh_cache_for_tables(session: str, tables: Sequence[str]) -> None:
