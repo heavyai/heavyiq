@@ -5,7 +5,7 @@ from fastapi.concurrency import run_in_threadpool
 from langchain.pydantic_v1 import BaseModel, Field
 from langchain.schema.runnable import Runnable, RunnableLambda, RunnablePassthrough
 
-from heavyiq.langchain.heavydb import HeavyDB
+from heavyiq.langchain.heavydb import HeavyDB, get_db
 
 from ..heavydb.auto_sql_chain import chain as auto_sql_chain
 
@@ -18,6 +18,7 @@ class InputType(BaseModel):
     question: str = Field(..., description="Natural Language question.")
     sql: str | None = Field(default=None, description="HeavyDB compatible SQL query.")
     enable_query_stats: bool = Field(default=True, description="Whether to calculate query stats or not.")
+    gold_queries: list[str] = Field(default=[], description="List of optional gold queries.")
 
 
 class OutputType(BaseModel):
@@ -61,6 +62,18 @@ async def compare_tables(inputs: dict) -> dict:
     return {**inputs, "error": error, "tables": pred_tables}
 
 
+def pick_matching_gold_query(pred_query: str, gold_queries: list[str]) -> str:
+    """
+    Return a matching gold query.
+    """
+    from heavyiq.cli.eval_commands.utils import check_predicted_query_equals_gold_query
+
+    for gold in gold_queries:
+        if check_predicted_query_equals_gold_query(pred_query, gold):
+            return gold
+    return gold_queries[0]
+
+
 async def compare_and_format_output(inputs: dict) -> dict:
     """
     Formats the llm results according to the chain's output schema.
@@ -68,21 +81,24 @@ async def compare_and_format_output(inputs: dict) -> dict:
     from heavyiq.cli.eval_commands.utils import sql_rate_reply
 
     sql_outputs = inputs["sql_outputs"]
-    gold_tables, pred_tables, gold_query, pred_query, error = (
+    gold_tables, pred_tables, gold_query, optional_gold_queries, pred_query, error = (
         sorted(inputs["gold_tables"]),
         sorted(sql_outputs["tables"]),
         inputs["sql"],
+        inputs["gold_queries"],
         sql_outputs["query"],
         sql_outputs["error"],
     )
 
-    has_tables_mismatch = True if gold_tables != pred_tables else False
+    # don't consider table mismatch as an error
+    # has_tables_mismatch = True if gold_tables != pred_tables else False
+    optional_gold_queries = [q for q in optional_gold_queries if q.strip()]
 
     # has error then pred query failed to pass the validation step
     # or the tables might get mismatched. In this case, don't calculate sql_rate_reply and query_stats
     # just return the function with necessary error details
-    if error or has_tables_mismatch:
-        status = "tables_mismatch" if has_tables_mismatch else "failed_to_generate_sql"
+    if error:
+        status = "failed_to_generate_sql"
         return {
             "query_id": inputs["query_id"],
             "db_id": inputs["db_id"],
@@ -94,17 +110,18 @@ async def compare_and_format_output(inputs: dict) -> dict:
             "query_stats": {},
         }
 
-    db = await HeavyDB.from_session_async(session_id=inputs["session_id"])
-    tasks = [sql_rate_reply(gold_query, pred_query, db=db)]
-    if inputs["enable_query_stats"]:
-        tasks.append(db.aquery_stats(pred_query))
-    else:
-        async_lambda: Coroutine = asyncio.coroutine(lambda x: {})  # type: ignore
-        tasks.append(async_lambda)
+    # from the list of gold queries pick the exact matching if there's any
+    gold_query = pick_matching_gold_query(pred_query, [gold_query] + optional_gold_queries)
 
+    db = await get_db(inputs["session_id"])
     exception, query_stats, eval_res = None, {}, {"success": False, "status": "", "error": ""}
     try:
-        eval_res, query_stats = await asyncio.gather(*tasks)
+        # eval_res, query_stats = await asyncio.gather(*tasks)
+        eval_res = await sql_rate_reply(gold_query, pred_query, db=db, question=inputs["question"])
+        if eval_res["error"] and inputs["enable_query_stats"]:
+            # refresh connection if in case of sql_rate_reply error
+            db = await HeavyDB.from_session_async(inputs["session_id"])
+            query_stats = await db.aquery_stats(pred_query)
     except Exception as e:
         eval_res["success"] = False
         eval_res["status"] = "failed_to_calculate_query_stats"

@@ -7,7 +7,8 @@ import time
 from loguru import logger as loguru_logger
 
 from heavyiq.config import get_config
-from heavyiq.langchain.callbacks import AsyncLogFileCallbackHandler, FileCallbackHandler
+from heavyiq.langchain.callbacks import (AsyncLogFileCallbackHandler,
+                                         FileCallbackHandler)
 
 from .loguru_logging import BaseAsyncLogger, access_formatter, iq_formatter
 
@@ -151,12 +152,13 @@ def get_log_name(lvl: str) -> str:
 def init_logs():
     global _access_logger, heavyiq_logger, default_logger
     LOG_CONFIG = get_config()
+    data: str = LOG_CONFIG.data  # type: ignore
+    if (data is None):
+        data = "./storage"
+    log_dir = os.path.join(data, "log")
 
     if _access_logger is None:
         access_log_name = get_log_name("ACCESS")
-        data: str = LOG_CONFIG.data  # type: ignore
-        log_dir = os.path.join(data, "log")
-
         # Ensure log_dir exists
         os.makedirs(log_dir, exist_ok=True)
 
@@ -182,9 +184,6 @@ def init_logs():
 
     if heavyiq_logger is None:
         app_log_name = get_log_name("APP")
-        data: str = LOG_CONFIG.data  # type: ignore
-        log_dir = os.path.join(data, "log")
-
         # Ensure log_dir exists
         os.makedirs(log_dir, exist_ok=True)
 

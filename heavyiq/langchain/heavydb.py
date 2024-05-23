@@ -23,7 +23,8 @@ from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
 from heavyiq.langchain.heavydb_utils import DB_KEYWORDS
-from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
+from heavyiq.utils import (LRUCache, calc_query_stats, is_destructive_sql,
+                           rate_sql_complexity, strip_sql_comments)
 
 
 class CustomColumnDetails(NamedTuple):
@@ -173,6 +174,18 @@ class HeavyDB:
         if cls._manager is None:
             cls._manager = multiprocessing.Manager()
         return cls._manager
+
+    @classmethod
+    def initialize(cls: type[HeavyDB]) -> None:
+        """
+        Initializes all the inter-process caches.
+        """
+        cls.get_top_k_cache()
+        cls.get_sample_rows_cache()
+        cls.get_table_schema_cache()
+        cls.get_table_text_columns_count_cache()
+        cls.get_table_total_row_count_cache()
+        cls.get_timestamp_cache()
 
     @classmethod
     def get_top_k_cache(cls: type[HeavyDB]) -> LRUCache[str, str]:
@@ -501,7 +514,7 @@ class HeavyDB:
         top_k_statement = f'SELECT {column}, COUNT(*) as cnt FROM "{table}" WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {cardinality_threshold + 1};'
         with self.lock:
             cursor = self._conn.execute(top_k_statement)
-        top_k_res: list[str] = [str(v[0]) for v in cursor.fetchall()]
+        top_k_res: list[str] = [str(v[0]).replace('\n', ' ') for v in cursor.fetchall()]
         is_high_cardinality = len(top_k_res) > cardinality_threshold
         if is_high_cardinality:
             # high-cardinality, return sample
@@ -629,12 +642,16 @@ class HeavyDB:
         return str(result[0])
 
     async def acomplexity(self, command: str) -> int:
-        self.logger.debug("Calculation SQL query complexity!")
-        command = strip_sql_comments(command)
-        plan = await self.aget_query_plan(command)
-        out = rate_sql_complexity(plan)
-        self.logger.debug("Successfully calculated SQL query complexity!")
-        return out
+        try:
+            self.logger.debug("Calculation SQL query complexity!")
+            command = strip_sql_comments(command)
+            plan = await self.aget_query_plan(command)
+            out = rate_sql_complexity(plan)
+            self.logger.debug("Successfully calculated SQL query complexity!")
+            return out
+        except Exception as e:
+            self.logger.error(f"Failed to calculate complexity, {e}")
+            return 0
 
     async def aquery_stats(self, command: str) -> dict[str, int]:
         command = strip_sql_comments(command)
@@ -672,11 +689,11 @@ class HeavyDB:
         # if there are < (threshold + 1) values, it's low cardinality and we can return all of them
         # if there are >= (threshold + 1) values, it's high cardinality and we need to sample the top high_cardinality_sample
         """Get the top k values for a column."""
-        self.logger.debug(f"Getting top k values for column {column} in table {table}")
+        self.logger.info(f"Getting top k values for column {column} in table {table}")
         top_k_statement = f'SELECT {column}, COUNT(*) as cnt FROM "{table}" WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {cardinality_threshold + 1};'
         async with self.alock:
             cursor = await run_in_threadpool(self._conn.execute, top_k_statement)
-        top_k_res: list[str] = [str(v[0]) for v in cursor.fetchall()]
+        top_k_res: list[str] = [str(v[0]).replace('\n', ' ') for v in cursor.fetchall()]
         is_high_cardinality = len(top_k_res) > cardinality_threshold
         if is_high_cardinality:
             # high-cardinality, return sample
@@ -706,7 +723,7 @@ class HeavyDB:
         Returns:
             bool: True if the table cache should be refreshed, False otherwise.
         """
-        self.logger.debug(f"Checking for {table} table cache refresh...")
+        self.logger.info(f"Checking for {table} table cache refresh...")
         cache_key = f"{self._dbname}.{table}"
         keys_found = self.table_schema_cache.get_key_starts_with(cache_key)
 
@@ -714,16 +731,23 @@ class HeavyDB:
         # async_lru cache value (shorter cache) for the same table
         most_recent_key_args = None
         if keys_found:
-            most_recent_key = keys_found[-1]
-            cached_schema = self.table_schema_cache.get(most_recent_key)
-            if cached_schema is None:
-                # no entry for the table on cache, so return False
+            most_recent_key = None
+            for key in keys_found[::-1]:
+                cached_schema = self.table_schema_cache.get(key)
+                if cached_schema:
+                    self.logger.info(f"Found a most recent key for : {table}")
+                    most_recent_key = key
+                    break
+
+            if most_recent_key is None:
+                self.logger.info(f"most recent key is none : {table}")
                 return False
 
             _, _, x, y, z = most_recent_key.split(".")
             most_recent_key_args = tuple([True if i == "True" else False for i in [x, y, z]])
         else:
             # no keys found to compare, so return False
+            self.logger.info(f"no keys found for table : {table}")
             return False
 
         # check for any diff in current schema and cached schema
@@ -734,17 +758,17 @@ class HeavyDB:
             current_schema = await self._aget_raw_table_schema_from_thrift(table)
 
         if cached_schema == current_schema:
-            self.logger.debug(f"Table {table} schema unchanged.")
+            self.logger.info(f"Table {table} schema unchanged.")
             return False
 
-        self.logger.debug(f"Table {table} schema changed, invalidating table caches...")
+        self.logger.info(f"Table {table} schema changed, invalidating table caches...")
         return True
 
     async def delete_table_cache(self, table: str) -> None:
         """
         Deletes all the cache entries associated with a particular table which includes top-k, sample_rows, schema, etc.
         """
-        self.logger.debug(f"Deleteing all caches for the table {table}")
+        self.logger.info(f"Deleteing all caches for the table {table}")
         cache_key = f"{self._dbname}.{table}"
         self.table_schema_cache.delete_by_key_prefix(cache_key)
         self.top_k_cache.delete(cache_key)
@@ -756,14 +780,13 @@ class HeavyDB:
         self._aget_table_details.cache_invalidate(table)
         self._aget_column_details.cache_invalidate(table)
         self.aget_text_columns.cache_invalidate(table)
-        self._aget_raw_table_schema_from_thrift.cache_invalidate(table)
 
     async def trigger_table_schema_change_callback(self, table: str, callback: Callable | None = None):
         schema_change_callback = callback or self.table_schema_change_callback
         if schema_change_callback:
             # run the callback as background task
             self.logger.debug(f"Schema change detected, callback initiated for {table} table.")
-            asyncio.create_task(schema_change_callback(self, table))
+            asyncio.create_task(schema_change_callback(self._conn._session, table))
 
     async def check_and_invalidate_table_cache(self, table: str) -> None:
         """
@@ -806,7 +829,7 @@ class HeavyDB:
             table_details = await run_in_threadpool(self._conn.get_table_details, table)
         return table_details
 
-    @alru_cache(ttl=60 * 10)  # store atleast for 10 mins
+    @alru_cache(ttl=60)  # store atleast for 10 secs
     async def _aget_column_details(self, table: str) -> list[ColumnDetails]:
         """
         Get table column details through thrift endpoint.
@@ -815,11 +838,15 @@ class HeavyDB:
             column_details = await run_in_threadpool(self._conn.get_column_details, table)
         return column_details
 
-    async def _aget_table_custom_details(self, table: str) -> CustomTableDetails:
+    async def _aget_table_custom_details(self, table: str, use_cache: bool = True) -> CustomTableDetails:
         """
         Return custom details of a heavyDB table.
         """
-        table_details = await self._aget_table_details(table)
+        if use_cache:
+            table_details = await self._aget_table_details(table)
+        else:
+            async with self.alock:
+                table_details = await run_in_threadpool(self._conn.get_table_details, table)
         table_comment = table_details.comment or ""
         columns: list[ColumnDetails] = _extract_column_details(table_details.row_desc)
         column_name_comments_mapping = {x.col_name: x.comment or "" for x in table_details.row_desc}
@@ -844,14 +871,13 @@ class HeavyDB:
         ]
         return CustomTableDetails(name=table, columns=custom_columns, comment=table_comment)
 
-    @alru_cache(ttl=60)
     async def _aget_raw_table_schema_from_thrift(
         self, table: str, include_top_k: bool = True, include_timestamp: bool = True, include_comments: bool = True
     ) -> str:
         """
-        Method used to form table_schema from `get_table_details` thrift endpoint.
+        Method used to form table_schema from `get_table_details` thrift endpoint without re-using any cache value.
         """
-        table_details: CustomTableDetails = await self._aget_table_custom_details(table)
+        table_details: CustomTableDetails = await self._aget_table_custom_details(table, use_cache=False)
         config = get_config()
         table_name = f'"{table_details.name}"' if table_details.name.upper() in DB_KEYWORDS else f"{table_details.name}"
         schema_stmt = (
@@ -928,9 +954,11 @@ class HeavyDB:
         cache_key = f"{self._dbname}.{table}.{include_top_k}.{include_timestamp}.{include_comments}"
         cached_value = self.table_schema_cache.get(cache_key)
         if cached_value is not None:
-            self.logger.debug(f"Got schema for table {table} from cache")
+            self.logger.info(f"cache key -> {cache_key}")
+            self.logger.info(f"Got schema for table {table} from cache")
             return cached_value
         # Get table schema from thrift endpoint
+        self.logger.info(f"Fetching the schema for {table} table")
         table_schema = await self._aget_raw_table_schema_from_thrift(
             table, include_top_k=include_top_k, include_timestamp=include_timestamp, include_comments=include_comments
         )
@@ -1177,14 +1205,14 @@ class HeavyDB:
             col_id = (db, table, column)
             result[id] = col_id
 
-        self.logger.debug("Finished extracting column mappings")
+        self.logger.debug(f"Extracted column mappings: {result}")
         return result
 
     async def aextract_string_literal_ops(self, detailed_query_plan: str) -> dict[str, tuple[str, str]]:
         self.logger.debug(f"Extracting string literal operations from query plan: {detailed_query_plan}")
         result = {}
-        pattern1 = r"(NOT\()?(LIKE|PG_ILIKE|>=|<=|<>|=)\(\$(\d+), '((?:''|[\w -])+)'\)"
-        pattern2 = r"(NOT\()?(LIKE|PG_ILIKE|>=|<=|<>|=)\('((?:''|[\w -])+)', \$(\d+)\)"
+        pattern1 = r"(NOT\()?(LIKE|PG_ILIKE|>=|<=|<>|=)\(\$(\d+), '((?:''|[\w .-])+)'\)"
+        pattern2 = r"(NOT\()?(LIKE|PG_ILIKE|>=|<=|<>|=)\('((?:''|[\w .-])+)', \$(\d+)\)"
 
         matches1 = re.findall(pattern1, detailed_query_plan)
         matches2 = re.findall(pattern2, detailed_query_plan)
@@ -1197,7 +1225,7 @@ class HeavyDB:
                 op = f"NOT {op}"
             result[id] = (op, literal)
 
-        self.logger.debug("Finished extracting string literal operations")
+        self.logger.debug(f"Extracted string literal operations: {result}")
         return result
 
     async def aget_string_literal_ops(self, query: str) -> list[StringLiteralOp]:
@@ -1255,29 +1283,91 @@ class HeavyDB:
                 return altered_literal
         elif total_count == 0:
             lower_literal = literal["literal"].lower()
-            similarity_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) FROM distinct_values WHERE LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) < 5 AND CAST(LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') AS DOUBLE) / NULLIF(LENGTH('{lower_literal}'), 0) < 0.3 ORDER BY LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) ASC, ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) ASC, num_str_values DESC LIMIT 2;"
+            lower_literal_prefix = re.split(r"[ ,:]+", lower_literal)[0]
+            using_lower_literal_prefix = False if lower_literal_prefix == lower_literal else True
+            prefix_condition = (
+                f"lower_attr ILIKE '{lower_literal_prefix}' OR lower_attr ILIKE '{lower_literal_prefix} %'"
+                if using_lower_literal_prefix
+                else f"lower_attr ILIKE '{lower_literal_prefix}%'"
+            )
+
+            prefix_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, num_str_values FROM distinct_values WHERE {prefix_condition} ORDER BY num_str_values DESC LIMIT 10;"
+
+            async with self.alock:
+                cursor = await run_in_threadpool(self._conn.execute, prefix_query)
+            prefix_matches = cursor.fetchall()
+
+            num_prefix_matches = len(prefix_matches)
+            self.logger.debug(f"Num prefix matches: {num_prefix_matches}")
+
+            similarity_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) AS subset_distance, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') AS absolute_distance, ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) AS abs_length_difference, num_str_values FROM distinct_values WHERE LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) < 5 AND CAST(LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') AS DOUBLE) / NULLIF(LENGTH('{lower_literal}'), 0) < 0.3 ORDER BY subset_distance ASC, abs_length_difference ASC, num_str_values DESC LIMIT 2;"
 
             async with self.alock:
                 cursor = await run_in_threadpool(self._conn.execute, similarity_query)
-            similarity_rows = cursor.fetchall()
+            similarity_matches = cursor.fetchall()
 
-            num_similarity_rows = len(similarity_rows)
+            num_similarity_matches = len(similarity_matches)
 
-            if num_similarity_rows > 0:
+            self.logger.debug(f"Num similarity matches: {num_similarity_matches}")
+            self.logger.debug(f"Similarity matches: {similarity_matches}")
+
+            if num_prefix_matches > 0 and num_prefix_matches <= 5:
+                prefix_set = set()
+                for prefix_match in prefix_matches:
+                    prefix_set.add(prefix_match[0])
+                num_similarity_prefix_overlaps = 0
+                for similarity_match in similarity_matches:
+                    if similarity_match[0] in prefix_set:
+                        num_similarity_prefix_overlaps += 1
+                self.logger.debug(f"Num Similarity Prefix overlaps: {num_similarity_prefix_overlaps}")
+                if num_similarity_prefix_overlaps != 1:
+                    if num_prefix_matches > 1:
+                        # Multiple prefix matches, use string prefix
+                        altered_literal["literal"] = f"{lower_literal_prefix}%"
+                    else:
+                        # Only one prefix match, use the full matched string
+                        altered_literal["literal"] = prefix_matches[0][0]
+                    if literal["operator"] in ("<>", "!=", "NOT LIKE", "NOT PG_ILIKE", "NOT ILIKE", "NOT PG_ILIKE"):
+                        altered_literal["operator"] = "NOT ILIKE"
+                    else:
+                        altered_literal["operator"] = "ILIKE"
+                    return altered_literal
+
+            # If we are here, we do fuzzy similarity search
+
+            if num_similarity_matches > 0:
                 if (
-                    num_similarity_rows > 1
-                    and similarity_rows[0][1] == 0
-                    and similarity_rows[0][1] == similarity_rows[1][1]
+                    num_similarity_matches > 1
+                    and similarity_matches[0][1] == 0
+                    and similarity_matches[0][1] == similarity_matches[1][1]
                 ):
+
                     # Here there are at least two matches such that the user-provided literal is a full substring of
                     # the column value. In this case, we will match against all strings that our string literal
                     # is a substring of
                     altered_literal["literal"] = f"%{lower_literal}%"
                 else:
-                    # There was only one match, or two matches and at least one did have a 0 distance score, so pick the
-                    # top returned value (we've sorted in ascending order by score and descending order by number
-                    # of string matches)
-                    altered_literal["literal"] = str(similarity_rows[0][0])
+                    # There was only one match, or two matches, so pick the
+                    # top returned value. In the case of a tie, pick the prefix match if it exists (we've sorted in ascending order by score and descending order by number
+                    if num_similarity_matches > 1 and similarity_matches[0][1] == similarity_matches[1][1]:
+
+                        def matching_prefix_length(s1, s2):
+                            match_length = 0
+                            for c1, c2 in zip(s1, s2):
+                                if c1 == c2:
+                                    match_length += 1
+                                else:
+                                    break
+                            return match_length
+
+                        prefix_match_len_1 = matching_prefix_length(lower_literal, similarity_matches[0][0])
+                        prefix_match_len_2 = matching_prefix_length(lower_literal, similarity_matches[1][0])
+                        if prefix_match_len_1 >= prefix_match_len_2:
+                            altered_literal["literal"] = str(similarity_matches[0][0])
+                        else:
+                            altered_literal["literal"] = str(similarity_matches[1][0])
+                    else:
+                        altered_literal["literal"] = str(similarity_matches[0][0])
             if literal["operator"] in ("<>", "!=", "NOT LIKE", "NOT PG_ILIKE", "NOT ILIKE", "NOT PG_ILIKE"):
                 altered_literal["operator"] = "NOT ILIKE"
             else:
@@ -1500,33 +1590,94 @@ class HeavyDB:
                 return altered_literal
         elif total_count == 0:
             lower_literal = literal["literal"].lower()
-            similarity_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) FROM distinct_values WHERE LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) < 5 AND CAST(LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') AS DOUBLE) / NULLIF(LENGTH('{lower_literal}'), 0) < 0.3 ORDER BY LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) ASC, ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) ASC, num_str_values DESC LIMIT 2;"
+            lower_literal_prefix = re.split(r"[ ,:]+", lower_literal)[0]
+            using_lower_literal_prefix = False if lower_literal_prefix == lower_literal else True
+            prefix_condition = (
+                f"lower_attr ILIKE '{lower_literal_prefix}' OR lower_attr ILIKE '{lower_literal_prefix} %'"
+                if using_lower_literal_prefix
+                else f"lower_attr ILIKE '{lower_literal_prefix}%'"
+            )
+
+            prefix_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, num_str_values FROM distinct_values WHERE {prefix_condition} ORDER BY num_str_values DESC LIMIT 10;"
+            with self.lock:
+                cursor = self._conn.execute(prefix_query)
+            prefix_matches = cursor.fetchall()
+
+            num_prefix_matches = len(prefix_matches)
+            self.logger.debug(f"Num prefix matches: {num_prefix_matches}")
+            self.logger.debug(f"Prefix matches: {prefix_matches}")
+
+            similarity_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) AS subset_distance, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') AS absolute_distance, ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) AS abs_length_difference, num_str_values FROM distinct_values WHERE LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) < 5 AND CAST(LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') AS DOUBLE) / NULLIF(LENGTH('{lower_literal}'), 0) < 0.3 ORDER BY subset_distance ASC, abs_length_difference ASC, num_str_values DESC LIMIT 2;"
 
             with self.lock:
                 cursor = self._conn.execute(similarity_query)
-            similarity_rows = cursor.fetchall()
+            similarity_matches = cursor.fetchall()
 
-            num_similarity_rows = len(similarity_rows)
+            num_similarity_matches = len(similarity_matches)
 
-            if num_similarity_rows > 0:
+            self.logger.debug(f"Num similarity matches: {num_similarity_matches}")
+            self.logger.debug(f"Similarity matches: {similarity_matches}")
+
+            if num_prefix_matches > 0 and num_prefix_matches <= 5:
+                prefix_set = set()
+                for prefix_match in prefix_matches:
+                    prefix_set.add(prefix_match[0])
+                num_similarity_prefix_overlaps = 0
+                for similarity_match in similarity_matches:
+                    if similarity_match[0] in prefix_set:
+                        num_similarity_prefix_overlaps += 1
+                self.logger.debug(f"Num Similarity Prefix overlaps: {num_similarity_prefix_overlaps}")
+                if num_similarity_prefix_overlaps != 1:
+                    if num_prefix_matches > 1:
+                        # Multiple prefix matches, use string prefix
+                        altered_literal["literal"] = f"{lower_literal_prefix}%"
+                    else:
+                        # Only one prefix match, use the full matched string
+                        altered_literal["literal"] = prefix_matches[0][0]
+                    if literal["operator"] in ("<>", "!=", "NOT LIKE", "NOT PG_ILIKE", "NOT ILIKE", "NOT PG_ILIKE"):
+                        altered_literal["operator"] = "NOT ILIKE"
+                    else:
+                        altered_literal["operator"] = "ILIKE"
+                    return altered_literal
+
+            # If we are here, we do fuzzy similarity search
+            if num_similarity_matches > 0:
                 if (
-                    num_similarity_rows > 1
-                    and similarity_rows[0][1] == 0
-                    and similarity_rows[0][1] == similarity_rows[1][1]
+                    num_similarity_matches > 1
+                    and similarity_matches[0][1] == 0
+                    and similarity_matches[0][1] == similarity_matches[1][1]
                 ):
+
                     # Here there are at least two matches such that the user-provided literal is a full substring of
                     # the column value. In this case, we will match against all strings that our string literal
                     # is a substring of
                     altered_literal["literal"] = f"%{lower_literal}%"
                 else:
-                    # There was only one match, or two matches and at least one did have a 0 distance score, so pick the
-                    # top returned value (we've sorted in ascending order by score and descending order by number
-                    # of string matches)
-                    altered_literal["literal"] = str(similarity_rows[0][0])
-                if literal["operator"] == "<>":
-                    altered_literal["operator"] = "NOT ILIKE"
-                else:
-                    altered_literal["operator"] = "ILIKE"
+                    # There was only one match, or two matches, so pick the
+                    # top returned value. In the case of a tie, pick the prefix match if it exists (we've sorted in ascending order by score and descending order by number
+                    if num_similarity_matches > 1 and similarity_matches[0][1] == similarity_matches[1][1]:
+
+                        def matching_prefix_length(s1, s2):
+                            match_length = 0
+                            for c1, c2 in zip(s1, s2):
+                                if c1 == c2:
+                                    match_length += 1
+                                else:
+                                    break
+                            return match_length
+
+                        prefix_match_len_1 = matching_prefix_length(lower_literal, similarity_matches[0][0])
+                        prefix_match_len_2 = matching_prefix_length(lower_literal, similarity_matches[1][0])
+                        if prefix_match_len_1 >= prefix_match_len_2:
+                            altered_literal["literal"] = str(similarity_matches[0][0])
+                        else:
+                            altered_literal["literal"] = str(similarity_matches[1][0])
+                    else:
+                        altered_literal["literal"] = str(similarity_matches[0][0])
+            if literal["operator"] in ("<>", "!=", "NOT LIKE", "NOT PG_ILIKE", "NOT ILIKE", "NOT PG_ILIKE"):
+                altered_literal["operator"] = "NOT ILIKE"
+            else:
+                altered_literal["operator"] = "ILIKE"
             return altered_literal
 
         return altered_literal
