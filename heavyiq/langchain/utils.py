@@ -211,7 +211,7 @@ async def update_table_index_on_schema_change_callback(session: str, table: str)
 TABLE_SCHEMA_ONLY_RGX: re.Pattern = re.compile(r"(?is)^create table .*?\);(?=\n|$)")
 TABLE_COMMENT_RGX: re.Pattern = re.compile(r"(?i)create table (\w+)\s*(?:/\*\s*(.*?)\s*\*/)?\s*")
 TABLE_COLUMN_RGX: re.Pattern = re.compile(
-    r"^ *(\w+)\s+(\w+(?:\[\d*\]|\([^()]*\))?(?: +ENCODING +\w+(?:\(\d*\))?)?)\s*(?:\((?:\([^()]*\)|[^()])+\))?\s*(?:/\*\s*(.*?)\s*\*/)?\s*,?\s*$"
+    r"^ *(\"[^\"]+\"|\w+)\s+(\w+(?:\[\d*\]|\([^()]*\))?(?: +ENCODING +\w+(?:\(\d*\))?)?)\s*(?:\((?:\([^()]*\)|[^()])+\))?\s*(?:/\*\s*(.*?)\s*\*/)?\s*,?\s*$"
 )
 
 
