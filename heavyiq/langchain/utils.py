@@ -17,8 +17,7 @@ from langchain_core.tracers.langchain import LangChainTracer
 from langchain_core.tracers.schemas import Run
 from transformers import AutoTokenizer, LlamaTokenizer
 
-from heavyiq.config import (HeavyIQConfig, change_iq_config_for_free_edition,
-                            get_config)
+from heavyiq.config import HeavyIQConfig, change_iq_config_for_free_edition, get_config
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.heavydb import get_db
 from heavyiq.langchain.llms import LLMType, get_vllm_model_name
@@ -212,7 +211,7 @@ async def update_table_index_on_schema_change_callback(session: str, table: str)
 TABLE_SCHEMA_ONLY_RGX: re.Pattern = re.compile(r"(?is)^create table .*?\);(?=\n|$)")
 TABLE_COMMENT_RGX: re.Pattern = re.compile(r"(?i)create table (\w+)\s*(?:/\*\s*(.*?)\s*\*/)?\s*")
 TABLE_COLUMN_RGX: re.Pattern = re.compile(
-    r"^(\w+)\s+([^()]*?)(?:\((?:\([^()]*\)|[^()])+\))?\s*(?:/\*\s*(.*?)\s*\*/)?\s*$"
+    r"^ *(\w+)\s+(\w+(?:\[\d*\]|\([^()]*\))?(?: +ENCODING +\w+(?:\(\d*\))?)?)\s*(?:\((?:\([^()]*\)|[^()])+\))?\s*(?:/\*\s*(.*?)\s*\*/)?\s*,?\s*$"
 )
 
 
