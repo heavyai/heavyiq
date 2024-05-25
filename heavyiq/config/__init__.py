@@ -62,7 +62,7 @@ def validate_config(iq: HeavyIQConfig) -> AppConfig:
         raise ValueError(
             f"Invalid custom LLM type (valid options are AZURE or API or API_VLLM): {iq.custom_llm_type}"
         )
-    
+
 
     return iq
 
@@ -74,7 +74,7 @@ def get_config(file: str = "./config.toml", config_provided = True) -> HeavyIQCo
     with _config_lock:
         if _config:
             return _config
-        
+
         app_config: AppConfig
         if config_provided:
             app_config = AppConfig(config_sources=FileSource(file=file))  # type: ignore
@@ -118,7 +118,6 @@ def change_iq_config_for_free_edition() -> bool:
     """
 
     keys_to_change = {
-        "heavydb_port": 6274,
         "custom_llm_api_base": "https://community-heavylm.heavy.ai/v1", # base url of API",
         "custom_llm_api_nl_to_sql_base": "https://community-heavylm.heavy.ai/v1",
         "custom_llm_api_sql_to_answer_base": "https://community-heavylm.heavy.ai/v1",
@@ -131,5 +130,5 @@ def change_iq_config_for_free_edition() -> bool:
 
     global _config
     validate_config(_config)
-    
+
     return change_success
