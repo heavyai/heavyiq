@@ -6,7 +6,7 @@ from enum import Enum
 from multiprocessing import Manager
 from multiprocessing.managers import SyncManager
 from pathlib import Path
-from typing import Any, Generic, Optional, Sequence, TypeVar
+from typing import Any, Generic, Literal, Optional, Sequence, TypeVar
 
 import aiofiles
 from fastapi.concurrency import run_in_threadpool
@@ -314,9 +314,12 @@ class TablesCache(Generic[KT, VT]):
     def cache(self) -> LRUCache:
         return self._instance._cache
 
-    def form_key(self, database: str, tables: Sequence[str]) -> str:
+    def form_key(self, database: str, key_for: Literal["tables", "query"], tables: Sequence[str]) -> str:
         """
         Form cache key from the sequence of tables.
+
+        Args:
+            key_for: for what purpose the key is going to be created, either "tables" or "query" should be used.
         """
         sorted_tables = []
         if isinstance(tables, set):
@@ -324,7 +327,7 @@ class TablesCache(Generic[KT, VT]):
         else:
             sorted_tables = sorted(tables)
 
-        return f"{self.key_prefix}.{database}.{','.join(sorted_tables)}"
+        return f"{self.key_prefix}.{database}.{key_for}.{','.join(sorted_tables)}"
 
     def delete(self, key: KT):
         """

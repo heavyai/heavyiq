@@ -265,7 +265,8 @@ async def should_refresh_table_cache(heavydb: HeavyDB, table: str) -> bool:
     """
     Decides whether to refresh table cache or not.
     """
-    key = TABLES_CACHE.form_key(database=heavydb._dbname, tables=(table,))
+    # here key_for=tables is hardcoded because we are going to check for schema equality without top-k
+    key = TABLES_CACHE.form_key(database=heavydb._dbname, key_for="tables", tables=(table,))
     out = TABLES_CACHE.get(key)
     if not out:
         return False
@@ -332,13 +333,15 @@ async def aget_table_info_wrt_token_limit(
     """
     logger, config = get_heavyiq_logger(), get_config()
     # refresh-cache
-    table_names_tuple = tuple(sorted(table_names_to_use))
+    table_names_tuple, key_for = tuple(sorted(table_names_to_use)), (
+        "tables" if caller == LLMType.NL_TO_TABLES else "query"
+    )
     # pass sorted tables tuple to refresh_cache_for_tables method is decorated by alru_cache
     await refresh_cache_for_tables(session, table_names_tuple)
 
     # check for combined tables cache
     heavydb = await get_db(session)
-    cache_key = TABLES_CACHE.form_key(database=heavydb._dbname, tables=table_names_tuple)
+    cache_key = TABLES_CACHE.form_key(database=heavydb._dbname, key_for=key_for, tables=table_names_tuple)
     out = TABLES_CACHE.get(cache_key)
     if out:
         logger.info(f"[Cached]: Returning tables_info for {table_names_tuple} tables from shared cache")
@@ -347,7 +350,7 @@ async def aget_table_info_wrt_token_limit(
     tables_cache, table_info = [], None
     if len(table_names_tuple) > 1:
         for table in table_names_tuple:
-            key = TABLES_CACHE.form_key(database=heavydb._dbname, tables=(table,))
+            key = TABLES_CACHE.form_key(database=heavydb._dbname, key_for=key_for, tables=(table,))
             out = TABLES_CACHE.get(key)
             if not out:
                 break
@@ -428,7 +431,7 @@ async def aget_table_info_wrt_token_limit(
         table_info_split = re.split(r"\n(?=CREATE TABLE)", table_info)
         for info in table_info_split:
             table_name = re.search(r"^CREATE TABLE (\w+)", info).group(1)
-            key = TABLES_CACHE.form_key(database=heavydb._dbname, tables=(table_name,))
+            key = TABLES_CACHE.form_key(database=heavydb._dbname, key_for=key_for, tables=(table_name,))
             out = TABLES_CACHE.get(key)
             current_data = info.strip()
             # always populate the cache with larger data
