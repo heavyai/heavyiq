@@ -213,6 +213,27 @@ TABLE_COMMENT_RGX: re.Pattern = re.compile(r"(?i)create table (\w+)\s*(?:/\*\s*(
 TABLE_COLUMN_RGX: re.Pattern = re.compile(
     r"^ *(\"[^\"]+\"|\w+)\s+(\w+(?:\[\d*\]|\([^()]*\))?(?: +ENCODING +\w+(?:\(\d*\))?)?)\s*(?:\((?:\([^()]*\)|[^()])+\))?\s*(?:/\*\s*(.*?)\s*\*/)?\s*,?\s*$"
 )
+COLUMN_NAME_DTYPE_RGX: re.Pattern = re.compile(
+    r"^ *(\"[^\"]+\"|\w+)\s+(\w+(?:\[\d*\]|\([^()]*\))?(?: +ENCODING +\w+(?:\(\d*\))?)?)"
+)
+COLUMN_COMMENT_RGX: re.Pattern = re.compile(r"^.*(?:/\*\s*(.*?)\s*\*/)\s*,?\s*$")
+
+
+def get_column_parts(column_detail: str) -> tuple[str, str, str | None]:
+    """
+    Get parts from the column detail.
+    """
+    name, dtype, comment = None, None, None
+    match = TABLE_COLUMN_RGX.search(column_detail)
+    if match:
+        name, dtype, comment = match.groups()
+    else:
+        name, dtype = COLUMN_NAME_DTYPE_RGX.search(column_detail).groups()
+        has_comment = COLUMN_COMMENT_RGX.search(column_detail)
+        if has_comment:
+            comment = has_comment.group(1)
+
+    return name, dtype.strip(), comment
 
 
 def retrieve_schema_details(schema: str) -> dict:
@@ -233,11 +254,11 @@ def retrieve_schema_details(schema: str) -> dict:
         elif i == num_lines:
             # last line
             raw_line = line.split(");")[0]
-            column_details = TABLE_COLUMN_RGX.search(raw_line).groups()
-            columns.append((column_details[0], column_details[1].strip(), column_details[2]))
+            col_parts = get_column_parts(raw_line)
+            columns.append(col_parts)
         else:
-            column_details = TABLE_COLUMN_RGX.search(line).groups()
-            columns.append((column_details[0], column_details[1].strip(), column_details[2]))
+            col_parts = get_column_parts(line)
+            columns.append(col_parts)
 
     return {"name": table_name, "comment": table_comment, "columns": columns}
 
