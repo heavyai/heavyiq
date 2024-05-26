@@ -266,11 +266,12 @@ async def should_refresh_table_cache(heavydb: HeavyDB, table: str) -> bool:
     Decides whether to refresh table cache or not.
     """
     # here key_for=tables is hardcoded because we are going to check for schema equality without top-k
-    key = TABLES_CACHE.form_key(database=heavydb._dbname, key_for="tables", tables=(table,))
-    out = TABLES_CACHE.get(key)
-    if not out:
+    keys = TABLES_CACHE.get_table_keys(database=heavydb._dbname, table=table)
+    if not keys:
         return False
-    _, existing_data = out
+    existing_data = TABLES_CACHE.get(keys[0])
+    if not existing_data:
+        return False
 
     current_data = await heavydb._aget_raw_table_schema_from_thrift(
         table, include_top_k=False, include_timestamp=False, include_comments=True
@@ -332,114 +333,133 @@ async def aget_table_info_wrt_token_limit(
     Gets the info of all the tables with respect to the token limit async.
     """
     logger, config = get_heavyiq_logger(), get_config()
+    table_names_tuple = tuple(sorted(table_names_to_use))
     # refresh-cache
-    table_names_tuple, key_for = tuple(sorted(table_names_to_use)), (
-        "tables" if caller == LLMType.NL_TO_TABLES else "query"
-    )
-    # pass sorted tables tuple to refresh_cache_for_tables method is decorated by alru_cache
-    await refresh_cache_for_tables(session, table_names_tuple)
+    await refresh_cache_for_tables(session, table_names_to_use)
 
-    # check for combined tables cache
-    heavydb = await get_db(session)
-    cache_key = TABLES_CACHE.form_key(database=heavydb._dbname, key_for=key_for, tables=table_names_tuple)
-    out = TABLES_CACHE.get(cache_key)
-    if out:
-        logger.info(f"[Cached]: Returning tables_info for {table_names_tuple} tables from shared cache")
-        return out[1]
-    # check for per table cache
-    tables_cache, table_info = [], None
-    if len(table_names_tuple) > 1:
-        for table in table_names_tuple:
-            key = TABLES_CACHE.form_key(database=heavydb._dbname, key_for=key_for, tables=(table,))
-            out = TABLES_CACHE.get(key)
-            if not out:
-                break
-            tables_cache.append(out[1])
-        else:
-            table_info = "\n\n".join(tables_cache)
-
-    if config.custom_llm_type is None or config.custom_llm_type == "AZURE":
-        token_limit = get_token_limit(llm.model_name)  # type: ignore
-        token_counter = llm.get_num_tokens
-        table_info_options: list[dict[str, bool]] = [
-            {},
-            {"include_top_k": False},
-            {"include_samples": False},
-            {"include_samples": False, "include_timestamp": False},
-            {"include_samples": False, "include_timestamp": False, "include_top_k": False},
-        ]
-    else:
-        token_limit = llm.context_window - 306  # type: ignore # (256 response + 50 buffer)
-        token_counter = custom_model_token_counter
-        table_info_options = [
-            {"include_samples": False},
-            {"include_samples": False, "include_timestamp": False},
-            {"include_samples": False, "include_timestamp": False, "include_top_k": False},
-            {"include_samples": False, "include_timestamp": False, "include_top_k": False, "include_comments": False},
-        ]
-
-    if table_info:
-        # check for the cached table info length lesser than the model's context width or not
+    async def is_prompt_tokens_lesser_than_token_limit(
+        table_info: str, token_limit: int, token_counter: Callable
+    ) -> bool:
+        """
+        Check whether the calculated prompt tokens lesser than the token limit allowed by the llm model.
+        """
         formatted_prompt = prompt.format(table_info=table_info)
         prompt_tokens = await run_in_threadpool(token_counter, formatted_prompt)
         if prompt_tokens <= token_limit:
-            logger.info(f"[Cached]: Returning combined tables_info for {table_names_tuple} tables from shared cache")
-            return table_info
+            return True
 
-    logger.info(f"Calculating tables_info for {table_names_tuple} tables...")
+        return False
+
+    # check for combined tables cache
+    heavydb = await get_db(session)
+
     top_k_max_str_column_count = (
         config.top_k_max_str_col_count_nl_to_tables
         if caller == LLMType.NL_TO_TABLES
         else config.top_k_max_str_col_count_nl_to_sql
     )
 
-    # decides whether to include top-k or not
+    # decide whether to include top-k, timetstamp or not even when retriving data from cache
     disable_top_k = False
-    available_text_column_count = await get_all_text_column_count(session, table_names_tuple)
+    available_text_column_count = await get_all_text_column_count(
+        session, table_names_tuple
+    )  # in-process cache used for upto 60 secs
     if available_text_column_count > top_k_max_str_column_count:
         disable_top_k = True
 
     # decides whether to include timestamp text or not
     disable_timestamp = not (config.include_timestamp_on_table_info_prompt)
 
+    # define table/cache options
+    table_info_options: list[dict[str, bool]] = [
+        {},
+        {"include_timestamp": False},
+        {"include_timestamp": False, "include_top_k": False},
+        {"include_timestamp": False, "include_top_k": False, "include_comments": False},
+    ]
+    if disable_timestamp and disable_top_k:
+        table_info_options = [
+            {"include_timestamp": False, "include_top_k": False},
+            {"include_timestamp": False, "include_top_k": False, "include_comments": False},
+        ]
+    elif disable_top_k:
+        table_info_options = [
+            {"include_top_k": False},
+            {"include_timestamp": False, "include_top_k": False},
+            {"include_timestamp": False, "include_top_k": False, "include_comments": False},
+        ]
+    elif disable_timestamp:
+        table_info_options = [
+            {"include_timestamp": False},
+            {"include_timestamp": False, "include_top_k": False},
+            {"include_timestamp": False, "include_top_k": False, "include_comments": False},
+        ]
+
+    # initialize token limit and token counter
+    if config.custom_llm_type is None or config.custom_llm_type == "AZURE":
+        token_limit = get_token_limit(llm.model_name)  # type: ignore
+        token_counter = llm.get_num_tokens
+    else:
+        token_limit = llm.context_window - 306  # type: ignore # (256 response + 50 buffer)
+        token_counter = custom_model_token_counter
+
+    # iterate over all the options to see which option best suits
+    # cache retrieval, get table_info from cache only when the relevant cache key found for all the tables
+    # else do the retrieval from database
     for options in table_info_options:
-        include_samples = options.get("include_samples", True)
+        tables_cache, table_info, found_break = [], None, False
+        for table in table_names_to_use:
+            key = TABLES_CACHE.create_cache_key_for_single_table(database=heavydb._dbname, table=table, **options)
+            out = TABLES_CACHE.get(key)
+            if not out:
+                found_break = True
+                break
+            tables_cache.append(out)
+        else:
+            # cache exists for all the tables, so check if the formed table_info is lesser than the token limit
+            table_info = "\n\n".join(tables_cache)
+            if await is_prompt_tokens_lesser_than_token_limit(
+                table_info=table_info, token_limit=token_limit, token_counter=token_counter
+            ):
+                logger.info(f"[Cached]: Returning table information for {table_names_to_use} tables from cache.")
+                return table_info
+
+        # don't go for other table_options if there isn't any cache found with the current option for atleast one table
+        if found_break:
+            break
+
+    logger.info(f"Calculating tables_info for {table_names_to_use} tables...")
+
+    for options in table_info_options:
         include_top_k = options.get("include_top_k", True)
         include_timestamp = options.get("include_timestamp", True)
         include_comments = options.get("include_comments", True)
-        if disable_top_k:
-            include_top_k = False
-        if disable_timestamp:
-            include_timestamp = False
 
         table_info = await aget_table_info_from_cache_or_calculate(
-            session, table_names_tuple, include_samples, include_top_k, include_timestamp, include_comments
+            session, table_names_tuple, False, include_top_k, include_timestamp, include_comments
         )
+        # set caches for each table
+        table_info_split = re.split(r"\n(?=CREATE TABLE)", table_info)
+        for info in table_info_split:
+            table_name = re.search(r"^CREATE TABLE (\w+)", info).group(1)
+            single_table_cache_key = TABLES_CACHE.create_cache_key_for_single_table(
+                database=heavydb._dbname,
+                table=table_name,
+                include_comments=include_comments,
+                include_top_k=include_top_k,
+                include_timestamp=include_timestamp,
+            )
+            out = TABLES_CACHE.get(single_table_cache_key)
+            if not out:
+                # populate the cache only when there isn't any key exists
+                TABLES_CACHE.put(single_table_cache_key, info.strip())
+
         formatted_prompt = prompt.format(table_info=table_info)
         prompt_tokens = await run_in_threadpool(token_counter, formatted_prompt)
         if prompt_tokens <= token_limit:
             break
     else:  # executed if the loop finished normally (no break)
         raise RuntimeError("Couldn't find suitable prompt provided token limit")
-
-    # store the combined or single table_info in cache
-    cache_metadata = (include_top_k, include_timestamp, include_comments)
-    TABLES_CACHE.put(cache_key, (cache_metadata, table_info))
-
-    if len(table_names_tuple) > 1:
-        # do a per table cache when table len > 1
-        table_info_split = re.split(r"\n(?=CREATE TABLE)", table_info)
-        for info in table_info_split:
-            table_name = re.search(r"^CREATE TABLE (\w+)", info).group(1)
-            key = TABLES_CACHE.form_key(database=heavydb._dbname, key_for=key_for, tables=(table_name,))
-            out = TABLES_CACHE.get(key)
-            current_data = info.strip()
-            # always populate the cache with larger data
-            if out:
-                if len(out[1]) < len(current_data):
-                    TABLES_CACHE.put(key, (cache_metadata, current_data))
-            else:
-                TABLES_CACHE.put(key, (cache_metadata, current_data))
 
     return table_info
 
@@ -520,6 +540,7 @@ def custom_model_tokenizer_decode(token_ids: list[int]) -> str:
     return get_tokenizer().decode(token_ids, skip_special_tokens=True)
 
 
+@alru_cache(ttl=60)
 async def get_all_text_column_count(session: str, tables: Sequence[str]) -> int:
     """
     Returns the count of all the text columns available in the tables.

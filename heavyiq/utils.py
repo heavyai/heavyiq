@@ -314,20 +314,31 @@ class TablesCache(Generic[KT, VT]):
     def cache(self) -> LRUCache:
         return self._instance._cache
 
-    def form_key(self, database: str, key_for: Literal["tables", "query"], tables: Sequence[str]) -> str:
+    def create_cache_key_for_single_table(
+        self,
+        database: str,
+        table: str,
+        include_comments: bool = True,
+        include_top_k: bool = True,
+        include_timestamp: bool = True,
+    ) -> str:
         """
-        Form cache key from the sequence of tables.
-
-        Args:
-            key_for: for what purpose the key is going to be created, either "tables" or "query" should be used.
+        Form cache key for a specific table with different cache options.
         """
-        sorted_tables = []
-        if isinstance(tables, set):
-            sorted_tables = sorted(list(tables))
-        else:
-            sorted_tables = sorted(tables)
+        return f"{self.key_prefix}:{database}:{table}:{include_comments}:{include_top_k}:{include_timestamp}"
 
-        return f"{self.key_prefix}.{database}.{key_for}.{','.join(sorted_tables)}"
+    def decrypt_cache_key(self, cache_key: str) -> dict:
+        """
+        Decrypts the cache key.
+        """
+        _, database, table, include_comments, include_top_k, include_timestamp = cache_key.split(":")
+        return {
+            "database": database,
+            "table": table,
+            "include_comments": include_comments,
+            "include_top_k": include_top_k,
+            "include_timestamp": include_timestamp,
+        }
 
     def delete(self, key: KT):
         """
@@ -344,13 +355,19 @@ class TablesCache(Generic[KT, VT]):
         with self._lock:
             return self.cache.put(key, value)
 
+    def get_table_keys(self, database: str, table: str) -> list[str]:
+        """
+        Get all keys releated to a table.
+        """
+        return self.cache.get_key_starts_with(f"{self.key_prefix}:{database}:{table}:")
+
     def delete_by_table_name(self, database: str, table_name: str):
         """
         Delete all the caches associated with a table name.
         """
-        keys_found = self.cache.get_key_contains(partial_key=table_name, key_prefix=f"{self.key_prefix}.{database}.")
+        keys_found = self.get_table_keys(database=database, table=table_name)
         for key in keys_found:
-            self.delete(key)
+            self.delete(key)  # type: ignore
 
 
 TABLES_CACHE = TablesCache[str, str]()
