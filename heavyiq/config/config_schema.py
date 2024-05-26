@@ -22,7 +22,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     heavydb_password: Optional[str] = None
     heavydb_host: str = "localhost"
     heavydb_port: int = 6278
-    heavydb_protocol: str = "binary"
+    heavydb_protocol: str = "http"
     huggingface_embed_model: str = "sentence-transformers/all-mpnet-base-v2"
     huggingface_model_cache_folder: str = "hf_models"
     huggingface_embed_documents_parallel: bool = False
@@ -52,7 +52,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     enable_debug_endpoints: bool = False
     enable_llm_cache: bool = False
     # CUSTOM LLM
-    custom_llm_type: Optional[str] = "API_VLLM"
+    custom_llm_type: Optional[str] = None
 
     """ 'API' or 'API_VLLM' or 'AZURE' """
     custom_llm_api_base: str = ""  # LLMType.DEFAULT
