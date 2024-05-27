@@ -295,7 +295,7 @@ async def should_refresh_table_cache(heavydb: HeavyDB, table: str) -> bool:
         return False
 
     current_data = await heavydb._aget_raw_table_schema_from_thrift(
-        table, include_top_k=False, include_timestamp=False, include_comments=True
+        table, include_top_k=False, include_timestamp=False, include_comments=True, use_cache=False
     )
 
     return not (is_cached_schema_equals_current_schema(existing_data, current_data))
