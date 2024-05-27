@@ -12,7 +12,7 @@ from contextvars import ContextVar
 from copy import deepcopy
 from multiprocessing.managers import SyncManager
 from threading import Lock
-from typing import Any, Callable, NamedTuple, Optional, TypedDict
+from typing import Any, Callable, Iterator, NamedTuple, Optional, Sequence, TypedDict
 
 import anyio
 from async_lru import alru_cache
@@ -23,8 +23,7 @@ from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
 from heavyiq.langchain.heavydb_utils import DB_KEYWORDS
-from heavyiq.utils import (LRUCache, calc_query_stats, is_destructive_sql,
-                           rate_sql_complexity, strip_sql_comments)
+from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
 
 
 class CustomColumnDetails(NamedTuple):
@@ -514,7 +513,7 @@ class HeavyDB:
         top_k_statement = f'SELECT {column}, COUNT(*) as cnt FROM "{table}" WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {cardinality_threshold + 1};'
         with self.lock:
             cursor = self._conn.execute(top_k_statement)
-        top_k_res: list[str] = [str(v[0]).replace('\n', ' ') for v in cursor.fetchall()]
+        top_k_res: list[str] = [str(v[0]).replace("\n", " ") for v in cursor.fetchall()]
         is_high_cardinality = len(top_k_res) > cardinality_threshold
         if is_high_cardinality:
             # high-cardinality, return sample
@@ -601,17 +600,30 @@ class HeavyDB:
         self.logger.debug(f"Got timestamp values for column {column} in table {table_name}")
         return min_value, max_value
 
+    async def _aget_timestamp(self, table_name: str, timestamp_columns: Sequence[str]) -> Iterator[str, tuple]:
+        """
+        Cached version of aget_timestamp.
+        """
+        self.logger.debug(f"Getting min/max timestamp values for table {table_name}")
+        cache_key = f"{self._dbname}.{table_name}"
+        timestamp_values = self.timestamp_cache.get(cache_key)
+        if timestamp_values is not None:
+            self.logger.info(f"Got timestamp values for table {table_name} from cache")
+        else:
+            if not timestamp_columns:
+                return []
+            self.logger.info(f"Calculating timestamp values for table {table_name}")
+            timestamp_values = await asyncio.gather(
+                *[self.aget_column_timestamp(table_name, col) for col in timestamp_columns]
+            )
+            self.timestamp_cache.put(cache_key, timestamp_values)
+
+        return zip(timestamp_columns, timestamp_values)
+
     async def aget_timestamp(self, table_name: str) -> str:
         """
         Get min/max values for all the timestamp, data columns exists on a table.
         """
-        self.logger.debug(f"Getting min/max timestamp values for table {table_name}")
-        cache_key = f"{self._dbname}.{table_name}"
-        cached_value = self.timestamp_cache.get(cache_key)
-        if cached_value is not None:
-            self.logger.debug(f"Got timestamp values for table {table_name} from cache")
-            return cached_value
-
         timestamp_columns = [
             c.name
             for c in self.get_table_columns(table_name)
@@ -620,15 +632,13 @@ class HeavyDB:
         timestamp_col_str = ""
 
         if timestamp_columns:
-            tasks = [self.aget_column_timestamp(table_name, col) for col in timestamp_columns]
-            timestamp_values = await asyncio.gather(*tasks)
+            zip_column_timestamp = await self._aget_timestamp(
+                table_name=table_name, timestamp_columns=timestamp_columns
+            )
 
             timestamp_col_str += "Timestamp and date columns with min and max values:\n"
-            for col, (min_value, max_value) in zip(timestamp_columns, timestamp_values):
+            for col, (min_value, max_value) in zip_column_timestamp:
                 timestamp_col_str += f"{col}: ({min_value}, {max_value})\n"
-
-        self.timestamp_cache.put(cache_key, timestamp_col_str)
-        self.logger.debug(f"Got min/max timestamp values for table {table_name}")
 
         return timestamp_col_str
 
@@ -689,11 +699,11 @@ class HeavyDB:
         # if there are < (threshold + 1) values, it's low cardinality and we can return all of them
         # if there are >= (threshold + 1) values, it's high cardinality and we need to sample the top high_cardinality_sample
         """Get the top k values for a column."""
-        self.logger.info(f"Getting top k values for column {column} in table {table}")
+        self.logger.debug(f"Getting top k values for column {column} in table {table}")
         top_k_statement = f'SELECT {column}, COUNT(*) as cnt FROM "{table}" WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {cardinality_threshold + 1};'
         async with self.alock:
             cursor = await run_in_threadpool(self._conn.execute, top_k_statement)
-        top_k_res: list[str] = [str(v[0]).replace('\n', ' ') for v in cursor.fetchall()]
+        top_k_res: list[str] = [str(v[0]).replace("\n", " ") for v in cursor.fetchall()]
         is_high_cardinality = len(top_k_res) > cardinality_threshold
         if is_high_cardinality:
             # high-cardinality, return sample
@@ -872,12 +882,18 @@ class HeavyDB:
         return CustomTableDetails(name=table, columns=custom_columns, comment=table_comment)
 
     async def _aget_raw_table_schema_from_thrift(
-        self, table: str, include_top_k: bool = True, include_timestamp: bool = True, include_comments: bool = True
+        self,
+        table: str,
+        include_top_k: bool = True,
+        include_timestamp: bool = True,
+        include_comments: bool = True,
+        use_cache: bool = True,
     ) -> str:
         """
-        Method used to form table_schema from `get_table_details` thrift endpoint without re-using any cache value.
+        Method used to form table_schema from `get_table_details` thrift endpoint without re-using any cache value unless use_cache is False.
+        use_cache=True, cached values of top-k and timestamp values are being used.
         """
-        table_details: CustomTableDetails = await self._aget_table_custom_details(table, use_cache=False)
+        table_details: CustomTableDetails = await self._aget_table_custom_details(table, use_cache=use_cache)
         config = get_config()
         table_name = f'"{table_details.name}"' if table_details.name.upper() in DB_KEYWORDS else f"{table_details.name}"
         schema_stmt = (
@@ -894,20 +910,31 @@ class HeavyDB:
                 timestamp_columns.append(col.name)
 
         if include_top_k and text_columns:
-            columns_top_k = await asyncio.gather(
-                *[self.aget_column_top_k(table_details.name, col) for col in text_columns]
-            )
-            for colstr, (top_k_res, is_high_cardinality) in zip(text_columns, columns_top_k):
+            # retrieve from top-k cache or calculate
+            if use_cache:
+                zip_colname_topk = await self._aget_top_k(table_name=table, text_columns=text_columns)
+            else:
+                columns_top_k = await asyncio.gather(
+                    *[self.aget_column_top_k(table_details.name, col) for col in text_columns]
+                )
+                zip_colname_topk = zip(text_columns, columns_top_k)
+
+            for colstr, (top_k_res, is_high_cardinality) in zip_colname_topk:
                 if top_k_res and is_high_cardinality:
                     column_metadata_mapping[colstr] = top_k_res[:-1] + [top_k_res[-1] + " ..."]
                 elif top_k_res:
                     column_metadata_mapping[colstr] = top_k_res
 
         if include_timestamp and timestamp_columns:
-            timestamp_values = await asyncio.gather(
-                *[self.aget_column_timestamp(table_details.name, col) for col in timestamp_columns]
-            )
-            for colstr, (min_value, max_value) in zip(timestamp_columns, timestamp_values):
+            if use_cache:
+                zip_column_timestamp = await self._aget_timestamp(table_name=table, timestamp_columns=timestamp_columns)
+            else:
+                timestamp_values = await asyncio.gather(
+                    *[self.aget_column_timestamp(table_details.name, col) for col in timestamp_columns]
+                )
+                zip_column_timestamp = zip(timestamp_columns, timestamp_values)
+
+            for colstr, (min_value, max_value) in zip_column_timestamp:
                 column_metadata_mapping[colstr] = [min_value, max_value]
 
         def format_column(column: CustomColumnDetails) -> str:
@@ -1048,26 +1075,40 @@ class HeavyDB:
         self.logger.debug(f"Got text columns count for table {table_name}")
         return text_columns_count
 
+    async def _aget_top_k(self, table_name: str, text_columns: Sequence[str]) -> Iterator[str, tuple]:
+        """
+        Get or find top-k for each text columns, save it in cache, return it as zip or text-columns, top-k mapping.
+        """
+        self.logger.debug(f"Getting top k values for table {table_name}")
+        cache_key = f"{self._dbname}.{table_name}"
+        columns_top_k = self.top_k_cache.get(cache_key)
+
+        if columns_top_k is not None:
+            self.logger.info(f"Got top k values for table {table_name} from cache")
+        else:
+            if not text_columns:
+                return []
+            self.logger.info(f"Calculating top k values for table {table_name}")
+            columns_top_k = await asyncio.gather(*[self.aget_column_top_k(table_name, col) for col in text_columns])
+            self.top_k_cache.put(cache_key, columns_top_k)
+
+        return zip(text_columns, columns_top_k)
+
     async def aget_top_k(self, table_name: str) -> str:
         """
         Get table top k rows from cache for db async.
         """
-        self.logger.debug(f"Getting top k values for table {table_name}")
-        cache_key = f"{self._dbname}.{table_name}"
-        cached_value = self.top_k_cache.get(cache_key)
-        if cached_value is not None:
-            self.logger.debug(f"Got top k values for table {table_name} from cache")
-            return cached_value
-        text_columns = await self.aget_text_columns(table_name)
         low_cardinality_columns = []
         high_cardinality_columns = []
-        columns_top_k = await asyncio.gather(*[self.aget_column_top_k(table_name, col) for col in text_columns])
-        for col, (top_k_res, is_high_cardinality) in zip(text_columns, columns_top_k):
+        text_columns = await self.aget_text_columns(table_name)
+        zip_colname_topk = await self._aget_top_k(table_name=table_name, text_columns=text_columns)
+        for col, (top_k_res, is_high_cardinality) in zip_colname_topk:
             if top_k_res:
                 if is_high_cardinality:
                     high_cardinality_columns.append((col, top_k_res))
                 else:
                     low_cardinality_columns.append((col, top_k_res))
+
         top_k_strings = ""
         if low_cardinality_columns:
             top_k_strings += "Low cardinality columns and every possible value:\n"
@@ -1077,8 +1118,7 @@ class HeavyDB:
             top_k_strings += "High cardinality columns and most common values:\n"
             for col, top_k_res in high_cardinality_columns:
                 top_k_strings += f"{col}: {', '.join(top_k_res)}\n"
-        self.top_k_cache.put(cache_key, top_k_strings)
-        self.logger.debug(f"Got top k values for table {table_name}")
+
         return top_k_strings
 
     async def aget_single_table_info(
