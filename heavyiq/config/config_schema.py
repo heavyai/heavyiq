@@ -21,8 +21,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     heavydb_username: Optional[str] = None
     heavydb_password: Optional[str] = None
     heavydb_host: str = "localhost"
-    heavydb_port: int = 6278
-    heavydb_protocol: str = "http"
+    heavydb_port: int = 6274
+    heavydb_protocol: str = "binary"
     huggingface_embed_model: str = "sentence-transformers/all-mpnet-base-v2"
     huggingface_model_cache_folder: str = "hf_models"
     huggingface_embed_documents_parallel: bool = False

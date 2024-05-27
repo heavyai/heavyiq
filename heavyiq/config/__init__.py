@@ -63,7 +63,6 @@ def validate_config(iq: HeavyIQConfig) -> AppConfig:
             f"Invalid custom LLM type (valid options are AZURE or API or API_VLLM): {iq.custom_llm_type}"
         )
 
-
     return iq
 
 
@@ -81,7 +80,7 @@ def get_config(file: str = "./config.toml", config_provided = True) -> HeavyIQCo
             validate_config(app_config.iq)
         else:
             app_config = AppConfig()
-            print("Skipping validation until license is loaded and config updated per edition used.")
+            # print("Skipping validation until license is loaded and config updated per edition used.")
 
         # Data setup things, move out of validate method
         if app_config.iq.data is None:
@@ -118,7 +117,8 @@ def change_iq_config_for_free_edition() -> bool:
     """
 
     keys_to_change = {
-        "custom_llm_api_base": "https://community-heavylm.heavy.ai/v1", # base url of API",
+        "custom_llm_type": "API_VLLM",
+        "custom_llm_api_base": "https://community-heavylm.heavy.ai/v1",  # base url of API
         "custom_llm_api_nl_to_sql_base": "https://community-heavylm.heavy.ai/v1",
         "custom_llm_api_sql_to_answer_base": "https://community-heavylm.heavy.ai/v1",
         "custom_llm_api_nl_to_tables_base": "https://community-heavylm.heavy.ai/v1",
@@ -127,6 +127,7 @@ def change_iq_config_for_free_edition() -> bool:
     }
 
     change_success = change_iq_config(keys_to_change)
+    # print("Setting configuration options for Free edition.")
 
     global _config
     validate_config(_config)
