@@ -8,6 +8,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from heavydb.exceptions import Error as HeavyDBError  # type: ignore
+from heavyrag.settings import settings as heavyrag_settings
 from langchain.globals import set_llm_cache
 from starlette.exceptions import HTTPException
 
@@ -38,6 +39,7 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
     App initialization code which get excuted before gunicorn process fork upon using `--preload` option.
     """
     from heavyiq.langchain.heavydb import HeavyDB
+    from heavyiq.langchain.llms import get_vllm_model_name
 
     logger = get_heavyiq_logger()
     logger.info("Allocating Shared Dict....")
@@ -58,6 +60,35 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
     # LLM Cache
     if config.enable_llm_cache:
         set_llm_cache(InMemoryLLMCache())
+
+    # set rag settings from global config
+    heavyrag_settings.persistant_collection_dir = config.rag_documents_index_path
+    heavyrag_settings.hf_embedding_model = config.huggingface_embed_model
+    heavyrag_settings.hf_embedding_model_cache_folder = config.huggingface_model_cache_folder
+    heavyrag_settings.heavydb_host = config.heavydb_host
+    heavyrag_settings.heavydb_port = config.heavydb_port
+    heavyrag_settings.llm_api_url = config.custom_llm_api_base
+    heavyrag_settings.llm_model = get_vllm_model_name(config.custom_llm_api_base)
+    heavyrag_settings.llm_max_tokens = 256
+
+
+def include_rag_routers(app: FastAPI) -> None:
+    """
+    Include RAG routers
+    """
+    from heavyiq.rag.document.router import doc_router
+
+    app.include_router(
+        doc_router,
+        prefix="/rag/document",
+        tags=["rag.document"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "model": ErrorResponse,
+            }
+        },
+    )
 
 
 _config_provided = True
@@ -174,6 +205,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
             }
         },
     )
+    include_rag_routers(app)
     if config.enable_debug_endpoints:
         from heavyiq.api.routes.debug_router import debug_router
         from heavyiq.api.routes.runnable_router import runnable_router

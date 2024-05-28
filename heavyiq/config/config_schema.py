@@ -134,6 +134,11 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     custom_prompt_instruct_start_token: str = "<|prompt|>\n"
     custom_prompt_instruct_body: Optional[str] = None
     custom_prompt_instruct_end_token: str = "\n<|prompt|>\n"
+    # rag
+    """Contain references to documents which are going to be indexed."""
+    rag_documents_db_path: str = "ragdb/sqlite"
+    """Persistant vectordb path"""
+    rag_documents_index_path: str = "ragdb/chromadb"
 
 
 class AppConfig(OverrideBaseConfig):  # type: ignore
