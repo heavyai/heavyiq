@@ -14,15 +14,15 @@ from starlette.exceptions import HTTPException
 from heavyiq.api.handlers import exception_handler as exh
 from heavyiq.api.middlewares import AsyncLoggingMiddleware
 from heavyiq.api.models.error import ErrorResponse
-from heavyiq.api.routes import (bgrouter, defaultrouter, iqrouter, lcelrouter,
-                                llmrouter, streamrouter)
+from heavyiq.api.routes import bgrouter, defaultrouter, iqrouter, lcelrouter, llmrouter, streamrouter
 from heavyiq.config import HeavyIQConfig, get_config
-from heavyiq.langchain.exceptions import (GenerateTableMetadataException,
-                                          NLtoAnswerException,
-                                          NLtoSQLException, NLtoTableException)
-from heavyiq.langchain.utils import (InMemoryLLMCache,
-                                     enable_telemetrics_for_free_edition,
-                                     init_telemetrics)
+from heavyiq.langchain.exceptions import (
+    GenerateTableMetadataException,
+    NLtoAnswerException,
+    NLtoSQLException,
+    NLtoTableException,
+)
+from heavyiq.langchain.utils import InMemoryLLMCache, enable_telemetrics_for_free_edition, init_telemetrics
 from heavyiq.logging_utils import get_heavyiq_logger, init_logs
 from heavyiq.utils import SharedDictSingleton
 
@@ -60,7 +60,39 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
         set_llm_cache(InMemoryLLMCache())
 
 
+def include_rag_routers(app: FastAPI) -> None:
+    """
+    Include RAG routers
+    """
+    from heavyiq.rag.router import doc_router, table_router
+
+    app.include_router(
+        doc_router,
+        prefix="/rag/documents",
+        tags=["rag.documents"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "model": ErrorResponse,
+            }
+        },
+    )
+    app.include_router(
+        table_router,
+        prefix="/rag/tables",
+        tags=["rag.tables"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "model": ErrorResponse,
+            }
+        },
+    )
+
+
 _config_provided = True
+
+
 def create_app(config_path: str = "./config.toml") -> FastAPI:
     """
     create and return a FastAPI instance.
@@ -78,7 +110,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         _config_provided = False
 
     config = get_config(config_path, _config_provided)  # loads config using specified path
-    
+
     # If IQ disabled in the config, don't go any further
     if config and config.disabled == True:
         # Figure out how to actually exit
@@ -174,6 +206,9 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
             }
         },
     )
+    # RAG routers
+    include_rag_routers(app)
+
     if config.enable_debug_endpoints:
         from heavyiq.api.routes.debug_router import debug_router
         from heavyiq.api.routes.runnable_router import runnable_router
@@ -197,6 +232,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         Code to be executed when application starts.
         """
         from heavyiq.logging_utils import heavyiq_logger as logger
+
         global _config_provided
 
         async def enable_telemetrics_for_free_license_daemon():
@@ -213,7 +249,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
                     continue
 
                 logger.info(f"Found HeavyAI license edition, license_type: {license_edition}")
-                
+
                 if license_edition == "free":
                     logger.info("Enabling langsmith telemetrics for free edition.")
                     done = enable_telemetrics_for_free_edition()
@@ -225,7 +261,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
                     if not _config_provided:
                         logger.error("Config must be provided when license edition is not free")
                         sys.exit()
-                        
+
                 break
             else:
                 logger.error(f"Failed to check HeavyAI license edition after {max_retries*2} seconds.")
@@ -233,7 +269,6 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         # run a background task to check license_edition got cached or not
         # if yes, and it's a free edition then enable langsmith telemetry
         asyncio.create_task(enable_telemetrics_for_free_license_daemon())
-        
 
     @app.on_event("shutdown")
     async def shutdown():

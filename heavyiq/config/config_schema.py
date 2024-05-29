@@ -69,6 +69,10 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     custom_llm_api_tables_to_questions_context_window: int = 15552  # LLMType.TABLES_TO_QUESTIONS
     custom_llm_api_instruct_base: Optional[str] = None  # LLMType.INSTRUCT
     custom_llm_api_instruct_context_window: int = 15552  # LLMType.INSTRUCT
+    custom_llm_api_rag_base: Optional[str] = None  # LLMType.RAG
+    custom_llm_api_rag_context_window: int = 4092  # LLMType.RAG
+    custom_llm_api_rag_prompt_start_token: str = ""  # LLMType.RAG
+    custom_llm_api_rag_prompt_end_token: str = ""  # LLMType.RAG
     custom_llm_api_instruct_prompt_start_token: str = "<|prompt|>\n"
     custom_llm_api_instruct_prompt_end_token: str = "\n<|answer|>\n"
     custom_llm_api_tables_to_questions_prompt_token: str = "<|table question prompt|>"
@@ -134,6 +138,11 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     custom_prompt_instruct_start_token: str = "<|prompt|>\n"
     custom_prompt_instruct_body: Optional[str] = None
     custom_prompt_instruct_end_token: str = "\n<|prompt|>\n"
+    # RAG
+    rag_storage_persist_dir: str = "rag_storage"
+    rag_documents_source_dir: str = "rag_sources"
+    rag_chromadb_persist_dir: str = rag_storage_persist_dir + "/chromadb"
+    rag_document_pdf_parser_url: str = ""
 
 
 class AppConfig(OverrideBaseConfig):  # type: ignore
