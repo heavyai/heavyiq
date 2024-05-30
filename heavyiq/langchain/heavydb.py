@@ -725,7 +725,7 @@ class HeavyDB:
                 )
                 # find values upto a certain limit from sample
                 cursor = await self.aexecute(
-                    f'SELECT DISTINCT({column}) FROM "{table}" WHERE {column} IS NOT NULL LIMIT {high_cardinality_sample};'
+                    f'SELECT {column} FROM "{table}" WHERE {column} IS NOT NULL LIMIT {high_cardinality_sample};'
                 )
                 top_k_res: list[str] = [str(v[0]).replace("\n", " ") for v in cursor.fetchall()]
                 return top_k_res, True
