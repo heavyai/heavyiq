@@ -14,7 +14,7 @@ DOCUMENTS_INDEX_ID = "documents"
 HEAVYDB_INDEX_ID = "heavydb"
 DOCUMENTS_INDEX_NODE = IndexNode(index_id=DOCUMENTS_INDEX_ID, text="Document Index")
 HEAVYDB_INDEX_NODE = IndexNode(index_id=HEAVYDB_INDEX_ID, text="HeavyDB Index")
-embed_model = HuggingFaceEmbedding(CONFIG.huggingface_embed_model)
+embed_model = HuggingFaceEmbedding(CONFIG.huggingface_embed_model, device="cpu")
 
 chroma_client = chromadb.PersistentClient(
     path=CONFIG.rag_chromadb_persist_dir,
