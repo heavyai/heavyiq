@@ -1058,6 +1058,7 @@ class HeavyDB:
         self.logger.debug(f"Got sample rows for table {table_name}")
         return res
 
+    @alru_cache(ttl=10)  # ttl of 10 secs alone would be enough to set row_count value in shared inter-process cache
     async def aget_total_row_count(self, table_name: str) -> int:
         """
         Get total row count of the given database table.
