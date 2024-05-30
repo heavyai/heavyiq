@@ -14,8 +14,6 @@ from heavyiq.rag.models import (
     BaseModelWithSessionID,
     ListFilesResponse,
 )
-from heavyrag.ingest import adelete_document, ainsert_document
-from heavyrag.main import ask_document, ask_facts, determine_table_names
 
 CONFIG = get_config()
 doc_router = APIRouter()
@@ -40,6 +38,8 @@ async def upload_files(
     """
     Supposed to save files into the configured source directory.
     """
+    from heavyrag.ingest import ainsert_document
+
     heavydb = await HeavyDB.from_session_async(session_id)
     collection_name = heavydb._dbname
     source_dir = f"{CONFIG.rag_documents_source_dir}/{collection_name}"
@@ -77,6 +77,8 @@ async def delete_file(file_name: str, collection_name: str = Depends(get_collect
     """
     Helps to delete a document from documents DB and also it's embeddings from vectordb.
     """
+    from heavyrag.ingest import adelete_document
+
     try:
         # delete relevant nodes
         await adelete_document(file_name=file_name, heavydb_name=collection_name)
@@ -96,6 +98,8 @@ async def ask_about_document(
     """
     Ask questions regrading the uploaded docs.
     """
+    from heavyrag.main import ask_document
+
     response, eval_result = await ask_document(
         question=request.question, heavydb_name=collection_name, do_evaluate=True
     )
@@ -120,6 +124,8 @@ async def ask_about_facts(
     """
     Ask questions regrading the uploaded docs.
     """
+    from heavyrag.main import ask_facts
+
     response, eval_result = await ask_facts(question=request.question, heavydb_name=collection_name, do_evaluate=True)
     passing, score = None, None
     if eval_result:
@@ -145,4 +151,6 @@ async def derive_table_names(
     """
     Retrieve table names which are relevant to the asked question.
     """
+    from heavyrag.main import determine_table_names
+
     return await determine_table_names(question=request.question, heavydb=heavydb)

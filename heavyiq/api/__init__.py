@@ -51,9 +51,8 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
     # we might endup in request pending issue.
     HeavyDB.initialize()
 
-    # w.r.t memory into consideration, we don't need to initialize/download HF model embeddings at the first place(ie. before process fork).
-    # We could make it happen on the fork/child process since the models are going to be stored inside a cache dir.
-    # and for the next time, HF model should be loaded from the cache dir itself.
+    # initialize heavyrag on the main process, so that embed model should be shared with all worker processes
+    import heavyrag.main
 
     # LLM Cache
     if config.enable_llm_cache:
@@ -229,8 +228,10 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
     @app.on_event("startup")
     async def initialize():
         """
-        Code to be executed when application starts.
+        Code to be executed when application starts, ie on each worker process.
         """
+        # initialize chains
+        import heavyiq.lcel.chains
         from heavyiq.logging_utils import heavyiq_logger as logger
 
         global _config_provided

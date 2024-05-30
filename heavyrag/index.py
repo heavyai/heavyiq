@@ -2,9 +2,10 @@
 from functools import lru_cache
 
 import chromadb
-from llama_index.core import StorageContext, VectorStoreIndex, load_index_from_storage
+from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.core.schema import BaseNode, IndexNode
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.embeddings.text_embeddings_inference import TextEmbeddingsInference
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
 from heavyiq.config import get_config
@@ -14,7 +15,16 @@ DOCUMENTS_INDEX_ID = "documents"
 HEAVYDB_INDEX_ID = "heavydb"
 DOCUMENTS_INDEX_NODE = IndexNode(index_id=DOCUMENTS_INDEX_ID, text="Document Index")
 HEAVYDB_INDEX_NODE = IndexNode(index_id=HEAVYDB_INDEX_ID, text="HeavyDB Index")
-embed_model = HuggingFaceEmbedding(CONFIG.huggingface_embed_model)
+
+if CONFIG.rag_embed_server_base:
+    embed_model = TextEmbeddingsInference(
+        model_name="BAAI/bge-large-en-v1.5",  # required for formatting inference text,
+        timeout=60,  # timeout in seconds
+        embed_batch_size=10,  # batch size for embeddin
+        base_url=CONFIG.rag_embed_server_base,
+    )
+else:
+    embed_model = HuggingFaceEmbedding(CONFIG.rag_embed_model_name, device="cpu")
 
 chroma_client = chromadb.PersistentClient(
     path=CONFIG.rag_chromadb_persist_dir,
