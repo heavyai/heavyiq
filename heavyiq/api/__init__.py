@@ -51,9 +51,6 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
     # we might endup in request pending issue.
     HeavyDB.initialize()
 
-    # initialize heavyrag on the main process, so that embed model should be shared with all worker processes
-    import heavyrag.main
-
     # LLM Cache
     if config.enable_llm_cache:
         set_llm_cache(InMemoryLLMCache())
@@ -230,8 +227,9 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         """
         Code to be executed when application starts, ie on each worker process.
         """
-        # initialize chains
+        # initialize chains and RAG
         import heavyiq.lcel.chains
+        import heavyrag.main
         from heavyiq.logging_utils import heavyiq_logger as logger
 
         global _config_provided
