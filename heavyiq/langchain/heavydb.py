@@ -16,7 +16,7 @@ from typing import Any, Callable, Iterator, NamedTuple, Optional, Sequence, Type
 
 import anyio
 from async_lru import alru_cache
-from heavyai import Connection, connect
+from heavyai import Connection, Cursor, connect
 from heavydb._parsers import ColumnDetails, _extract_column_details
 from heavydb.thrift.ttypes import TTableDetails
 from starlette.concurrency import run_in_threadpool
@@ -378,6 +378,22 @@ class HeavyDB:
         """Return string representation of dialect to use."""
         return "ANSI SQL"
 
+    async def aexecute(self, query: str) -> Cursor:
+        """
+        Executes a SQL query on the HeavyDB database asynchronously and returns a cursor to the result set.
+
+        This method ensures thread safety by acquiring an asynchronous lock before executing the query.
+        The actual execution is offloaded to a thread pool to avoid blocking the event loop.
+
+        Parameters:
+            query (str): The SQL query to be executed on the HeavyDB database.
+
+        Returns:
+            Cursor: A cursor object that can be used to fetch the results of the query.
+        """
+        async with self.alock:
+            return await run_in_threadpool(self._conn.execute, query)
+
     def get_usable_table_names(self) -> set[str]:
         """Get names of tables available."""
         if self._include_tables:
@@ -594,8 +610,7 @@ class HeavyDB:
         """
         self.logger.debug(f"Getting timestamp values for column {column} in table {table_name}")
         min_max_statement = f'SELECT min("{column}"), max("{column}") FROM "{table_name}";'
-        async with self.alock:
-            cursor = await run_in_threadpool(self._conn.execute, min_max_statement)
+        cursor = await self.aexecute(min_max_statement)
         min_value, max_value = [str(v) for v in cursor.fetchone()]
         self.logger.debug(f"Got timestamp values for column {column} in table {table_name}")
         return min_value, max_value
@@ -646,8 +661,7 @@ class HeavyDB:
         query = strip_sql_comments(query)
         if is_destructive_sql(query):
             raise ValueError("Destructive SQL is not allowed")
-        async with self.alock:
-            cursor = await run_in_threadpool(self._conn.execute, f"EXPLAIN PLAN {query}")
+        cursor = await self.aexecute(f"EXPLAIN PLAN {query}")
         result: tuple[str] = cursor.fetchone()  # type: ignore
         return str(result[0])
 
@@ -694,6 +708,28 @@ class HeavyDB:
 
         # always quote all the columns
         column = f'"{column}"'
+        row_count = await self.aget_total_row_count(table_name=table)
+        if row_count > config.column_top_k_max_unique_values_count:
+            # check whether the number of unique values of this column is greather than certain threshold value or not
+            # if yes, then just return the few values from sample else calculate top-k
+            unique_values_stmt = f'SELECT APPROX_COUNT_DISTINCT({column}) FROM "{table}";'
+            cursor = await self.aexecute(unique_values_stmt)
+            unique_values_count = int(cursor.fetchone()[0])
+            if ugtmax := (unique_values_count > config.column_top_k_max_unique_values_count) or (
+                (unique_values_count / row_count) * 100 >= 95.0
+            ):
+                self.logger.debug(
+                    f"Column {column} distinct values exceeds the threshold. Returning sample {high_cardinality_sample} values"
+                    if ugtmax
+                    else f"Column {column} distinct values count almost close to the total row count. Returning sample {high_cardinality_sample} values"
+                )
+                # find values upto a certain limit from sample
+                cursor = await self.aexecute(
+                    f'SELECT {column} FROM "{table}" WHERE {column} IS NOT NULL LIMIT {high_cardinality_sample};'
+                )
+                top_k_res: list[str] = [str(v[0]).replace("\n", " ") for v in cursor.fetchall()]
+                return top_k_res, True
+
         # check to see if the column is low cardinality
         # fetch top (threshold + 1)
         # if there are < (threshold + 1) values, it's low cardinality and we can return all of them
@@ -701,8 +737,7 @@ class HeavyDB:
         """Get the top k values for a column."""
         self.logger.debug(f"Getting top k values for column {column} in table {table}")
         top_k_statement = f'SELECT {column}, COUNT(*) as cnt FROM "{table}" WHERE {column} is not null GROUP BY {column} ORDER BY cnt DESC LIMIT {cardinality_threshold + 1};'
-        async with self.alock:
-            cursor = await run_in_threadpool(self._conn.execute, top_k_statement)
+        cursor = await self.aexecute(top_k_statement)
         top_k_res: list[str] = [str(v[0]).replace("\n", " ") for v in cursor.fetchall()]
         is_high_cardinality = len(top_k_res) > cardinality_threshold
         if is_high_cardinality:
@@ -816,8 +851,7 @@ class HeavyDB:
         """
         create_command = f'SHOW CREATE TABLE "{table}";'
 
-        async with self.alock:
-            cursor = await run_in_threadpool(self._conn.execute, create_command)
+        cursor = await self.aexecute(create_command)
 
         table_schema = cursor.fetchone()[0]  # type: ignore
         table_schema = re.sub(r" ENCODING .*\)([,\)])", r"\1", table_schema)  # type: ignore
@@ -1011,10 +1045,9 @@ class HeavyDB:
         columns_str = ",".join([col.name for col in await self.aget_table_columns(table_name)])
 
         # get the sample rows
-        async with self.alock:
-            sample_rows = await run_in_threadpool(self._conn.execute, command)
+        cursor = await self.aexecute(command)
         # shorten values in the sample rows
-        sample_rows = list(map(lambda ls: [str(i)[:100] for i in ls], sample_rows))
+        sample_rows = list(map(lambda ls: [str(i)[:100] for i in ls], cursor))
 
         # save the sample rows in string format
         sample_rows_str = "\n".join([",".join(row) for row in sample_rows])
@@ -1025,26 +1058,21 @@ class HeavyDB:
         self.logger.debug(f"Got sample rows for table {table_name}")
         return res
 
+    @alru_cache(ttl=10)  # ttl of 10 secs alone would be enough to set row_count value in shared inter-process cache
     async def aget_total_row_count(self, table_name: str) -> int:
         """
         Get total row count of the given database table.
         """
-        self.logger.debug(f"Getting total row count of table {table_name}")
         cache_key = f"{self._dbname}.{table_name}"
         cached_value = self.table_total_row_count_cache.get(cache_key)
         if cached_value is not None:
-            self.logger.debug(f"Got total row count of table {table_name} from cache")
             return cached_value
         # build the select command
         command = f'SELECT COUNT(*) FROM "{table_name}"'
-
-        # get the sample rows
-        async with self.alock:
-            sql_result = await run_in_threadpool(self._conn.execute, command)
-
-        row_count = sql_result.fetchone()[0]
+        # Get the total row count
+        cursor = await self.aexecute(command)
+        row_count = cursor.fetchone()[0]
         self.table_total_row_count_cache.put(cache_key, row_count)
-        self.logger.debug(f"Got total row count of table {table_name}")
         return row_count
 
     @alru_cache(maxsize=32, ttl=10)  # internal cache used to cache the text columns for 10 secs
@@ -1213,8 +1241,7 @@ class HeavyDB:
         command = strip_sql_comments(command)
         if is_destructive_sql(command):
             raise ValueError("Destructive SQL is not allowed")
-        async with self.alock:
-            cursor = await run_in_threadpool(self._conn.execute, command)
+        cursor = await self.aexecute(command)
         if fetch == "all":
             result = cursor.fetchall()
         elif fetch == "one":
@@ -1230,8 +1257,7 @@ class HeavyDB:
         if is_destructive_sql(query):
             raise ValueError("Destructive SQL is not allowed")
         sql_stmt = f"EXPLAIN CALCITE DETAILED {query}" if detailed else f"EXPLAIN CALCITE {query}"
-        async with self.alock:
-            cursor = await run_in_threadpool(self._conn.execute, sql_stmt)
+        cursor = await self.aexecute(sql_stmt)
         query_plan: tuple[str] = cursor.fetchone()  # type: ignore
         return str(query_plan[0])
 
@@ -1293,8 +1319,7 @@ class HeavyDB:
         """
         self.logger.debug(f"Correcting string literal: {literal['column']} : {literal['literal']}")
         case_match_query = f"SELECT {literal['column']}, COUNT(*) FROM {literal['database']}.{literal['table']} WHERE {literal['column']} ILIKE '{literal['literal']}' GROUP BY {literal['column']} ORDER BY COUNT(*) DESC;"
-        async with self.alock:
-            cursor = await run_in_threadpool(self._conn.execute, case_match_query)
+        cursor = await self.aexecute(case_match_query)
         case_match_rows = cursor.fetchall()
 
         num_case_match_rows = len(case_match_rows)
@@ -1333,17 +1358,14 @@ class HeavyDB:
 
             prefix_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, num_str_values FROM distinct_values WHERE {prefix_condition} ORDER BY num_str_values DESC LIMIT 10;"
 
-            async with self.alock:
-                cursor = await run_in_threadpool(self._conn.execute, prefix_query)
+            cursor = await self.aexecute(prefix_query)
             prefix_matches = cursor.fetchall()
 
             num_prefix_matches = len(prefix_matches)
             self.logger.debug(f"Num prefix matches: {num_prefix_matches}")
 
             similarity_query = f"WITH distinct_values AS (SELECT LOWER({literal['column']}) AS lower_attr, COUNT(*) AS num_str_values FROM {literal['database']}.{literal['table']} GROUP BY LOWER({literal['column']})) SELECT lower_attr, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) AS subset_distance, LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') AS absolute_distance, ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) AS abs_length_difference, num_str_values FROM distinct_values WHERE LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') - ABS(LENGTH(lower_attr) - LENGTH('{lower_literal}')) < 5 AND CAST(LEVENSHTEIN_DISTANCE(lower_attr, '{lower_literal}') AS DOUBLE) / NULLIF(LENGTH('{lower_literal}'), 0) < 0.3 ORDER BY subset_distance ASC, abs_length_difference ASC, num_str_values DESC LIMIT 2;"
-
-            async with self.alock:
-                cursor = await run_in_threadpool(self._conn.execute, similarity_query)
+            cursor = await self.aexecute(similarity_query)
             similarity_matches = cursor.fetchall()
 
             num_similarity_matches = len(similarity_matches)

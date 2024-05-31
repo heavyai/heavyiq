@@ -35,6 +35,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     """If the cardinality of a column is less than this threshold, we will include each value of the column in the prompt"""
     column_top_k_high_cardinality_sample: int = 3
     """If the cardinality of a column is greater than the threshold, we will sample this many values from the column"""
+    column_top_k_max_unique_values_count: int = 10000000  # 10 Million
+    """Maximum number of unqiue values a column might posses in-order to find top-k"""
     # TELEMETRICS
     langchain_endpoint: str = "https://api.smith.langchain.com"
     langsmith_api_key: Optional[str] = None
