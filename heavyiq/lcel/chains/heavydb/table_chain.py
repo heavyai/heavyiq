@@ -10,7 +10,6 @@ from heavyiq.lcel.chains.utils import configure_step, get_value_from_runnable_bi
 from heavyiq.lcel.llms import llm_runnable
 from heavyiq.lcel.prompts import to_tables_prompt_runnable
 from heavyiq.lcel.types import TableChainInputType, TableChainOutputType
-from heavyrag.main import determine_table_names
 
 # llm
 nl_to_tables_llm_rbl = llm_runnable.with_config(
@@ -28,6 +27,8 @@ async def get_tables(inputs: dict, use_rag: bool = False) -> list[str]:
     """
     Return a list of allowed tables by doing similarity search on chroma db when tables length goes beyond certain limit.
     """
+    from heavyrag.main import determine_table_names
+
     db, config = await get_db(inputs["session_id"]), get_config()
 
     allowed_tables: list[str] = inputs.get("allowed_tables", [])

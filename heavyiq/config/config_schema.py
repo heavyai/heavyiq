@@ -145,6 +145,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     rag_documents_source_dir: str = "rag_sources"
     rag_chromadb_persist_dir: str = rag_storage_persist_dir + "/chromadb"
     rag_document_pdf_parser_url: str = ""
+    rag_embed_model_name: str = "BAAI/bge-large-en-v1.5"
+    rag_embed_server_base: Optional[str] = None
 
 
 class AppConfig(OverrideBaseConfig):  # type: ignore
