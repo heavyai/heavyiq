@@ -3,15 +3,15 @@ import asyncio
 from collections import defaultdict
 
 from chromadb import Collection
-from chromadb.api import segment
-from chromadb.db.mixins import embeddings_queue
-from chromadb.utils.batch_utils import create_batches
 from llama_index.core import VectorStoreIndex
 from llama_index.core.indices.base import BaseIndex
+from llama_index.core.ingestion import IngestionPipeline
+from llama_index.core.node_parser import SentenceSplitter
+from llama_index.core.schema import BaseNode
 
 from heavyiq.langchain.heavydb import HeavyDB
 from heavyrag.index import acreate_index_and_insert_nodes, get_index, get_or_create_index
-from heavyrag.loaders import aload_file, aload_files_from_directory, aload_table, aload_tables
+from heavyrag.loaders import aload_facts, aload_file, aload_files_from_directory, aload_table, aload_tables
 from heavyrag.query import any_table_node, has_table_node
 from heavyrag.transform import atransform
 
@@ -69,6 +69,15 @@ async def ainsert_table(heavydb: HeavyDB, table_name: str) -> BaseIndex:
     return index
 
 
+async def get_or_create_index_and_insert_nodes(collection_name: str, nodes: list[BaseNode]) -> BaseIndex:
+    """
+    Added nodes to the existing or newly created index.
+    """
+    index = get_or_create_index(collection_name=collection_name)
+    index.insert_nodes(nodes=nodes, show_progress=True)
+    return index
+
+
 async def ainsert_tables(heavydb: HeavyDB) -> BaseIndex:
     """
     Insert data relevant to all tables in a database.
@@ -78,6 +87,25 @@ async def ainsert_tables(heavydb: HeavyDB) -> BaseIndex:
     index = get_or_create_index(collection_name=heavydb._dbname)
     index.insert_nodes(nodes=nodes, show_progress=True)
     return index
+
+
+async def ainsert_facts(facts: str, heavydb: HeavyDB) -> BaseIndex:
+    """
+    Insert facts nodes.
+    """
+    documents = await aload_facts(facts=facts, heavydb_name=heavydb._dbname)
+    pipeline = IngestionPipeline(transformations=[SentenceSplitter(chunk_size=120, chunk_overlap=10)])
+    nodes = await atransform(documents=documents, pipeline=pipeline)
+    return await get_or_create_index_and_insert_nodes(collection_name=heavydb._dbname, nodes=nodes)
+
+
+async def upsert_facts(facts: str, heavydb: HeavyDB) -> None:
+    """
+    This supposed to delete and insert facts.
+    """
+    index = get_or_create_index(collection_name=heavydb._dbname)
+    await delete_database_facts(index, heavydb_name=heavydb._dbname)
+    await ainsert_facts(facts=facts, heavydb=heavydb)
 
 
 def delete_nodes(collection: Collection, where: dict, batch_size: int = 166) -> bool:
@@ -118,6 +146,14 @@ async def delete_table_nodes(index: VectorStoreIndex, table_name: str) -> bool:
     """
     collection = index.vector_store._collection
     return delete_nodes(collection=collection, where={"$and": [{"name": table_name}, {"type": "table"}]})
+
+
+async def delete_database_facts(index: VectorStoreIndex, heavydb_name: str) -> bool:
+    """
+    Delete all facts nodes associated with a heavydb database.
+    """
+    collection = index.vector_store._collection
+    return delete_nodes(collection=collection, where={"$and": [{"dbname": heavydb_name}, {"type": "facts"}]})
 
 
 async def sync_table_index(heavydb: HeavyDB, force_sync: bool = False) -> VectorStoreIndex:

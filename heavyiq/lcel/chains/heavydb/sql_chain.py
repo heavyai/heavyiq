@@ -16,6 +16,7 @@ from heavyiq.lcel.types.sql_type import (
     SqlChainOutputType,
 )
 from heavyiq.utils import strip_sql_comments
+from heavyrag import IndexNotFound
 
 # var endswith `rbl` means it's an runnable
 nl_to_sql_llm_rbl = llm_runnable.with_config(
@@ -44,7 +45,7 @@ async def get_table_info(sql_chain_inputs: dict) -> str:
     on_retry = True if sql_chain_inputs.get("sql_cmd") else False
 
     prompt_rbl = nl_to_sql_retry_prompt_rbl if on_retry else nl_to_sql_prompt_rbl
-    partial_inputs = {"input": sql_chain_inputs["question"]}
+    partial_inputs = {"input": sql_chain_inputs["question"], "relevant_info": sql_chain_inputs.get("relevant_info", "")}
     if on_retry:
         partial_inputs.update({"sql_cmd": sql_chain_inputs["sql_cmd"], "error": sql_chain_inputs["error"]})  # type: ignore
 
@@ -53,6 +54,25 @@ async def get_table_info(sql_chain_inputs: dict) -> str:
         get_value_from_runnable_binding(nl_to_sql_llm_rbl), sql_chain_inputs["session_id"], partial_gen_sql_prompt, sql_chain_inputs["tables"]  # type: ignore
     )
     return table_info
+
+
+async def get_relevant_info_using_rag(inputs: dict) -> str:
+    """
+    Helps to get the table info for the prompt based upon the allowed token limit.
+    """
+    from heavyrag.main import get_relevant_facts_info
+
+    heavydb = await get_db(inputs["session_id"])
+
+    try:
+        relevant_facts = await get_relevant_facts_info(question=inputs["question"], heavydb_name=heavydb._dbname)
+    except IndexNotFound:
+        return ""
+
+    if not relevant_facts:
+        return ""
+    # has relevant facts
+    return f"Relevant info:\n{relevant_facts}\n"
 
 
 # Predicting Query
@@ -65,7 +85,15 @@ table_info_runnable_lambda: Runnable = RunnableLambda(get_table_info).with_confi
         "metadata": {"step": "Retrieving table information for prompt."},
     }
 )
-query_variables = RunnablePassthrough.assign(table_info=table_info_runnable_lambda, input=lambda x: x["question"]).with_config(  # type: ignore
+# calculating relevant info (RAG)
+relevant_info_lambda: Runnable = RunnableLambda(get_relevant_info_using_rag).with_config(
+    config={
+        "tags": ["intermediate-step"],
+        "run_name": "Get Relevant Info",
+        "metadata": {"step": "Getting relevant information based on the asked question."},
+    }
+)
+query_variables = (RunnablePassthrough.assign(relevant_info=relevant_info_lambda) | RunnablePassthrough.assign(table_info=table_info_runnable_lambda, input=lambda x: x["question"])).with_config(  # type: ignore
     config={
         "tags": ["intermediate-step"],
         "run_name": "Calculate Input Variables",

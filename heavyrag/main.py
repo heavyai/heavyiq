@@ -1,11 +1,17 @@
+import asyncio
+from typing import Literal
+
+from llama_index.core import VectorStoreIndex
 from llama_index.core.base.response.schema import RESPONSE_TYPE
 from llama_index.core.evaluation import EvaluationResult
 from llama_index.core.postprocessor import SimilarityPostprocessor
 from llama_index.core.response_synthesizers import ResponseMode
+from llama_index.core.schema import NodeWithScore
 
 from heavyiq.langchain.heavydb import HeavyDB
+from heavyrag import IndexNotFound
 from heavyrag.evaluate import aevaluate_response_by_relevancy
-from heavyrag.filters import document_filters, get_document_filter_matches, table_filters
+from heavyrag.filters import document_filters, get_document_filter_matches, get_facts_filter_matches, table_filters
 from heavyrag.index import get_index
 from heavyrag.ingest import sync_table_index
 from heavyrag.llm import get_llm
@@ -20,7 +26,7 @@ async def ask_document(
     """
     index = get_index(collection_name=heavydb_name)
     if not index:
-        raise ValueError(f"VectorStoreIndex not found {heavydb_name} collection.")
+        raise IndexNotFound(f"VectorStoreIndex not found {heavydb_name} collection.")
 
     filters = None
     if file_name:
@@ -40,15 +46,51 @@ async def ask_document(
     return response, eval_result
 
 
+async def retrieve_facts(
+    index: VectorStoreIndex, question: str, heavydb_name: str, similarity_cutoff: float = 0.30
+) -> list[NodeWithScore]:
+    """
+    Retrieve only the fact nodes which are relevant to the asked question without using llm.
+    """
+    doc_engine = index.as_retriever(
+        filters=document_filters,
+        similarity_top_k=2,
+    )
+    facts_engine = index.as_retriever(
+        filters=get_facts_filter_matches(heavydb_name),
+        similarity_top_k=2,
+    )
+    doc_nodes_with_score, facts_nodes_with_score = await asyncio.gather(
+        doc_engine.aretrieve(question), facts_engine.aretrieve(question)
+    )
+    # filter nodes below 0.30 similarity score
+    processor = SimilarityPostprocessor(similarity_cutoff=similarity_cutoff)
+    filtered_nodes = processor.postprocess_nodes(facts_nodes_with_score + doc_nodes_with_score)
+    return filtered_nodes
+
+
+async def get_relevant_facts_info(question: str, heavydb_name: str) -> str:
+    """
+    Function which supposed to return facts information relevant to the asked question by querying the index.
+    """
+    facts_info = ""
+    retrieved_facts = await ask_facts(question=question, heavydb_name=heavydb_name, only_retrieve=True)
+    for fact, metadata in retrieved_facts:
+        facts_info += fact
+
+    return facts_info
+
+
 async def ask_facts(
     question: str,
     heavydb_name: str,
-    only_retrieve: bool = False,
-    do_evaluate: bool = True,
+    only_retrieve: bool = True,
+    do_evaluate: bool = False,
+    metada_mode: Literal["all", "llm", "none"] = "none",
     similarity_cutoff: float = 0.30,
-) -> tuple[RESPONSE_TYPE, EvaluationResult | None] | list[str]:
+) -> tuple[RESPONSE_TYPE, EvaluationResult | None] | list[tuple[str, dict]]:
     """
-    Search document nodes and retrieve facts relevant to the asked question.
+    Search document, facts nodes and retrieve facts relevant to the asked question.
 
     Params:
     - only_retrieve : If enabled then it will do only the RAG retrieval (no call to llm)
@@ -56,18 +98,13 @@ async def ask_facts(
     """
     index = get_index(collection_name=heavydb_name)
     if not index:
-        raise ValueError(f"VectorStoreIndex not found {heavydb_name} collection.")
+        raise IndexNotFound(f"VectorStoreIndex not found {heavydb_name} collection.")
 
     if only_retrieve:
-        engine = index.as_retriever(
-            filters=document_filters,
-            similarity_top_k=2,
+        filtered_nodes = await retrieve_facts(
+            index, question=question, heavydb_name=heavydb_name, similarity_cutoff=similarity_cutoff
         )
-        nodes_with_score = await engine.aretrieve(question)
-        # filter nodes below 0.30 similarity score
-        processor = SimilarityPostprocessor(similarity_cutoff=similarity_cutoff)
-        filtered_nodes = processor.postprocess_nodes(nodes_with_score)
-        return [node.get_content(metadata_mode="llm") for node in filtered_nodes]
+        return [(node.get_content(metadata_mode=metada_mode), node.metadata) for node in filtered_nodes]
 
     engine = index.as_query_engine(
         llm=get_llm(),

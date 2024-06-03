@@ -102,3 +102,10 @@ async def aload_tables(heavydb: HeavyDB, exlude_tables: list[str] | None = None)
     result = await semaphore_gather(5, tasks)  # run only 5 tasks at a time
     flattened_list = list(chain.from_iterable(result))
     return _exclude_metadata(flattened_list)
+
+
+async def aload_facts(facts: str, heavydb_name: str, table_name: str | None = None) -> list[Document]:
+    """
+    Form a document from the passed facts.
+    """
+    return [Document(text=facts, extra_info={"dbname": heavydb_name, "type": "facts"})]

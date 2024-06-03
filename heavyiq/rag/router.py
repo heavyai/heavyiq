@@ -2,18 +2,22 @@ import re
 from pathlib import Path
 
 from fastapi import APIRouter, Body, Depends, Form, HTTPException, UploadFile
-from sqlalchemy.orm import Session as Session
+from sqlalchemy.orm import Session
 
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
 from heavyiq.rag.models import (
+    AddORUpdateFactsRequest,
     AskDocumentRequest,
     AskDocumentResponse,
     AskFactsRequest,
     AskFactsResponse,
     BaseModelWithSessionID,
+    FactsResponse,
+    GetFactsRequest,
     ListFilesResponse,
 )
+from heavyrag.database import FactsModel, ragdb
 
 CONFIG = get_config()
 doc_router = APIRouter()
@@ -126,7 +130,16 @@ async def ask_about_facts(
     """
     from heavyrag.main import ask_facts
 
-    response, eval_result = await ask_facts(question=request.question, heavydb_name=collection_name, do_evaluate=True)
+    out = await ask_facts(
+        question=request.question,
+        heavydb_name=collection_name,
+        only_retrieve=request.only_retrieve,
+        do_evaluate=request.do_evaluate,
+    )
+    if request.only_retrieve:
+        return AskFactsResponse(sources=out)
+
+    response, eval_result = out
     passing, score = None, None
     if eval_result:
         passing = eval_result.passing
@@ -154,3 +167,44 @@ async def derive_table_names(
     from heavyrag.main import determine_table_names
 
     return await determine_table_names(question=request.question, heavydb=heavydb)
+
+
+# RAG database router
+# which helps to make CRUD operations on RAG database, especially for facts
+facts_db_router = APIRouter()
+
+
+# insert or update facts
+@facts_db_router.post("/upsert")
+async def add_or_update_facts(
+    request: AddORUpdateFactsRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
+) -> FactsResponse:
+    """
+    Endpoint for adding or updating facts.
+    """
+    from heavyrag.ingest import upsert_facts
+
+    with ragdb.get_db() as session:
+        try:
+            # update index
+            await upsert_facts(facts=request.facts, heavydb=heavydb)
+            # update db record
+            facts = FactsModel.add_or_update_database_facts(
+                db_session=session, heavydb_name=heavydb._dbname, facts=request.facts
+            )
+
+            return FactsResponse(facts=facts.facts)
+        except Exception as e:
+            raise e
+
+
+@facts_db_router.post("/get")
+def get_facts(request: GetFactsRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)) -> FactsResponse:
+    """
+    Endpoint for getting facts.
+    """
+    with ragdb.get_db() as session:
+        facts = FactsModel.get(db_session=session, heavydb_name=heavydb._dbname)
+        if facts:
+            return FactsResponse(facts=facts.facts)
+        return FactsResponse()
