@@ -126,6 +126,7 @@ async def ask_about_facts(
         heavydb_name=collection_name,
         only_retrieve=request.only_retrieve,
         do_evaluate=request.do_evaluate,
+        similarity_cutoff=CONFIG.rag_facts_retrieve_similarity_cutoff_score,
     )
     if request.only_retrieve:
         return md.AskFactsResponse(sources=out)

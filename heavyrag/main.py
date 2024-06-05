@@ -63,20 +63,23 @@ async def retrieve_facts(
     doc_nodes_with_score, facts_nodes_with_score = await asyncio.gather(
         doc_engine.aretrieve(question), facts_engine.aretrieve(question)
     )
+    final_nodes = facts_nodes_with_score + doc_nodes_with_score
     # filter nodes below 0.30 similarity score
     processor = SimilarityPostprocessor(similarity_cutoff=similarity_cutoff)
-    filtered_nodes = processor.postprocess_nodes(facts_nodes_with_score + doc_nodes_with_score)
+    filtered_nodes = processor.postprocess_nodes(final_nodes)
     return filtered_nodes
 
 
-async def get_relevant_facts_info(question: str, heavydb_name: str) -> str:
+async def get_relevant_facts_info(question: str, heavydb_name: str, similarity_cutoff: float = 0.30) -> str:
     """
     Function which supposed to return facts information relevant to the asked question by querying the index.
     """
     facts_info = ""
-    retrieved_facts = await ask_facts(question=question, heavydb_name=heavydb_name, only_retrieve=True)
+    retrieved_facts = await ask_facts(
+        question=question, heavydb_name=heavydb_name, only_retrieve=True, similarity_cutoff=similarity_cutoff
+    )
     for fact, metadata in retrieved_facts:
-        facts_info += fact
+        facts_info += fact + "\n"
 
     return facts_info
 

@@ -18,6 +18,7 @@ from heavyiq.lcel.types.sql_type import (
 from heavyiq.utils import strip_sql_comments
 from heavyrag import IndexNotFound
 
+CONFIG = get_config()
 # var endswith `rbl` means it's an runnable
 nl_to_sql_llm_rbl = llm_runnable.with_config(
     configurable={"llm": "nl_to_sql", "llm_temperature": 0}, config={"tags": ["nl_to_sql_llm"]}  # type: ignore
@@ -62,17 +63,24 @@ async def get_relevant_info_using_rag(inputs: dict) -> str:
     """
     from heavyrag.main import get_relevant_facts_info
 
+    if not CONFIG.custom_prompt_nl_to_sql_include_relevant_info:
+        return ""
+
     heavydb = await get_db(inputs["session_id"])
 
     try:
-        relevant_facts = await get_relevant_facts_info(question=inputs["question"], heavydb_name=heavydb._dbname)
+        relevant_facts = await get_relevant_facts_info(
+            question=inputs["question"],
+            heavydb_name=heavydb._dbname,
+            similarity_cutoff=CONFIG.rag_facts_retrieve_similarity_cutoff_score,
+        )
     except IndexNotFound:
         return ""
 
     if not relevant_facts:
         return ""
     # has relevant facts
-    return f"Relevant info:\n{relevant_facts}\n"
+    return f"Relevant info:\n{relevant_facts}"
 
 
 # Predicting Query
@@ -220,7 +228,7 @@ async def do_string_literal_correction(inputs: dict) -> dict:
     Do string literal correction on the generated SQL query.
     """
     sql_cmd = inputs["sql_cmd"].strip()
-    if get_config().enable_str_literal_correction:
+    if CONFIG.enable_str_literal_correction:
         heavydb = await get_db(inputs["session_id"])
         corrected_query = await heavydb.acorrect_string_literals(sql_cmd)
         sql_cmd = corrected_query
@@ -284,7 +292,7 @@ do_string_correction_and_calculate_complexity_or_passthrough_branch: Runnable = 
 
 chain: Runnable[Any, Any] = (
     (
-        RunnablePassthrough().assign(sql_cmd=query_runnable, max_revisions=lambda x: get_config().max_retries_nl_to_sql)
+        RunnablePassthrough().assign(sql_cmd=query_runnable, max_revisions=lambda x: CONFIG.max_retries_nl_to_sql)
         | validation_step
         | revise_lambda
         | do_string_correction_and_calculate_complexity_or_passthrough_branch

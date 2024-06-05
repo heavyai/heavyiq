@@ -113,6 +113,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     table_schema_check_interval_minutes: int = 1
     # prompts
     # nl to sql
+    custom_prompt_nl_to_sql_include_relevant_info: bool = False
     custom_prompt_nl_to_sql_start_token: str = "<|sql prompt|>\n"
     custom_prompt_nl_to_sql_body: Optional[str] = None
     custom_prompt_nl_to_sql_end_token: str = "\n<|sql answer|>\n"
@@ -148,6 +149,9 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     rag_embed_model_name: str = "BAAI/bge-large-en-v1.5"
     rag_embed_server_base: Optional[str] = None
     rag_database_uri: str = "sqlite:///ragdb.sqlite"  # db for storing data relevant to RAG processing, ie. facts
+    rag_facts_retrieve_similarity_cutoff_score: float = (
+        0.5  # score should be ranges from 0.0 to 1.0 (high value means more accurate)
+    )
 
 
 class AppConfig(OverrideBaseConfig):  # type: ignore
