@@ -1,4 +1,3 @@
-from fastapi import UploadFile
 from pydantic import BaseModel, Field
 
 
@@ -78,18 +77,45 @@ class TableNamesRequest(BaseModelWithSessionID):
         }
 
 
-class AddORUpdateFactsRequest(BaseModelWithSessionID):
+class AddFactRequest(BaseModelWithSessionID):
     """
-    Add facts relevant to a particular database.
+    Add fact relevant to a particular database.
     """
 
-    facts: str = Field(..., description="Facts")
+    fact: str = Field(..., description="Fact")
 
     class Config:
-        json_schema_extra = {"examples": [{"session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "facts": ""}]}
+        json_schema_extra = {
+            "examples": [
+                {
+                    "session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+                    "fact": "Profitability of a well is defined by sum of oil * current oil price + sum of gas * current gas price - expense column.",
+                }
+            ]
+        }
 
 
-class GetFactsRequest(BaseModelWithSessionID):
+class UpdateFactRequest(BaseModelWithSessionID):
+    """
+    Update existing fact.
+    """
+
+    fact_id: str = Field(..., description="Fact database record ID")
+    fact: str = Field(..., description="Fact description")
+
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {
+                    "session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+                    "fact_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+                    "fact": "Profitability of a well is defined by sum of oil * current oil price + sum of gas * current gas price - expense column.",
+                }
+            ]
+        }
+
+
+class ListFactsRequest(BaseModelWithSessionID):
     """
     Get facts relevant to a particular database.
     """
@@ -98,15 +124,62 @@ class GetFactsRequest(BaseModelWithSessionID):
         json_schema_extra = {"examples": [{"session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}]}
 
 
-class FactsResponse(BaseModel):
+class GetFactRequest(BaseModelWithSessionID):
     """
-    Facts response.
+    Get facts relevant to a particular database.
     """
 
-    facts: str | None = Field(default=None, description="facts")
+    fact_id: str = Field(..., description="Fact database record ID")
 
     class Config:
-        json_schema_extra = {"examples": [{"facts": "asddsssddsdd"}]}
+        json_schema_extra = {
+            "examples": [
+                {"session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "fact_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxv"}
+            ]
+        }
+
+
+DeleteFactRequest = GetFactRequest
+DeleteAllFactsRequest = ListFactsRequest
+
+
+class AddFactResponse(BaseModel):
+    """
+    Add Fact response.
+    """
+
+    fact_id: str = Field(..., description="Fact database record ID")
+
+
+class FactResponse(BaseModel):
+    """
+    Fact response.
+    """
+
+    fact: str | None = Field(default=None, description="facts")
+
+    class Config:
+        json_schema_extra = {"examples": [{"fact": "asddsssddsdd"}]}
+
+
+class DeleteFactResponse(BaseModel):
+    """
+    Delete facts response.
+    """
+
+    deleted: bool = Field(default=False, description="Shows whether the object gets deleted or not.")
+
+
+class ListFactsResponse(BaseModel):
+    """
+    Fact list response.
+    """
+
+    class Fact(BaseModel):
+        id: str = Field(..., description="fact_id")
+        fact: str = Field(..., description="Fact")
+
+    facts: list[Fact] = Field(default=[], description="Facts list")
 
 
 class AskFactsRequest(BaseModelWithSessionID):
@@ -119,7 +192,7 @@ class AskFactsRequest(BaseModelWithSessionID):
             "examples": [
                 {
                     "session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-                    "question": "What is NLP?",
+                    "question": "Where should I drill my next well in Colorado to be the most profitable?",
                     "only_retrieve": "true",
                     "do_evaluate": "false",
                 }

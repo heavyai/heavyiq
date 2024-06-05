@@ -1,4 +1,3 @@
-import re
 from pathlib import Path
 
 from fastapi import APIRouter, Body, Depends, Form, HTTPException, UploadFile
@@ -6,25 +5,17 @@ from sqlalchemy.orm import Session
 
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
-from heavyiq.rag.models import (
-    AddORUpdateFactsRequest,
-    AskDocumentRequest,
-    AskDocumentResponse,
-    AskFactsRequest,
-    AskFactsResponse,
-    BaseModelWithSessionID,
-    FactsResponse,
-    GetFactsRequest,
-    ListFilesResponse,
-)
+from heavyiq.logging_utils import get_heavyiq_logger
+from heavyiq.rag import models as md
 from heavyrag.database import FactsModel, ragdb
 
 CONFIG = get_config()
 doc_router = APIRouter()
+logger = get_heavyiq_logger()
 
 
 # dependency function which provides HeavyDB instance
-async def get_current_heavydb_instance(request: BaseModelWithSessionID = Body(...)) -> HeavyDB:
+async def get_current_heavydb_instance(request: md.BaseModelWithSessionID = Body(...)) -> HeavyDB:
     """Dependency which helps to get the HeavyDB instance"""
     return await HeavyDB.from_session_async(request.session_id)
 
@@ -68,12 +59,12 @@ async def upload_files(
     return uploaded_files
 
 
-@doc_router.post("/list", response_model=ListFilesResponse)
+@doc_router.post("/list", response_model=md.ListFilesResponse)
 async def list_files(
     collection_name: HeavyDB = Depends(get_collection_name),
-) -> ListFilesResponse:
+) -> md.ListFilesResponse:
     source_dir = f"{CONFIG.rag_documents_source_dir}/{collection_name}"
-    return ListFilesResponse(documents=[fil.name for fil in Path(source_dir).glob("*") if fil.is_file()])
+    return md.ListFilesResponse(documents=[fil.name for fil in Path(source_dir).glob("*") if fil.is_file()])
 
 
 @doc_router.delete("/delete")
@@ -95,10 +86,10 @@ async def delete_file(file_name: str, collection_name: str = Depends(get_collect
     return {"message": f"Document {file_name} has been deleted."}
 
 
-@doc_router.post("/ask", response_model=AskDocumentResponse)
+@doc_router.post("/ask", response_model=md.AskDocumentResponse)
 async def ask_about_document(
-    request: AskDocumentRequest, collection_name: str = Depends(get_collection_name)
-) -> AskDocumentResponse:
+    request: md.AskDocumentRequest, collection_name: str = Depends(get_collection_name)
+) -> md.AskDocumentResponse:
     """
     Ask questions regrading the uploaded docs.
     """
@@ -112,7 +103,7 @@ async def ask_about_document(
         passing = eval_result.passing
         score = eval_result.score
 
-    return AskDocumentResponse(
+    return md.AskDocumentResponse(
         answer=response.response,
         metadata=response.metadata,
         sources=[i.get_content(metadata_mode="all") for i in response.source_nodes],
@@ -121,10 +112,10 @@ async def ask_about_document(
     )
 
 
-@doc_router.post("/ask_facts", response_model=AskFactsResponse)
+@doc_router.post("/ask_facts", response_model=md.AskFactsResponse)
 async def ask_about_facts(
-    request: AskFactsRequest, collection_name: str = Depends(get_collection_name)
-) -> AskFactsResponse:
+    request: md.AskFactsRequest, collection_name: str = Depends(get_collection_name)
+) -> md.AskFactsResponse:
     """
     Ask questions regrading the uploaded docs.
     """
@@ -137,7 +128,7 @@ async def ask_about_facts(
         do_evaluate=request.do_evaluate,
     )
     if request.only_retrieve:
-        return AskFactsResponse(sources=out)
+        return md.AskFactsResponse(sources=out)
 
     response, eval_result = out
     passing, score = None, None
@@ -145,7 +136,7 @@ async def ask_about_facts(
         passing = eval_result.passing
         score = eval_result.score
 
-    return AskFactsResponse(
+    return md.AskFactsResponse(
         answer=response.response,
         metadata=response.metadata,
         sources=[i.get_content(metadata_mode="all") for i in response.source_nodes],
@@ -159,7 +150,7 @@ table_router = APIRouter()
 
 @table_router.post("/names")
 async def derive_table_names(
-    request: AskDocumentRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
+    request: md.AskDocumentRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
 ) -> list[str]:
     """
     Retrieve table names which are relevant to the asked question.
@@ -175,36 +166,105 @@ facts_db_router = APIRouter()
 
 
 # insert or update facts
-@facts_db_router.post("/upsert")
-async def add_or_update_facts(
-    request: AddORUpdateFactsRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
-) -> FactsResponse:
+@facts_db_router.post("/insert")
+async def add_fact(
+    request: md.AddFactRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
+) -> md.AddFactResponse:
     """
-    Endpoint for adding or updating facts.
+    Endpoint for adding a new fact.
     """
-    from heavyrag.ingest import upsert_facts
+    from heavyrag.ingest import ainsert_fact
+
+    with ragdb.get_db() as session:
+        fact_id = None
+        try:
+            # add db record
+            fact_id = FactsModel.add(db_session=session, heavydb_name=heavydb._dbname, fact=request.fact)
+            # add to index
+            await ainsert_fact(fact_id=fact_id, fact=request.fact, heavydb_name=heavydb._dbname)
+
+            return md.AddFactResponse(fact_id=fact_id)
+        except Exception as e:
+            if fact_id:
+                FactsModel.delete(db_session=session, id=fact_id)
+            raise e
+
+
+@facts_db_router.post("/update")
+async def update_fact(
+    request: md.UpdateFactRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
+) -> md.AddFactResponse:
+    """
+    Updates a particular fact.
+    """
+    from heavyrag.ingest import aupdate_fact
 
     with ragdb.get_db() as session:
         try:
-            # update index
-            await upsert_facts(facts=request.facts, heavydb=heavydb)
-            # update db record
-            facts = FactsModel.add_or_update_database_facts(
-                db_session=session, heavydb_name=heavydb._dbname, facts=request.facts
-            )
+            # add db record
+            updated_id = FactsModel.update(db_session=session, id=request.fact_id, fact=request.fact)
+            if not updated_id:
+                raise ValueError(f"Failed to update fact id, {request.fact_id}")
+            # add to index
+            await aupdate_fact(fact_id=request.fact_id, fact=request.fact, heavydb_name=heavydb._dbname)
 
-            return FactsResponse(facts=facts.facts)
+            return md.AddFactResponse(fact_id=request.fact_id)
+
         except Exception as e:
             raise e
 
 
 @facts_db_router.post("/get")
-def get_facts(request: GetFactsRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)) -> FactsResponse:
+async def get_fact(
+    request: md.GetFactRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
+) -> md.FactResponse:
     """
-    Endpoint for getting facts.
+    Return a particular fact by fact_id.
     """
     with ragdb.get_db() as session:
-        facts = FactsModel.get(db_session=session, heavydb_name=heavydb._dbname)
-        if facts:
-            return FactsResponse(facts=facts.facts)
-        return FactsResponse()
+        fact = FactsModel.get(db_session=session, id=request.fact_id)
+        if fact and fact.heavydb_name == heavydb._dbname:
+            return md.FactResponse(fact=fact.fact)
+        return md.FactResponse()
+
+
+@facts_db_router.post("/delete")
+async def delete_fact(
+    request: md.DeleteFactRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
+) -> md.DeleteFactResponse:
+    """
+    Delete a particular database fact.
+    """
+    from heavyrag.ingest import adelete_fact
+
+    with ragdb.get_db() as session:
+        await adelete_fact(fact_id=request.fact_id, heavydb_name=heavydb._dbname)
+        deleted = FactsModel.delete(db_session=session, id=request.fact_id)
+        return md.DeleteFactResponse(deleted=deleted)
+
+
+@facts_db_router.post("/list")
+async def list_facts(
+    request: md.ListFactsRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
+) -> md.ListFactsResponse:
+    """
+    List all facts associated with a database.
+    """
+    with ragdb.get_db() as session:
+        facts = FactsModel.list(db_session=session, heavydb_name=heavydb._dbname, serialize=True)
+        return md.ListFactsResponse(facts=facts)
+
+
+@facts_db_router.post("/delete_all")
+async def delete_facts(
+    request: md.DeleteAllFactsRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
+) -> None:
+    """
+    Delete all facts asscoiated with a database. This involves deleteing database entries and index nodes.
+    """
+    from heavyrag.ingest import adelete_facts
+
+    with ragdb.get_db() as session:
+        await adelete_facts(heavydb_name=heavydb._dbname)
+        FactsModel.delete_facts_by_database(db_session=session, heavydb_name=heavydb._dbname)
+        return None

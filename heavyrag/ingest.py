@@ -11,7 +11,7 @@ from llama_index.core.schema import BaseNode
 
 from heavyiq.langchain.heavydb import HeavyDB
 from heavyrag.index import acreate_index_and_insert_nodes, get_index, get_or_create_index
-from heavyrag.loaders import aload_facts, aload_file, aload_files_from_directory, aload_table, aload_tables
+from heavyrag.loaders import aload_file, aload_files_from_directory, aload_table, aload_tables, load_fact, load_facts
 from heavyrag.query import any_table_node, has_table_node
 from heavyrag.transform import atransform
 
@@ -89,11 +89,54 @@ async def ainsert_tables(heavydb: HeavyDB) -> BaseIndex:
     return index
 
 
+async def ainsert_fact(fact_id: str, fact: str, heavydb_name: str) -> BaseIndex:
+    """
+    Form a textnode and then insert it into the index.
+    """
+    fact_node = load_fact(fact_id=fact_id, fact=fact, heavydb_name=heavydb_name)
+    index = get_or_create_index(collection_name=heavydb_name)
+    index.insert_nodes(nodes=[fact_node], show_progress=True)
+    return index
+
+
+async def aupdate_fact(fact_id: str, fact: str, heavydb_name: str) -> BaseIndex:
+    """
+    Update fact.
+    """
+    index = get_or_create_index(collection_name=heavydb_name)
+    # deleet the relevant node by id
+    delete_node_by_id(index=index, id=fact_id)
+    # re-insert the node once again
+    fact_node = load_fact(fact_id=fact_id, fact=fact, heavydb_name=heavydb_name)
+    index.insert_nodes(nodes=[fact_node], show_progress=True)
+    return index
+
+
+async def adelete_fact(fact_id: str, heavydb_name: str) -> BaseIndex:
+    """
+    Delete a particular fact by fact_id.
+    """
+    index = get_or_create_index(collection_name=heavydb_name)
+    # deleet the relevant node by id
+    delete_node_by_id(index=index, id=fact_id)
+    return index
+
+
+async def adelete_facts(heavydb_name: str) -> BaseIndex:
+    """
+    Delete a particular fact by fact_id.
+    """
+    index = get_or_create_index(collection_name=heavydb_name)
+    # deleet the relevant node by id
+    await adelete_database_facts(index=index, heavydb_name=heavydb_name)
+    return index
+
+
 async def ainsert_facts(facts: str, heavydb: HeavyDB) -> BaseIndex:
     """
     Insert facts nodes.
     """
-    documents = await aload_facts(facts=facts, heavydb_name=heavydb._dbname)
+    documents = await load_facts(facts=facts, heavydb_name=heavydb._dbname)
     pipeline = IngestionPipeline(transformations=[SentenceSplitter(chunk_size=120, chunk_overlap=10)])
     nodes = await atransform(documents=documents, pipeline=pipeline)
     return await get_or_create_index_and_insert_nodes(collection_name=heavydb._dbname, nodes=nodes)
@@ -104,7 +147,7 @@ async def upsert_facts(facts: str, heavydb: HeavyDB) -> None:
     This supposed to delete and insert facts.
     """
     index = get_or_create_index(collection_name=heavydb._dbname)
-    await delete_database_facts(index, heavydb_name=heavydb._dbname)
+    await adelete_database_facts(index, heavydb_name=heavydb._dbname)
     await ainsert_facts(facts=facts, heavydb=heavydb)
 
 
@@ -148,7 +191,23 @@ async def delete_table_nodes(index: VectorStoreIndex, table_name: str) -> bool:
     return delete_nodes(collection=collection, where={"$and": [{"name": table_name}, {"type": "table"}]})
 
 
-async def delete_database_facts(index: VectorStoreIndex, heavydb_name: str) -> bool:
+def delete_nodes_by_ids(index: VectorStoreIndex, ids: list[str]) -> bool:
+    """
+    Helps to delete nodes by "id".
+    """
+    collection = index.vector_store._collection
+    return delete_nodes(collection=collection, where={"id": {"$in": ids}})
+
+
+def delete_node_by_id(index: VectorStoreIndex, id: str) -> bool:
+    """
+    Helps to delete nodes by "id".
+    """
+    collection = index.vector_store._collection
+    return delete_nodes(collection=collection, where={"id": {"$eq": id}})
+
+
+async def adelete_database_facts(index: VectorStoreIndex, heavydb_name: str) -> bool:
     """
     Delete all facts nodes associated with a heavydb database.
     """
