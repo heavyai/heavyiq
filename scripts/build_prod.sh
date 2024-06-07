@@ -41,6 +41,7 @@ pyarmor reg pyarmor-regfile-5130.zip
 # Note the pyarmor step can create the
 # ./dist dir if it doesn't already exist.
 pyarmor gen ./heavyiq
+pyarmor gen ./heavyrag
 cp -r heavyiq/langchain/tokenizer_models/ ./dist/heavyiq/langchain/tokenizer_models/
 cp gunicorn.conf.py ./dist/gunicorn.conf.py
 
