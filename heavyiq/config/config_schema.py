@@ -148,6 +148,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     rag_document_pdf_parser_url: str = ""
     rag_embed_model_name: str = "BAAI/bge-large-en-v1.5"
     rag_embed_server_base: Optional[str] = None
+    rag_rerank_server_base: Optional[str] = None
     rag_database_uri: str = "sqlite:///ragdb.sqlite"  # db for storing data relevant to RAG processing, ie. facts
     rag_facts_similarity_top_k: int = 3
     rag_facts_similarity_cutoff_score: float = (

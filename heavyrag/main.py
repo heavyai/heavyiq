@@ -16,6 +16,7 @@ from heavyrag.filters import document_filters, get_document_filter_matches, get_
 from heavyrag.index import get_index
 from heavyrag.ingest import sync_table_index
 from heavyrag.llm import get_llm
+from heavyrag.postprocessor import TextEmbeddingsInferenceRerank
 from heavyrag.prompts import FACTS_QA_PROMPT, TEXT_QA_PROMPT
 
 
@@ -52,11 +53,15 @@ async def retrieve_facts(
     question: str,
     heavydb_name: str,
     similarity_cutoff: float = 0.30,
-    similarity_top_k: int = 2,
+    similarity_top_k: int = 5,
+    with_reranker: bool = False,
+    reranker_top_n: int = 3,
 ) -> list[NodeWithScore]:
     """
     Retrieve only the fact nodes which are relevant to the asked question without using llm.
     """
+    from heavyiq.config import get_config
+
     doc_engine = index.as_retriever(
         filters=document_filters,
         similarity_top_k=similarity_top_k,
@@ -72,11 +77,23 @@ async def retrieve_facts(
     # filter nodes below 0.30 similarity score
     processor = SimilarityPostprocessor(similarity_cutoff=similarity_cutoff)
     filtered_nodes = processor.postprocess_nodes(final_nodes)
+    if with_reranker:
+        # configure reranker
+        reranker = TextEmbeddingsInferenceRerank(
+            base_url=get_config().rag_rerank_server_base,
+            top_n=reranker_top_n,
+        )
+        filtered_nodes = await reranker.apostprocess_nodes(filtered_nodes, query_str=question)
+
     return filtered_nodes
 
 
 async def get_relevant_facts_info(
-    question: str, heavydb_name: str, similarity_cutoff: float = 0.30, similarity_top_k: int = 2
+    question: str,
+    heavydb_name: str,
+    similarity_cutoff: float = 0.30,
+    similarity_top_k: int = 2,
+    with_reranker: bool = False,
 ) -> str:
     """
     Function which supposed to return facts information relevant to the asked question by querying the index.
@@ -88,6 +105,7 @@ async def get_relevant_facts_info(
         only_retrieve=True,
         similarity_cutoff=similarity_cutoff,
         similarity_top_k=similarity_top_k,
+        with_reranker=with_reranker,
     )
     for fact, metadata in retrieved_facts:
         facts_info += fact + "\n\n"
@@ -129,6 +147,7 @@ async def ask_facts(
     do_evaluate: bool = False,
     similarity_cutoff: float = 0.30,
     similarity_top_k: int = 2,
+    with_reranker: bool = False,
 ) -> tuple[RESPONSE_TYPE, EvaluationResult | None] | list[tuple[str, dict, float | None]]:
     """
     Search document, facts nodes and retrieve facts relevant to the asked question.
@@ -148,6 +167,7 @@ async def ask_facts(
             heavydb_name=heavydb_name,
             similarity_cutoff=similarity_cutoff,
             similarity_top_k=similarity_top_k,
+            with_reranker=with_reranker,
         )
         return [(node.get_text(), node.metadata, node.score) for node in filtered_nodes]
 

@@ -128,6 +128,7 @@ async def ask_about_facts(
         do_evaluate=request.do_evaluate,
         similarity_cutoff=CONFIG.rag_facts_similarity_cutoff_score,
         similarity_top_k=CONFIG.rag_facts_similarity_top_k,
+        with_reranker=request.use_reranker,
     )
     if request.only_retrieve:
         return md.AskFactsResponse(sources=out)

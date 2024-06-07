@@ -87,7 +87,7 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
             LLMType.NL_TO_TABLES: config.openai_gpt_model_nl_to_tables,
             LLMType.INSTRUCT: config.openai_gpt_model_instruct,
             LLMType.TABLES_TO_QUESTIONS: config.openai_gpt_model_tables_to_questions,
-            LLMType.RAG: config.openai_gpt_model,
+            LLMType.RAG: config.openai_gpt_model,  # use the same default model for handling RAG question
         }
         model_name: str = openai_llm_mapping[LLMType.DEFAULT] if openai_llm_mapping[model_type] is None else openai_llm_mapping[model_type]  # type: ignore
         return get_openai_llm_by_model_name(model=model_name, **kwargs)
