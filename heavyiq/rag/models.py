@@ -37,7 +37,7 @@ class AskDocumentResponse(BaseModel):
         default=None, description="Answer returned by LLM by using the retrieved doc sources as context."
     )
     metadata: dict | None = Field(default=None, description="Metadata about the retrieved document sources")
-    sources: list[str | tuple[str, dict]] = Field(
+    sources: list[str | tuple[str, dict, float | None]] = Field(
         default=[], description="Optional list of content sources used to derive the answer"
     )
     score: float | None = Field(default=None, description="Answer Evaluation Score")
@@ -198,6 +198,32 @@ class AskFactsRequest(BaseModelWithSessionID):
                 }
             ]
         }
+
+
+class GetFactsfromIndexRequest(BaseModelWithSessionID):
+    """
+    Get facts relevant to a particular database.
+    """
+
+    limit: int = Field(default=100, description="How many nodes to return..")
+
+    class Config:
+        json_schema_extra = {"examples": [{"session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "limit": 100}]}
+
+
+class GetFactsfromIndexResponse(BaseModel):
+    """
+    Get facts relevant to a particular database.
+    """
+
+    class Node(BaseModel):
+        content: str = Field(..., description="Node content")
+        metadata: dict = Field(..., description="Node metadata")
+
+    nodes: list[Node] = Field(..., description="List of nodes")
+
+    class Config:
+        json_schema_extra = {"examples": {"nodes": [{"content": "This is a node's content", "metadata": ""}]}}
 
 
 AskFactsResponse = AskDocumentResponse

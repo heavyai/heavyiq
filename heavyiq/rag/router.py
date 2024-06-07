@@ -126,7 +126,8 @@ async def ask_about_facts(
         heavydb_name=collection_name,
         only_retrieve=request.only_retrieve,
         do_evaluate=request.do_evaluate,
-        similarity_cutoff=CONFIG.rag_facts_retrieve_similarity_cutoff_score,
+        similarity_cutoff=CONFIG.rag_facts_similarity_cutoff_score,
+        similarity_top_k=CONFIG.rag_facts_similarity_top_k,
     )
     if request.only_retrieve:
         return md.AskFactsResponse(sources=out)
@@ -269,3 +270,18 @@ async def delete_facts(
         await adelete_facts(heavydb_name=heavydb._dbname)
         FactsModel.delete_facts_by_database(db_session=session, heavydb_name=heavydb._dbname)
         return None
+
+
+@facts_db_router.post("/index/nodes")
+async def get_fact_nodes(
+    request: md.GetFactsfromIndexRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
+) -> md.GetFactsfromIndexResponse:
+    """
+    Get facts from vectorDB index.
+    """
+    from heavyrag.main import get_facts
+
+    nodes = await get_facts(heavydb_name=heavydb._dbname, limit=request.limit)
+    return md.GetFactsfromIndexResponse(
+        nodes=[md.GetFactsfromIndexResponse.Node(content=i.get_text(), metadata=i.metadata) for i in nodes]
+    )

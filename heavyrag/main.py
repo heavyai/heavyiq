@@ -1,5 +1,5 @@
 import asyncio
-from typing import Literal
+from typing import Literal, Optional
 
 from llama_index.core import VectorStoreIndex
 from llama_index.core.base.response.schema import RESPONSE_TYPE
@@ -7,6 +7,7 @@ from llama_index.core.evaluation import EvaluationResult
 from llama_index.core.postprocessor import SimilarityPostprocessor
 from llama_index.core.response_synthesizers import ResponseMode
 from llama_index.core.schema import NodeWithScore
+from llama_index.core.vector_stores.types import MetadataFilters, VectorStoreQuery
 
 from heavyiq.langchain.heavydb import HeavyDB
 from heavyrag import IndexNotFound
@@ -47,18 +48,22 @@ async def ask_document(
 
 
 async def retrieve_facts(
-    index: VectorStoreIndex, question: str, heavydb_name: str, similarity_cutoff: float = 0.30
+    index: VectorStoreIndex,
+    question: str,
+    heavydb_name: str,
+    similarity_cutoff: float = 0.30,
+    similarity_top_k: int = 2,
 ) -> list[NodeWithScore]:
     """
     Retrieve only the fact nodes which are relevant to the asked question without using llm.
     """
     doc_engine = index.as_retriever(
         filters=document_filters,
-        similarity_top_k=2,
+        similarity_top_k=similarity_top_k,
     )
     facts_engine = index.as_retriever(
         filters=get_facts_filter_matches(heavydb_name),
-        similarity_top_k=2,
+        similarity_top_k=similarity_top_k,
     )
     doc_nodes_with_score, facts_nodes_with_score = await asyncio.gather(
         doc_engine.aretrieve(question), facts_engine.aretrieve(question)
@@ -70,18 +75,51 @@ async def retrieve_facts(
     return filtered_nodes
 
 
-async def get_relevant_facts_info(question: str, heavydb_name: str, similarity_cutoff: float = 0.30) -> str:
+async def get_relevant_facts_info(
+    question: str, heavydb_name: str, similarity_cutoff: float = 0.30, similarity_top_k: int = 2
+) -> str:
     """
     Function which supposed to return facts information relevant to the asked question by querying the index.
     """
     facts_info = ""
     retrieved_facts = await ask_facts(
-        question=question, heavydb_name=heavydb_name, only_retrieve=True, similarity_cutoff=similarity_cutoff
+        question=question,
+        heavydb_name=heavydb_name,
+        only_retrieve=True,
+        similarity_cutoff=similarity_cutoff,
+        similarity_top_k=similarity_top_k,
     )
     for fact, metadata in retrieved_facts:
-        facts_info += fact + "\n"
+        facts_info += fact + "\n\n"
 
-    return facts_info
+    return facts_info.strip()
+
+
+async def get_nodes(
+    index: VectorStoreIndex, filters: Optional[MetadataFilters] = None, limit: int = 100, **kwargs
+) -> list[NodeWithScore]:
+    """
+    Get the nodes by applying filters.
+    """
+    retriever = index.as_retriever(filters=filters, similarity_top_k=limit, **kwargs)  # how many nodes to return
+    query = VectorStoreQuery(
+        similarity_top_k=retriever._similarity_top_k,
+        filters=retriever._filters,
+    )
+    query_result = await retriever._vector_store.aquery(query, **retriever._kwargs)
+    nodes = retriever._build_node_list_from_query_result(query_result)
+    return nodes
+
+
+async def get_facts(heavydb_name: str, limit: int = 100) -> list[NodeWithScore]:
+    """
+    Get all the fact nodes without querying the vectorDB.
+    """
+    index = get_index(collection_name=heavydb_name)
+    if not index:
+        raise IndexNotFound(f"VectorStoreIndex not found {heavydb_name} collection.")
+    nodes = await get_nodes(index=index, filters=get_facts_filter_matches(heavydb_name), limit=limit)
+    return nodes
 
 
 async def ask_facts(
@@ -89,9 +127,9 @@ async def ask_facts(
     heavydb_name: str,
     only_retrieve: bool = True,
     do_evaluate: bool = False,
-    metada_mode: Literal["all", "llm", "none"] = "none",
     similarity_cutoff: float = 0.30,
-) -> tuple[RESPONSE_TYPE, EvaluationResult | None] | list[tuple[str, dict]]:
+    similarity_top_k: int = 2,
+) -> tuple[RESPONSE_TYPE, EvaluationResult | None] | list[tuple[str, dict, float | None]]:
     """
     Search document, facts nodes and retrieve facts relevant to the asked question.
 
@@ -105,14 +143,19 @@ async def ask_facts(
 
     if only_retrieve:
         filtered_nodes = await retrieve_facts(
-            index, question=question, heavydb_name=heavydb_name, similarity_cutoff=similarity_cutoff
+            index,
+            question=question,
+            heavydb_name=heavydb_name,
+            similarity_cutoff=similarity_cutoff,
+            similarity_top_k=similarity_top_k,
         )
-        return [(node.get_content(metadata_mode=metada_mode), node.metadata) for node in filtered_nodes]
+        return [(node.get_text(), node.metadata, node.score) for node in filtered_nodes]
 
     engine = index.as_query_engine(
         llm=get_llm(),
         filters=document_filters,
-        similarity_top_k=2,
+        similarity_top_k=similarity_top_k,
+        similarity_cutoff=similarity_cutoff,
         response_mode=ResponseMode.SIMPLE_SUMMARIZE,
         text_qa_template=FACTS_QA_PROMPT,
     )

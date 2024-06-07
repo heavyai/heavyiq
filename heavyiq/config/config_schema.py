@@ -149,8 +149,9 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     rag_embed_model_name: str = "BAAI/bge-large-en-v1.5"
     rag_embed_server_base: Optional[str] = None
     rag_database_uri: str = "sqlite:///ragdb.sqlite"  # db for storing data relevant to RAG processing, ie. facts
-    rag_facts_retrieve_similarity_cutoff_score: float = (
-        0.5  # score should be ranges from 0.0 to 1.0 (high value means more accurate)
+    rag_facts_similarity_top_k: int = 3
+    rag_facts_similarity_cutoff_score: float = (
+        0.45  # score should be ranges from 0.0 to 1.0 (high value means more accurate)
     )
 
 

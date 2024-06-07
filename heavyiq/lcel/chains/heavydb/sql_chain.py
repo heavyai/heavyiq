@@ -72,7 +72,8 @@ async def get_relevant_info_using_rag(inputs: dict) -> str:
         relevant_facts = await get_relevant_facts_info(
             question=inputs["question"],
             heavydb_name=heavydb._dbname,
-            similarity_cutoff=CONFIG.rag_facts_retrieve_similarity_cutoff_score,
+            similarity_cutoff=CONFIG.rag_facts_similarity_cutoff_score,
+            similarity_top_k=CONFIG.rag_facts_similarity_top_k,
         )
     except IndexNotFound:
         return ""
