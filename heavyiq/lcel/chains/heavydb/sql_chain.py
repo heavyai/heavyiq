@@ -48,7 +48,7 @@ async def get_table_info(sql_chain_inputs: dict) -> str:
     prompt_rbl = nl_to_sql_retry_prompt_rbl if on_retry else nl_to_sql_prompt_rbl
     partial_inputs = {"input": sql_chain_inputs["question"], "relevant_info": sql_chain_inputs.get("relevant_info", "")}
     if on_retry:
-        partial_inputs.update({"sql_cmd": sql_chain_inputs["sql_cmd"], "error": sql_chain_inputs["error"]})  # type: ignore
+        partial_inputs.update({"sql_cmd": sql_chain_inputs["sql_cmd"], "relevant_info": sql_chain_inputs.get("relevant_info", ""), "error": sql_chain_inputs["error"]})  # type: ignore
 
     partial_gen_sql_prompt = get_value_from_runnable_binding(prompt_rbl).partial(**partial_inputs)  # type: ignore
     table_info = await aget_table_info_wrt_token_limit(
@@ -138,7 +138,7 @@ query_runnable = (
 # Query retry runnable which accepts error and sql_cmd from previous query prediction chain
 # Retry Query Prediction
 # Step 1
-retry_query_variables = RunnablePassthrough.assign(table_info=table_info_runnable_lambda, input=lambda x: x["question"]).with_config(  # type: ignore
+retry_query_variables = (RunnablePassthrough.assign(relevant_info=relevant_info_lambda) | RunnablePassthrough.assign(table_info=table_info_runnable_lambda, input=lambda x: x["question"])).with_config(  # type: ignore
     config={
         "tags": ["intermediate-step"],
         "run_name": "Calculate Input Variables",

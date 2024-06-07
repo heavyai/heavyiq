@@ -107,7 +107,7 @@ async def get_relevant_facts_info(
         similarity_top_k=similarity_top_k,
         with_reranker=with_reranker,
     )
-    for fact, metadata in retrieved_facts:
+    for fact, metadata, score in retrieved_facts:
         facts_info += fact + "\n\n"
 
     return facts_info.strip()
