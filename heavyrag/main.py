@@ -1,6 +1,7 @@
 import asyncio
 from typing import Literal, Optional
 
+from async_lru import alru_cache
 from llama_index.core import VectorStoreIndex
 from llama_index.core.base.response.schema import RESPONSE_TYPE
 from llama_index.core.evaluation import EvaluationResult
@@ -111,6 +112,26 @@ async def get_relevant_facts_info(
         facts_info += fact + "\n\n"
 
     return facts_info.strip()
+
+
+@alru_cache(ttl=60)
+async def get_relevant_facts_info_from_cache(
+    question: str,
+    heavydb_name: str,
+    similarity_cutoff: float = 0.30,
+    similarity_top_k: int = 2,
+    with_reranker: bool = False,
+) -> str:
+    """
+    Get the relevant facts from cache or calculate.
+    """
+    return await get_relevant_facts_info(
+        question=question,
+        heavydb_name=heavydb_name,
+        similarity_cutoff=similarity_cutoff,
+        similarity_top_k=similarity_top_k,
+        with_reranker=with_reranker,
+    )
 
 
 async def get_nodes(

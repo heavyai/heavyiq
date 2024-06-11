@@ -130,6 +130,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     custom_prompt_sql_to_answer_body: Optional[str] = None
     custom_prompt_sql_to_answer_end_token: str = "\n<|english answer|>\n"
     # nl to tables
+    custom_prompt_nl_to_tables_include_relevant_info: bool = False
     custom_prompt_nl_to_tables_start_token: str = "<|table prompt|>\n"
     custom_prompt_nl_to_tables_body: Optional[str] = None
     custom_prompt_nl_to_tables_end_token: str = "\n<|table answer|>\n"
