@@ -26,7 +26,8 @@ test_for_internally_release_pyheavydb
 test_for_include_all_deps ./dist/requirements.txt
 
 pip install -r ./dist/requirements.txt
-pip install --no-deps llama-index-embeddings-text-embeddings-inference==0.1.2
+pip install -r ./dist/requirements-linux.txt
+pip install --no-deps -r ./dist/requirements-no-deps.txt
 pip freeze -l > ./dist/requirements.txt
 
 # pip freeze -l inserts an absolute path
@@ -34,7 +35,8 @@ pip freeze -l > ./dist/requirements.txt
 update_pyheavydb_reference ./dist/requirements.txt
 
 cp requirements-linux.txt ./dist/requirements-linux.txt
-pip install -r ./requirements-dev.txt
+cp requirements-no-deps.txt ./dist/requirements-no-deps.txt
+pip install -r ./requirements-build-prod.txt
 
 # Create Obfuscated Build
 pyarmor reg pyarmor-regfile-5130.zip
