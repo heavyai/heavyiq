@@ -1,5 +1,6 @@
 # ENV Requirements
 ## python3.10 (Installed)
+set -e
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 source  $SCRIPT_DIR/common_fn.sh
 process_args "$@"
