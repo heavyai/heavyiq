@@ -26,6 +26,7 @@ test_for_internally_release_pyheavydb
 test_for_include_all_deps ./dist/requirements.txt
 
 pip install -r ./dist/requirements.txt
+pip install --no-deps llama-index-embeddings-text-embeddings-inference==0.1.2
 pip freeze -l > ./dist/requirements.txt
 
 # pip freeze -l inserts an absolute path
