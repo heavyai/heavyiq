@@ -12,6 +12,9 @@ python3.10 -m venv venv
 # Install Requirements
 mkdir -p ./dist
 cp requirements.txt ./dist/requirements.txt
+cp requirements-linux.txt ./dist/requirements-linux.txt
+cp requirements-no-deps.txt ./dist/requirements-no-deps.txt
+
 # if INTERNALLY_RELEASED_PYHEAVYDB is set
 # (see common_fn.sh argument processing)
 # 1. grab the whl and store in ./dist
@@ -35,8 +38,6 @@ pip freeze -l > ./dist/requirements.txt
 # for pyheavydb.  We need a relative path
 update_pyheavydb_reference ./dist/requirements.txt
 
-cp requirements-linux.txt ./dist/requirements-linux.txt
-cp requirements-no-deps.txt ./dist/requirements-no-deps.txt
 pip install -r ./requirements-build-prod.txt
 
 # Create Obfuscated Build
