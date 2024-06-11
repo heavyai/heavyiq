@@ -1,5 +1,6 @@
 # ENV Requirements
 ## python3.10 (Installed)
+set -e
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 source  $SCRIPT_DIR/common_fn.sh
 process_args "$@"
@@ -26,6 +27,8 @@ test_for_internally_release_pyheavydb
 test_for_include_all_deps ./dist/requirements.txt
 
 pip install -r ./dist/requirements.txt
+pip install -r ./dist/requirements-linux.txt
+pip install --no-deps -r ./dist/requirements-no-deps.txt
 pip freeze -l > ./dist/requirements.txt
 
 # pip freeze -l inserts an absolute path
@@ -33,7 +36,8 @@ pip freeze -l > ./dist/requirements.txt
 update_pyheavydb_reference ./dist/requirements.txt
 
 cp requirements-linux.txt ./dist/requirements-linux.txt
-pip install -r ./requirements-dev.txt
+cp requirements-no-deps.txt ./dist/requirements-no-deps.txt
+pip install -r ./requirements-build-prod.txt
 
 # Create Obfuscated Build
 pyarmor reg pyarmor-regfile-5130.zip

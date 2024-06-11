@@ -1,0 +1,2 @@
+# Must be built with --no-deps flag
+llama-index-embeddings-text-embeddings-inference==0.1.2
