@@ -64,6 +64,8 @@ async def retrieve_facts(
     """
     from heavyiq.config import get_config
 
+    config = get_config()
+
     logger.debug("Started retrieving facts...")
 
     doc_engine = index.as_retriever(
@@ -84,11 +86,11 @@ async def retrieve_facts(
     logger.debug(
         f"Filtered nodes count after applying similarity postprocessor with similarity_cutoff {similarity_cutoff}: {len(filtered_nodes)}"
     )
-    if with_reranker:
+    if with_reranker or config.rag_rerank_server_base:
         logger.debug("Started re-ranking filtered nodes...")
         # configure reranker
         reranker = TextEmbeddingsInferenceRerank(
-            base_url=get_config().rag_rerank_server_base,
+            base_url=config.rag_rerank_server_base,
             top_n=reranker_top_n,
         )
         filtered_nodes = await reranker.apostprocess_nodes(filtered_nodes, query_str=question)
