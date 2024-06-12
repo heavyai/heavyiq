@@ -80,11 +80,12 @@ async def retrieve_facts(
         doc_engine.aretrieve(question), facts_engine.aretrieve(question)
     )
     final_nodes = facts_nodes_with_score + doc_nodes_with_score
+    logger.debug(f"Nodes found after applying facts and document filters, {[(i.id_, i.score) for i in final_nodes]}")
     # filter nodes below 0.30 similarity score
     processor = SimilarityPostprocessor(similarity_cutoff=similarity_cutoff)
     filtered_nodes = processor.postprocess_nodes(final_nodes)
     logger.debug(
-        f"Filtered nodes count after applying similarity postprocessor with similarity_cutoff {similarity_cutoff}: {len(filtered_nodes)}"
+        f"Filtered nodes after applying similarity postprocessor with similarity_cutoff {similarity_cutoff}: {[(i.id_, i.score) for i in filtered_nodes]}"
     )
     if with_reranker or config.rag_rerank_server_base:
         logger.debug("Started re-ranking filtered nodes...")
@@ -94,7 +95,9 @@ async def retrieve_facts(
             top_n=reranker_top_n,
         )
         filtered_nodes = await reranker.apostprocess_nodes(filtered_nodes, query_str=question)
-        logger.debug(f"Filtered nodes count after applying ReRanking postprocessor: {len(filtered_nodes)}")
+        logger.debug(
+            f"Rearranged nodes after applying ReRanking postprocessor: {[(i.id_, i.score) for i in filtered_nodes]}"
+        )
 
     return filtered_nodes
 
