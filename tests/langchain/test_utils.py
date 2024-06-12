@@ -2,7 +2,8 @@ import pytest
 
 from heavyiq.langchain.utils import retrieve_schema_details
 
-column_details = """CREATE TABLE mlb_pitches /* mlb_pitches comment */ (
+column_details = """CREATE TABLE mlb_pitches /* mlb_pitches comment with 
+newline chars */ (
 SHAPE_LEN DOUBLE
 BASE_BBL TEXT (4163500400, 4163500300, 4163400050 ...)
 MPLUTO_BBL TEXT (4163500400, 4163500300, 4163400050 ...),
@@ -48,6 +49,6 @@ def test_schema():
     From the cached table schema, parse and return parts for each column in list of tuples patterm.
     """
     details = retrieve_schema_details(column_details.strip())
-    assert details["name"] == "mlb_pitches" and details["comment"] == "mlb_pitches comment"
+    assert details["name"] == "mlb_pitches" and details["comment"] == "mlb_pitches comment with \nnewline chars"
     for parts, expected in zip(details["columns"], expected_output):
         assert parts == expected
