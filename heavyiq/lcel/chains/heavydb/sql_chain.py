@@ -81,7 +81,7 @@ async def get_relevant_info_using_rag(inputs: dict) -> str:
     if not relevant_facts:
         return ""
     # has relevant facts
-    return f"Relevant info:\n{relevant_facts}"
+    return f"Relevant info:\n\n{relevant_facts}\n"
 
 
 # Predicting Query

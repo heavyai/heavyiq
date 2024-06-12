@@ -103,7 +103,7 @@ async def aupdate_fact(fact_id: str, fact: str, heavydb_name: str) -> BaseIndex:
     """
     Update fact.
     """
-    index = get_or_create_index(collection_name=heavydb_name)
+    index = get_index(collection_name=heavydb_name)
     # deleet the relevant node by id
     delete_node_by_id(index=index, id=fact_id)
     # re-insert the node once again
@@ -116,7 +116,7 @@ async def adelete_fact(fact_id: str, heavydb_name: str) -> BaseIndex:
     """
     Delete a particular fact by fact_id.
     """
-    index = get_or_create_index(collection_name=heavydb_name)
+    index = get_index(collection_name=heavydb_name)
     # deleet the relevant node by id
     delete_node_by_id(index=index, id=fact_id)
     return index
@@ -126,7 +126,7 @@ async def adelete_facts(heavydb_name: str) -> BaseIndex:
     """
     Delete a particular fact by fact_id.
     """
-    index = get_or_create_index(collection_name=heavydb_name)
+    index = get_index(collection_name=heavydb_name)
     # deleet the relevant node by id
     await adelete_database_facts(index=index, heavydb_name=heavydb_name)
     return index

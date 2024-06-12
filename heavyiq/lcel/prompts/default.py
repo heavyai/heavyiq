@@ -66,6 +66,7 @@ Alongside each text column, in parentheses "()" you will see the top 3 values fo
 
 {table_info}
 
+{relevant_info}
 Emit each table name along with a 1 if the table is required to answer the following user question, or a 0 if the table is not required.
 
 Question: {input}
