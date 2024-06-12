@@ -32,3 +32,4 @@ hf_models/
 pyheavydb.whl.version
 pyheavydb*.whl
 *.sqlite
+rag_storage/

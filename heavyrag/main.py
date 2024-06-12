@@ -17,6 +17,7 @@ from heavyrag.filters import document_filters, get_document_filter_matches, get_
 from heavyrag.index import get_index
 from heavyrag.ingest import sync_table_index
 from heavyrag.llm import get_llm
+from heavyrag.logger import logger
 from heavyrag.postprocessor import TextEmbeddingsInferenceRerank
 from heavyrag.prompts import FACTS_QA_PROMPT, TEXT_QA_PROMPT
 
@@ -63,6 +64,8 @@ async def retrieve_facts(
     """
     from heavyiq.config import get_config
 
+    logger.debug("Started retrieving facts...")
+
     doc_engine = index.as_retriever(
         filters=document_filters,
         similarity_top_k=similarity_top_k,
@@ -78,13 +81,18 @@ async def retrieve_facts(
     # filter nodes below 0.30 similarity score
     processor = SimilarityPostprocessor(similarity_cutoff=similarity_cutoff)
     filtered_nodes = processor.postprocess_nodes(final_nodes)
+    logger.debug(
+        f"Filtered nodes count after applying similarity postprocessor with similarity_cutoff {similarity_cutoff}: {len(filtered_nodes)}"
+    )
     if with_reranker:
+        logger.debug("Started re-ranking filtered nodes...")
         # configure reranker
         reranker = TextEmbeddingsInferenceRerank(
             base_url=get_config().rag_rerank_server_base,
             top_n=reranker_top_n,
         )
         filtered_nodes = await reranker.apostprocess_nodes(filtered_nodes, query_str=question)
+        logger.debug(f"Filtered nodes count after applying ReRanking postprocessor: {len(filtered_nodes)}")
 
     return filtered_nodes
 
@@ -100,6 +108,7 @@ async def get_relevant_facts_info(
     Function which supposed to return facts information relevant to the asked question by querying the index.
     """
     facts_info = ""
+    logger.debug(f"Getting relevant facts from {heavydb_name} collection for question: {question}...")
     retrieved_facts = await ask_facts(
         question=question,
         heavydb_name=heavydb_name,
@@ -111,7 +120,9 @@ async def get_relevant_facts_info(
     for fact, metadata, score in retrieved_facts:
         facts_info += fact + "\n\n"
 
-    return facts_info.strip()
+    facts_info = facts_info.strip()
+    logger.debug(f"Facts found? {True if facts_info else False}")
+    return facts_info
 
 
 @alru_cache(ttl=60)
@@ -181,6 +192,17 @@ async def ask_facts(
     if not index:
         raise IndexNotFound(f"VectorStoreIndex not found {heavydb_name} collection.")
 
+    logger.debug(
+        "Called ask_facts with args:\n"
+        f"question: {question}\n"
+        f"heavydb_name: {heavydb_name}\n"
+        f"only_retrieve: {only_retrieve}\n"
+        f"do_evaluate: {do_evaluate}\n"
+        f"similarity_cutoff: {similarity_cutoff}\n"
+        f"similarity_top_k: {similarity_top_k}\n"
+        f"with_reranker: {with_reranker}"
+    )
+
     if only_retrieve:
         filtered_nodes = await retrieve_facts(
             index,
@@ -192,6 +214,7 @@ async def ask_facts(
         )
         return [(node.get_text(), node.metadata, node.score) for node in filtered_nodes]
 
+    logger.debug("Started generating response using LLM from the contents of retrieved nodes...")
     engine = index.as_query_engine(
         llm=get_llm(),
         filters=document_filters,
@@ -202,6 +225,7 @@ async def ask_facts(
     )
     response, eval_result = await engine.aquery(question), None
     if do_evaluate:
+        logger.debug("Evaluating the RAG LLM response...")
         eval_result = await aevaluate_response_by_relevancy(question=question, response=response)
 
     return response, eval_result
@@ -211,7 +235,9 @@ async def determine_table_names(question: str, heavydb: HeavyDB, force_sync: boo
     """
     Fetch the approprate table name relevant to the asked question.
     """
+    logger.debug("Started determining table names, syncing table index...")
     index = await sync_table_index(heavydb=heavydb, force_sync=force_sync)
+    logger.debug("Finished syncing table index.")
     engine = index.as_retriever(
         filters=table_filters,
         similarity_top_k=2,
@@ -222,5 +248,7 @@ async def determine_table_names(question: str, heavydb: HeavyDB, force_sync: boo
         table_name = n.metadata["name"]
         if table_name not in tables:
             tables.append(table_name)
+
+    logger.debug("Retrieved tables: {tables}")
 
     return tables

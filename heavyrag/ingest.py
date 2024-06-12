@@ -12,6 +12,7 @@ from llama_index.core.schema import BaseNode
 from heavyiq.langchain.heavydb import HeavyDB
 from heavyrag.index import acreate_index_and_insert_nodes, get_index, get_or_create_index
 from heavyrag.loaders import aload_file, aload_files_from_directory, aload_table, aload_tables, load_fact, load_facts
+from heavyrag.logger import logger
 from heavyrag.query import any_table_node, has_table_node
 from heavyrag.transform import atransform
 
@@ -20,7 +21,9 @@ async def ainsert_documents(source_dir: str) -> list[BaseIndex]:
     """
     Grab documents from a source folder recursivley, split, transfor ingest into vectordb, finally create index.
     """
+    logger.debug(f"Started loading files for document insertion from the {source_dir} directory")
     documents = await aload_files_from_directory(source_dir)
+    logger.debug("Loaded documents, transforming each document into nodes...")
     nodes = await atransform(documents=documents)
     # group the nodes by database id
     nodes_group_by_database_name = defaultdict(list)
@@ -33,6 +36,7 @@ async def ainsert_documents(source_dir: str) -> list[BaseIndex]:
 
     tasks = []
     for dbname in nodes_group_by_database_name:
+        logger.debug(f"Inserting nodes into {dbname} index.")
         db_nodes = nodes_group_by_database_name[dbname]
         tasks.append(
             acreate_index_and_insert_nodes(db_nodes, collection_name=dbname, collection_metadata={"type": "document"})
@@ -45,6 +49,7 @@ async def ainsert_document(filepath: str, heavydb_name: str) -> BaseIndex:
     """
     Inserts a document into an existing or newly created index.
     """
+    logger.debug(f"Index: Inserting a single document {filepath}...")
     documents = await aload_file(filepath)
     nodes = await atransform(documents=documents)
     index = get_index(collection_name=heavydb_name)
@@ -55,6 +60,8 @@ async def ainsert_document(filepath: str, heavydb_name: str) -> BaseIndex:
         # index already exists, so just add nodes to it
         index.insert_nodes(nodes=nodes, show_progress=True)
 
+    logger.debug(f"Successfully inserted all the nodes relevant to {filepath} document.")
+
     return index
 
 
@@ -62,10 +69,12 @@ async def ainsert_table(heavydb: HeavyDB, table_name: str) -> BaseIndex:
     """
     Inserts information related to a HeavyDB table.
     """
+    logger.debug(f"Index: Inserting {table_name} table information into {heavydb} index/collection.")
     documents = await aload_table(heavydb=heavydb, table_name=table_name)
     nodes = await atransform(documents=documents)
     index = get_or_create_index(collection_name=heavydb._dbname)
     index.insert_nodes(nodes=nodes, show_progress=True)
+    logger.debug(f"Successfully inserted {table_name} table information.")
     return index
 
 
@@ -73,8 +82,10 @@ async def get_or_create_index_and_insert_nodes(collection_name: str, nodes: list
     """
     Added nodes to the existing or newly created index.
     """
+    logger.debug(f"Index: Inserting {len(nodes)} nodes into {collection_name} collection.")
     index = get_or_create_index(collection_name=collection_name)
     index.insert_nodes(nodes=nodes, show_progress=True)
+    logger.debug(f"Successfully inserted {len(nodes)} nodes.")
     return index
 
 
@@ -82,10 +93,12 @@ async def ainsert_tables(heavydb: HeavyDB) -> BaseIndex:
     """
     Insert data relevant to all tables in a database.
     """
+    logger.info(f"Index: Bulk Inserting table info into {heavydb} collection.")
     documents = await aload_tables(heavydb=heavydb)
     nodes = await atransform(documents=documents)
     index = get_or_create_index(collection_name=heavydb._dbname)
     index.insert_nodes(nodes=nodes, show_progress=True)
+    logger.info(f"Successfully Bulk Inserted table info into {heavydb} collection.")
     return index
 
 
@@ -96,6 +109,7 @@ async def ainsert_fact(fact_id: str, fact: str, heavydb_name: str) -> BaseIndex:
     fact_node = load_fact(fact_id=fact_id, fact=fact, heavydb_name=heavydb_name)
     index = get_or_create_index(collection_name=heavydb_name)
     index.insert_nodes(nodes=[fact_node], show_progress=True)
+    logger.info(f"Index: Inserted a fact into {heavydb_name} collection.")
     return index
 
 
@@ -109,6 +123,7 @@ async def aupdate_fact(fact_id: str, fact: str, heavydb_name: str) -> BaseIndex:
     # re-insert the node once again
     fact_node = load_fact(fact_id=fact_id, fact=fact, heavydb_name=heavydb_name)
     index.insert_nodes(nodes=[fact_node], show_progress=True)
+    logger.info(f"Index: Updated a fact ({fact_id}) on {heavydb_name} collection.")
     return index
 
 
@@ -119,6 +134,7 @@ async def adelete_fact(fact_id: str, heavydb_name: str) -> BaseIndex:
     index = get_index(collection_name=heavydb_name)
     # deleet the relevant node by id
     delete_node_by_id(index=index, id=fact_id)
+    logger.info(f"Index: Deleted a fact ({fact_id}) from {heavydb_name} collection.")
     return index
 
 
@@ -129,6 +145,7 @@ async def adelete_facts(heavydb_name: str) -> BaseIndex:
     index = get_index(collection_name=heavydb_name)
     # deleet the relevant node by id
     await adelete_database_facts(index=index, heavydb_name=heavydb_name)
+    logger.info(f"Index: Deleted all facts from {heavydb_name} collection.")
     return index
 
 
@@ -136,6 +153,7 @@ async def ainsert_facts(facts: str, heavydb: HeavyDB) -> BaseIndex:
     """
     Insert facts nodes.
     """
+    logger.info(f"Index: Bulk inserting facts into {heavydb} collection.")
     documents = await load_facts(facts=facts, heavydb_name=heavydb._dbname)
     pipeline = IngestionPipeline(transformations=[SentenceSplitter(chunk_size=120, chunk_overlap=10)])
     nodes = await atransform(documents=documents, pipeline=pipeline)
@@ -158,6 +176,8 @@ def delete_nodes(collection: Collection, where: dict, batch_size: int = 166) -> 
     ids = collection.get(where=where)["ids"]
     if not ids:
         return False
+
+    logger.debug(f"Index: Deleting the following node ids: {ids}")
 
     doc_count = len(ids)
     if doc_count < batch_size:
