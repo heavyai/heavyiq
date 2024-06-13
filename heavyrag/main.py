@@ -1,5 +1,4 @@
 import asyncio
-from typing import Literal, Optional
 
 from async_lru import alru_cache
 from llama_index.core import VectorStoreIndex
@@ -8,7 +7,6 @@ from llama_index.core.evaluation import EvaluationResult
 from llama_index.core.postprocessor import SimilarityPostprocessor
 from llama_index.core.response_synthesizers import ResponseMode
 from llama_index.core.schema import NodeWithScore
-from llama_index.core.vector_stores.types import MetadataFilters, VectorStoreQuery
 
 from heavyiq.langchain.heavydb import HeavyDB
 from heavyrag import IndexNotFound
@@ -20,6 +18,7 @@ from heavyrag.llm import get_llm
 from heavyrag.logger import logger
 from heavyrag.postprocessor import TextEmbeddingsInferenceRerank
 from heavyrag.prompts import FACTS_QA_PROMPT, TEXT_QA_PROMPT
+from heavyrag.utils import get_nodes, is_document_node_in_index, is_facts_node_in_index
 
 
 async def ask_document(
@@ -68,17 +67,23 @@ async def retrieve_facts(
 
     logger.debug("Started retrieving facts...")
 
-    doc_engine = index.as_retriever(
-        filters=document_filters,
-        similarity_top_k=similarity_top_k,
-    )
-    facts_engine = index.as_retriever(
-        filters=get_facts_filter_matches(heavydb_name),
-        similarity_top_k=similarity_top_k,
-    )
-    doc_nodes_with_score, facts_nodes_with_score = await asyncio.gather(
-        doc_engine.aretrieve(question), facts_engine.aretrieve(question)
-    )
+    doc_nodes_with_score, facts_nodes_with_score = [], []
+    has_doc_node, has_facts_node = await asyncio.gather(is_document_node_in_index(index), is_facts_node_in_index(index))
+
+    if has_doc_node:
+        doc_engine = index.as_retriever(
+            filters=document_filters,
+            similarity_top_k=similarity_top_k,
+        )
+        doc_nodes_with_score = await doc_engine.aretrieve(question)
+
+    if has_facts_node:
+        facts_engine = index.as_retriever(
+            filters=get_facts_filter_matches(heavydb_name),
+            similarity_top_k=similarity_top_k,
+        )
+        facts_nodes_with_score = await facts_engine.aretrieve(question)
+
     final_nodes = facts_nodes_with_score + doc_nodes_with_score
     logger.debug(f"Nodes found after applying facts and document filters, {[(i.id_, i.score) for i in final_nodes]}")
     # filter nodes below 0.30 similarity score
@@ -148,22 +153,6 @@ async def get_relevant_facts_info_from_cache(
         similarity_top_k=similarity_top_k,
         with_reranker=with_reranker,
     )
-
-
-async def get_nodes(
-    index: VectorStoreIndex, filters: Optional[MetadataFilters] = None, limit: int = 100, **kwargs
-) -> list[NodeWithScore]:
-    """
-    Get the nodes by applying filters.
-    """
-    retriever = index.as_retriever(filters=filters, similarity_top_k=limit, **kwargs)  # how many nodes to return
-    query = VectorStoreQuery(
-        similarity_top_k=retriever._similarity_top_k,
-        filters=retriever._filters,
-    )
-    query_result = await retriever._vector_store.aquery(query, **retriever._kwargs)
-    nodes = retriever._build_node_list_from_query_result(query_result)
-    return nodes
 
 
 async def get_facts(heavydb_name: str, limit: int = 100) -> list[NodeWithScore]:
