@@ -8,6 +8,7 @@ class CallLLMRequest(BaseModel):
     temperature: float = Field(0.0, description="Temperature to use for LLM")
     max_tokens: int = Field(512, description="Max tokens to use for LLM response")
     guided_choice: list[str] | None = Field(default=None, description="An optional list of allowed outputs")
+    guided_regex: str | None = Field(default=None, description="An optional regex pattern to guide output")
     stop: list[str] | None = Field(default=None, description="An optional list of stop words")
 
     class Config:
