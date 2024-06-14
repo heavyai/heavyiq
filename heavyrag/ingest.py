@@ -149,24 +149,13 @@ async def adelete_facts(heavydb_name: str) -> BaseIndex:
     return index
 
 
-async def ainsert_facts(facts: str, heavydb: HeavyDB) -> BaseIndex:
+async def ainsert_facts(facts: list[tuple[str, str]], heavydb_name: str) -> BaseIndex:
     """
     Insert facts nodes.
     """
-    logger.info(f"Index: Bulk inserting facts into {heavydb} collection.")
-    documents = await load_facts(facts=facts, heavydb_name=heavydb._dbname)
-    pipeline = IngestionPipeline(transformations=[SentenceSplitter(chunk_size=120, chunk_overlap=10)])
-    nodes = await atransform(documents=documents, pipeline=pipeline)
-    return await get_or_create_index_and_insert_nodes(collection_name=heavydb._dbname, nodes=nodes)
-
-
-async def upsert_facts(facts: str, heavydb: HeavyDB) -> None:
-    """
-    This supposed to delete and insert facts.
-    """
-    index = get_or_create_index(collection_name=heavydb._dbname)
-    await adelete_database_facts(index, heavydb_name=heavydb._dbname)
-    await ainsert_facts(facts=facts, heavydb=heavydb)
+    logger.info(f"Index: Bulk inserting facts into {heavydb_name} collection.")
+    nodes = load_facts(facts=facts, heavydb_name=heavydb_name)
+    return await get_or_create_index_and_insert_nodes(collection_name=heavydb_name, nodes=nodes)
 
 
 def delete_nodes(collection: Collection, where: dict, batch_size: int = 166) -> bool:

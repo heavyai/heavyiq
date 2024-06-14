@@ -104,11 +104,14 @@ async def aload_tables(heavydb: HeavyDB, exlude_tables: list[str] | None = None)
     return _exclude_metadata(flattened_list)
 
 
-def load_facts(facts: str, heavydb_name: str, table_name: str | None = None) -> list[Document]:
+def load_facts(facts: list[tuple[str, str]], heavydb_name: str, table_name: str | None = None) -> list[Document]:
     """
     Form a document from the passed facts.
     """
-    return [Document(text=facts, extra_info={"dbname": heavydb_name, "type": "facts"})]
+    return [
+        TextNode(text=fact, id_=fact_id, metadata={"dbname": heavydb_name, "type": "facts", "id": fact_id})
+        for fact_id, fact in facts
+    ]
 
 
 def load_fact(fact_id: str, fact: str, heavydb_name: str) -> TextNode:

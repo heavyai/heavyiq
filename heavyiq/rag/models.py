@@ -228,3 +228,24 @@ class GetFactsfromIndexResponse(BaseModel):
 
 
 AskFactsResponse = AskDocumentResponse
+
+
+class BulkInsertFactsRequest(BaseModelWithSessionID):
+    """
+    Bulk Insert facts request.
+    """
+
+    facts: list[str] = Field(..., description="List of facts.")
+
+    class Config:
+        json_schema_extra = {
+            "examples": [{"session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "facts": ["fact1", "fact2"]}]
+        }
+
+
+class BulkInsertFactsResponse(BaseModel):
+    """
+    Bulk Insert facts response.
+    """
+
+    fact_ids: list[str] = Field(default=[], description="List of inserted fact ids")
