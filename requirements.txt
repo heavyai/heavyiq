@@ -25,6 +25,7 @@ pypdf==4.1.0
 PyJWT==2.8.0
 loguru==0.7.2
 llama-index-core==0.10.34
+llama-index-embeddings-text-embeddings-inference==0.1.2
 llama-index-embeddings-huggingface==0.1.5
 llama-index-readers-file==0.1.22
 llama-index-vector-stores-chroma==0.1.6
