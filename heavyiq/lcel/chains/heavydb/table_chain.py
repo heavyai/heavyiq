@@ -10,6 +10,9 @@ from heavyiq.lcel.chains.utils import configure_step, get_value_from_runnable_bi
 from heavyiq.lcel.llms import llm_runnable
 from heavyiq.lcel.prompts import to_tables_prompt_runnable
 from heavyiq.lcel.types import TableChainInputType, TableChainOutputType
+from heavyrag import IndexNotFound
+
+CONFIG = get_config()
 
 # llm
 nl_to_tables_llm_rbl = llm_runnable.with_config(
@@ -83,7 +86,7 @@ async def get_table_info(inputs: dict) -> str:
     """
 
     prompt_rbl = nl_to_tables_prompt_rbl
-    partial_inputs = {"input": inputs["question"]}
+    partial_inputs = {"input": inputs["question"], "relevant_info": inputs.get("relevant_info", "")}
 
     partial_gen_sql_prompt = get_value_from_runnable_binding(prompt_rbl).partial(**partial_inputs)  # type: ignore
     table_info = await aget_table_info_wrt_token_limit(
@@ -99,22 +102,42 @@ async def parse_output(text: str) -> dict[str, int]:
     return {x: int(y) for x, y in re.findall(r"(\w+):\s*([01])", text)}
 
 
-# TODO: remove the below commented code
-# Step 1
-# Find relevant tables by doing similarity search on chroma db
-# get_tables_lambda = configure_step(
-#     RunnableLambda(get_tables),
-#     run_name="Similarity Search for Relevant Tables",
-#     step="Finding relevant tables by querying ChromaDB.",
-# )
+# Step 0
+async def get_relevant_info_using_rag(inputs: dict) -> str:
+    """
+    Helps to get the table info for the prompt based upon the allowed token limit.
+    """
+    from heavyrag.main import get_relevant_facts_info_from_cache
 
-# # Step 2
-# # Retrieve table information for the identified tables in order to construct the prompt
-# retrieve_tables_info_lambda = configure_step(
-#     RunnableLambda(get_table_info),
-#     run_name="Retrieve Table Information",
-#     step="Retrieving table information for the identified tables.",
-# )
+    if not CONFIG.custom_prompt_nl_to_tables_include_relevant_info:
+        return ""
+
+    heavydb = await get_db(inputs["session_id"])
+
+    try:
+        relevant_facts = await get_relevant_facts_info_from_cache(
+            question=inputs["question"],
+            heavydb_name=heavydb._dbname,
+            similarity_cutoff=CONFIG.rag_facts_similarity_cutoff_score,
+            similarity_top_k=CONFIG.rag_facts_similarity_top_k,
+        )
+    except IndexNotFound:
+        return ""
+
+    if not relevant_facts:
+        return ""
+    # has relevant facts
+    return f"Relevant info:\n\n{relevant_facts}\n"
+
+
+# calculating relevant info (RAG)
+relevant_info_lambda: Runnable = RunnableLambda(get_relevant_info_using_rag).with_config(
+    config={
+        "tags": ["intermediate-step"],
+        "run_name": "Get Relevant Info for NLtoTables",
+        "metadata": {"step": "Getting relevant information based on the asked question."},
+    }
+)
 
 # Step 1 and Step 2 combined
 get_and_retrieve_table_info_lambda = configure_step(
@@ -139,7 +162,8 @@ parse_output_lambda = configure_step(
 
 chain: Runnable = (
     (
-        RunnablePassthrough.assign(table_info=get_and_retrieve_table_info_lambda, input=lambda x: x["question"])
+        RunnablePassthrough.assign(relevant_info=relevant_info_lambda)
+        | RunnablePassthrough.assign(table_info=get_and_retrieve_table_info_lambda, input=lambda x: x["question"])
         | prompt
         | model
         | StrOutputParser()  # needed for chat models to efficiently convert chat message instance to str

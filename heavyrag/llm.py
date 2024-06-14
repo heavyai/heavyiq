@@ -26,4 +26,7 @@ class OverridedLangChainLLM(LangChainLLM):
 
 
 def get_llm(temperature: float = 0.1, max_tokens: int = 512) -> LangChainLLM:
+    """
+    Gets the model for handling RAG QA prompts.
+    """
     return OverridedLangChainLLM(llm=get_llm_by_type(LLMType.RAG, temperature=temperature, max_tokens=max_tokens))

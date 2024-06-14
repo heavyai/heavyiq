@@ -2,7 +2,7 @@
 from itertools import chain
 
 from llama_index.core import SimpleDirectoryReader
-from llama_index.core.schema import Document
+from llama_index.core.schema import Document, TextNode
 from llama_index.readers.file import PDFReader
 
 from heavyiq.config import get_config
@@ -102,3 +102,17 @@ async def aload_tables(heavydb: HeavyDB, exlude_tables: list[str] | None = None)
     result = await semaphore_gather(5, tasks)  # run only 5 tasks at a time
     flattened_list = list(chain.from_iterable(result))
     return _exclude_metadata(flattened_list)
+
+
+def load_facts(facts: str, heavydb_name: str, table_name: str | None = None) -> list[Document]:
+    """
+    Form a document from the passed facts.
+    """
+    return [Document(text=facts, extra_info={"dbname": heavydb_name, "type": "facts"})]
+
+
+def load_fact(fact_id: str, fact: str, heavydb_name: str) -> TextNode:
+    """
+    Form a textnode from fact string.
+    """
+    return TextNode(text=fact, id_=fact_id, metadata={"dbname": heavydb_name, "type": "facts", "id": fact_id})

@@ -1,0 +1,2 @@
+class IndexNotFound(Exception):
+    pass

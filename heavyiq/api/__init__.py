@@ -51,6 +51,11 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
     # we might endup in request pending issue.
     HeavyDB.initialize()
 
+    # initialize RAG DB
+    from heavyrag.database import ragdb
+
+    ragdb.create_tables()
+
     # LLM Cache
     if config.enable_llm_cache:
         set_llm_cache(InMemoryLLMCache())
@@ -60,7 +65,7 @@ def include_rag_routers(app: FastAPI) -> None:
     """
     Include RAG routers
     """
-    from heavyiq.rag.router import doc_router, table_router
+    from heavyiq.rag.router import doc_router, facts_db_router, table_router
 
     app.include_router(
         doc_router,
@@ -77,6 +82,17 @@ def include_rag_routers(app: FastAPI) -> None:
         table_router,
         prefix="/rag/tables",
         tags=["rag.tables"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "model": ErrorResponse,
+            }
+        },
+    )
+    app.include_router(
+        facts_db_router,
+        prefix="/rag/facts",
+        tags=["rag.facts"],
         responses={
             500: {
                 "description": "Internal Server Error",

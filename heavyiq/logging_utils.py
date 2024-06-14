@@ -7,8 +7,7 @@ import time
 from loguru import logger as loguru_logger
 
 from heavyiq.config import get_config
-from heavyiq.langchain.callbacks import (AsyncLogFileCallbackHandler,
-                                         FileCallbackHandler)
+from heavyiq.langchain.callbacks import AsyncLogFileCallbackHandler, FileCallbackHandler
 
 from .loguru_logging import BaseAsyncLogger, access_formatter, iq_formatter
 
@@ -53,7 +52,7 @@ class HeavyIQLogger(BaseAsyncLogger):
             enable_console_logging=enable_console_logging,
             max_file_size=max_file_size,
         )
-        self.info("HeavyIQ Logger initialized")
+        self.info(f"{name.upper()} Logger initialized")
 
     def langchain_cb_handler(self, to_stdout: bool = True) -> FileCallbackHandler:
         """
@@ -128,9 +127,10 @@ class _AccessLogger(BaseAsyncLogger):
 _access_logger: _AccessLogger | None = None
 heavyiq_logger: HeavyIQLogger | None = None
 default_logger: HeavyIQLogger | None = None
+heavyrag_logger: HeavyIQLogger | None = None
 
 
-def get_log_name(lvl: str) -> str:
+def get_log_name(lvl: str, package_name: str = "heavyiq") -> str:
     """
     Constructs a log name based on the system's metadata and current time.
 
@@ -145,15 +145,15 @@ def get_log_name(lvl: str) -> str:
     u = getpass.getuser()
     t = time.strftime("%Y%m%d-%H%M%S")
 
-    return f"heavyiq.{h}.{u}.log.{lvl}.{t}"
+    return f"{package_name}.{h}.{u}.log.{lvl}.{t}"
 
 
 # had to add this so the logs didn't init the config before we passed the config path
 def init_logs():
-    global _access_logger, heavyiq_logger, default_logger
+    global _access_logger, heavyiq_logger, default_logger, heavyrag_logger
     LOG_CONFIG = get_config()
     data: str = LOG_CONFIG.data  # type: ignore
-    if (data is None):
+    if data is None:
         data = "./storage"
     log_dir = os.path.join(data, "log")
 
@@ -209,6 +209,30 @@ def init_logs():
 
         default_logger = heavyiq_logger
 
+    if heavyrag_logger is None:
+        app_log_name = get_log_name("RAG", package_name="heavyrag")
+        # Ensure log_dir exists
+        os.makedirs(log_dir, exist_ok=True)
+        heavyrag_logger = HeavyIQLogger(
+            name="heavyrag",
+            log_file_path=os.path.join(log_dir, app_log_name),
+            level=LOG_CONFIG.heavyrag_log_level,
+            enable_console_logging=LOG_CONFIG.log_to_stdout,
+            max_file_size=LOG_CONFIG.heavyiq_log_max_file_size,
+        )
+
+        rag_symlink = os.path.join(log_dir, "heavyrag.RAG")
+        if os.path.islink(rag_symlink):
+            try:
+                os.remove(rag_symlink)
+            except OSError as e:
+                print(f"Failed to delete symlink: {e}")
+
+        try:
+            os.symlink(os.path.join("./", app_log_name), rag_symlink)
+        except OSError as e:
+            print(f"Failed to create symlink: {e}")
+
 
 def _get_access_logger() -> _AccessLogger:
     global _access_logger
@@ -222,3 +246,10 @@ def get_heavyiq_logger() -> HeavyIQLogger:
     if heavyiq_logger is None:
         init_logs()
     return heavyiq_logger  # type: ignore
+
+
+def get_heavyrag_logger() -> HeavyIQLogger:
+    global heavyrag_logger
+    if heavyrag_logger is None:
+        init_logs()
+    return heavyrag_logger  # type: ignore
