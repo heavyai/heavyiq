@@ -168,7 +168,7 @@ async def derive_table_names(
 facts_db_router = APIRouter()
 
 
-# insert or update facts
+# insert fact
 @facts_db_router.post("/insert")
 async def add_fact(
     request: md.AddFactRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
@@ -193,6 +193,31 @@ async def add_fact(
             raise e
 
 
+# bulk insert facts
+@facts_db_router.post("/bulk-insert")
+async def bulk_insert_fact(
+    request: md.BulkInsertFactsRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
+) -> md.BulkInsertFactsResponse:
+    """
+    Bulk insert facts into sqlite database and store the relavant embeddings on vector database.
+    """
+    from heavyrag.ingest import ainsert_facts
+
+    with ragdb.get_db() as session:
+        session.begin()
+        try:
+            # add db record
+            fact_ids = FactsModel.bulk_insert(db_session=session, heavydb_name=heavydb._dbname, facts=request.facts)
+            # add to index
+            await ainsert_facts(facts=list(zip(fact_ids, request.facts)), heavydb_name=heavydb._dbname)
+
+            return md.BulkInsertFactsResponse(fact_ids=fact_ids)
+        except Exception as e:
+            session.rollback()
+            raise e
+
+
+# update fact
 @facts_db_router.post("/update")
 async def update_fact(
     request: md.UpdateFactRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)

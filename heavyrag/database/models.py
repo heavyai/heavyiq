@@ -1,5 +1,5 @@
 import uuid
-from typing import Optional
+from typing import List, Optional
 
 from sqlalchemy import Column, String, Text
 from sqlalchemy import delete as sqldelete
@@ -77,6 +77,18 @@ class FactsModel(Base):
         db_session.commit()
 
         return inserted_id
+
+    @classmethod
+    def bulk_insert(cls: type["FactsModel"], db_session: Session, heavydb_name: str, facts: List[str]) -> List[str]:
+        """
+        Bulk insert facts.
+        """
+        ids = db_session.scalars(
+            insert(cls).values(heavydb_name=heavydb_name).returning(cls.id, sort_by_parameter_order=True),
+            [{"fact": fact} for fact in facts],
+        ).all()
+        db_session.commit()
+        return ids  # type: ignore
 
     @classmethod
     def delete(cls: type["FactsModel"], db_session: Session, id: str) -> bool:
