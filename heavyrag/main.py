@@ -135,7 +135,7 @@ async def get_relevant_facts_info(
     return facts_info
 
 
-@alru_cache(ttl=60)
+@alru_cache(ttl=10)
 async def get_relevant_facts_info_from_cache(
     question: str,
     heavydb_name: str,
