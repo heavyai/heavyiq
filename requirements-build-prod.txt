@@ -1,0 +1,2 @@
+# Only used in build_prod.sh
+pyarmor==8.3.5

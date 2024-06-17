@@ -209,7 +209,7 @@ async def update_table_index_on_schema_change_callback(session: str, table: str)
 
 
 TABLE_SCHEMA_ONLY_RGX: re.Pattern = re.compile(r"(?is)^create table .*?\);(?=\n|$)")
-TABLE_COMMENT_RGX: re.Pattern = re.compile(r"(?i)create table (\w+)\s*(?:/\*\s*(.*?)\s*\*/)?\s*")
+TABLE_COMMENT_RGX: re.Pattern = re.compile(r"(?is)^\s*create table (\w+)\s*(?:/\*\s*(.*?)\s*\*/)?\s*")
 TABLE_COLUMN_RGX: re.Pattern = re.compile(
     r"^ *(\"[^\"]+\"|\w+)\s+(\w+(?:\[\d*\]|\([^()]*\))?(?: +ENCODING +\w+(?:\(\d*\))?)?)\s*(?:\((?:\([^()]*\)|[^()])+\))?\s*(?:/\*\s*(.*?)\s*\*/)?\s*,?\s*$"
 )
@@ -242,23 +242,45 @@ def retrieve_schema_details(schema: str) -> dict:
     """
     # grab only the create schema stmt
     schema = TABLE_SCHEMA_ONLY_RGX.search(schema).group()
+    # extract table name and optional table_comment
+    table_name, table_comment = TABLE_COMMENT_RGX.search(schema).groups()
+    if table_comment:
+        # remove table comment from the schema after extraction
+        schema = TABLE_COMMENT_RGX.sub(r"create table \1 ", schema)
     # strip column metadata like top-k and timestamp values
     lines = schema.split("\n")
     num_lines = len(lines)
-    table_name, columns, table_comment = None, [], None
-
+    columns = []
+    comment_started, intermediate_colname, intermediate_dtype, intermediate_comment = False, None, None, ""
     for i, line in enumerate(lines, start=1):
         if i == 1:
-            # first line
-            table_name, table_comment = TABLE_COMMENT_RGX.search(line).groups()
-        elif i == num_lines:
-            # last line
-            raw_line = line.split(");")[0]
-            col_parts = get_column_parts(raw_line)
-            columns.append(col_parts)
+            # skip the first line
+            continue
+        if i == num_lines:
+            line = line.split(");")[0]
+        # remaining lines
+        if "/*" in line and "*/" in line and not comment_started:
+            # has single line comment
+            name, dtype, comment = get_column_parts(line)
+            columns.append((name, dtype, comment))
+        elif "/*" in line and "*/" not in line and not comment_started:
+            # line has hanging comment
+            name, dtype = COLUMN_NAME_DTYPE_RGX.search(line).groups()
+            comment_started, intermediate_colname, intermediate_dtype = True, name, dtype
+            intermediate_comment += line.split("/*")[1]
+        elif "/*" not in line and "*/" in line and comment_started:
+            # comment end line
+            intermediate_comment += "\n" + line.split("*/")[0]
+            columns.append((intermediate_colname, intermediate_dtype, intermediate_comment.strip()))
+            # reset to defaults
+            comment_started, intermediate_colname, intermediate_dtype, intermediate_comment = False, None, None, ""
+        elif comment_started:
+            # comment line
+            intermediate_comment += "\n" + line
         else:
-            col_parts = get_column_parts(line)
-            columns.append(col_parts)
+            # no comment
+            name, dtype = COLUMN_NAME_DTYPE_RGX.search(line).groups()
+            columns.append((name, dtype, None))
 
     return {"name": table_name, "comment": table_comment, "columns": columns}
 

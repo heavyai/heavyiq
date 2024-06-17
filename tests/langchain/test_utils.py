@@ -1,8 +1,9 @@
 import pytest
 
-from heavyiq.langchain.utils import get_column_parts
+from heavyiq.langchain.utils import retrieve_schema_details
 
-column_details = """
+column_details = """CREATE TABLE mlb_pitches /* mlb_pitches comment with 
+newline chars */ (
 SHAPE_LEN DOUBLE
 BASE_BBL TEXT (4163500400, 4163500300, 4163400050 ...)
 MPLUTO_BBL TEXT (4163500400, 4163500300, 4163400050 ...),
@@ -17,8 +18,11 @@ STATE_NAME TEXT ENCODING DICT(32) (Twitter for iPhone, Twitter for Android, Inst
   SHAPE_Leng DOUBLE[],
   SHAPE_Area DOUBLE[2],
   geom GEOMETRY(MULTIPOLYGON, 4326) ENCODING COMPRESSED(32)
-  geom GEOMETRY(MULTIPOLYGON, 4326) ENCODING COMPRESSED(32) (sadds,sda,sda,sdsd) /* bqda sdnbds*/
-"a var with space" TEXT ENCODING COMPRESSED(32) (sadds,sda,sda,sdsd) /* bqda sdnbds*/
+  geom_new GEOMETRY(MULTIPOLYGON, 4326) ENCODING COMPRESSED(32) (sadds,sda,sda,sdsd) /* bqda
+  multiline comment
+  new
+  sdnbds*/
+"a var with space" TEXT ENCODING COMPRESSED(32) (sadds,sda,sda,sdsd) /* bqda sdnbds*/);
 """
 expected_output = [
     ("SHAPE_LEN", "DOUBLE", None),
@@ -35,15 +39,16 @@ expected_output = [
     ("SHAPE_Leng", "DOUBLE[]", None),
     ("SHAPE_Area", "DOUBLE[2]", None),
     ("geom", "GEOMETRY(MULTIPOLYGON, 4326) ENCODING COMPRESSED(32)", None),
-    ("geom", "GEOMETRY(MULTIPOLYGON, 4326) ENCODING COMPRESSED(32)", "bqda sdnbds"),
+    ("geom_new", "GEOMETRY(MULTIPOLYGON, 4326) ENCODING COMPRESSED(32)", "bqda\n  multiline comment\n  new\n  sdnbds"),
     ('"a var with space"', "TEXT ENCODING COMPRESSED(32)", "bqda sdnbds"),
 ]
 
 
-def test_get_column_parts():
+def test_schema():
     """
     From the cached table schema, parse and return parts for each column in list of tuples patterm.
     """
-    lines = column_details.strip().split("\n")
-    for line, expected in zip(lines, expected_output):
-        assert get_column_parts(line) == expected
+    details = retrieve_schema_details(column_details.strip())
+    assert details["name"] == "mlb_pitches" and details["comment"] == "mlb_pitches comment with \nnewline chars"
+    for parts, expected in zip(details["columns"], expected_output):
+        assert parts == expected
