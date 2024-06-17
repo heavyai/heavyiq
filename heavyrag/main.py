@@ -57,6 +57,7 @@ async def retrieve_facts(
     similarity_top_k: int = 5,
     with_reranker: bool = False,
     reranker_top_n: int = 3,
+    reranker_cutoff: float = 0.01,
 ) -> list[NodeWithScore]:
     """
     Retrieve only the fact nodes which are relevant to the asked question without using llm.
@@ -102,6 +103,11 @@ async def retrieve_facts(
         filtered_nodes = await reranker.apostprocess_nodes(filtered_nodes, query_str=question)
         logger.debug(
             f"Rearranged nodes after applying ReRanking postprocessor: {[(i.id_, i.score) for i in filtered_nodes]}"
+        )
+        # apply postprocessor to drop off nodes which has the score lesser than the reranker_cutoff
+        filtered_nodes = SimilarityPostprocessor(similarity_cutoff=reranker_cutoff).postprocess_nodes(filtered_nodes)
+        logger.debug(
+            f"Filtered nodes after applying similarity postprocessor with reranker_cutoff {reranker_cutoff}: {[(i.id_, i.score) for i in filtered_nodes]}"
         )
 
     return filtered_nodes
