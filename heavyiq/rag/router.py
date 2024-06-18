@@ -111,42 +111,6 @@ async def ask_about_document(
     )
 
 
-@doc_router.post("/ask_facts", response_model=md.AskFactsResponse)
-async def ask_about_facts(
-    request: md.AskFactsRequest, collection_name: str = Depends(get_collection_name)
-) -> md.AskFactsResponse:
-    """
-    Ask questions regrading the uploaded docs.
-    """
-    from heavyrag.main import ask_facts
-
-    out = await ask_facts(
-        question=request.question,
-        heavydb_name=collection_name,
-        only_retrieve=request.only_retrieve,
-        do_evaluate=request.do_evaluate,
-        similarity_cutoff=CONFIG.rag_facts_similarity_cutoff_score,
-        similarity_top_k=CONFIG.rag_facts_similarity_top_k,
-        with_reranker=request.use_reranker,
-    )
-    if request.only_retrieve:
-        return md.AskFactsResponse(sources=out)
-
-    response, eval_result = out
-    passing, score = None, None
-    if eval_result:
-        passing = eval_result.passing
-        score = eval_result.score
-
-    return md.AskFactsResponse(
-        answer=response.response,
-        metadata=response.metadata,
-        sources=[i.get_content(metadata_mode="all") for i in response.source_nodes],
-        passing=passing,
-        score=score,
-    )
-
-
 table_router = APIRouter()
 
 
@@ -317,4 +281,42 @@ async def get_fact_nodes(
     nodes = await get_facts(heavydb_name=heavydb._dbname, limit=request.limit)
     return md.GetFactsfromIndexResponse(
         nodes=[md.GetFactsfromIndexResponse.Node(content=i.get_text(), metadata=i.metadata) for i in nodes]
+    )
+
+
+@facts_db_router.post("/ask", response_model=md.AskFactsResponse)
+async def ask_about_facts(
+    request: md.AskFactsRequest, collection_name: str = Depends(get_collection_name)
+) -> md.AskFactsResponse:
+    """
+    Ask questions regrading the uploaded facts.
+    """
+    from heavyrag.main import ask_facts
+
+    out = await ask_facts(
+        question=request.question,
+        heavydb_name=collection_name,
+        only_retrieve=request.only_retrieve,
+        do_evaluate=request.do_evaluate,
+        similarity_cutoff=CONFIG.rag_facts_similarity_cutoff_score,
+        similarity_top_k=CONFIG.rag_facts_similarity_top_k,
+        with_reranker=request.use_reranker,
+        reranker_top_k=CONFIG.rag_facts_reranker_top_k,
+        reranker_cutoff=CONFIG.rag_facts_reranker_cutoff_score,
+    )
+    if request.only_retrieve:
+        return md.AskFactsResponse(sources=out)
+
+    response, eval_result = out
+    passing, score = None, None
+    if eval_result:
+        passing = eval_result.passing
+        score = eval_result.score
+
+    return md.AskFactsResponse(
+        answer=response.response,
+        metadata=response.metadata,
+        sources=[i.get_content(metadata_mode="all") for i in response.source_nodes],
+        passing=passing,
+        score=score,
     )

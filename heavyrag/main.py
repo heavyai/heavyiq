@@ -56,7 +56,7 @@ async def retrieve_facts(
     similarity_cutoff: float = 0.30,
     similarity_top_k: int = 5,
     with_reranker: bool = False,
-    reranker_top_n: int = 3,
+    reranker_top_k: int = 3,
     reranker_cutoff: float = 0.01,
 ) -> list[NodeWithScore]:
     """
@@ -93,12 +93,12 @@ async def retrieve_facts(
     logger.debug(
         f"Filtered nodes after applying similarity postprocessor with similarity_cutoff {similarity_cutoff}: {[(i.id_, i.score) for i in filtered_nodes]}"
     )
-    if with_reranker or config.rag_rerank_server_base:
+    if with_reranker and config.rag_rerank_server_base:
         logger.debug("Started re-ranking filtered nodes...")
         # configure reranker
         reranker = TextEmbeddingsInferenceRerank(
             base_url=config.rag_rerank_server_base,
-            top_n=reranker_top_n,
+            top_n=reranker_top_k,
         )
         filtered_nodes = await reranker.apostprocess_nodes(filtered_nodes, query_str=question)
         logger.debug(
@@ -117,8 +117,10 @@ async def get_relevant_facts_info(
     question: str,
     heavydb_name: str,
     similarity_cutoff: float = 0.30,
-    similarity_top_k: int = 2,
+    similarity_top_k: int = 5,
     with_reranker: bool = False,
+    reranker_top_k: int = 3,
+    reranker_cutoff: float = 0.01,
 ) -> str:
     """
     Function which supposed to return facts information relevant to the asked question by querying the index.
@@ -132,6 +134,8 @@ async def get_relevant_facts_info(
         similarity_cutoff=similarity_cutoff,
         similarity_top_k=similarity_top_k,
         with_reranker=with_reranker,
+        reranker_top_k=reranker_top_k,
+        reranker_cutoff=reranker_cutoff,
     )
     for fact, metadata, score in retrieved_facts:
         facts_info += fact + "\n\n"
@@ -146,8 +150,10 @@ async def get_relevant_facts_info_from_cache(
     question: str,
     heavydb_name: str,
     similarity_cutoff: float = 0.30,
-    similarity_top_k: int = 2,
+    similarity_top_k: int = 5,
     with_reranker: bool = False,
+    reranker_top_k: int = 3,
+    reranker_cutoff: float = 0.01,
 ) -> str:
     """
     Get the relevant facts from cache or calculate.
@@ -158,6 +164,8 @@ async def get_relevant_facts_info_from_cache(
         similarity_cutoff=similarity_cutoff,
         similarity_top_k=similarity_top_k,
         with_reranker=with_reranker,
+        reranker_top_k=reranker_top_k,
+        reranker_cutoff=reranker_cutoff,
     )
 
 
@@ -178,8 +186,10 @@ async def ask_facts(
     only_retrieve: bool = True,
     do_evaluate: bool = False,
     similarity_cutoff: float = 0.30,
-    similarity_top_k: int = 2,
+    similarity_top_k: int = 5,
     with_reranker: bool = False,
+    reranker_top_k: int = 3,
+    reranker_cutoff: float = 0.01,
 ) -> tuple[RESPONSE_TYPE, EvaluationResult | None] | list[tuple[str, dict, float | None]]:
     """
     Search document, facts nodes and retrieve facts relevant to the asked question.
@@ -211,6 +221,8 @@ async def ask_facts(
             similarity_cutoff=similarity_cutoff,
             similarity_top_k=similarity_top_k,
             with_reranker=with_reranker,
+            reranker_top_k=reranker_top_k,
+            reranker_cutoff=reranker_cutoff,
         )
         return [(node.get_text(), node.metadata, node.score) for node in filtered_nodes]
 
