@@ -139,7 +139,24 @@ class GetFactRequest(BaseModelWithSessionID):
         }
 
 
-DeleteFactRequest = GetFactRequest
+class DeleteFactRequest(BaseModelWithSessionID):
+    """
+    Delete a list of fact ids.
+    """
+
+    fact_ids: list[str] = Field(..., description="Fact database record ID", min_length=1)
+
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {
+                    "session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+                    "fact_ids": ["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxv", "yyyyyyyyyyyyyyyyyyy"],
+                }
+            ]
+        }
+
+
 DeleteAllFactsRequest = ListFactsRequest
 
 

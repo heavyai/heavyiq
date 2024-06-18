@@ -91,17 +91,19 @@ class FactsModel(Base):
         return ids  # type: ignore
 
     @classmethod
-    def delete(cls: type["FactsModel"], db_session: Session, id: str) -> bool:
+    def delete(cls: type["FactsModel"], db_session: Session, ids: List[str]) -> bool:
         """
         Delete facts.
         """
-        record = cls.get(db_session=db_session, id=id)
-        if record:
-            db_session.delete(record)
+        assert ids
+        stmt = sqldelete(cls).returning(cls.id).where(cls.id.in_(ids))
+        out = db_session.execute(stmt)
+        deleted_ids = [i[0] for i in out.fetchall()]  # grab only the first value for all the returned rows
+        has_deleted = sorted(deleted_ids) == sorted(ids)
+        if has_deleted:
+            # commit only if the passed ids and the ids which are going to be deleted are same
             db_session.commit()
-            return True
-
-        return False
+        return has_deleted
 
     @classmethod
     def delete_facts_by_database(cls: type["FactsModel"], db_session: Session, heavydb_name: str) -> None:

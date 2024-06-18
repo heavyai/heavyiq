@@ -5,9 +5,9 @@ from collections import defaultdict
 from chromadb import Collection
 from llama_index.core import VectorStoreIndex
 from llama_index.core.indices.base import BaseIndex
-from llama_index.core.ingestion import IngestionPipeline
-from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.schema import BaseNode
+from llama_index.core.vector_stores import FilterCondition, FilterOperator, MetadataFilter, MetadataFilters
+from llama_index.vector_stores.chroma.base import _to_chroma_filter
 
 from heavyiq.langchain.heavydb import HeavyDB
 from heavyrag.index import acreate_index_and_insert_nodes, get_index, get_or_create_index
@@ -138,14 +138,18 @@ async def adelete_fact(fact_id: str, heavydb_name: str) -> BaseIndex:
     return index
 
 
-async def adelete_facts(heavydb_name: str) -> BaseIndex:
+async def adelete_facts(heavydb_name: str, fact_ids: list[str] | None = None) -> BaseIndex:
     """
-    Delete a particular fact by fact_id.
+    Delete a all database facts or specific facts.
     """
     index = get_index(collection_name=heavydb_name)
-    # deleet the relevant node by id
-    await adelete_database_facts(index=index, heavydb_name=heavydb_name)
-    logger.info(f"Index: Deleted all facts from {heavydb_name} collection.")
+    if fact_ids:
+        # delete only the facts associated with the passed facts ids
+        await adelete_facts_by_ids(index=index, heavydb_name=heavydb_name, facts_ids=fact_ids)
+    else:
+        # delete all the facts relevant to a particular database
+        await adelete_database_facts(index=index, heavydb_name=heavydb_name)
+        logger.info(f"Index: Deleted all facts from {heavydb_name} collection.")
     return index
 
 
@@ -222,6 +226,22 @@ async def adelete_database_facts(index: VectorStoreIndex, heavydb_name: str) -> 
     """
     collection = index.vector_store._collection
     return delete_nodes(collection=collection, where={"$and": [{"dbname": heavydb_name}, {"type": "facts"}]})
+
+
+async def adelete_facts_by_ids(index: VectorStoreIndex, heavydb_name: str, facts_ids: list[str]) -> None:
+    """
+    Delete specific facts.
+    """
+    collection = index.vector_store._collection
+    filters = MetadataFilters(
+        filters=[
+            MetadataFilter(key="type", operator=FilterOperator.EQ, value="facts"),
+            MetadataFilter(key="dbname", operator=FilterOperator.EQ, value=heavydb_name),
+            MetadataFilter(key="id", operator=FilterOperator.IN, value=facts_ids),
+        ],
+        condition=FilterCondition.AND,
+    )
+    return delete_nodes(collection=collection, where=_to_chroma_filter(filters))
 
 
 async def sync_table_index(heavydb: HeavyDB, force_sync: bool = False) -> VectorStoreIndex:

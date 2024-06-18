@@ -1,7 +1,6 @@
 from pathlib import Path
 
 from fastapi import APIRouter, Body, Depends, Form, HTTPException, UploadFile
-from sqlalchemy.orm import Session
 
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
@@ -263,12 +262,20 @@ async def delete_fact(
     """
     Delete a particular database fact.
     """
-    from heavyrag.ingest import adelete_fact
+    from heavyrag.ingest import adelete_facts
 
     with ragdb.get_db() as session:
-        await adelete_fact(fact_id=request.fact_id, heavydb_name=heavydb._dbname)
-        deleted = FactsModel.delete(db_session=session, id=request.fact_id)
-        return md.DeleteFactResponse(deleted=deleted)
+        session.begin()
+        try:
+            deleted = FactsModel.delete(db_session=session, ids=request.fact_ids)
+            if deleted:
+                await adelete_facts(heavydb_name=heavydb._dbname, fact_ids=request.fact_ids)
+                return md.DeleteFactResponse(deleted=True)
+            return md.DeleteFactResponse(deleted=False)
+
+        except Exception as e:
+            session.rollback()
+            raise e
 
 
 @facts_db_router.post("/list")
