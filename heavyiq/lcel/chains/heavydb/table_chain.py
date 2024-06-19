@@ -107,7 +107,7 @@ async def get_relevant_info_using_rag(inputs: dict) -> str:
     """
     Helps to get the table info for the prompt based upon the allowed token limit.
     """
-    from heavyrag.main import get_relevant_facts_info_from_cache
+    from heavyrag.main import get_relevant_facts_info
 
     if not CONFIG.custom_prompt_nl_to_tables_include_relevant_info:
         return ""
@@ -115,7 +115,7 @@ async def get_relevant_info_using_rag(inputs: dict) -> str:
     heavydb = await get_db(inputs["session_id"])
 
     try:
-        relevant_facts = await get_relevant_facts_info_from_cache(
+        relevant_facts = await get_relevant_facts_info(
             question=inputs["question"],
             heavydb_name=heavydb._dbname,
             similarity_cutoff=CONFIG.rag_facts_similarity_cutoff_score,
