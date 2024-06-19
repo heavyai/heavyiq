@@ -1,9 +1,11 @@
 import uuid
+from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import Column, String, Text
+import sqlalchemy as sa
+from sqlalchemy import Column, DateTime, String, Text
 from sqlalchemy import delete as sqldelete
-from sqlalchemy import update
+from sqlalchemy import event, update
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 
@@ -21,6 +23,8 @@ class FactsModel(Base):
     heavydb_name = Column(String, nullable=False)
     table_name = Column(String, nullable=True)
     fact = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=sa.func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=sa.func.now(), onupdate=sa.func.now(), nullable=False)
 
     @classmethod
     def get(cls: type["FactsModel"], db_session: Session, id: str) -> Optional["FactsModel"]:
@@ -33,7 +37,7 @@ class FactsModel(Base):
         """
         Serializes the current object.
         """
-        return {"id": self.id, "fact": self.fact}
+        return {"id": self.id, "fact": self.fact, "created_at": self.created_at, "updated_at": self.updated_at}
 
     @classmethod
     def list(

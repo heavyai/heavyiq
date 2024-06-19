@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -168,17 +170,32 @@ class AddSnippetResponse(BaseModel):
     snippet_id: str = Field(..., description="Snippet database record ID")
 
 
-class SnippetResponse(BaseModel):
+class Snippet(BaseModel):
     """
-    Fact response.
+    Defines a snippet.
     """
 
-    snippet: str | None = Field(default=None, description="Snippet")
+    snippet_id: str = Field(..., description="snippet_id")
+    snippet: str = Field(..., description="Snippet")
+    created_at: datetime | None = Field(default=None, description="The date and time when the snippet was created")
+    updated_at: datetime | None = Field(
+        default=None, description="The date and time when the snippet was last modified"
+    )
 
     class Config:
         json_schema_extra = {
-            "examples": [{"snippet": "Profitability of a well is defined by sum of oil * current oil price."}]
+            "examples": [
+                {
+                    "snippet_id": "9f4ece37daa04a1e956ae084d0ac8088",
+                    "snippet": "When asked for the play of a well, use play_designation.",
+                    "created_at": "2024-06-19T10:19:05",
+                    "updated_at": "2024-06-19T10:32:31",
+                }
+            ]
         }
+
+
+SnippetResponse = Snippet
 
 
 class DeleteSnippetResponse(BaseModel):
@@ -194,11 +211,23 @@ class ListSnippetsResponse(BaseModel):
     Fact list response.
     """
 
-    class Snippet(BaseModel):
-        snippet_id: str = Field(..., description="snippet_id")
-        snippet: str = Field(..., description="Snippet")
-
     snippets: list[Snippet] = Field(default=[], description="Snippet list")
+
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {
+                    "snippets": [
+                        {
+                            "snippet_id": "9f4ece37daa04a1e956ae084d0ac8088",
+                            "snippet": "When asked for the play of a well, use play_designation.",
+                            "created_at": "2024-06-19T10:19:05",
+                            "updated_at": "2024-06-19T10:32:31",
+                        }
+                    ]
+                }
+            ]
+        }
 
 
 class AskSnippetsRequest(BaseModelWithSessionID):

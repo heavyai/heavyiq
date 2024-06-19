@@ -251,7 +251,10 @@ async def list_snippets(
     """
     with ragdb.get_db() as session:
         facts = FactsModel.list(db_session=session, heavydb_name=heavydb._dbname, serialize=True)
-        snippets = [{"snippet_id": i["id"], "snippet": i["fact"]} for i in facts]
+        snippets = [
+            {"snippet_id": i["id"], "snippet": i["fact"], "created_at": i["created_at"], "updated_at": i["updated_at"]}
+            for i in facts
+        ]
         return md.ListSnippetsResponse(snippets=snippets)
 
 
