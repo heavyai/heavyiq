@@ -13,7 +13,6 @@ python3.10 -m venv venv
 mkdir -p ./dist
 cp requirements.txt ./dist/requirements.txt
 cp requirements-linux.txt ./dist/requirements-linux.txt
-cp requirements-no-deps.txt ./dist/requirements-no-deps.txt
 
 # if INTERNALLY_RELEASED_PYHEAVYDB is set
 # (see common_fn.sh argument processing)
@@ -31,7 +30,6 @@ test_for_include_all_deps ./dist/requirements.txt
 
 pip install -r ./dist/requirements.txt
 pip install -r ./dist/requirements-linux.txt
-pip install --no-deps -r ./dist/requirements-no-deps.txt
 pip freeze -l > ./dist/requirements.txt
 
 # pip freeze -l inserts an absolute path
