@@ -215,8 +215,10 @@ async def get_snippet(
     with ragdb.get_db() as session:
         fact = FactsModel.get(db_session=session, id=request.snippet_id)
         if fact and fact.heavydb_name == heavydb._dbname:
-            return md.SnippetResponse(snippet=fact.fact)
-        return md.SnippetResponse()
+            return md.SnippetResponse(
+                snippet=fact.fact, snippet_id=fact.id, created_at=fact.created_at, updated_at=fact.updated_at
+            )
+        raise HTTPException(status_code=404)
 
 
 @facts_db_router.post("/delete")
