@@ -6,8 +6,9 @@ from .agent_commands import agent
 from .chain_commands import chain
 from .eval_commands import eval
 from .gen_commands import gen
-from .metadata_index_commands import metadata_index
 from .heavydb_commands import db
+from .metadata_index_commands import metadata_index
+from .rag_commands import rag
 
 init_telemetrics()
 
@@ -24,3 +25,4 @@ cli.add_command(eval)
 cli.add_command(gen)
 cli.add_command(metadata_index)
 cli.add_command(db)
+cli.add_command(rag)
