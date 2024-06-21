@@ -16,7 +16,7 @@ from heavyrag.index import get_index
 from heavyrag.ingest import sync_table_index
 from heavyrag.llm import get_llm
 from heavyrag.logger import logger
-from heavyrag.postprocessor import TextEmbeddingsInferenceRerank
+from heavyrag.postprocessor import OverridedLLMRerank, TextEmbeddingsInferenceRerank
 from heavyrag.prompts import FACTS_QA_PROMPT, TEXT_QA_PROMPT
 from heavyrag.utils import get_nodes, is_document_node_in_index, is_facts_node_in_index
 
@@ -93,14 +93,16 @@ async def retrieve_facts(
     logger.debug(
         f"Filtered nodes after applying similarity postprocessor with similarity_cutoff {similarity_cutoff}: {[(i.id_, i.score) for i in filtered_nodes]}"
     )
-    if with_reranker and config.rag_rerank_server_base:
+    if with_reranker:
         logger.debug("Started re-ranking filtered nodes...")
         # configure reranker
-        reranker = TextEmbeddingsInferenceRerank(
-            base_url=config.rag_rerank_server_base,
-            top_n=reranker_top_k,
-        )
-        filtered_nodes = await reranker.apostprocess_nodes(filtered_nodes, query_str=question)
+        # reranker = TextEmbeddingsInferenceRerank(
+        #     base_url=config.rag_rerank_server_base,
+        #     top_n=reranker_top_k,
+        # )
+        # filtered_nodes = await reranker.apostprocess_nodes(filtered_nodes, query_str=question)
+        reranker = OverridedLLMRerank(top_n=reranker_top_k)
+        filtered_nodes = reranker.postprocess_nodes(filtered_nodes, query_str=question)
         logger.debug(
             f"Rearranged nodes after applying ReRanking postprocessor: {[(i.id_, i.score) for i in filtered_nodes]}"
         )

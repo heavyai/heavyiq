@@ -3,8 +3,15 @@ from typing import Any, Callable, List, Optional, Union
 
 from llama_index.core.bridge.pydantic import Field
 from llama_index.core.callbacks import CBEventType, EventPayload
+from llama_index.core.llms.llm import LLM
+from llama_index.core.postprocessor import LLMRerank
 from llama_index.core.postprocessor.types import BaseNodePostprocessor
+from llama_index.core.prompts import BasePromptTemplate
 from llama_index.core.schema import MetadataMode, NodeWithScore, QueryBundle
+from llama_index.core.service_context import ServiceContext
+
+from .llm import get_rerank_llm
+from .prompts import RAG_RERANK_CHOICE_SELECT_PROMPT
 
 DEFAULT_SENTENCE_TRANSFORMER_MAX_LENGTH = 512
 
@@ -177,3 +184,37 @@ class TextEmbeddingsInferenceRerank(TEIServerFetchMixin, BaseNodePostprocessor):
         else:
             pass
         return await self._apostprocess_nodes(nodes, query_bundle)
+
+
+class OverridedLLMRerank(LLMRerank):
+    """
+    Overrided LLMRerank class.
+    This enables us to include custom prompt and answer tokens on the prompt.
+    """
+
+    def __init__(
+        self,
+        llm: Optional[LLM] = None,
+        choice_select_prompt: Optional[BasePromptTemplate] = None,
+        choice_batch_size: int = 10,
+        format_node_batch_fn: Optional[Callable] = None,
+        parse_choice_select_answer_fn: Optional[Callable] = None,
+        service_context: Optional[ServiceContext] = None,
+        top_n: int = 10,
+    ) -> None:
+        choice_select_prompt = choice_select_prompt or RAG_RERANK_CHOICE_SELECT_PROMPT
+        if not llm:
+            llm = get_rerank_llm()
+        super().__init__(
+            llm=llm,
+            choice_select_prompt=choice_select_prompt,
+            choice_batch_size=choice_batch_size,
+            format_node_batch_fn=format_node_batch_fn,
+            parse_choice_select_answer_fn=parse_choice_select_answer_fn,
+            service_context=service_context,
+            top_n=top_n,
+        )
+
+    @classmethod
+    def class_name(cls: type["OverridedLLMRerank"]) -> str:
+        return "OverridedLLMRerank"
