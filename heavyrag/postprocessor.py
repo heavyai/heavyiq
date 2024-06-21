@@ -1,3 +1,4 @@
+import re
 from abc import abstractproperty
 from typing import Any, Callable, List, Optional, Union
 
@@ -7,7 +8,7 @@ from llama_index.core.llms.llm import LLM
 from llama_index.core.postprocessor import LLMRerank
 from llama_index.core.postprocessor.types import BaseNodePostprocessor
 from llama_index.core.prompts import BasePromptTemplate
-from llama_index.core.schema import MetadataMode, NodeWithScore, QueryBundle
+from llama_index.core.schema import BaseNode, MetadataMode, NodeWithScore, QueryBundle
 from llama_index.core.service_context import ServiceContext
 
 from .llm import get_rerank_llm
@@ -186,6 +187,49 @@ class TextEmbeddingsInferenceRerank(TEIServerFetchMixin, BaseNodePostprocessor):
         return await self._apostprocess_nodes(nodes, query_bundle)
 
 
+def overrided_format_node_batch_fn(
+    summary_nodes: List[BaseNode],
+) -> str:
+    """Default format node batch function.
+
+    Assign each summary node a number, and format the batch of nodes.
+
+    """
+    fmt_node_txts = []
+    for idx in range(len(summary_nodes)):
+        number = idx + 1
+        fmt_node_txts.append(f"Hint {number}:\n" f"{summary_nodes[idx].get_content(metadata_mode=MetadataMode.NONE)}")
+    return "\n\n".join(fmt_node_txts)
+
+
+def overrided_parse_choice_select_answer_fn(
+    answer: str, num_choices: int, raise_error: bool = False
+) -> tuple[List[int], List[float]]:
+    """Default parse choice select answer function."""
+    answer_lines = answer.split("\n")
+    answer_nums = []
+    answer_relevances = []
+    for answer_line in answer_lines:
+        line_tokens = answer_line.split(":")
+        if len(line_tokens) != 2:
+            if not raise_error:
+                continue
+            else:
+                raise ValueError(
+                    f"Invalid answer line: {answer_line}. "
+                    "Answer line must be of the form: "
+                    "Hint <answer_num|int>: <answer_relevance|int>"
+                )
+        answer_num = int(line_tokens[0].split()[1].strip())
+        if answer_num > num_choices:
+            continue
+        answer_nums.append(answer_num)
+        # extract just the first digits after the colon.
+        _answer_relevance = int(line_tokens[1].strip())
+        answer_relevances.append(_answer_relevance)
+    return answer_nums, answer_relevances
+
+
 class OverridedLLMRerank(LLMRerank):
     """
     Overrided LLMRerank class.
@@ -200,11 +244,14 @@ class OverridedLLMRerank(LLMRerank):
         format_node_batch_fn: Optional[Callable] = None,
         parse_choice_select_answer_fn: Optional[Callable] = None,
         service_context: Optional[ServiceContext] = None,
-        top_n: int = 10,
     ) -> None:
         choice_select_prompt = choice_select_prompt or RAG_RERANK_CHOICE_SELECT_PROMPT
         if not llm:
             llm = get_rerank_llm()
+        if not format_node_batch_fn:
+            format_node_batch_fn = overrided_format_node_batch_fn
+        if not parse_choice_select_answer_fn:
+            parse_choice_select_answer_fn = overrided_parse_choice_select_answer_fn
         super().__init__(
             llm=llm,
             choice_select_prompt=choice_select_prompt,
@@ -212,9 +259,42 @@ class OverridedLLMRerank(LLMRerank):
             format_node_batch_fn=format_node_batch_fn,
             parse_choice_select_answer_fn=parse_choice_select_answer_fn,
             service_context=service_context,
-            top_n=top_n,
         )
 
     @classmethod
     def class_name(cls: type["OverridedLLMRerank"]) -> str:
         return "OverridedLLMRerank"
+
+    def _postprocess_nodes(
+        self,
+        nodes: List[NodeWithScore],
+        query_bundle: Optional[QueryBundle] = None,
+    ) -> List[NodeWithScore]:
+        if query_bundle is None:
+            raise ValueError("Query bundle must be provided.")
+        if len(nodes) == 0:
+            return []
+
+        initial_results: List[NodeWithScore] = []
+        for idx in range(0, len(nodes), self.choice_batch_size):
+            nodes_batch = [node.node for node in nodes[idx : idx + self.choice_batch_size]]
+
+            query_str = query_bundle.query_str
+            fmt_batch_str = self._format_node_batch_fn(nodes_batch)
+            # call each batch independently
+            raw_response = self.llm.predict(
+                self.choice_select_prompt,
+                context_str=fmt_batch_str,
+                query_str=query_str,
+            )
+
+            raw_choices, relevances = self._parse_choice_select_answer_fn(raw_response, len(nodes_batch))
+            choice_idxs = [int(choice) - 1 for choice in raw_choices]
+            choice_nodes = [nodes_batch[idx] for idx in choice_idxs]
+            relevances = relevances or [1.0 for _ in choice_nodes]
+            initial_results.extend(
+                [NodeWithScore(node=node, score=relevance) for node, relevance in zip(choice_nodes, relevances)]
+            )
+
+        # return only the nodes having the score greater than 0, ie. 1, so no need for top-k
+        return [i for i in initial_results if i.score > 0]
