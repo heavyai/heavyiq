@@ -47,8 +47,10 @@ async def eval(dataset: str):
     """
     Evaluate RAG get_relevant_info function.
     """
-    rag_eval_id = uuid4().hex[:8]
+
+    config, rag_eval_id = get_config(), uuid4().hex[:8]
     rag_str = f"rag_{rag_eval_id}"
+    output_file_path = f"./eval/results/{rag_str}_queries.csv"
     logger.info(f"RAG Eval ID: {rag_eval_id}")
     tasks, output_rows, final_rows_to_write = [], [], []
     for dbname, rows in read_and_group_csv(dataset, group_by_column_idx=1, header=True).items():
@@ -59,8 +61,8 @@ async def eval(dataset: str):
                     dbname,
                     only_retrieve=True,
                     do_evaluate=False,
-                    similarity_cutoff=0.30,
-                    similarity_top_k=8,
+                    similarity_cutoff=config.rag_facts_similarity_cutoff_score,
+                    similarity_top_k=config.rag_facts_similarity_top_k,
                     with_reranker=True,
                 )
             )
@@ -94,7 +96,6 @@ async def eval(dataset: str):
 
     if final_rows_to_write:
         logger.info("Started writing output csv...")
-        output_file_path = f"./eval/results/{rag_str}_queries.csv"
         write_csv(
             output_file_path,
             headers=[
@@ -117,5 +118,9 @@ async def eval(dataset: str):
         [i[-1] for i in final_rows_to_write]
     )
     print(
-        f"Total row count: {total_row_count}\nSum of false positives: {sum_false_positive}\nSum of false negatives: {sum_false_negative}"
+        f"Total row count: {total_row_count}\n"
+        f"Summary for evaluation: {rag_str}\n"
+        f"Results file: {output_file_path}\n"
+        f"Sum of false positives: {sum_false_positive}\n"
+        f"Sum of false negatives: {sum_false_negative}"
     )
