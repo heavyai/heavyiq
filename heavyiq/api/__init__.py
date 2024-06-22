@@ -91,8 +91,8 @@ def include_rag_routers(app: FastAPI) -> None:
     )
     app.include_router(
         facts_db_router,
-        prefix="/rag/facts",
-        tags=["rag.facts"],
+        prefix="/rag/snippets",
+        tags=["rag.snippets"],
         responses={
             500: {
                 "description": "Internal Server Error",
