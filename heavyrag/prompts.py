@@ -98,6 +98,9 @@ RAG_RERANK_CHOICE_SELECT_PROMPT_TMPL = (
     "Question: {query_str}\n"
     f"{CONFIG.rag_rerank_llm_end_token}"
 )
+DEFAULT_RAG_RERANK_CHOICE_SELECT_PROMPT = PromptTemplate(
+    DEFAULT_RAG_RERANK_CHOICE_SELECT_PROMPT_TMPL, prompt_type=PromptType.CHOICE_SELECT
+)
 RAG_RERANK_CHOICE_SELECT_PROMPT = PromptTemplate(
     RAG_RERANK_CHOICE_SELECT_PROMPT_TMPL, prompt_type=PromptType.CHOICE_SELECT
 )
