@@ -1,4 +1,3 @@
-import re
 from abc import abstractproperty
 from enum import Enum, auto
 from functools import partial

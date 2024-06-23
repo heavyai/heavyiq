@@ -157,8 +157,15 @@ async def eval(dataset: str):
             predicted_answer_tei.append(int(snippet_metadata["id"]))
 
         valid_answers = set(answer + also_acceptable_answer)
+
         false_positive = len(set(predicted_answer) - valid_answers)
         false_negative = len(set(answer) - set(predicted_answer))
+
+        default_false_positive = len(set(predicted_answer_default) - valid_answers)
+        default_false_negative = len(set(answer) - set(predicted_answer_default))
+
+        tei_false_positive = len(set(predicted_answer_tei) - valid_answers)
+        tei_false_negative = len(set(answer) - set(predicted_answer_tei))
 
         # check for any one predicted answer exists in answer and also_accepted_answer
         # if yes then set status as True else False
@@ -178,7 +185,11 @@ async def eval(dataset: str):
                 false_positive,
                 false_negative,
                 predicted_answer_default,
+                default_false_positive,
+                default_false_negative,
                 predicted_answer_tei,
+                tei_false_positive,
+                tei_false_negative,
             ]
         )
 
@@ -197,7 +208,11 @@ async def eval(dataset: str):
                 "false_positive",
                 "false_negative",
                 "default_predicted_answer",
+                "default_false_positive",
+                "default_false_negative",
                 "tei_predicted_answer",
+                "tei_false_positive",
+                "tei_false_negative",
             ],
             rows=final_rows_to_write,
         )
@@ -207,10 +222,20 @@ async def eval(dataset: str):
     sum_false_positive, sum_false_negative = sum([i[7] for i in final_rows_to_write]), sum(
         [i[8] for i in final_rows_to_write]
     )
+    sum_default_false_positive, sum_default_false_negative = sum([i[10] for i in final_rows_to_write]), sum(
+        [i[11] for i in final_rows_to_write]
+    )
+    sum_tei_false_positive, sum_tei_false_negative = sum([i[13] for i in final_rows_to_write]), sum(
+        [i[14] for i in final_rows_to_write]
+    )
     print(
         f"Total row count: {total_row_count}\n"
         f"Summary for evaluation: {rag_str}\n"
         f"Results file: {output_file_path}\n"
-        f"Sum of false positives: {sum_false_positive}\n"
-        f"Sum of false negatives: {sum_false_negative}"
+        f"Sum of Hint false positives: {sum_false_positive}\n"
+        f"Sum of Hint false negatives: {sum_false_negative}\n"
+        f"Sum of Default false positives: {sum_default_false_positive}\n"
+        f"Sum of Default false negatives: {sum_default_false_negative}\n"
+        f"Sum of TEI false positives: {sum_tei_false_positive}\n"
+        f"Sum of TEI false negatives: {sum_tei_false_negative}\n"
     )
