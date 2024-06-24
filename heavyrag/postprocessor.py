@@ -1,3 +1,4 @@
+import math
 from abc import abstractproperty
 from enum import Enum, auto
 from functools import partial
@@ -287,23 +288,40 @@ class OverridedLLMRerank(LLMRerank):
 
             query_str = query_bundle.query_str
             fmt_batch_str = self._format_node_batch_fn(nodes_batch)
-            # call each batch independently
-            raw_response = self.llm.predict(
+
+            gen_response = self.llm.stream(
                 self.choice_select_prompt,
+                logprobs=True,
                 context_str=fmt_batch_str,
                 query_str=query_str,
             )
+            response, previous_token = "", ()
+            predicted_tokens_probability = []
+            for token, logprobs in gen_response:
+                response += token
+                if token == "\n" or token == "":
+                    if previous_token and (previous_token[0] in ["1", "0"]):
+                        if previous_token[0] == "1":
+                            probability = math.exp(previous_token[1])
+                        else:
+                            probability = 1 - math.exp(previous_token[1])
 
-            raw_choices, relevances = self._parse_choice_select_answer_fn(raw_response, len(nodes_batch))
+                        predicted_tokens_probability.append(probability)
+                previous_token = (token, logprobs["token_logprobs"][0])
+
+            raw_choices, relevances = self._parse_choice_select_answer_fn(response, len(nodes_batch))
             choice_idxs = [int(choice) - 1 for choice in raw_choices]
             choice_nodes = [nodes_batch[idx] for idx in choice_idxs]
             relevances = relevances or [1.0 for _ in choice_nodes]
             initial_results.extend(
-                [NodeWithScore(node=node, score=relevance) for node, relevance in zip(choice_nodes, relevances)]
+                [
+                    NodeWithScore(node=node, score=relevance)
+                    for node, relevance in zip(choice_nodes, predicted_tokens_probability)
+                ]
             )
 
-        # return only the nodes having the score greater than 0, ie. 1, so no need for top-k
-        return [i for i in initial_results if i.score > 0]
+        # sort initial results in descending order
+        return sorted(initial_results, key=lambda k: -k.score)
 
 
 class ReRankerType(Enum):
@@ -360,7 +378,9 @@ class ReRanker:
             filtered_nodes = processor.postprocess_nodes(rearranged_nodes)
         elif isinstance(self.instance, OverridedLLMRerank):
             # greedily grab all the nodes having the score 1
-            filtered_nodes = self.instance._postprocess_nodes(nodes=nodes, query_bundle=query_bundle)
+            rearranged_nodes = self.instance._postprocess_nodes(nodes=nodes, query_bundle=query_bundle)
+            processor = SimilarityPostprocessor(similarity_cutoff=self.cutoff_score)
+            filtered_nodes = processor.postprocess_nodes(rearranged_nodes)
         elif isinstance(self.instance, LLMRerank):
             # apply top-n and similarity cut-off
             rearranged_nodes = self.instance._postprocess_nodes(nodes=nodes, query_bundle=query_bundle)
