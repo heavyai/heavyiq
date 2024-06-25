@@ -212,7 +212,9 @@ async def ask_facts(
         f"do_evaluate: {do_evaluate}\n"
         f"similarity_cutoff: {similarity_cutoff}\n"
         f"similarity_top_k: {similarity_top_k}\n"
-        f"with_reranker: {with_reranker}"
+        f"with_reranker: {with_reranker}\n"
+        f"reranker_top_k: {reranker_top_k}\n"
+        f"reranker_cutoff: {reranker_cutoff}"
     )
 
     if only_retrieve:
