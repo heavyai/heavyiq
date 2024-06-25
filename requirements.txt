@@ -1,5 +1,4 @@
 aiocsv==1.2.4
-
 aiofiles==23.2.1
 chromadb-pysqlite3==0.5.3
 confz==2.0.1
