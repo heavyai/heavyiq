@@ -1,9 +1,11 @@
 import uuid
-from typing import Optional
+from datetime import datetime
+from typing import List, Optional
 
-from sqlalchemy import Column, String, Text
+import sqlalchemy as sa
+from sqlalchemy import Column, DateTime, String, Text
 from sqlalchemy import delete as sqldelete
-from sqlalchemy import update
+from sqlalchemy import event, update
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 
@@ -21,6 +23,8 @@ class FactsModel(Base):
     heavydb_name = Column(String, nullable=False)
     table_name = Column(String, nullable=True)
     fact = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=sa.func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=sa.func.now(), onupdate=sa.func.now(), nullable=False)
 
     @classmethod
     def get(cls: type["FactsModel"], db_session: Session, id: str) -> Optional["FactsModel"]:
@@ -33,7 +37,7 @@ class FactsModel(Base):
         """
         Serializes the current object.
         """
-        return {"id": self.id, "fact": self.fact}
+        return {"id": self.id, "fact": self.fact, "created_at": self.created_at, "updated_at": self.updated_at}
 
     @classmethod
     def list(
@@ -79,17 +83,31 @@ class FactsModel(Base):
         return inserted_id
 
     @classmethod
-    def delete(cls: type["FactsModel"], db_session: Session, id: str) -> bool:
+    def bulk_insert(cls: type["FactsModel"], db_session: Session, heavydb_name: str, facts: List[str]) -> List[str]:
+        """
+        Bulk insert facts.
+        """
+        ids = db_session.scalars(
+            insert(cls).values(heavydb_name=heavydb_name).returning(cls.id, sort_by_parameter_order=True),
+            [{"fact": fact} for fact in facts],
+        ).all()
+        db_session.commit()
+        return ids  # type: ignore
+
+    @classmethod
+    def delete(cls: type["FactsModel"], db_session: Session, ids: List[str]) -> bool:
         """
         Delete facts.
         """
-        record = cls.get(db_session=db_session, id=id)
-        if record:
-            db_session.delete(record)
+        assert ids
+        stmt = sqldelete(cls).returning(cls.id).where(cls.id.in_(ids))
+        out = db_session.execute(stmt)
+        deleted_ids = [i[0] for i in out.fetchall()]  # grab only the first value for all the returned rows
+        has_deleted = sorted(deleted_ids) == sorted(ids)
+        if has_deleted:
+            # commit only if the passed ids and the ids which are going to be deleted are same
             db_session.commit()
-            return True
-
-        return False
+        return has_deleted
 
     @classmethod
     def delete_facts_by_database(cls: type["FactsModel"], db_session: Session, heavydb_name: str) -> None:

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -77,112 +79,158 @@ class TableNamesRequest(BaseModelWithSessionID):
         }
 
 
-class AddFactRequest(BaseModelWithSessionID):
+class AddSnippetRequest(BaseModelWithSessionID):
     """
-    Add fact relevant to a particular database.
+    Add snippet relevant to a particular database.
     """
 
-    fact: str = Field(..., description="Fact")
+    snippet: str = Field(..., description="Snippet")
 
     class Config:
         json_schema_extra = {
             "examples": [
                 {
                     "session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-                    "fact": "Profitability of a well is defined by sum of oil * current oil price + sum of gas * current gas price - expense column.",
+                    "snippet": "Profitability of a well is defined by sum of oil * current oil price + sum of gas * current gas price - expense column.",
                 }
             ]
         }
 
 
-class UpdateFactRequest(BaseModelWithSessionID):
+class UpdateSnippetRequest(BaseModelWithSessionID):
     """
-    Update existing fact.
+    Update existing snippet.
     """
 
-    fact_id: str = Field(..., description="Fact database record ID")
-    fact: str = Field(..., description="Fact description")
+    snippet_id: str = Field(..., description="Snippet database record ID")
+    snippet: str = Field(..., description="Snippet description")
 
     class Config:
         json_schema_extra = {
             "examples": [
                 {
                     "session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-                    "fact_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-                    "fact": "Profitability of a well is defined by sum of oil * current oil price + sum of gas * current gas price - expense column.",
+                    "snippet_id": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+                    "snippet": "Profitability of a well is defined by sum of oil * current oil price + sum of gas * current gas price - expense column.",
                 }
             ]
         }
 
 
-class ListFactsRequest(BaseModelWithSessionID):
+class ListSnippetsRequest(BaseModelWithSessionID):
     """
-    Get facts relevant to a particular database.
+    Get snippets relevant to a particular database.
     """
 
     class Config:
         json_schema_extra = {"examples": [{"session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}]}
 
 
-class GetFactRequest(BaseModelWithSessionID):
+class GetSnippetRequest(BaseModelWithSessionID):
     """
-    Get facts relevant to a particular database.
+    Get relevant snippet by snippet id.
     """
 
-    fact_id: str = Field(..., description="Fact database record ID")
+    snippet_id: str = Field(..., description="Snippet database record ID")
 
     class Config:
         json_schema_extra = {
             "examples": [
-                {"session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "fact_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxv"}
+                {"session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "snippet_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxv"}
             ]
         }
 
 
-DeleteFactRequest = GetFactRequest
-DeleteAllFactsRequest = ListFactsRequest
+class DeleteSnippetsRequest(BaseModelWithSessionID):
+    """
+    Delete a list of snippet ids.
+    """
+
+    snippet_ids: list[str] = Field(..., description="Fact database record ID", min_length=1)
+
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {
+                    "session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+                    "snippet_ids": ["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxv", "yyyyyyyyyyyyyyyyyyy"],
+                }
+            ]
+        }
 
 
-class AddFactResponse(BaseModel):
+DeleteAllSnippetsRequest = ListSnippetsRequest
+
+
+class AddSnippetResponse(BaseModel):
     """
     Add Fact response.
     """
 
-    fact_id: str = Field(..., description="Fact database record ID")
+    snippet_id: str = Field(..., description="Snippet database record ID")
 
 
-class FactResponse(BaseModel):
+class Snippet(BaseModel):
     """
-    Fact response.
+    Defines a snippet.
     """
 
-    fact: str | None = Field(default=None, description="facts")
+    snippet_id: str = Field(..., description="snippet_id")
+    snippet: str = Field(..., description="Snippet")
+    created_at: datetime | None = Field(default=None, description="The date and time when the snippet was created")
+    updated_at: datetime | None = Field(
+        default=None, description="The date and time when the snippet was last modified"
+    )
 
     class Config:
-        json_schema_extra = {"examples": [{"fact": "asddsssddsdd"}]}
+        json_schema_extra = {
+            "examples": [
+                {
+                    "snippet_id": "9f4ece37daa04a1e956ae084d0ac8088",
+                    "snippet": "When asked for the play of a well, use play_designation.",
+                    "created_at": "2024-06-19T10:19:05",
+                    "updated_at": "2024-06-19T10:32:31",
+                }
+            ]
+        }
 
 
-class DeleteFactResponse(BaseModel):
+SnippetResponse = Snippet
+
+
+class DeleteSnippetResponse(BaseModel):
     """
-    Delete facts response.
+    Delete snippets response.
     """
 
-    deleted: bool = Field(default=False, description="Shows whether the object gets deleted or not.")
+    deleted: bool = Field(default=False, description="Shows whether the snippet gets deleted or not.")
 
 
-class ListFactsResponse(BaseModel):
+class ListSnippetsResponse(BaseModel):
     """
     Fact list response.
     """
 
-    class Fact(BaseModel):
-        id: str = Field(..., description="fact_id")
-        fact: str = Field(..., description="Fact")
+    snippets: list[Snippet] = Field(default=[], description="Snippet list")
 
-    facts: list[Fact] = Field(default=[], description="Facts list")
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {
+                    "snippets": [
+                        {
+                            "snippet_id": "9f4ece37daa04a1e956ae084d0ac8088",
+                            "snippet": "When asked for the play of a well, use play_designation.",
+                            "created_at": "2024-06-19T10:19:05",
+                            "updated_at": "2024-06-19T10:32:31",
+                        }
+                    ]
+                }
+            ]
+        }
 
 
-class AskFactsRequest(BaseModelWithSessionID):
+class AskSnippetsRequest(BaseModelWithSessionID):
     question: str = Field(..., description="Natural language question")
     only_retrieve: bool = Field(default=True, description="Retrieve Only")
     do_evaluate: bool = Field(default=False, description="Evaluate the response generated by llm")
@@ -204,9 +252,9 @@ class AskFactsRequest(BaseModelWithSessionID):
         }
 
 
-class GetFactsfromIndexRequest(BaseModelWithSessionID):
+class GetSnippetsfromIndexRequest(BaseModelWithSessionID):
     """
-    Get facts relevant to a particular database.
+    Get snippets relevant to a particular database.
     """
 
     limit: int = Field(default=100, description="How many nodes to return..")
@@ -215,9 +263,9 @@ class GetFactsfromIndexRequest(BaseModelWithSessionID):
         json_schema_extra = {"examples": [{"session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "limit": 100}]}
 
 
-class GetFactsfromIndexResponse(BaseModel):
+class GetSnippetsfromIndexResponse(BaseModel):
     """
-    Get facts relevant to a particular database.
+    Get snippets relevant to a particular database.
     """
 
     class Node(BaseModel):
@@ -227,4 +275,25 @@ class GetFactsfromIndexResponse(BaseModel):
     nodes: list[Node] = Field(..., description="List of nodes")
 
 
-AskFactsResponse = AskDocumentResponse
+AskSnippetsResponse = AskDocumentResponse
+
+
+class BulkInsertSnippetsRequest(BaseModelWithSessionID):
+    """
+    Bulk Insert snippets request.
+    """
+
+    snippets: list[str] = Field(..., description="List of snippets.")
+
+    class Config:
+        json_schema_extra = {
+            "examples": [{"session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "snippets": ["snippet1", "snippet2"]}]
+        }
+
+
+class BulkInsertSnippetsResponse(BaseModel):
+    """
+    Bulk Insert snippets response.
+    """
+
+    snippet_ids: list[str] = Field(default=[], description="List of inserted snippet ids")

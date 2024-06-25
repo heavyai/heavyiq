@@ -153,10 +153,12 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     rag_embed_server_base: Optional[str] = None
     rag_rerank_server_base: Optional[str] = None
     rag_database_uri: str = "sqlite:///ragdb.sqlite"  # db for storing data relevant to RAG processing, ie. facts
-    rag_facts_similarity_top_k: int = 3
+    rag_facts_similarity_top_k: int = 8
     rag_facts_similarity_cutoff_score: float = (
         0.45  # score should be ranges from 0.0 to 1.0 (high value means more accurate)
     )
+    rag_facts_reranker_top_k: int = 3
+    rag_facts_reranker_cutoff_score: float = 0.01
 
 
 class AppConfig(OverrideBaseConfig):  # type: ignore
