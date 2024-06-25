@@ -1,4 +1,5 @@
 import asyncio
+from typing import Literal
 from uuid import uuid4
 
 import click
@@ -84,88 +85,77 @@ async def retrieve_facts(args: RetrieveFactsArgs) -> list[tuple[str, dict, float
 
 @snippets.command()
 @coro
+@click.option(
+    "--reranker-type", default="hint", show_default=True, help="Type of reranker to use. (e.g., hint, document, tei)"
+)
 @click.argument("dataset", type=str)
-async def eval(dataset: str):
+async def eval(dataset: str, reranker_type: Literal["document", "hint", "tei"]):
     """
     Evaluate RAG get_relevant_info function.
     """
 
     config, rag_eval_id = get_config(), uuid4().hex[:8]
-    rag_str = f"rag_{rag_eval_id}"
+    rag_str = f"rag_{reranker_type}_{rag_eval_id}"
     output_file_path = f"./eval/results/{rag_str}_queries.csv"
     logger.info(f"RAG Eval ID: {rag_eval_id}")
-    deafult_llm_reranker_tasks, hint_llm_reranker_tasks, tei_reranker_tasks, output_rows, final_rows_to_write = (
-        [],
-        [],
+    reranker_tasks, output_rows, final_rows_to_write = (
         [],
         [],
         [],
     )
+    if reranker_type not in ["document", "hint", "tei"]:
+        raise ValueError(f"Invalid reranker_type {reranker_type}")
+
     for dbname, rows in read_and_group_csv(dataset, group_by_column_idx=1, header=True).items():
         for row in rows:
-            default_args = RetrieveFactsArgs(
-                question=row[2],
-                dbname=dbname,
-                similarity_top_k=config.rag_facts_similarity_top_k,
-                similarity_cutoff=config.rag_facts_similarity_cutoff_score,
-                rerank_top_k=config.rag_facts_reranker_top_k,
-                rerank_cutoff=config.rag_facts_reranker_cutoff_score,
-                reranker_type=ReRankerType.DefaultLLMReRanker,
-            )
-            hint_args = RetrieveFactsArgs(
-                question=row[2],
-                dbname=dbname,
-                similarity_top_k=config.rag_facts_similarity_top_k,
-                similarity_cutoff=config.rag_facts_similarity_cutoff_score,
-                rerank_top_k=config.rag_facts_reranker_top_k,
-                rerank_cutoff=config.rag_facts_reranker_cutoff_score,
-                reranker_type=ReRankerType.OverridedLLMReRanker,
-            )
-            tei_args = RetrieveFactsArgs(
-                question=row[2],
-                dbname=dbname,
-                similarity_top_k=config.rag_facts_similarity_top_k,
-                similarity_cutoff=config.rag_facts_similarity_cutoff_score,
-                rerank_top_k=config.rag_facts_reranker_top_k,
-                rerank_cutoff=config.rag_facts_reranker_cutoff_score,
-                reranker_type=ReRankerType.TEIReRanker,
-            )
-            deafult_llm_reranker_tasks.append(retrieve_facts(default_args))
-            hint_llm_reranker_tasks.append(retrieve_facts(hint_args))
-            tei_reranker_tasks.append(retrieve_facts(tei_args))
+            reranker_args = None
+            if reranker_type == "document":
+                reranker_args = RetrieveFactsArgs(
+                    question=row[2],
+                    dbname=dbname,
+                    similarity_top_k=config.rag_facts_similarity_top_k,
+                    similarity_cutoff=config.rag_facts_similarity_cutoff_score,
+                    rerank_top_k=config.rag_facts_reranker_top_k,
+                    rerank_cutoff=config.rag_facts_reranker_cutoff_score,
+                    reranker_type=ReRankerType.DefaultLLMReRanker,
+                )
+            elif reranker_type == "hint":
+                reranker_args = RetrieveFactsArgs(
+                    question=row[2],
+                    dbname=dbname,
+                    similarity_top_k=config.rag_facts_similarity_top_k,
+                    similarity_cutoff=config.rag_facts_similarity_cutoff_score,
+                    rerank_top_k=config.rag_facts_reranker_top_k,
+                    rerank_cutoff=config.rag_facts_reranker_cutoff_score,
+                    reranker_type=ReRankerType.OverridedLLMReRanker,
+                )
+            else:
+                reranker_args = RetrieveFactsArgs(
+                    question=row[2],
+                    dbname=dbname,
+                    similarity_top_k=config.rag_facts_similarity_top_k,
+                    similarity_cutoff=config.rag_facts_similarity_cutoff_score,
+                    rerank_top_k=config.rag_facts_reranker_top_k,
+                    rerank_cutoff=config.rag_facts_reranker_cutoff_score,
+                    reranker_type=ReRankerType.TEIReRanker,
+                )
+            reranker_tasks.append(retrieve_facts(reranker_args))
             output_rows.append(row)
 
-    retrieved_contents_from_default_prompt = await asyncio.gather(*deafult_llm_reranker_tasks)
-    retrieved_contents_from_hint_prompt = await asyncio.gather(*hint_llm_reranker_tasks)
-    retrieved_contents_from_tei = await asyncio.gather(*tei_reranker_tasks)
+    retrieved_contents = await asyncio.gather(*reranker_tasks)
 
-    for output_row, hint_output, default_output, tei_output in zip(
-        output_rows,
-        retrieved_contents_from_hint_prompt,
-        retrieved_contents_from_default_prompt,
-        retrieved_contents_from_tei,
-    ):
-        predicted_answer, predicted_answer_default, predicted_answer_tei = [], [], []
+    for output_row, output in zip(output_rows, retrieved_contents):
+        predicted_answer = []
         answer = string_to_list(output_row[3])
         also_acceptable_answer = string_to_list(output_row[4])
 
-        for _, snippet_metadata, _ in hint_output:
+        for _, snippet_metadata, _ in output:
             predicted_answer.append(int(snippet_metadata["id"]))
-        for _, snippet_metadata, _ in default_output:
-            predicted_answer_default.append(int(snippet_metadata["id"]))
-        for _, snippet_metadata, _ in tei_output:
-            predicted_answer_tei.append(int(snippet_metadata["id"]))
 
         valid_answers = set(answer + also_acceptable_answer)
 
         false_positive = len(set(predicted_answer) - valid_answers)
         false_negative = len(set(answer) - set(predicted_answer))
-
-        default_false_positive = len(set(predicted_answer_default) - valid_answers)
-        default_false_negative = len(set(answer) - set(predicted_answer_default))
-
-        tei_false_positive = len(set(predicted_answer_tei) - valid_answers)
-        tei_false_negative = len(set(answer) - set(predicted_answer_tei))
 
         # check for any one predicted answer exists in answer and also_accepted_answer
         # if yes then set status as True else False
@@ -177,20 +167,7 @@ async def eval(dataset: str):
 
         final_rows_to_write.append(
             output_row[:3]
-            + [
-                answer,
-                also_acceptable_answer,
-                predicted_answer,
-                is_success,
-                false_positive,
-                false_negative,
-                predicted_answer_default,
-                default_false_positive,
-                default_false_negative,
-                predicted_answer_tei,
-                tei_false_positive,
-                tei_false_negative,
-            ]
+            + [answer, also_acceptable_answer, predicted_answer, is_success, false_positive, false_negative]
         )
 
     if final_rows_to_write:
@@ -207,12 +184,6 @@ async def eval(dataset: str):
                 "success",
                 "false_positive",
                 "false_negative",
-                "default_predicted_answer",
-                "default_false_positive",
-                "default_false_negative",
-                "tei_predicted_answer",
-                "tei_false_positive",
-                "tei_false_negative",
             ],
             rows=final_rows_to_write,
         )
@@ -222,20 +193,10 @@ async def eval(dataset: str):
     sum_false_positive, sum_false_negative = sum([i[7] for i in final_rows_to_write]), sum(
         [i[8] for i in final_rows_to_write]
     )
-    sum_default_false_positive, sum_default_false_negative = sum([i[10] for i in final_rows_to_write]), sum(
-        [i[11] for i in final_rows_to_write]
-    )
-    sum_tei_false_positive, sum_tei_false_negative = sum([i[13] for i in final_rows_to_write]), sum(
-        [i[14] for i in final_rows_to_write]
-    )
     print(
         f"Total row count: {total_row_count}\n"
         f"Summary for evaluation: {rag_str}\n"
         f"Results file: {output_file_path}\n"
-        f"Sum of Hint false positives: {sum_false_positive}\n"
-        f"Sum of Hint false negatives: {sum_false_negative}\n"
-        f"Sum of Default false positives: {sum_default_false_positive}\n"
-        f"Sum of Default false negatives: {sum_default_false_negative}\n"
-        f"Sum of TEI false positives: {sum_tei_false_positive}\n"
-        f"Sum of TEI false negatives: {sum_tei_false_negative}\n"
+        f"Sum of {reranker_type} false positives: {sum_false_positive}\n"
+        f"Sum of {reranker_type} false negatives: {sum_false_negative}\n"
     )
