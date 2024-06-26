@@ -66,6 +66,10 @@ async def get_relevant_info_using_rag(inputs: dict) -> str:
     if not CONFIG.custom_prompt_nl_to_sql_include_relevant_info:
         return ""
 
+    pre_calculated_relevant_info = inputs.get("pre_calculated_relevant_info", None)
+    if pre_calculated_relevant_info is not None:
+        return pre_calculated_relevant_info
+
     heavydb = await get_db(inputs["session_id"])
 
     try:

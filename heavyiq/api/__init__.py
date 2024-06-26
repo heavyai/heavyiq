@@ -61,6 +61,15 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
         set_llm_cache(InMemoryLLMCache())
 
 
+def add_rag_db_exception_handlers(app: FastAPI) -> None:
+    """
+    Adding RAG DB exception handlers to the fastapi app.
+    """
+    from heavyrag.database import RAGDBIntegrityError
+
+    app.add_exception_handler(RAGDBIntegrityError, exh.ragdb_integrity_exception_handler)
+
+
 def include_rag_routers(app: FastAPI) -> None:
     """
     Include RAG routers
@@ -160,6 +169,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
     app.add_exception_handler(GenerateTableMetadataException, exh.generate_table_metadata_exception_handler)
     app.add_exception_handler(NLtoTableException, exh.nl_to_tables_exception_handler)
     app.add_exception_handler(Exception, exh.unhandled_exception_handler)
+    add_rag_db_exception_handlers(app)
 
     # Include your API routes
     app.include_router(defaultrouter)

@@ -56,3 +56,51 @@ REFINE_TABLE_NAME_PROMPT = PromptTemplate(
     format_prompt(DEFAULT_REFINE_TABLE_NAME_TMPL), prompt_type=PromptType.TABLE_CONTEXT
 )
 FACTS_QA_PROMPT = PromptTemplate(format_prompt(FACTS_PROMPT_TMPL), prompt_type=PromptType.QUESTION_ANSWER)
+
+# TODO: remove this prompt
+DEFAULT_RAG_RERANK_CHOICE_SELECT_PROMPT_TMPL = (
+    f"{CONFIG.rag_rerank_llm_start_token}A list of documents is shown below. Each document has a number next to it along "
+    "with a summary of the document. A question is also provided. \n"
+    "Respond with the numbers of the documents "
+    "you should consult to answer the question, in order of relevance, as well \n"
+    "as the relevance score. The relevance score is a number from 1-10 based on "
+    "how relevant you think the document is to the question.\n"
+    "Do not include any documents that are not relevant to the question. \n"
+    "Example format: \n"
+    "Document 1:\n<summary of document 1>\n\n"
+    "Document 2:\n<summary of document 2>\n\n"
+    "...\n\n"
+    "Document 10:\n<summary of document 10>\n\n"
+    "Question: <question>\n"
+    "Answer:\n"
+    "Doc: 9, Relevance: 7\n"
+    "Doc: 3, Relevance: 4\n"
+    "Doc: 7, Relevance: 3\n\n"
+    "Let's try this now: \n\n"
+    "{context_str}\n"
+    "Question: {query_str}\n"
+    f"Answer:{CONFIG.rag_rerank_llm_end_token}"
+)
+RAG_RERANK_CHOICE_SELECT_PROMPT_TMPL = (
+    f"{CONFIG.rag_rerank_llm_start_token}A numbered list of potentially relevant hints to answer a question is shown below. The question is also provided. \n"
+    "Respond with a list of each hint number along with a 1 if the hint is helpful to answer the question, or a 0 if not.\n"
+    "Example format: \n"
+    "Hint 1:\n<content of hint 1>\n\n"
+    "Hint 2:\n<content of hint 2>\n\n"
+    "...\n\n"
+    "Question: <question>\n"
+    f"{CONFIG.rag_rerank_llm_end_token}\n"
+    "Hint 1: 0|1\n"
+    "Hint 2: 0|1\n"
+    "...\n\n"
+    "Let's try this now: \n\n"
+    "{context_str}\n\n"
+    "Question: {query_str}\n"
+    f"{CONFIG.rag_rerank_llm_end_token}"
+)
+DEFAULT_RAG_RERANK_CHOICE_SELECT_PROMPT = PromptTemplate(
+    DEFAULT_RAG_RERANK_CHOICE_SELECT_PROMPT_TMPL, prompt_type=PromptType.CHOICE_SELECT
+)
+RAG_RERANK_CHOICE_SELECT_PROMPT = PromptTemplate(
+    RAG_RERANK_CHOICE_SELECT_PROMPT_TMPL, prompt_type=PromptType.CHOICE_SELECT
+)

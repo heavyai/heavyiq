@@ -16,7 +16,7 @@ from heavyrag.index import get_index
 from heavyrag.ingest import sync_table_index
 from heavyrag.llm import get_llm
 from heavyrag.logger import logger
-from heavyrag.postprocessor import TextEmbeddingsInferenceRerank
+from heavyrag.postprocessor import OverridedLLMRerank, TextEmbeddingsInferenceRerank
 from heavyrag.prompts import FACTS_QA_PROMPT, TEXT_QA_PROMPT
 from heavyrag.utils import get_nodes, is_document_node_in_index, is_facts_node_in_index
 
@@ -93,16 +93,18 @@ async def retrieve_facts(
     logger.debug(
         f"Filtered nodes after applying similarity postprocessor with similarity_cutoff {similarity_cutoff}: {[(i.id_, i.score) for i in filtered_nodes]}"
     )
-    if with_reranker and config.rag_rerank_server_base:
+    if with_reranker:
         logger.debug("Started re-ranking filtered nodes...")
         # configure reranker
-        reranker = TextEmbeddingsInferenceRerank(
-            base_url=config.rag_rerank_server_base,
-            top_n=reranker_top_k,
-        )
-        filtered_nodes = await reranker.apostprocess_nodes(filtered_nodes, query_str=question)
+        # reranker = TextEmbeddingsInferenceRerank(
+        #     base_url=config.rag_rerank_server_base,
+        #     top_n=reranker_top_k,
+        # )
+        # filtered_nodes = await reranker.apostprocess_nodes(filtered_nodes, query_str=question)
+        reranker = OverridedLLMRerank()
+        filtered_nodes = reranker.postprocess_nodes(filtered_nodes, query_str=question)
         logger.debug(
-            f"Rearranged nodes after applying ReRanking postprocessor: {[(i.id_, i.score) for i in filtered_nodes]}"
+            f"Filtered nodes after applying ReRanking postprocessor: {[(i.id_, i.score) for i in filtered_nodes]}"
         )
         # apply postprocessor to drop off nodes which has the score lesser than the reranker_cutoff
         filtered_nodes = SimilarityPostprocessor(similarity_cutoff=reranker_cutoff).postprocess_nodes(filtered_nodes)
@@ -210,7 +212,9 @@ async def ask_facts(
         f"do_evaluate: {do_evaluate}\n"
         f"similarity_cutoff: {similarity_cutoff}\n"
         f"similarity_top_k: {similarity_top_k}\n"
-        f"with_reranker: {with_reranker}"
+        f"with_reranker: {with_reranker}\n"
+        f"reranker_top_k: {reranker_top_k}\n"
+        f"reranker_cutoff: {reranker_cutoff}"
     )
 
     if only_retrieve:
