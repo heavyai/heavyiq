@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import List, Optional
 
 import sqlalchemy as sa
-from sqlalchemy import Column, DateTime, String, Text
+from sqlalchemy import Column, DateTime, String, Text, UniqueConstraint
 from sqlalchemy import delete as sqldelete
 from sqlalchemy import event, update
 from sqlalchemy.dialects.sqlite import insert
@@ -25,6 +25,8 @@ class FactsModel(Base):
     fact = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=sa.func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=sa.func.now(), onupdate=sa.func.now(), nullable=False)
+
+    __table_args__ = (UniqueConstraint("heavydb_name", "fact", name="uix_1"),)
 
     @classmethod
     def get(cls: type["FactsModel"], db_session: Session, id: str) -> Optional["FactsModel"]:
@@ -101,7 +103,7 @@ class FactsModel(Base):
         """
         assert ids
         stmt = sqldelete(cls).returning(cls.id).where(cls.id.in_(ids))
-        out = db_session.execute(stmt)
+        out = db_session.execute(stmt, execution_options={"synchronize_session": "fetch"})
         deleted_ids = [i[0] for i in out.fetchall()]  # grab only the first value for all the returned rows
         has_deleted = sorted(deleted_ids) == sorted(ids)
         if has_deleted:
@@ -117,3 +119,10 @@ class FactsModel(Base):
         stmt = sqldelete(cls).where(cls.heavydb_name == heavydb_name)
         db_session.execute(stmt)
         db_session.commit()
+
+
+# Custom exception class
+class RAGDBIntegrityError(Exception):
+    def __init__(self, message: str, original_exception: Exception):
+        super().__init__(message)
+        self.original_exception = original_exception

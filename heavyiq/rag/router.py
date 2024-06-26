@@ -1,12 +1,13 @@
 from pathlib import Path
 
+import sqlalchemy.exc as sqlalchemy_exc
 from fastapi import APIRouter, Body, Depends, Form, HTTPException, UploadFile
 
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
 from heavyiq.logging_utils import get_heavyiq_logger
 from heavyiq.rag import models as md
-from heavyrag.database import FactsModel, ragdb
+from heavyrag.database import FactsModel, RAGDBIntegrityError, ragdb
 
 CONFIG = get_config()
 doc_router = APIRouter()
@@ -150,6 +151,8 @@ async def add_snippet(
             await ainsert_fact(fact_id=fact_id, fact=request.snippet, heavydb_name=heavydb._dbname)
 
             return md.AddSnippetResponse(snippet_id=fact_id)
+        except sqlalchemy_exc.IntegrityError as e:
+            raise RAGDBIntegrityError("UNIQUE constraint failed on fact", e)
         except Exception as e:
             if fact_id:
                 FactsModel.delete(db_session=session, ids=[fact_id])
@@ -167,7 +170,7 @@ async def bulk_insert_snippets(
     from heavyrag.ingest import ainsert_facts
 
     with ragdb.get_db() as session:
-        session.begin()
+        fact_ids: list[str] = []
         try:
             # add db record
             fact_ids = FactsModel.bulk_insert(db_session=session, heavydb_name=heavydb._dbname, facts=request.snippets)
@@ -175,8 +178,11 @@ async def bulk_insert_snippets(
             await ainsert_facts(facts=list(zip(fact_ids, request.snippets)), heavydb_name=heavydb._dbname)
 
             return md.BulkInsertSnippetsResponse(snippet_ids=fact_ids)
+        except sqlalchemy_exc.IntegrityError as e:
+            raise RAGDBIntegrityError("UNIQUE constraint failed on fact", e)
         except Exception as e:
-            session.rollback()
+            if fact_ids:
+                FactsModel.delete(db_session=session, ids=fact_ids)
             raise e
 
 
@@ -200,6 +206,8 @@ async def update_snippet(
             await aupdate_fact(fact_id=request.snippet_id, fact=request.snippet, heavydb_name=heavydb._dbname)
 
             return md.AddSnippetResponse(snippet_id=request.snippet_id)
+        except sqlalchemy_exc.IntegrityError as e:
+            raise RAGDBIntegrityError("UNIQUE constraint failed on fact", e)
 
         except Exception as e:
             raise e
@@ -231,7 +239,6 @@ async def delete_snippets(
     from heavyrag.ingest import adelete_facts
 
     with ragdb.get_db() as session:
-        session.begin()
         try:
             deleted = FactsModel.delete(db_session=session, ids=request.snippet_ids)
             if deleted:
@@ -240,7 +247,6 @@ async def delete_snippets(
             return md.DeleteSnippetResponse(deleted=False)
 
         except Exception as e:
-            session.rollback()
             raise e
 
 
@@ -270,13 +276,11 @@ async def delete_all_snippets(
     from heavyrag.ingest import adelete_facts
 
     with ragdb.get_db() as session:
-        session.begin()
         try:
             FactsModel.delete_facts_by_database(db_session=session, heavydb_name=heavydb._dbname)
             await adelete_facts(heavydb_name=heavydb._dbname)
             return md.DeleteSnippetResponse(deleted=True)
         except Exception as e:
-            session.rollback()
             raise e
 
 
