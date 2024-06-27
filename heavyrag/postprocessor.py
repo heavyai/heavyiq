@@ -251,6 +251,7 @@ class OverridedLLMRerank(LLMRerank):
         format_node_batch_fn: Optional[Callable] = None,
         parse_choice_select_answer_fn: Optional[Callable] = None,
         service_context: Optional[ServiceContext] = None,
+        top_n: int = 10,
     ) -> None:
         choice_select_prompt = choice_select_prompt or RAG_RERANK_CHOICE_SELECT_PROMPT
         if not llm:
@@ -266,6 +267,7 @@ class OverridedLLMRerank(LLMRerank):
             format_node_batch_fn=format_node_batch_fn,
             parse_choice_select_answer_fn=parse_choice_select_answer_fn,
             service_context=service_context,
+            top_n=top_n,
         )
 
     @classmethod
@@ -321,7 +323,7 @@ class OverridedLLMRerank(LLMRerank):
             )
 
         # sort initial results in descending order
-        return sorted(initial_results, key=lambda k: -k.score)
+        return sorted(initial_results, key=lambda x: x.score or 0.0, reverse=True)[: self.top_n]
 
 
 class ReRankerType(Enum):
