@@ -16,9 +16,9 @@ def get_value_from_runnable_binding(
         return binding.default
     value = binding.bound._prepare(binding.config)  # type: ignore
     if value and isinstance(value, tuple):
-        actual_value = value[0]
+        actual_value, attached_config = value
         if isinstance(actual_value, RunnableConfigurableFields):
-            return actual_value._prepare(config)[0]  # type: ignore
+            return actual_value._prepare(config or attached_config)[0]  # type: ignore
         return actual_value
     return value
 

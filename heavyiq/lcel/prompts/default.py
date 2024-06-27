@@ -88,6 +88,43 @@ Write a compelling question to ask of the above data:""",
     """\n<|table question answer|>\n""",
 )
 
+DEFAULT_NL_TO_MULTIPLE_SQL_JUDGE_PROMPT = (
+    "<|prompt|>\n",
+    """You are an expert data analyst adept at picking right SQL queries from a list of SQL queries which answer user questions.
+A numbered list of potentially relevant SQL queries to answer a question is shown below. The question and table information is also provided.
+Respond with a list of each SQL number along with a 1 if the SQL query is helpful to answer the question, or a 0 if not.
+
+Table Information:
+
+{table_info}
+
+Example format: 
+
+SQL 1: 
+<SQL query 1>
+
+SQL 2: 
+<SQL query 2>
+
+…
+
+SQL 5: 
+<SQL query 5>
+
+
+Question:  <question>
+\n<|answer|>\n
+SQL 1 : 0|1
+SQL 2: 0|1
+SQL 5: 0|1
+
+Let's try this now:
+{context_str}
+
+Question: {question}""",
+    "\n<|answer|>\n",
+)
+
 DEFAULT_INSTRUCT_PROMPT = ("<|prompt|>\n", "{question}", "\n<|answer|>\n")
 
 

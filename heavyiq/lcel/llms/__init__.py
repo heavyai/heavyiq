@@ -51,6 +51,9 @@ llm_runnable = (
         nl_to_sql_error=partial(make_llm_configurable, LLMType.NL_TO_SQL_ERROR, default_temperature=0.0, **llm_configurable_fields),  # type: ignore
         sql_to_answer=partial(make_llm_configurable, LLMType.SQL_TO_ANSWER, default_temperature=0.0, **llm_configurable_fields),  # type: ignore
         nl_to_tables=partial(make_llm_configurable, LLMType.NL_TO_TABLES, default_temperature=0.0, **llm_configurable_fields),  # type: ignore
+        nl_to_multiple_sql=partial(
+            make_llm_configurable, LLMType.NL_TO_MULTIPLE_SQL, default_temperature=0.0, **llm_configurable_fields
+        ),
         tables_to_questions=partial(
             make_llm_configurable, LLMType.TABLES_TO_QUESTIONS, default_temperature=0.0, **llm_configurable_fields
         ),  # type: ignore

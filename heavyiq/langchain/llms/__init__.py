@@ -20,6 +20,8 @@ class LLMType(Enum):
     DEFAULT = "default"
     NL_TO_SQL = "nl_to_sql"
     NL_TO_SQL_COT = "nl_to_sql_cot"
+    NL_TO_MULTIPLE_SQL = "nl_to_multiple_sql"
+    NL_TO_MULTIPLE_SQL_JUDGE = "nl_to_multiple_sql_judge"
     NL_TO_SQL_ERROR = "nl_to_sql_error"
     NL_TO_SQL_COT_ERROR = "nl_to_sql_cot_error"
     SQL_TO_ANSWER = "sql_to_answer"
@@ -65,6 +67,10 @@ def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str
         kwargs["n"] = 1
     if model_type in [LLMType.NL_TO_SQL, LLMType.NL_TO_SQL_ERROR]:
         kwargs["max_tokens"] = config.custom_llm_api_vllm_max_tokens
+    if model_type in [LLMType.NL_TO_MULTIPLE_SQL]:
+        kwargs["max_tokens"] = config.custom_llm_api_vllm_max_tokens
+        model_kwargs["use_beam_search"] = False
+        kwargs["n"] = 5
     return kwargs, {"extra_body": model_kwargs} if model_kwargs else {}
 
 
@@ -122,11 +128,14 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
                     break
             api_base, context_window = custom_llm_mapping[found_key]
         else:
-            api_base, context_window = (
-                custom_llm_mapping[LLMType.DEFAULT]
-                if custom_llm_mapping[model_type][0] is None
-                else custom_llm_mapping[model_type]
-            )
+            if model_type not in custom_llm_mapping:
+                api_base, context_window = custom_llm_mapping[LLMType.DEFAULT]
+            else:
+                api_base, context_window = (
+                    custom_llm_mapping[LLMType.DEFAULT]
+                    if custom_llm_mapping[model_type][0] is None
+                    else custom_llm_mapping[model_type]
+                )
         return _get_custom_llm(model_type, api_base, context_window, **kwargs)  # type: ignore
 
 
