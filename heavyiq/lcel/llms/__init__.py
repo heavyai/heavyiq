@@ -54,6 +54,9 @@ llm_runnable = (
         nl_to_multiple_sql=partial(
             make_llm_configurable, LLMType.NL_TO_MULTIPLE_SQL, default_temperature=0.0, **llm_configurable_fields
         ),
+        nl_to_multiple_sql_judge=partial(
+            make_llm_configurable, LLMType.NL_TO_MULTIPLE_SQL_JUDGE, default_temperature=0.0, **llm_configurable_fields
+        ),
         tables_to_questions=partial(
             make_llm_configurable, LLMType.TABLES_TO_QUESTIONS, default_temperature=0.0, **llm_configurable_fields
         ),  # type: ignore

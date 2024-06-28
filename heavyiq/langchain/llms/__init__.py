@@ -71,6 +71,11 @@ def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str
         kwargs["max_tokens"] = config.custom_llm_api_vllm_max_tokens
         model_kwargs["use_beam_search"] = False
         kwargs["n"] = 5
+    if model_type == LLMType.NL_TO_MULTIPLE_SQL_JUDGE:
+        # enable logprobs
+        model_kwargs["logprobs"] = config.custom_llm_logprobs_limit
+        kwargs["n"] = 1
+        kwargs["max_tokens"] = config.custom_llm_api_vllm_max_tokens
     return kwargs, {"extra_body": model_kwargs} if model_kwargs else {}
 
 
