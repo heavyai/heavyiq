@@ -498,16 +498,37 @@ async def run_config_model_on_auto_questions(
 @eval.command()
 @coro
 @click.option("--temperature", default=0.0, help="Temperature for LLM (Defaults to 0.0)", type=float)
-@click.option("--verbose", default=False, help="Verbose output", type=bool)
+@click.option("--n", default=1, help="number of generations", type=int)
+@click.option("--best-of", default=2, help="best_of, ie. vllm beam width", type=int)
+@click.option("--verbose", "-v", is_flag=True, help="Verbose output")
+@click.option(
+    "--generate", "-g", is_flag=True, help="-g alone should pick an sql query from the list of generated sql queries"
+)
+@click.option("--disable-beam-search", "-d", is_flag=True, help="-d alone should disable beam search")
+@click.option("--expand", "-e", is_flag=True, help="Expand and write the generated sql queries into multiple rows")
 @click.argument("eval_dataset_csv", type=str)
 @click.pass_context  # type: ignore
 async def run_config_model_on_questions_lcel(
-    ctx: click.Context, eval_dataset_csv: str, temperature: float, verbose: bool
+    ctx: click.Context,
+    eval_dataset_csv: str,
+    expand: bool,
+    disable_beam_search: bool,
+    generate: bool,
+    verbose: bool,
+    best_of: int,
+    n: int,
+    temperature: float,
 ):
     """
     Run config model on questions using lcel approach.
     """
     from heavyiq.lcel.chains import sql_chain
+    from heavyiq.lcel.chains.heavydb.sql_gen_chain import filter_valid_queries_chain
+
+    if generate:
+        chain = filter_valid_queries_chain
+    else:
+        chain = sql_chain
 
     set_verbose(verbose)
     logger = get_heavyiq_logger()
@@ -539,7 +560,7 @@ async def run_config_model_on_questions_lcel(
         for _ in range(processor_count):
             await queue.put(None)
 
-    async def predict_query(question: str, gold_query: str, db: HeavyDB) -> tuple[str, str]:
+    async def predict_query(question: str, gold_query: str, db: HeavyDB) -> tuple[list[str], str]:
         """
         Predicts the target query.
 
@@ -553,8 +574,26 @@ async def run_config_model_on_questions_lcel(
         out: dict = {"query": None, "error": None}
         async with heavydb_context(db):
             tables = await aextract_tables_from_query(db, gold_query)
-            out = await sql_chain.ainvoke({"question": question, "tables": tables, "session_id": db._conn._session})
-        return out["query"], out["error"]
+            if not generate:
+                out = await chain.ainvoke(
+                    {"question": question, "tables": tables, "session_id": db._conn._session},
+                    config={"configurable": {"llm_n": n, "llm_temperature": temperature}},
+                )
+                return [out["query"]], out["error"]
+            else:
+                # generate, so the chain output should be a list of SQL queries
+                model_kwargs = {"extra_body": {"use_beam_search": False if disable_beam_search else True}}
+                llm_args = {
+                    "llm_n": n,
+                    "llm_temperature": temperature,
+                    "llm_best_of": best_of,
+                    "llm_model_kwargs": model_kwargs,
+                }
+                out = await chain.ainvoke(
+                    {"question": question, "tables": tables, "session_id": db._conn._session},
+                    config={"configurable": llm_args},
+                )
+                return out, ""
 
     async def processor(input_queue: asyncio.Queue, output_queue: asyncio.Queue, processor_id: int):
         """
@@ -565,7 +604,6 @@ async def run_config_model_on_questions_lcel(
             item = await input_queue.get()
 
             if item is None:
-                print(f"Processor {processor_id} stopped!")
                 await output_queue.put(None)
                 await asyncio.sleep(0.1)
                 input_queue.task_done()
@@ -579,54 +617,125 @@ async def run_config_model_on_questions_lcel(
                 db_id, question, gold_query, *optional_gold_queries = item
 
             db = await HeavyDB.from_env_async(db_id)
-            pred_query, query_error = await predict_query(question, gold_query, db)
+            pred_queries, query_error = await predict_query(question, gold_query, db)
+            pred_queries = set(pred_queries)  # remove duplicates
+
+            output_items = []
 
             if not query_error:
-                try:
-                    gold_queries = [gold_query] + optional_gold_queries
-                    for gold in gold_queries:
-                        if not gold:
-                            continue
-                        if check_predicted_query_equals_gold_query(pred_query, gold):
-                            gold_query = gold
-                            break
-                    eval_res = await sql_rate_reply(gold_query, pred_query, db=db, question=question)
-                    if eval_res.get("error"):
-                        del db
-                        db = await HeavyDB.from_env_async(db_id)
-                    query_stats = await db.aquery_stats(pred_query)
+                if generate and expand:
+                    for genid, pred_query in enumerate(pred_queries, start=1):
+                        gold_queries = [gold_query] + optional_gold_queries
+                        for gold in gold_queries:
+                            if not gold:
+                                continue
+                            if check_predicted_query_equals_gold_query(pred_query, gold):
+                                gold_query = gold
+                                break
+                        eval_res = await sql_rate_reply(gold_query, pred_query, db=db, question=question)
+                        if eval_res.get("error"):
+                            del db
+                            db = await HeavyDB.from_env_async(db_id)
+                        try:
+                            query_stats = await db.aquery_stats(pred_query)
+                        except Exception as e:
+                            eval_res_success = False
+                            eval_res_status = "failed_to_generate_sql"
+                            error = f"Failed to calculate query stats, {e}"
+                            eval_res_error = error
+                            logger.error(error)
+                        else:
+                            eval_res_success = eval_res["success"]
+                            eval_res_status = eval_res["status"]
+                            eval_res_error = eval_res["error"]
+                            logger.info(f"Evaluation Success: {eval_res['success']}")
 
-                except Exception as e:
-                    eval_res_success = False
-                    eval_res_status = "failed_to_generate_sql"
-                    error = f"Failed to calculate query stats, {e}"
-                    eval_res_error = error
-                    logger.error(error)
+                        output_items.append(
+                            (
+                                query_id,
+                                db_id,
+                                question,
+                                gold_query,
+                                pred_query,
+                                eval_res_success,
+                                eval_res_status,
+                                eval_res_error,
+                                prob_stats,
+                                query_stats,
+                                genid,
+                            )
+                        )
                 else:
-                    eval_res_success = eval_res["success"]
-                    eval_res_status = eval_res["status"]
-                    eval_res_error = eval_res["error"]
-                    logger.info(f"Evaluation Success: {eval_res['success']}")
+                    # this gets executed with and without generate option
+                    final_query, eval_res = "", {}
+                    for pred_query in pred_queries:
+                        final_query = pred_query
+
+                        gold_queries = [gold_query] + optional_gold_queries
+                        for gold in gold_queries:
+                            if not gold:
+                                continue
+                            if check_predicted_query_equals_gold_query(pred_query, gold):
+                                gold_query = gold
+                                break
+                        eval_res = await sql_rate_reply(gold_query, pred_query, db=db, question=question)
+                        if eval_res.get("error"):
+                            del db
+                            db = await HeavyDB.from_env_async(db_id)
+                        elif eval_res.get("success"):
+                            break
+
+                    try:
+                        query_stats = await db.aquery_stats(final_query)
+                    except Exception as e:
+                        eval_res_success = False
+                        eval_res_status = "failed_to_generate_sql"
+                        error = f"Failed to calculate query stats, {e}"
+                        eval_res_error = error
+                        logger.error(error)
+                    else:
+                        eval_res_success = eval_res["success"]
+                        eval_res_status = eval_res["status"]
+                        eval_res_error = eval_res["error"]
+                        logger.info(f"Evaluation Success: {eval_res['success']}")
+                    output_items.append(
+                        (
+                            query_id,
+                            db_id,
+                            question,
+                            gold_query,
+                            pred_query,
+                            eval_res_success,
+                            eval_res_status,
+                            eval_res_error,
+                            prob_stats,
+                            query_stats,
+                        )
+                    )
             else:
                 eval_res_success = False
                 eval_res_status = "failed_to_generate_sql"
                 eval_res_error = query_error
+                pred_query = next(iter(pred_queries))
                 logger.error("Error occurs while predicting the query.")
 
-            output_item = (
-                query_id,
-                db_id,
-                question,
-                gold_query,
-                pred_query,
-                eval_res_success,
-                eval_res_status,
-                eval_res_error,
-                prob_stats,
-                query_stats,
-            )
+                output_items.append(
+                    (
+                        query_id,
+                        db_id,
+                        question,
+                        gold_query,
+                        pred_query,
+                        eval_res_success,
+                        eval_res_status,
+                        eval_res_error,
+                        prob_stats,
+                        query_stats,
+                    )
+                )
 
-            await output_queue.put(output_item)
+            for output_item in output_items:
+                await output_queue.put(output_item)
             await asyncio.sleep(0.1)
             input_queue.task_done()
 
@@ -645,14 +754,29 @@ async def run_config_model_on_questions_lcel(
             eval_res_error,
             prob_stats,
             query_stats,
+            *gen_id,
         ) = item
         row_data = []
         if query_id:
             row_data.append(query_id)
 
-        row_data.extend(
-            [db_id, question, gold_query, pred_query, eval_res_success, eval_res_status, eval_res_error or ""]
-        )
+        if gen_id:
+            row_data.extend(
+                [
+                    db_id,
+                    gen_id[0],
+                    question,
+                    gold_query,
+                    pred_query,
+                    eval_res_success,
+                    eval_res_status,
+                    eval_res_error or "",
+                ]
+            )
+        else:
+            row_data.extend(
+                [db_id, question, gold_query, pred_query, eval_res_success, eval_res_status, eval_res_error or ""]
+            )
         row_data = [str(item).replace("\n", " ").replace("\r", " ") for item in row_data]
         return row_data
 
@@ -666,6 +790,8 @@ async def run_config_model_on_questions_lcel(
 
             # write header
             header_data = ["db_id", "question", "gold_query", "pred_query", "success", "status", "error"]
+            if generate and expand:
+                header_data = ["db_id", "gen_id", "question", "gold_query", "pred_query", "success", "status", "error"]
             if has_id:
                 header_data = ["id"] + header_data
             if enable_query_stats:

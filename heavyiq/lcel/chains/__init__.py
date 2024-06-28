@@ -4,5 +4,6 @@ from .heavydb.auto_sql_chain import chain as auto_sql_chain
 from .heavydb.question_chain import chain as question_chain
 from .heavydb.sql_chain import chain as sql_chain
 from .heavydb.sql_cot_chain import chain as sql_cot_chain
+from .heavydb.sql_gen_chain import chain as sql_gen_chain
 from .heavydb.table_chain import chain as table_chain
 from .heavydb.table_chain import tables_list_chain

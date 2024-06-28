@@ -5,7 +5,9 @@ from typing import Any, AsyncIterator
 from langchain.schema.runnable import Runnable, RunnableConfig, RunnableSerializable
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.runnables import RunnableConfig, ensure_config
+from langchain_core.runnables.utils import Input
 
+from heavyiq.langchain.heavydb import heavydb_context
 from heavyiq.lcel.chains.utils import get_value_from_runnable_binding
 from heavyiq.lcel.types import StepDict
 
@@ -104,3 +106,23 @@ class LLMGenerationRunnable(Runnable):
             generations.append(gen.text)
 
         return generations
+
+
+class SessionRunnable(Runnable):
+    """
+    Runnable which expects session_id or any session_key should exists in the input dict.
+    """
+
+    def __init__(self, runnable: Runnable, session_key: str = "session_id"):
+        self.runnable = runnable
+        self.session_key = session_key
+
+    def invoke(self, input: Any, config: RunnableConfig | None = None) -> Any:
+        return super().invoke(input, config)
+
+    async def ainvoke(self, input: Input, config: RunnableConfig | None = None) -> Any:
+        session_id = input.get(self.session_key)
+        assert session_id, "session_id expected"
+        async with heavydb_context(session_id):
+            output = await self.runnable.ainvoke(input, config)
+            return output
