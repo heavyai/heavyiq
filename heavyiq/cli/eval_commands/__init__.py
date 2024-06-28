@@ -499,10 +499,12 @@ async def run_config_model_on_auto_questions(
 @coro
 @click.option("--temperature", default=0.0, help="Temperature for LLM (Defaults to 0.0)", type=float)
 @click.option("--n", default=1, help="number of generations", type=int)
+@click.option("--best-of", default=2, help="best_of, ie. vllm beam width", type=int)
 @click.option("--verbose", "-v", is_flag=True, help="Verbose output")
 @click.option(
     "--generate", "-g", is_flag=True, help="-g alone should pick an sql query from the list of generated sql queries"
 )
+@click.option("--disable-beam-search", "-d", is_flag=True, help="-d alone should disable beam search")
 @click.option("--expand", "-e", is_flag=True, help="Expand and write the generated sql queries into multiple rows")
 @click.argument("eval_dataset_csv", type=str)
 @click.pass_context  # type: ignore
@@ -510,8 +512,10 @@ async def run_config_model_on_questions_lcel(
     ctx: click.Context,
     eval_dataset_csv: str,
     expand: bool,
+    disable_beam_search: bool,
     generate: bool,
     verbose: bool,
+    best_of: int,
     n: int,
     temperature: float,
 ):
@@ -570,13 +574,26 @@ async def run_config_model_on_questions_lcel(
         out: dict = {"query": None, "error": None}
         async with heavydb_context(db):
             tables = await aextract_tables_from_query(db, gold_query)
-            out = await chain.ainvoke(
-                {"question": question, "tables": tables, "session_id": db._conn._session},
-                config={"configurable": {"llm_n": n, "llm_temperature": temperature}},
-            )
-            if generate:
+            if not generate:
+                out = await chain.ainvoke(
+                    {"question": question, "tables": tables, "session_id": db._conn._session},
+                    config={"configurable": {"llm_n": n, "llm_temperature": temperature}},
+                )
+                return [out["query"]], out["error"]
+            else:
+                # generate, so the chain output should be a list of SQL queries
+                model_kwargs = {"extra_body": {"use_beam_search": False if disable_beam_search else True}}
+                llm_args = {
+                    "llm_n": n,
+                    "llm_temperature": temperature,
+                    "llm_best_of": best_of,
+                    "llm_model_kwargs": model_kwargs,
+                }
+                out = await chain.ainvoke(
+                    {"question": question, "tables": tables, "session_id": db._conn._session},
+                    config={"configurable": llm_args},
+                )
                 return out, ""
-        return [out["query"]], out["error"]
 
     async def processor(input_queue: asyncio.Queue, output_queue: asyncio.Queue, processor_id: int):
         """
