@@ -280,6 +280,14 @@ async def awrite_eval_results_row(
         await writer.writerow(row_data)
 
 
+# Function to apply to each group
+def dedupe_group(group):
+    if group["success"].any():  # Check if there's any True in 'b'
+        return group[group["success"]].iloc[0]  # Return the row with True
+    else:
+        return group.iloc[-1]  # Return the last row if no True
+
+
 def summarize_eval_results(eval_str: str) -> None:
     """
     Reads the results tsv associated with a given eval_str, counts the occurrences of each
@@ -288,6 +296,9 @@ def summarize_eval_results(eval_str: str) -> None:
     # Read the results tsv into a pandas DataFrame
     results_path = f"./eval/results/{eval_str}_results.csv"
     df = pd.read_csv(results_path)
+
+    # Apply the function to each group and reset the index
+    df = df.groupby("id", group_keys=False).apply(dedupe_group).reset_index(drop=True)
 
     # Count occurrences of each status value
     status_counts = Counter(df["status"])

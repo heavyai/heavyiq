@@ -4,6 +4,19 @@ from langchain.schema.runnable import Runnable, RunnableBinding, RunnableConfig
 from langchain.schema.runnable.configurable import RunnableConfigurableAlternatives, RunnableConfigurableFields
 
 
+def merge_dicts(d1: dict, d2: dict) -> dict:
+    """
+    Recursively merge two dictionaries.
+    """
+    merged = d1.copy()
+    for key, value in d2.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = merge_dicts(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
 def get_value_from_runnable_binding(
     binding: RunnableBinding | RunnableConfigurableAlternatives, config: RunnableConfig | None = None
 ) -> Any:
@@ -18,7 +31,10 @@ def get_value_from_runnable_binding(
     if value and isinstance(value, tuple):
         actual_value, attached_config = value
         if isinstance(actual_value, RunnableConfigurableFields):
-            return actual_value._prepare(config or attached_config)[0]  # type: ignore
+            config = config or {}
+            # merge the default config and the passed config
+            merged_config = merge_dicts(attached_config, config)
+            return actual_value._prepare(merged_config)[0]  # type: ignore
         return actual_value
     return value
 

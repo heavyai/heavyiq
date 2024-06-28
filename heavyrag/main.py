@@ -101,7 +101,7 @@ async def retrieve_facts(
         #     top_n=reranker_top_k,
         # )
         # filtered_nodes = await reranker.apostprocess_nodes(filtered_nodes, query_str=question)
-        reranker = OverridedLLMRerank()
+        reranker = OverridedLLMRerank(top_n=reranker_top_k)
         filtered_nodes = reranker.postprocess_nodes(filtered_nodes, query_str=question)
         logger.debug(
             f"Filtered nodes after applying ReRanking postprocessor: {[(i.id_, i.score) for i in filtered_nodes]}"
