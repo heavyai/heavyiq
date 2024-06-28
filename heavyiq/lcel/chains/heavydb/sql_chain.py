@@ -16,7 +16,9 @@ from heavyiq.lcel.types.sql_type import (
     SqlChainOutputType,
 )
 from heavyiq.utils import strip_sql_comments
+from heavyrag import IndexNotFound
 
+CONFIG = get_config()
 # var endswith `rbl` means it's an runnable
 nl_to_sql_llm_rbl = llm_runnable.with_config(
     configurable={"llm": "nl_to_sql", "llm_temperature": 0}, config={"tags": ["nl_to_sql_llm"]}  # type: ignore
@@ -44,15 +46,49 @@ async def get_table_info(sql_chain_inputs: dict) -> str:
     on_retry = True if sql_chain_inputs.get("sql_cmd") else False
 
     prompt_rbl = nl_to_sql_retry_prompt_rbl if on_retry else nl_to_sql_prompt_rbl
-    partial_inputs = {"input": sql_chain_inputs["question"]}
+    partial_inputs = {"input": sql_chain_inputs["question"], "relevant_info": sql_chain_inputs.get("relevant_info", "")}
     if on_retry:
-        partial_inputs.update({"sql_cmd": sql_chain_inputs["sql_cmd"], "error": sql_chain_inputs["error"]})  # type: ignore
+        partial_inputs.update({"sql_cmd": sql_chain_inputs["sql_cmd"], "relevant_info": sql_chain_inputs.get("relevant_info", ""), "error": sql_chain_inputs["error"]})  # type: ignore
 
     partial_gen_sql_prompt = get_value_from_runnable_binding(prompt_rbl).partial(**partial_inputs)  # type: ignore
     table_info = await aget_table_info_wrt_token_limit(
         get_value_from_runnable_binding(nl_to_sql_llm_rbl), sql_chain_inputs["session_id"], partial_gen_sql_prompt, sql_chain_inputs["tables"]  # type: ignore
     )
     return table_info
+
+
+async def get_relevant_info_using_rag(inputs: dict) -> str:
+    """
+    Helps to get the table info for the prompt based upon the allowed token limit.
+    """
+    from heavyrag.main import get_relevant_facts_info
+
+    if not CONFIG.custom_prompt_nl_to_sql_include_relevant_info:
+        return ""
+
+    pre_calculated_relevant_info = inputs.get("pre_calculated_relevant_info", None)
+    if pre_calculated_relevant_info is not None:
+        return pre_calculated_relevant_info
+
+    heavydb = await get_db(inputs["session_id"])
+
+    try:
+        relevant_facts = await get_relevant_facts_info(
+            question=inputs["question"],
+            heavydb_name=heavydb._dbname,
+            similarity_cutoff=CONFIG.rag_facts_similarity_cutoff_score,
+            similarity_top_k=CONFIG.rag_facts_similarity_top_k,
+            with_reranker=True,
+            reranker_top_k=CONFIG.rag_facts_reranker_top_k,
+            reranker_cutoff=CONFIG.rag_facts_reranker_cutoff_score,
+        )
+    except IndexNotFound:
+        return ""
+
+    if not relevant_facts:
+        return ""
+    # has relevant facts
+    return f"Relevant info:\n\n{relevant_facts}\n"
 
 
 # Predicting Query
@@ -65,7 +101,15 @@ table_info_runnable_lambda: Runnable = RunnableLambda(get_table_info).with_confi
         "metadata": {"step": "Retrieving table information for prompt."},
     }
 )
-query_variables = RunnablePassthrough.assign(table_info=table_info_runnable_lambda, input=lambda x: x["question"]).with_config(  # type: ignore
+# calculating relevant info (RAG)
+relevant_info_lambda: Runnable = RunnableLambda(get_relevant_info_using_rag).with_config(
+    config={
+        "tags": ["intermediate-step"],
+        "run_name": "Get Relevant Info for NLtoSQL",
+        "metadata": {"step": "Getting relevant information based on the asked question."},
+    }
+)
+query_variables = (RunnablePassthrough.assign(relevant_info=relevant_info_lambda) | RunnablePassthrough.assign(table_info=table_info_runnable_lambda, input=lambda x: x["question"])).with_config(  # type: ignore
     config={
         "tags": ["intermediate-step"],
         "run_name": "Calculate Input Variables",
@@ -101,7 +145,7 @@ query_runnable = (
 # Query retry runnable which accepts error and sql_cmd from previous query prediction chain
 # Retry Query Prediction
 # Step 1
-retry_query_variables = RunnablePassthrough.assign(table_info=table_info_runnable_lambda, input=lambda x: x["question"]).with_config(  # type: ignore
+retry_query_variables = (RunnablePassthrough.assign(relevant_info=relevant_info_lambda) | RunnablePassthrough.assign(table_info=table_info_runnable_lambda, input=lambda x: x["question"])).with_config(  # type: ignore
     config={
         "tags": ["intermediate-step"],
         "run_name": "Calculate Input Variables",
@@ -192,7 +236,7 @@ async def do_string_literal_correction(inputs: dict) -> dict:
     Do string literal correction on the generated SQL query.
     """
     sql_cmd = inputs["sql_cmd"].strip()
-    if get_config().enable_str_literal_correction:
+    if CONFIG.enable_str_literal_correction:
         heavydb = await get_db(inputs["session_id"])
         corrected_query = await heavydb.acorrect_string_literals(sql_cmd)
         sql_cmd = corrected_query
@@ -256,7 +300,7 @@ do_string_correction_and_calculate_complexity_or_passthrough_branch: Runnable = 
 
 chain: Runnable[Any, Any] = (
     (
-        RunnablePassthrough().assign(sql_cmd=query_runnable, max_revisions=lambda x: get_config().max_retries_nl_to_sql)
+        RunnablePassthrough().assign(sql_cmd=query_runnable, max_revisions=lambda x: CONFIG.max_retries_nl_to_sql)
         | validation_step
         | revise_lambda
         | do_string_correction_and_calculate_complexity_or_passthrough_branch

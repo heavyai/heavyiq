@@ -119,3 +119,11 @@ async def nl_to_tables_exception_handler(request: Request, exc: NLtoTableExcepti
         status_code=HTTP_500_INTERNAL_SERVER_ERROR,
         content=jsonable_encoder(ErrorResponse(error=str(exc))),
     )
+
+
+@log_exception
+async def ragdb_integrity_exception_handler(request: Request, exc: Exception) -> Response:
+    return JSONResponse(
+        status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+        content=jsonable_encoder(_build_error_response("RAG_DB Error", str(exc))),
+    )

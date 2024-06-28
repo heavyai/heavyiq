@@ -4,6 +4,7 @@ from .overrides import OverrideBaseConfig
 
 
 class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
+    disabled: bool = False
     port: int = 6275
     data: Optional[str] = None
     openai_api_key: Optional[str] = None
@@ -20,7 +21,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     heavydb_username: Optional[str] = None
     heavydb_password: Optional[str] = None
     heavydb_host: str = "localhost"
-    heavydb_port: int = 6278
+    heavydb_port: int = 6274
     heavydb_protocol: str = "binary"
     huggingface_embed_model: str = "sentence-transformers/all-mpnet-base-v2"
     huggingface_model_cache_folder: str = "hf_models"
@@ -34,6 +35,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     """If the cardinality of a column is less than this threshold, we will include each value of the column in the prompt"""
     column_top_k_high_cardinality_sample: int = 3
     """If the cardinality of a column is greater than the threshold, we will sample this many values from the column"""
+    column_top_k_max_unique_values_count: int = 5000000  # 5 Million
+    """Maximum number of unqiue values a column might posses in-order to find top-k"""
     # TELEMETRICS
     langchain_endpoint: str = "https://api.smith.langchain.com"
     langsmith_api_key: Optional[str] = None
@@ -43,6 +46,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     """Used for the access log of the web server."""
     heavyiq_log_level: str = "INFO"
     """Used for the log of the application code."""
+    heavyrag_log_level: str = "INFO"
+    """Used for the log of the heavyrag code."""
     access_log_max_file_size: int = 104857600
     """Default Access logs max file size is 100 MB"""
     heavyiq_log_max_file_size: int = 104857600
@@ -52,27 +57,32 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     enable_llm_cache: bool = False
     # CUSTOM LLM
     custom_llm_type: Optional[str] = None
+
     """ 'API' or 'API_VLLM' or 'AZURE' """
     custom_llm_api_base: str = ""  # LLMType.DEFAULT
-    custom_llm_api_context_window: int = 8192  # LLMType.DEFAULT
+    custom_llm_api_context_window: int = 15552  # LLMType.DEFAULT
     custom_llm_api_nl_to_sql_base: Optional[str] = None  # LLMType.NL_TO_SQL
-    custom_llm_api_nl_to_sql_context_window: int = 8192  # LLMType.NL_TO_SQL
+    custom_llm_api_nl_to_sql_context_window: int = 15552  # LLMType.NL_TO_SQL
     custom_llm_api_nl_to_sql_error_base: Optional[str] = None  # LLMType.NL_TO_SQL_ERROR
-    custom_llm_api_nl_to_sql_error_context_window: int = 8192  # LLMType.NL_TO_SQL_ERROR
+    custom_llm_api_nl_to_sql_error_context_window: int = 15552  # LLMType.NL_TO_SQL_ERROR
     custom_llm_api_sql_to_answer_base: Optional[str] = None  # LLMType.SQL_TO_ANSWER
-    custom_llm_api_sql_to_answer_context_window: int = 8192  # LLMType.SQL_TO_ANSWER
+    custom_llm_api_sql_to_answer_context_window: int = 15552  # LLMType.SQL_TO_ANSWER
     custom_llm_api_nl_to_tables_base: Optional[str] = None  # LLMType.NL_TO_TABLES
-    custom_llm_api_nl_to_tables_context_window: int = 8192  # LLMType.NL_TO_TABLES
+    custom_llm_api_nl_to_tables_context_window: int = 15552  # LLMType.NL_TO_TABLES
     custom_llm_api_tables_to_questions_base: Optional[str] = None  # LLMType.TABLES_TO_QUESTIONS
-    custom_llm_api_tables_to_questions_context_window: int = 8192  # LLMType.TABLES_TO_QUESTIONS
+    custom_llm_api_tables_to_questions_context_window: int = 15552  # LLMType.TABLES_TO_QUESTIONS
     custom_llm_api_instruct_base: Optional[str] = None  # LLMType.INSTRUCT
-    custom_llm_api_instruct_context_window: int = 8192  # LLMType.INSTRUCT
+    custom_llm_api_instruct_context_window: int = 15552  # LLMType.INSTRUCT
+    custom_llm_api_rag_base: Optional[str] = None  # LLMType.RAG
+    custom_llm_api_rag_context_window: int = 4092  # LLMType.RAG
+    custom_llm_api_rag_prompt_start_token: str = ""  # LLMType.RAG
+    custom_llm_api_rag_prompt_end_token: str = ""  # LLMType.RAG
     custom_llm_api_instruct_prompt_start_token: str = "<|prompt|>\n"
     custom_llm_api_instruct_prompt_end_token: str = "\n<|answer|>\n"
     custom_llm_api_tables_to_questions_prompt_token: str = "<|table question prompt|>"
     custom_llm_api_tables_to_questions_answer_token: str = "<|table question answer|>"
     custom_llm_api_vllm_beam_width: int = 2
-    custom_llm_api_vllm_max_tokens: int = 512
+    custom_llm_api_vllm_max_tokens: int = 768
     custom_llm_azure_openai_api_version: str = "2023-03-15-preview"
     custom_llm_azure_openai_api_base: str = ""
     custom_llm_azure_deployment_name: str = ""
@@ -80,8 +90,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     enable_logprobs: bool = False
     custom_llm_logprobs_limit: int = 1
     # top-k
-    top_k_max_str_col_count_nl_to_sql: int = 50
-    top_k_max_str_col_count_nl_to_tables: int = 50
+    top_k_max_str_col_count_nl_to_sql: int = 200
+    top_k_max_str_col_count_nl_to_tables: int = 100
     # table order in prompt
     sort_prompt_tables_desc: bool = True
     # whether to include timestamp text on table prompt
@@ -101,8 +111,11 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     max_retries_nl_to_sql: int = 2
     # llm api-key
     heavylm_api_key: Optional[str] = None
+    # how often a table schema change check should happen in minutes
+    table_schema_check_interval_minutes: int = 1
     # prompts
     # nl to sql
+    custom_prompt_nl_to_sql_include_relevant_info: bool = False
     custom_prompt_nl_to_sql_start_token: str = "<|sql prompt|>\n"
     custom_prompt_nl_to_sql_body: Optional[str] = None
     custom_prompt_nl_to_sql_end_token: str = "\n<|sql answer|>\n"
@@ -119,6 +132,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     custom_prompt_sql_to_answer_body: Optional[str] = None
     custom_prompt_sql_to_answer_end_token: str = "\n<|english answer|>\n"
     # nl to tables
+    custom_prompt_nl_to_tables_include_relevant_info: bool = False
     custom_prompt_nl_to_tables_start_token: str = "<|table prompt|>\n"
     custom_prompt_nl_to_tables_body: Optional[str] = None
     custom_prompt_nl_to_tables_end_token: str = "\n<|table answer|>\n"
@@ -130,8 +144,25 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     custom_prompt_instruct_start_token: str = "<|prompt|>\n"
     custom_prompt_instruct_body: Optional[str] = None
     custom_prompt_instruct_end_token: str = "\n<|prompt|>\n"
+    # RAG
+    rag_storage_persist_dir: str = "rag_storage"
+    rag_documents_source_dir: str = "rag_sources"
+    rag_chromadb_persist_dir: str = rag_storage_persist_dir + "/chromadb"
+    rag_document_pdf_parser_url: str = ""
+    rag_embed_model_name: str = "BAAI/bge-large-en-v1.5"
+    rag_embed_server_base: Optional[str] = None
+    rag_rerank_server_base: Optional[str] = None
+    rag_rerank_llm_start_token: str = "<|prompt|>\n"
+    rag_rerank_llm_end_token: str = "\n<|answer|>\n"
+    rag_database_uri: str = "sqlite:///ragdb.sqlite"  # db for storing data relevant to RAG processing, ie. facts
+    rag_facts_similarity_top_k: int = 10
+    rag_facts_similarity_cutoff_score: float = (
+        0.35  # score should be ranges from 0.0 to 1.0 (high value means more accurate)
+    )
+    rag_facts_reranker_top_k: int = 4
+    rag_facts_reranker_cutoff_score: float = 0.4
 
 
 class AppConfig(OverrideBaseConfig):  # type: ignore
     data: Optional[str] = None
-    iq: HeavyIQConfig
+    iq: Optional[HeavyIQConfig] = HeavyIQConfig()

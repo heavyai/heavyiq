@@ -1,5 +1,6 @@
 # ENV Requirements
 ## python3.10 (Installed)
+set -e
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 source  $SCRIPT_DIR/common_fn.sh
 process_args "$@"
@@ -11,6 +12,8 @@ python3.10 -m venv venv
 # Install Requirements
 mkdir -p ./dist
 cp requirements.txt ./dist/requirements.txt
+cp requirements-linux.txt ./dist/requirements-linux.txt
+
 # if INTERNALLY_RELEASED_PYHEAVYDB is set
 # (see common_fn.sh argument processing)
 # 1. grab the whl and store in ./dist
@@ -26,14 +29,14 @@ test_for_internally_release_pyheavydb
 test_for_include_all_deps ./dist/requirements.txt
 
 pip install -r ./dist/requirements.txt
+pip install -r ./dist/requirements-linux.txt
 pip freeze -l > ./dist/requirements.txt
 
 # pip freeze -l inserts an absolute path
 # for pyheavydb.  We need a relative path
 update_pyheavydb_reference ./dist/requirements.txt
 
-cp requirements-linux.txt ./dist/requirements-linux.txt
-pip install -r ./requirements-dev.txt
+pip install -r ./requirements-build-prod.txt
 
 # Create Obfuscated Build
 pyarmor reg pyarmor-regfile-5130.zip
@@ -41,6 +44,7 @@ pyarmor reg pyarmor-regfile-5130.zip
 # Note the pyarmor step can create the
 # ./dist dir if it doesn't already exist.
 pyarmor gen ./heavyiq
+pyarmor gen ./heavyrag
 cp -r heavyiq/langchain/tokenizer_models/ ./dist/heavyiq/langchain/tokenizer_models/
 cp gunicorn.conf.py ./dist/gunicorn.conf.py
 

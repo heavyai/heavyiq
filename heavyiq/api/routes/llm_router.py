@@ -19,5 +19,16 @@ async def call_llm(request: CallLLMRequest) -> CallLLMResponse:
         get_llm_by_type, LLMType.INSTRUCT, temperature=request.temperature, max_tokens=request.max_tokens
     )
     prompt = f"{config.custom_llm_api_instruct_prompt_start_token}{request.question}{config.custom_llm_api_instruct_prompt_end_token}"
-    response = await llm.apredict(prompt, stop=request.stop, callbacks=[NoopLangChainTracer(client=1)])
+    extra_body = {}
+    if request.guided_choice:
+      extra_body["guided_choice"] = request.guided_choice
+    elif request.guided_regex:
+      extra_body["guided_regex"] = request.guided_regex
+
+    response = await llm.apredict(
+        prompt,
+        stop=request.stop,
+        extra_body=extra_body,
+        callbacks=[NoopLangChainTracer(client=1)]
+    )
     return CallLLMResponse(response=response.strip())

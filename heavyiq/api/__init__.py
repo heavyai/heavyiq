@@ -1,4 +1,5 @@
 import asyncio
+import sys
 from typing import Any
 
 from asgi_correlation_id import CorrelationIdMiddleware
@@ -48,15 +49,69 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
     # always create a HeavyDB's multiprocessing.Manager instance (which was being used for shared cache) before gunicorn process fork
     # if we let it to happen on each worker process at the time of http request then
     # we might endup in request pending issue.
-    HeavyDB.get_manager()
+    HeavyDB.initialize()
 
-    # w.r.t memory into consideration, we don't need to initialize/download HF model embeddings at the first place(ie. before process fork).
-    # We could make it happen on the fork/child process since the models are going to be stored inside a cache dir.
-    # and for the next time, HF model should be loaded from the cache dir itself.
+    # initialize RAG DB
+    from heavyrag.database import ragdb
+
+    ragdb.create_tables()
 
     # LLM Cache
     if config.enable_llm_cache:
         set_llm_cache(InMemoryLLMCache())
+
+
+def add_rag_db_exception_handlers(app: FastAPI) -> None:
+    """
+    Adding RAG DB exception handlers to the fastapi app.
+    """
+    from heavyrag.database import RAGDBIntegrityError
+
+    app.add_exception_handler(RAGDBIntegrityError, exh.ragdb_integrity_exception_handler)
+
+
+def include_rag_routers(app: FastAPI) -> None:
+    """
+    Include RAG routers
+    """
+    from heavyiq.rag.router import doc_router, facts_db_router, table_router
+
+    app.include_router(
+        doc_router,
+        prefix="/rag/documents",
+        tags=["rag.documents"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "model": ErrorResponse,
+            }
+        },
+    )
+    app.include_router(
+        table_router,
+        prefix="/rag/tables",
+        tags=["rag.tables"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "model": ErrorResponse,
+            }
+        },
+    )
+    app.include_router(
+        facts_db_router,
+        prefix="/rag/snippets",
+        tags=["rag.snippets"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "model": ErrorResponse,
+            }
+        },
+    )
+
+
+_config_provided = True
 
 
 def create_app(config_path: str = "./config.toml") -> FastAPI:
@@ -65,16 +120,24 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
 
     :return FastAPI: instance of fastapi with custom openapi scehma.
     """
+    global _config_provided
     try:
         with open(config_path, "r") as f:
             if "[iq]" not in f.read():
-                print("No HeavyIQ configuration options detected; service disabled.")
-                return stripped_down_api()
+                print("No HeavyIQ configuration options detected; using defaults.")
+                _config_provided = False
     except Exception:
-        print("Provided config path is not valid; service disabled.")
-        return stripped_down_api()
+        print("Provided config path is not valid.")
+        _config_provided = False
 
-    config = get_config(config_path)  # loads config using specified path
+    config = get_config(config_path, _config_provided)  # loads config using specified path
+
+    # If IQ disabled in the config, don't go any further
+    if config and config.disabled == True:
+        # Figure out how to actually exit
+        print("App disabled from config.toml, exiting.")
+        sys.exit()
+
     init_logs()  # initializes logs using config
     init_telemetrics()  # initializes langsmith
 
@@ -106,6 +169,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
     app.add_exception_handler(GenerateTableMetadataException, exh.generate_table_metadata_exception_handler)
     app.add_exception_handler(NLtoTableException, exh.nl_to_tables_exception_handler)
     app.add_exception_handler(Exception, exh.unhandled_exception_handler)
+    add_rag_db_exception_handlers(app)
 
     # Include your API routes
     app.include_router(defaultrouter)
@@ -164,6 +228,9 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
             }
         },
     )
+    # RAG routers
+    include_rag_routers(app)
+
     if config.enable_debug_endpoints:
         from heavyiq.api.routes.debug_router import debug_router
         from heavyiq.api.routes.runnable_router import runnable_router
@@ -184,15 +251,20 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
     @app.on_event("startup")
     async def initialize():
         """
-        Code to be executed when application starts.
+        Code to be executed when application starts, ie on each worker process.
         """
+        # initialize chains and RAG
         import heavyiq.lcel.chains
+        import heavyrag.main
         from heavyiq.logging_utils import heavyiq_logger as logger
+
+        global _config_provided
 
         async def enable_telemetrics_for_free_license_daemon():
             """
             This enables langsmith telemetrics for the free license by polling a shared multiprocessing dict.
             """
+
             shared_dict, max_retries, retry_count = SharedDictSingleton(), 20, 0
             while retry_count < max_retries:
                 retry_count += 1
@@ -200,7 +272,9 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
                 license_edition = await shared_dict.get(SharedDictSingleton.Keys.HeavyDBLicenseEdition.name)
                 if not license_edition:
                     continue
+
                 logger.info(f"Found HeavyAI license edition, license_type: {license_edition}")
+
                 if license_edition == "free":
                     logger.info("Enabling langsmith telemetrics for free edition.")
                     done = enable_telemetrics_for_free_edition()
@@ -208,6 +282,11 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
                         logger.info("Successfully changed langsmith telemetrics and HeavyIQ configs for free edition.")
                     else:
                         logger.error("Failed to change langsmith telemetrics and HeavyIQ configs for free edition.")
+                else:
+                    if not _config_provided:
+                        logger.error("Config must be provided when license edition is not free")
+                        sys.exit()
+
                 break
             else:
                 logger.error(f"Failed to check HeavyAI license edition after {max_retries*2} seconds.")

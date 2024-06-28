@@ -27,6 +27,7 @@ class LLMType(Enum):
     NL_TO_TABLES = "nl_to_tables"
     TABLES_TO_QUESTIONS = "tables_to_questions"
     INSTRUCT = "instruct"  # mainly used on /call-llm endpoint to resolve general instructions
+    RAG = "rag"
 
 
 def is_using_custom_trained_llm() -> bool:
@@ -91,6 +92,7 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
             LLMType.INSTRUCT: config.openai_gpt_model_instruct,
             LLMType.TABLES_TO_QUESTIONS: config.openai_gpt_model_tables_to_questions,
             LLMType.NL_TO_SQL_GEN: config.openai_gpt_model_nl_to_sql,  # use the same nl to sql model
+            LLMType.RAG: config.openai_gpt_model,  # use the same default model for handling RAG question
         }
         model_name: str = openai_llm_mapping[LLMType.DEFAULT] if openai_llm_mapping[model_type] is None else openai_llm_mapping[model_type]  # type: ignore
         return get_openai_llm_by_model_name(model=model_name, **kwargs)
@@ -119,6 +121,7 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
                 config.custom_llm_api_nl_to_sql_base,
                 config.custom_llm_api_nl_to_sql_context_window,
             ),
+            LLMType.RAG: (config.custom_llm_api_rag_base, config.custom_llm_api_rag_context_window),
         }
         if model_type == LLMType.NL_TO_SQL_ERROR:
             found_key = LLMType.DEFAULT
