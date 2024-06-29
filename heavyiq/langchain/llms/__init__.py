@@ -67,6 +67,7 @@ def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str
         kwargs["best_of"] = config.custom_llm_api_vllm_beam_width
         kwargs["n"] = 1
     if model_type == LLMType.NL_TO_SQL_GEN:
+        kwargs["max_tokens"] = config.custom_llm_api_vllm_max_tokens
         # set best_of >= n for sql generations
         kwargs["best_of"] = 5
         model_kwargs["use_beam_search"] = False  # if we set beam search then temperature should not be 0

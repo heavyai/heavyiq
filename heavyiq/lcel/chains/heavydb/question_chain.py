@@ -7,7 +7,7 @@ from heavyiq.lcel.chains.utils import configure_step, get_value_from_runnable_bi
 from heavyiq.lcel.llms import llm_runnable
 from heavyiq.lcel.prompts import to_questions_prompt_runnable
 from heavyiq.lcel.prompts.utils import get_prompt_template_from_prompt_runnable
-from heavyiq.lcel.runnables.base import LLMGenerationRunnable
+from heavyiq.lcel.runnables.base import LLMGeneratorRunnable
 from heavyiq.lcel.types import QuestionsChainInputType, QuestionsChainInputTypedDict, QuestionsChainOutputType
 
 CONFIG = get_config()
@@ -60,7 +60,7 @@ prompt = configure_step(
 
 # Step 3
 # Call LLM
-model = configure_step(LLMGenerationRunnable(tables_to_questions_llm_rbl), run_name="Call LLM", step="Calling LLM.")
+model = configure_step(LLMGeneratorRunnable(tables_to_questions_llm_rbl), run_name="Call LLM", step="Calling LLM.")
 
 chain: Runnable = (
     (
@@ -71,6 +71,7 @@ chain: Runnable = (
         )
         | prompt
         | model
+        | RunnableLambda(lambda x: [i["text"] for i in x])
     )
     .with_config(config={"tags": ["TablesToQuestionsChain"], "run_name": "Tables to NL Questions Chain"})
     .with_types(input_type=QuestionsChainInputType, output_type=QuestionsChainOutputType)  # type: ignore

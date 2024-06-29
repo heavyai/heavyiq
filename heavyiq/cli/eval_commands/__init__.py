@@ -504,6 +504,9 @@ async def run_config_model_on_auto_questions(
 @click.option(
     "--generate", "-g", is_flag=True, help="-g alone should pick an sql query from the list of generated sql queries"
 )
+@click.option(
+    "--judge", "-j", is_flag=True, help="-j judge the predicted SQL queries, and it must be used with -g option"
+)
 @click.option("--disable-beam-search", "-d", is_flag=True, help="-d alone should disable beam search")
 @click.option("--expand", "-e", is_flag=True, help="Expand and write the generated sql queries into multiple rows")
 @click.argument("eval_dataset_csv", type=str)
@@ -513,6 +516,7 @@ async def run_config_model_on_questions_lcel(
     eval_dataset_csv: str,
     expand: bool,
     disable_beam_search: bool,
+    judge: bool,
     generate: bool,
     verbose: bool,
     best_of: int,
@@ -524,8 +528,11 @@ async def run_config_model_on_questions_lcel(
     """
     from heavyiq.lcel.chains import sql_chain
     from heavyiq.lcel.chains.heavydb.sql_gen_chain import filter_valid_queries_chain
+    from heavyiq.lcel.chains.heavydb.sql_multiple_chain import slim_chain as sql_gen_judge_chain
 
-    if generate:
+    if generate and judge:
+        chain = sql_gen_judge_chain
+    elif generate:
         chain = filter_valid_queries_chain
     else:
         chain = sql_chain
@@ -560,7 +567,9 @@ async def run_config_model_on_questions_lcel(
         for _ in range(processor_count):
             await queue.put(None)
 
-    async def predict_query(question: str, gold_query: str, db: HeavyDB) -> tuple[list[str], str]:
+    async def predict_query(
+        question: str, gold_query: str, db: HeavyDB
+    ) -> tuple[list[str] | list[tuple[str, float]], str]:
         """
         Predicts the target query.
 
@@ -580,8 +589,23 @@ async def run_config_model_on_questions_lcel(
                     config={"configurable": {"llm_n": n, "llm_temperature": temperature}},
                 )
                 return [out["query"]], out["error"]
-            else:
+            elif generate and judge:
                 # generate, so the chain output should be a list of SQL queries
+                model_kwargs = {
+                    "extra_body": {"use_beam_search": False if disable_beam_search else True, "logprobs": 5}
+                }
+                llm_args = {
+                    "llm_n": n,
+                    "llm_temperature": temperature,
+                    "llm_best_of": best_of,
+                    "llm_model_kwargs": model_kwargs,
+                }
+                out = await chain.ainvoke(
+                    {"question": question, "tables": tables, "session_id": db._conn._session},
+                    config={"configurable": llm_args},
+                )
+                return out, ""
+            else:
                 model_kwargs = {"extra_body": {"use_beam_search": False if disable_beam_search else True}}
                 llm_args = {
                     "llm_n": n,
@@ -618,6 +642,13 @@ async def run_config_model_on_questions_lcel(
 
             db = await HeavyDB.from_env_async(db_id)
             pred_queries, query_error = await predict_query(question, gold_query, db)
+            scores = []
+            if judge:
+                sqls = []
+                for sql, score in pred_queries:
+                    sqls.append(sql)
+                    scores.append(score)
+                pred_queries = sqls
             pred_queries = set(pred_queries)  # remove duplicates
 
             output_items = []
@@ -650,21 +681,39 @@ async def run_config_model_on_questions_lcel(
                             eval_res_error = eval_res["error"]
                             logger.info(f"Evaluation Success: {eval_res['success']}")
 
-                        output_items.append(
-                            (
-                                query_id,
-                                db_id,
-                                question,
-                                gold_query,
-                                pred_query,
-                                eval_res_success,
-                                eval_res_status,
-                                eval_res_error,
-                                prob_stats,
-                                query_stats,
-                                genid,
+                        if judge:
+                            output_items.append(
+                                (
+                                    query_id,
+                                    db_id,
+                                    question,
+                                    gold_query,
+                                    pred_query,
+                                    scores[genid - 1],
+                                    eval_res_success,
+                                    eval_res_status,
+                                    eval_res_error,
+                                    prob_stats,
+                                    query_stats,
+                                    genid,
+                                )
                             )
-                        )
+                        else:
+                            output_items.append(
+                                (
+                                    query_id,
+                                    db_id,
+                                    question,
+                                    gold_query,
+                                    pred_query,
+                                    eval_res_success,
+                                    eval_res_status,
+                                    eval_res_error,
+                                    prob_stats,
+                                    query_stats,
+                                    genid,
+                                )
+                            )
                 else:
                     # this gets executed with and without generate option
                     final_query, eval_res = "", {}
@@ -743,24 +792,54 @@ async def run_config_model_on_questions_lcel(
         """
         Builds output csv record from the item we got from the output queue.
         """
-        (
-            query_id,
-            db_id,
-            question,
-            gold_query,
-            pred_query,
-            eval_res_success,
-            eval_res_status,
-            eval_res_error,
-            prob_stats,
-            query_stats,
-            *gen_id,
-        ) = item
+        if judge:
+            (
+                query_id,
+                db_id,
+                question,
+                gold_query,
+                pred_query,
+                score,
+                eval_res_success,
+                eval_res_status,
+                eval_res_error,
+                prob_stats,
+                query_stats,
+                *gen_id,
+            ) = item
+        else:
+            (
+                query_id,
+                db_id,
+                question,
+                gold_query,
+                pred_query,
+                eval_res_success,
+                eval_res_status,
+                eval_res_error,
+                prob_stats,
+                query_stats,
+                *gen_id,
+            ) = item
         row_data = []
         if query_id:
             row_data.append(query_id)
 
-        if gen_id:
+        if gen_id and judge:
+            row_data.extend(
+                [
+                    db_id,
+                    gen_id[0],
+                    question,
+                    gold_query,
+                    pred_query,
+                    score,
+                    eval_res_success,
+                    eval_res_status,
+                    eval_res_error or "",
+                ]
+            )
+        elif gen_id:
             row_data.extend(
                 [
                     db_id,
@@ -791,7 +870,29 @@ async def run_config_model_on_questions_lcel(
             # write header
             header_data = ["db_id", "question", "gold_query", "pred_query", "success", "status", "error"]
             if generate and expand:
-                header_data = ["db_id", "gen_id", "question", "gold_query", "pred_query", "success", "status", "error"]
+                if judge:
+                    header_data = [
+                        "db_id",
+                        "gen_id",
+                        "question",
+                        "gold_query",
+                        "pred_query",
+                        "score",
+                        "success",
+                        "status",
+                        "error",
+                    ]
+                else:
+                    header_data = [
+                        "db_id",
+                        "gen_id",
+                        "question",
+                        "gold_query",
+                        "pred_query",
+                        "success",
+                        "status",
+                        "error",
+                    ]
             if has_id:
                 header_data = ["id"] + header_data
             if enable_query_stats:

@@ -57,4 +57,4 @@ class SQLwithScore(BaseModel):
 class SqlMultipleChainOutputType(BaseModel):
     """NLtoSQL chain output type."""
 
-    query: list[SQLwithScore] = Field(..., description="Generated SQL query with score.")
+    queries: list[SQLwithScore] = Field(..., description="Generated SQL query with score.")
