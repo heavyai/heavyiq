@@ -154,7 +154,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     rag_rerank_server_base: Optional[str] = None
     rag_rerank_llm_start_token: str = "<|prompt|>\n"
     rag_rerank_llm_end_token: str = "\n<|answer|>\n"
-    rag_database_uri: str = "sqlite:///chroma.sqlite"  # db for storing data relevant to RAG processing, ie. facts
+    rag_database_uri: str = "sqlite:///ragdp.sqlite"  # db for storing data relevant to RAG processing, ie. facts
     rag_facts_similarity_top_k: int = 10
     rag_facts_similarity_cutoff_score: float = (
         0.35  # score should be ranges from 0.0 to 1.0 (high value means more accurate)
