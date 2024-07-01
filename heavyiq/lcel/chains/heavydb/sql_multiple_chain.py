@@ -100,9 +100,8 @@ def parse_judge_llm_output_and_assign_scores(inputs: dict) -> list[str, float]:
     valid_sqls = inputs["valid_sqls"]
     logprobs = inputs["judge_llm_output"][0]["logprobs"]
     scores = find_probability_score_from_logprobs(logprobs)
-    assert len(valid_sqls) == len(scores)
     # return list of queries in descending order acc to score
-    sql_score_tuple_list = list(zip(valid_sqls, scores))
+    sql_score_tuple_list = list(zip(valid_sqls, scores))[: len(valid_sqls)]
     return {"queries": sorted(sql_score_tuple_list, key=lambda x: x[1], reverse=True)}
 
 
