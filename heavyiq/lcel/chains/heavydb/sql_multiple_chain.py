@@ -123,7 +123,7 @@ def route(inputs: dict) -> Any:
             | RunnablePassthrough.assign(judge_llm_output=multiple_sql_judge_prompt | judge_llm)
             | RunnableLambda(parse_judge_llm_output_and_assign_scores)  # store judge llm output along with logprobs
         )  # compute the score for each sql query
-    return SqlMultipleChainOutputType(queries=[SQLwithScore(sql=i, score=0.0) for i in inputs["valid_sqls"]])
+    return {"queries": [(i, 0.0) for i in inputs["valid_sqls"]]}
 
 
 chain = (
