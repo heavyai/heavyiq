@@ -1,7 +1,7 @@
 ARG BASE_HEAVYDB_IMG=docker-internal.mapd.com/mapd/mapd-render:master
 FROM  $BASE_HEAVYDB_IMG
-# Note this build expects all the required heavyiq pieces to already 
-# exist inside the heavydb docker image. It doesn't use files from 
+# Note this build expects all the required heavyiq pieces to already
+# exist inside the heavydb docker image. It doesn't use files from
 # the local heavyiq directory
 #
 SHELL ["/bin/bash", "-c"]
@@ -10,5 +10,5 @@ SHELL ["/bin/bash", "-c"]
 # Once the packages directory change is in it could be removed
 RUN cd heavyiq && python3 -m venv venv && source venv/bin/activate ;\
   [[ -f pyheavydb-8.0.0-py3-none-any.whl ]] && mkdir -p dist && mv pyheavydb-8.0.0-py3-none-any.whl dist/. ; \
-  pip install -r requirements.txt -r requirements-linux.txt
+  pip install -r requirements.txt
 
