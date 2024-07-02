@@ -93,7 +93,7 @@ def find_probability_score_from_logprobs(logprobs: dict) -> list[float]:
     return predicted_tokens_probability
 
 
-def parse_judge_llm_output_and_assign_scores(inputs: dict) -> list[str, float]:
+def parse_judge_llm_output_and_assign_scores(inputs: dict) -> dict[str, list[tuple[str, float]]]:
     """
     Helps to assign SQL scores based on log probability.
     """
@@ -105,11 +105,18 @@ def parse_judge_llm_output_and_assign_scores(inputs: dict) -> list[str, float]:
     return {"queries": sorted(sql_score_tuple_list, key=lambda x: x[1], reverse=True)}
 
 
-def filter_queries_by_threshold(sqls: list[str], threshold: float = 0.5):
+def apply_top_k_and_cutoff(inputs: dict) -> dict[str, list[tuple[str, float]]]:
     """
-    Filters the sqls in the list that meet or exceed the threshold value.
+    Apply cutoff threshold and top-k.
     """
-    return [sql[0] for sql in sqls if sqls[1] >= threshold]
+    sqls = inputs["queries"]
+    config, cutoff, top_k = get_config(), None, None
+    if not cutoff:
+        cutoff = config.custom_llm_api_nl_to_multiple_sql_judge_cutoff_score
+    if not top_k:
+        top_k = config.custom_llm_api_nl_to_multiple_sql_judge_top_k
+    inputs["queries"] = [sql for sql in sqls if sql[1] >= cutoff][:top_k]
+    return inputs
 
 
 def route(inputs: dict) -> Any:
@@ -121,8 +128,9 @@ def route(inputs: dict) -> Any:
             RunnablePassthrough.assign(context_str=prepare_judge_llm_context)
             | RunnablePassthrough.assign(judge_llm_output=multiple_sql_judge_prompt | judge_llm)
             | RunnableLambda(parse_judge_llm_output_and_assign_scores)  # store judge llm output along with logprobs
+            | RunnableLambda(apply_top_k_and_cutoff)
         )  # compute the score for each sql query
-    return {"queries": [(i, 0.0) for i in inputs["valid_sqls"]]}
+    return apply_top_k_and_cutoff({"queries": [(i, 0.0) for i in inputs["valid_sqls"]]})
 
 
 chain = (
