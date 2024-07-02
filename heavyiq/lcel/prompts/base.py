@@ -82,6 +82,12 @@ class BasePromptBuilder(metaclass=ABCMeta):
                 config.custom_prompt_instruct_body,
                 config.custom_prompt_instruct_end_token,
             )
+        if llm_type == LLMType.NL_TO_MULTIPLE_SQL_JUDGE:
+            return (
+                config.custom_prompt_nl_to_multiple_sql_judge_start_token,
+                config.custom_prompt_nl_to_multiple_sql_judge_body,
+                config.custom_prompt_nl_to_multiple_sql_judge_end_token,
+            )
         if llm_type == LLMType.NL_TO_SQL_COT:
             return (None, None, None)
         if llm_type == LLMType.NL_TO_SQL_COT_ERROR:

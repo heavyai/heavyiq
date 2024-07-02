@@ -5,18 +5,14 @@ import math
 from typing import Any
 
 from langchain.schema.runnable import Runnable, RunnableLambda, RunnablePassthrough
-from langchain_core.language_models.llms import LLMResult
-from langchain_core.outputs.generation import Generation
 
 from heavyiq.langchain.heavydb import get_config, get_db
-from heavyiq.langchain.llms import LLMType, get_llm_by_type, is_using_custom_trained_llm
-from heavyiq.lcel.chains.utils import get_value_from_runnable_binding
-from heavyiq.lcel.llms import llm_runnable
+from heavyiq.langchain.llms import LLMType, get_llm_by_type
 from heavyiq.lcel.prompts import multiple_sql_judge_prompt
 
 # from .sql_chain import table_info_runnable_lambda
 from heavyiq.lcel.runnables.base import LLMGeneratorRunnable, SessionRunnable
-from heavyiq.lcel.types import SqlChainInputType, SqlMultipleChainOutputType, SQLwithScore
+from heavyiq.lcel.types import SqlChainInputType, SqlMultipleChainOutputType
 
 from .sql_gen_chain import filter_valid_queries_chain as sql_generator_chain
 from .sql_gen_chain import gen_query_variables as query_variables
@@ -24,9 +20,6 @@ from .sql_gen_chain import gen_query_variables as query_variables
 CONFIG = get_config()
 
 
-# judge_llm_rbl = llm_runnable.with_config(
-#     configurable={"llm": "nl_to_multiple_sql_judge", "llm_temperature": 0.0, "llm_n": 1}, config={"tags": ["nl_to_sql_llm"]}  # type: ignore
-# )
 judge_llm_rbl = get_llm_by_type(LLMType.NL_TO_MULTIPLE_SQL_JUDGE, temperature=0.0)
 
 judge_llm: Runnable = LLMGeneratorRunnable(llm_runnable=judge_llm_rbl, name="sql-judge-llm").with_config(
@@ -150,7 +143,7 @@ def route(inputs: dict) -> Any:
     return {"queries": [(i, 0.0) for i in inputs["valid_sqls"]]}
 
 
-chain = (
+multiple_query_chain = (
     SessionRunnable(  # always wrap this chain with SessionRunnable so that the underlying methods may make use of the passed variables
         query_variables
         | RunnablePassthrough.assign(valid_sqls=sql_generator_chain).with_config(
@@ -166,4 +159,5 @@ chain = (
     .with_types(input_type=SqlChainInputType, output_type=SqlMultipleChainOutputType)
 )  # type: ignore
 
-slim_chain = chain | RunnableLambda(lambda x: x["queries"])
+slim_chain = multiple_query_chain | RunnableLambda(lambda x: x["queries"])
+chain = slim_chain
