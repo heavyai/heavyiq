@@ -153,7 +153,9 @@ def route(inputs: dict) -> Any:
 chain = (
     SessionRunnable(  # always wrap this chain with SessionRunnable so that the underlying methods may make use of the passed variables
         query_variables
-        | RunnablePassthrough.assign(valid_sqls=sql_generator_chain)  # filter the queries using sql_validate func
+        | RunnablePassthrough.assign(valid_sqls=sql_generator_chain).with_config(
+            config={"tags": ["gen_sqls"]}
+        )  # filter the queries using sql_validate func
         | RunnableLambda(route)
         | RunnableLambda(apply_top_k_and_cutoff)
         | RunnableLambda(do_string_literal_correction)  # do string literal correction

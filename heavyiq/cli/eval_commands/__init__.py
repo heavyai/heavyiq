@@ -601,27 +601,24 @@ async def run_config_model_on_questions_lcel(
                     "llm_best_of": best_of,
                     "llm_model_kwargs": model_kwargs,
                 }
-                judge_prompt, judge_llm_output, out = None, None, None
+                judge_prompt, judge_llm_output, out, valid_sqls = None, None, None, []
                 async for patch in chain.astream_log(
                     {"question": question, "tables": tables, "session_id": db._conn._session},
                     config={"configurable": llm_args},
-                    include_tags=["judge_prompt", "judge_llm_output"],
+                    include_tags=["gen_sqls", "judge_prompt", "judge_llm_output"],
                 ):
                     for op in patch.ops:
                         op_path = op["path"]
-                        if op_path == "/logs/PromptTemplate/final_output":
+                        if op_path == "/logs/RunnableParallel<valid_sqls>/final_output":
+                            valid_sqls = op["value"]["valid_sqls"]
+                        elif op_path == "/logs/PromptTemplate/final_output":
                             judge_prompt = op["value"].text
                         elif op_path == "/logs/Judge LLM/final_output":
                             judge_llm_output = op["value"]["generations"][0][0]["text"]
                         elif op_path == "/final_output":
                             out = op["value"]
-                out = [t + (judge_prompt, judge_llm_output) for t in out]
+                out = [t + (valid_sqls, judge_prompt, judge_llm_output) for t in out]
                 return out, ""
-                # out = await chain.astream_log(
-                #     {"question": question, "tables": tables, "session_id": db._conn._session},
-                #     config={"configurable": llm_args},
-                # )
-                # return out, ""
             else:
                 model_kwargs = {"extra_body": {"use_beam_search": False if disable_beam_search else True}}
                 llm_args = {
@@ -659,7 +656,7 @@ async def run_config_model_on_questions_lcel(
 
             db = await HeavyDB.from_env_async(db_id)
             pred_queries, query_error = await predict_query(question, gold_query, db)
-            scores, judge_prompts, judge_answers = [], [], []
+            scores, valid_sqls, judge_prompts, judge_answers = [], [], [], []
             if judge:
                 sqls = []
                 for unpackme in pred_queries:
@@ -667,8 +664,9 @@ async def run_config_model_on_questions_lcel(
                     sqls.append(sql)
                     scores.append(score)
                     if extra:
-                        judge_prompts.append(extra[0])
-                        judge_answers.append(extra[1])
+                        valid_sqls.append(extra[0])
+                        judge_prompts.append(extra[1])
+                        judge_answers.append(extra[2])
                 pred_queries = sqls
             pred_queries = set(pred_queries)  # remove duplicates
 
@@ -710,6 +708,7 @@ async def run_config_model_on_questions_lcel(
                                     question,
                                     gold_query,
                                     pred_query,
+                                    valid_sqls[genid - 1],
                                     scores[genid - 1],
                                     judge_prompts[genid - 1],
                                     judge_answers[genid - 1],
@@ -822,6 +821,7 @@ async def run_config_model_on_questions_lcel(
                 question,
                 gold_query,
                 pred_query,
+                valid_sqls,
                 score,
                 judge_prompt,
                 judge_answer,
@@ -858,6 +858,7 @@ async def run_config_model_on_questions_lcel(
                     question,
                     gold_query,
                     pred_query,
+                    "|".join([f'"{i}" : {"1" if i.strip() == gold_query else "0"}' for i in valid_sqls]),
                     score,
                     judge_prompt,
                     judge_answer,
@@ -904,9 +905,10 @@ async def run_config_model_on_questions_lcel(
                         "question",
                         "gold_query",
                         "pred_query",
+                        "gold_judge_answer",
                         "score",
                         "judge_prompt",
-                        "judge_answer",
+                        "pred_judge_answer",
                         "success",
                         "status",
                         "error",
