@@ -24,15 +24,10 @@ from heavyiq.langchain.heavydb import heavydb_context
 from heavyiq.langchain.llms import LLMType, get_llm_by_type
 from heavyiq.logging_utils import get_heavyiq_logger
 
-from .utils import (
-    aextract_tables_from_query,
-    awrite_eval_results_header,
-    awrite_eval_results_row,
-    check_predicted_query_equals_gold_query,
-    compute_prob_stats,
-    sql_rate_reply,
-    summarize_eval_results,
-)
+from .utils import (aextract_tables_from_query, awrite_eval_results_header,
+                    awrite_eval_results_row,
+                    check_predicted_query_equals_gold_query,
+                    compute_prob_stats, sql_rate_reply, summarize_eval_results)
 
 
 @click.group()
@@ -528,8 +523,10 @@ async def run_config_model_on_questions_lcel(
     Run config model on questions using lcel approach.
     """
     from heavyiq.lcel.chains import sql_chain
-    from heavyiq.lcel.chains.heavydb.sql_gen_chain import filter_valid_queries_chain
-    from heavyiq.lcel.chains.heavydb.sql_multiple_chain import slim_chain as sql_gen_judge_chain
+    from heavyiq.lcel.chains.heavydb.sql_gen_chain import \
+        filter_valid_queries_chain
+    from heavyiq.lcel.chains.heavydb.sql_multiple_chain import \
+        slim_chain as sql_gen_judge_chain
 
     if generate and judge:
         chain = sql_gen_judge_chain
@@ -858,7 +855,7 @@ async def run_config_model_on_questions_lcel(
                     question,
                     gold_query,
                     pred_query,
-                    "|".join([f'"{i}" : {"1" if i.strip() == gold_query else "0"}' for i in valid_sqls]),
+                    " ".join([f'SQL {i}: {"1" if j.strip() == gold_query else "0"}' for i, j in enumerate(valid_sqls, start=1)]),
                     score,
                     judge_prompt,
                     judge_answer,
