@@ -120,6 +120,21 @@ def apply_top_k_and_cutoff(inputs: dict) -> dict[str, list[tuple[str, float]]]:
     return inputs
 
 
+async def do_string_literal_correction(inputs: dict) -> dict:
+    """
+    Do string literal correction on the generated SQL query.
+    """
+    if not CONFIG.enable_str_literal_correction:
+        return inputs
+    corrected_queries = []
+    for query, score in inputs["queries"]:
+        heavydb = await get_db(None)
+        corrected_query = await heavydb.acorrect_string_literals(query)
+        corrected_queries.append((corrected_query, score))
+    inputs["queries"] = corrected_queries
+    return inputs
+
+
 def route(inputs: dict) -> Any:
     """
     Call the judge llm only if the valid SQLs are generated.
@@ -136,11 +151,12 @@ def route(inputs: dict) -> Any:
 
 
 chain = (
-    SessionRunnable(
+    SessionRunnable(  # always wrap this chain with SessionRunnable so that the underlying methods may make use of the passed variables
         query_variables
         | RunnablePassthrough.assign(valid_sqls=sql_generator_chain)  # filter the queries using sql_validate func
         | RunnableLambda(route)
         | RunnableLambda(apply_top_k_and_cutoff)
+        | RunnableLambda(do_string_literal_correction)  # do string literal correction
     )
     .with_config(  # type: ignore
         config={"tags": ["NLtoMultipleSQLJudgeChain"], "run_name": "NL to Multiple SQL Judge Chain"}  # type: ignore
