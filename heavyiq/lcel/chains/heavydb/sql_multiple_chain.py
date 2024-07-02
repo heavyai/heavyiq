@@ -12,7 +12,7 @@ from heavyiq.langchain.heavydb import get_config, get_db
 from heavyiq.langchain.llms import LLMType, get_llm_by_type, is_using_custom_trained_llm
 from heavyiq.lcel.chains.utils import get_value_from_runnable_binding
 from heavyiq.lcel.llms import llm_runnable
-from heavyiq.lcel.prompts import multiple_sql_judge_prompt, to_sql_prompt_runnable
+from heavyiq.lcel.prompts import multiple_sql_judge_prompt
 
 # from .sql_chain import table_info_runnable_lambda
 from heavyiq.lcel.runnables.base import LLMGeneratorRunnable, SessionRunnable
@@ -32,10 +32,11 @@ judge_llm_rbl = get_llm_by_type(LLMType.NL_TO_MULTIPLE_SQL_JUDGE, temperature=0.
 judge_llm: Runnable = LLMGeneratorRunnable(llm_runnable=judge_llm_rbl, name="sql-judge-llm").with_config(
     config={
         "tags": ["intermediate-step"],
-        "run_name": "Calling Judge LLM",
+        "run_name": "Judge LLM",
         "metadata": {"step": "Invoking the LLM for judging mutiple SQL queries."},
     }
 )
+judge_prompt = multiple_sql_judge_prompt.with_config(config={"tags": ["judge_prompt"]})
 
 
 async def filter_valid_queries(inputs: dict) -> list[str]:
@@ -126,11 +127,12 @@ def route(inputs: dict) -> Any:
     if inputs["valid_sqls"]:
         return (
             RunnablePassthrough.assign(context_str=prepare_judge_llm_context)
-            | RunnablePassthrough.assign(judge_llm_output=multiple_sql_judge_prompt | judge_llm)
+            | RunnablePassthrough.assign(judge_llm_output=judge_prompt | judge_llm).with_config(
+                config={"tags": ["judge_llm_output"]}
+            )
             | RunnableLambda(parse_judge_llm_output_and_assign_scores)  # store judge llm output along with logprobs
-            | RunnableLambda(apply_top_k_and_cutoff)
         )  # compute the score for each sql query
-    return apply_top_k_and_cutoff({"queries": [(i, 0.0) for i in inputs["valid_sqls"]]})
+    return {"queries": [(i, 0.0) for i in inputs["valid_sqls"]]}
 
 
 chain = (
@@ -138,6 +140,7 @@ chain = (
         query_variables
         | RunnablePassthrough.assign(valid_sqls=sql_generator_chain)  # filter the queries using sql_validate func
         | RunnableLambda(route)
+        | RunnableLambda(apply_top_k_and_cutoff)
     )
     .with_config(  # type: ignore
         config={"tags": ["NLtoMultipleSQLJudgeChain"], "run_name": "NL to Multiple SQL Judge Chain"}  # type: ignore

@@ -11,6 +11,7 @@ from langchain.chat_models.base import BaseChatModel
 from langchain.globals import set_verbose
 from langchain.llms.base import BaseLLM
 from langchain.pydantic_v1 import BaseModel
+from langchain_core.tracers.log_stream import RunLogPatch
 from langsmith import Client
 from thrift.transport.TTransport import TTransportException
 
@@ -600,11 +601,27 @@ async def run_config_model_on_questions_lcel(
                     "llm_best_of": best_of,
                     "llm_model_kwargs": model_kwargs,
                 }
-                out = await chain.ainvoke(
+                judge_prompt, judge_llm_output, out = None, None, None
+                async for patch in chain.astream_log(
                     {"question": question, "tables": tables, "session_id": db._conn._session},
                     config={"configurable": llm_args},
-                )
+                    include_tags=["judge_prompt", "judge_llm_output"],
+                ):
+                    for op in patch.ops:
+                        op_path = op["path"]
+                        if op_path == "/logs/PromptTemplate/final_output":
+                            judge_prompt = op["value"].text
+                        elif op_path == "/logs/Judge LLM/final_output":
+                            judge_llm_output = op["value"]["generations"][0][0]["text"]
+                        elif op_path == "/final_output":
+                            out = op["value"]
+                out = [t + (judge_prompt, judge_llm_output) for t in out]
                 return out, ""
+                # out = await chain.astream_log(
+                #     {"question": question, "tables": tables, "session_id": db._conn._session},
+                #     config={"configurable": llm_args},
+                # )
+                # return out, ""
             else:
                 model_kwargs = {"extra_body": {"use_beam_search": False if disable_beam_search else True}}
                 llm_args = {
@@ -642,12 +659,16 @@ async def run_config_model_on_questions_lcel(
 
             db = await HeavyDB.from_env_async(db_id)
             pred_queries, query_error = await predict_query(question, gold_query, db)
-            scores = []
+            scores, judge_prompts, judge_answers = [], [], []
             if judge:
                 sqls = []
-                for sql, score in pred_queries:
+                for unpackme in pred_queries:
+                    sql, score, *extra = unpackme
                     sqls.append(sql)
                     scores.append(score)
+                    if extra:
+                        judge_prompts.append(extra[0])
+                        judge_answers.append(extra[1])
                 pred_queries = sqls
             pred_queries = set(pred_queries)  # remove duplicates
 
@@ -690,6 +711,8 @@ async def run_config_model_on_questions_lcel(
                                     gold_query,
                                     pred_query,
                                     scores[genid - 1],
+                                    judge_prompts[genid - 1],
+                                    judge_answers[genid - 1],
                                     eval_res_success,
                                     eval_res_status,
                                     eval_res_error,
@@ -800,6 +823,8 @@ async def run_config_model_on_questions_lcel(
                 gold_query,
                 pred_query,
                 score,
+                judge_prompt,
+                judge_answer,
                 eval_res_success,
                 eval_res_status,
                 eval_res_error,
@@ -834,6 +859,8 @@ async def run_config_model_on_questions_lcel(
                     gold_query,
                     pred_query,
                     score,
+                    judge_prompt,
+                    judge_answer,
                     eval_res_success,
                     eval_res_status,
                     eval_res_error or "",
@@ -878,6 +905,8 @@ async def run_config_model_on_questions_lcel(
                         "gold_query",
                         "pred_query",
                         "score",
+                        "judge_prompt",
+                        "judge_answer",
                         "success",
                         "status",
                         "error",
