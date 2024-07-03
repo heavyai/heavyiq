@@ -1,4 +1,5 @@
 # Remainder of dependencies used for dev and the command line interface
+aiocsv==1.2.4
 autoflake==2.2.0
 black==23.7.0
 click==8.1.7
