@@ -1,4 +1,6 @@
 import logging
+import os
+import re
 from contextlib import contextmanager
 
 from sqlalchemy import create_engine
@@ -25,5 +27,8 @@ class Database:
             db.close()
 
     def create_tables(self):
+        # make sure to create db parent if not exists
+        parent_dir = re.search(r"sqlite:///(.*)/[^/]+\.sqlite", self.database_uri).group(1)
+        os.makedirs(parent_dir, exist_ok=True)
         Base.metadata.create_all(bind=self.engine)
         logger.info("Created tables in the database")
