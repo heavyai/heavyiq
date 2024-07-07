@@ -38,6 +38,7 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
     App initialization code which get excuted before gunicorn process fork upon using `--preload` option.
     """
     from heavyiq.langchain.heavydb import HeavyDB
+    from heavyrag import initialize_rag
 
     logger = get_heavyiq_logger()
     logger.info("Allocating Shared Dict....")
@@ -59,6 +60,9 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
     # LLM Cache
     if config.enable_llm_cache:
         set_llm_cache(InMemoryLLMCache())
+    # set embed model on master process in-order to avoid avoid multiprocessing.fork error
+    # initializes embedding model and chroma client
+    initialize_rag()
 
 
 def add_rag_db_exception_handlers(app: FastAPI) -> None:
@@ -255,7 +259,6 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         """
         # initialize chains and RAG
         import heavyiq.lcel.chains
-        import heavyrag.main
         from heavyiq.logging_utils import heavyiq_logger as logger
 
         global _config_provided
