@@ -33,12 +33,25 @@ def stripped_down_api() -> FastAPI:
     return app
 
 
+def rag_initialize():
+    """
+    Intialize heavyrag.
+    """
+    from heavyrag import initialize_rag
+    from heavyrag.database import ragdb
+
+    # initialize RAG DB
+    ragdb.create_tables()
+    # set embed model on master process in-order to avoid avoid multiprocessing.fork error
+    # initializes embedding model and chroma client
+    initialize_rag()
+
+
 def app_initialize(config: HeavyIQConfig, config_path: str):
     """
     App initialization code which get excuted before gunicorn process fork upon using `--preload` option.
     """
     from heavyiq.langchain.heavydb import HeavyDB
-    from heavyrag import initialize_rag
 
     logger = get_heavyiq_logger()
     logger.info("Allocating Shared Dict....")
@@ -52,17 +65,11 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
     # we might endup in request pending issue.
     HeavyDB.initialize()
 
-    # initialize RAG DB
-    from heavyrag.database import ragdb
-
-    ragdb.create_tables()
-
     # LLM Cache
     if config.enable_llm_cache:
         set_llm_cache(InMemoryLLMCache())
-    # set embed model on master process in-order to avoid avoid multiprocessing.fork error
-    # initializes embedding model and chroma client
-    initialize_rag()
+    if config.enable_rag:
+        rag_initialize()
 
 
 def add_rag_db_exception_handlers(app: FastAPI) -> None:
@@ -184,7 +191,6 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
     app.add_exception_handler(GenerateTableMetadataException, exh.generate_table_metadata_exception_handler)
     app.add_exception_handler(NLtoTableException, exh.nl_to_tables_exception_handler)
     app.add_exception_handler(Exception, exh.unhandled_exception_handler)
-    add_rag_db_exception_handlers(app)
 
     # Include your API routes
     app.include_router(defaultrouter)
@@ -243,8 +249,10 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
             }
         },
     )
-    # RAG routers
-    include_rag_routers(app)
+    if config.enable_rag:
+        add_rag_db_exception_handlers(app)
+        # RAG routers
+        include_rag_routers(app)
 
     if config.enable_debug_endpoints:
         from heavyiq.api.routes.debug_router import debug_router

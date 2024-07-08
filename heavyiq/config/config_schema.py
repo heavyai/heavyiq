@@ -145,6 +145,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     custom_prompt_instruct_body: Optional[str] = None
     custom_prompt_instruct_end_token: str = "\n<|prompt|>\n"
     # RAG
+    enable_rag: bool = True  # enable/disable RAG
     rag_storage_persist_dir: str = "rag_storage"
     rag_documents_source_dir: str = "rag_sources"
     rag_chromadb_persist_dir: str = rag_storage_persist_dir + "/chromadb"
