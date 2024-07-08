@@ -161,6 +161,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     )
     rag_facts_reranker_top_k: int = 4
     rag_facts_reranker_cutoff_score: float = 0.4
+    rag_chromadb_collection_backup_dir: str = rag_storage_persist_dir + "/backup"
 
 
 class AppConfig(OverrideBaseConfig):  # type: ignore

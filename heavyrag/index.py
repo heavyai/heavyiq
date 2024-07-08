@@ -1,14 +1,12 @@
 # Module for creating various indexes
-from functools import lru_cache
 
-import chromadb
 from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.core.schema import BaseNode, IndexNode
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
 from heavyiq.config import get_config
 from heavyiq.logging_utils import get_heavyiq_logger
-from heavyrag.embed import get_chroma_client, get_embed_model
+from heavyrag.embed import LlamaIndexEmbeddingAdapter, get_chroma_client, get_embed_model
 
 CONFIG = get_config()
 logger = get_heavyiq_logger()
@@ -27,11 +25,14 @@ def get_vectorstore(
     """
     Get or Create a VectorStore.
     """
+    embedding_function = LlamaIndexEmbeddingAdapter(embed_model)
     if create_collection_if_not_exists:
-        chroma_collection = chroma_client.get_or_create_collection(collection_name, metadata=metadata)
+        chroma_collection = chroma_client.get_or_create_collection(
+            collection_name, metadata=metadata, embedding_function=embedding_function
+        )
     else:
         try:
-            chroma_collection = chroma_client.get_collection(collection_name)
+            chroma_collection = chroma_client.get_collection(collection_name, embedding_function=embedding_function)
         except ValueError:
             return None
     return ChromaVectorStore.from_collection(chroma_collection)
@@ -54,7 +55,6 @@ def get_or_create_index(
     return index
 
 
-@lru_cache
 def get_index(collection_name: str) -> VectorStoreIndex | None:
     """
     Get index only by collection name.

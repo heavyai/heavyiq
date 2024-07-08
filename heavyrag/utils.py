@@ -8,7 +8,7 @@ from heavyrag.filters import document_filters, facts_filters
 
 
 async def get_nodes(
-    index: VectorStoreIndex, filters: Optional[MetadataFilters] = None, limit: int = 100, **kwargs
+    index: VectorStoreIndex, filters: Optional[MetadataFilters] = None, limit: int | None = None, **kwargs
 ) -> list[NodeWithScore]:
     """
     Get the nodes by applying filters.

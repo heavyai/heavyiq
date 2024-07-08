@@ -10,6 +10,7 @@ from llama_index.core.vector_stores import FilterCondition, FilterOperator, Meta
 from llama_index.vector_stores.chroma.base import _to_chroma_filter
 
 from heavyiq.langchain.heavydb import HeavyDB
+from heavyrag.chroma_ops import update_embeddings
 from heavyrag.index import acreate_index_and_insert_nodes, get_index, get_or_create_index
 from heavyrag.loaders import aload_file, aload_files_from_directory, aload_table, aload_tables, load_fact, load_facts
 from heavyrag.logger import logger
@@ -184,6 +185,20 @@ def delete_nodes(collection: Collection, where: dict, batch_size: int = 166) -> 
     return True
 
 
+def re_embed_documents(collection_name: str) -> bool:
+    """
+    Re-embed all the documents available in a chromadb collection.
+    This involves collection backup, collection deletion and collection restore with new embeddings.
+    """
+    idx = get_index(collection_name)
+    if not idx:
+        return False
+
+    collection = idx.vector_store._collection  # type: ignore
+    update_embeddings(collection=collection)
+    return True
+
+
 async def adelete_document(file_name: str, heavydb_name: str) -> bool:
     """
     Delete all nodes associate with a particular document.
@@ -192,7 +207,7 @@ async def adelete_document(file_name: str, heavydb_name: str) -> bool:
     if not index:
         return False
 
-    collection = index.vector_store._collection
+    collection = index.vector_store._collection  # type: ignore
     return delete_nodes(collection=collection, where={"$and": [{"name": file_name}, {"type": "document"}]})
 
 
@@ -200,7 +215,7 @@ async def delete_table_nodes(index: VectorStoreIndex, table_name: str) -> bool:
     """
     Delete all the nodes associated with a table.
     """
-    collection = index.vector_store._collection
+    collection = index.vector_store._collection  # type: ignore
     return delete_nodes(collection=collection, where={"$and": [{"name": table_name}, {"type": "table"}]})
 
 
@@ -208,7 +223,7 @@ def delete_nodes_by_ids(index: VectorStoreIndex, ids: list[str]) -> bool:
     """
     Helps to delete nodes by "id".
     """
-    collection = index.vector_store._collection
+    collection = index.vector_store._collection  # type: ignore
     return delete_nodes(collection=collection, where={"id": {"$in": ids}})
 
 
@@ -216,7 +231,7 @@ def delete_node_by_id(index: VectorStoreIndex, id: str) -> bool:
     """
     Helps to delete nodes by "id".
     """
-    collection = index.vector_store._collection
+    collection = index.vector_store._collection  # type: ignore
     return delete_nodes(collection=collection, where={"id": {"$eq": id}})
 
 
@@ -224,7 +239,7 @@ async def adelete_database_facts(index: VectorStoreIndex, heavydb_name: str) -> 
     """
     Delete all facts nodes associated with a heavydb database.
     """
-    collection = index.vector_store._collection
+    collection = index.vector_store._collection  # type: ignore
     return delete_nodes(collection=collection, where={"$and": [{"dbname": heavydb_name}, {"type": "facts"}]})
 
 
@@ -232,7 +247,7 @@ async def adelete_facts_by_ids(index: VectorStoreIndex, heavydb_name: str, facts
     """
     Delete specific facts.
     """
-    collection = index.vector_store._collection
+    collection = index.vector_store._collection  # type: ignore
     filters = MetadataFilters(
         filters=[
             MetadataFilter(key="type", operator=FilterOperator.EQ, value="facts"),

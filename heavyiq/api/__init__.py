@@ -78,7 +78,7 @@ def include_rag_routers(app: FastAPI) -> None:
     """
     Include RAG routers
     """
-    from heavyiq.rag.router import doc_router, facts_db_router, table_router
+    from heavyiq.rag.router import collection_router, doc_router, facts_db_router, table_router
 
     app.include_router(
         doc_router,
@@ -106,6 +106,17 @@ def include_rag_routers(app: FastAPI) -> None:
         facts_db_router,
         prefix="/rag/snippets",
         tags=["rag.snippets"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "model": ErrorResponse,
+            }
+        },
+    )
+    app.include_router(
+        collection_router,
+        prefix="/rag/collection",
+        tags=["rag.collection"],
         responses={
             500: {
                 "description": "Internal Server Error",
