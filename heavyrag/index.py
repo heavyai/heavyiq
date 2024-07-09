@@ -1,15 +1,12 @@
 # Module for creating various indexes
-from functools import lru_cache
 
-import chromadb
 from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.core.schema import BaseNode, IndexNode
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.embeddings.text_embeddings_inference import TextEmbeddingsInference
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
 from heavyiq.config import get_config
 from heavyiq.logging_utils import get_heavyiq_logger
+from heavyrag.embed import LlamaIndexEmbeddingAdapter, get_chroma_client, get_embed_model
 
 CONFIG = get_config()
 logger = get_heavyiq_logger()
@@ -18,27 +15,8 @@ HEAVYDB_INDEX_ID = "heavydb"
 DOCUMENTS_INDEX_NODE = IndexNode(index_id=DOCUMENTS_INDEX_ID, text="Document Index")
 HEAVYDB_INDEX_NODE = IndexNode(index_id=HEAVYDB_INDEX_ID, text="HeavyDB Index")
 
-if CONFIG.rag_embed_server_base:
-    logger.info(
-        "Initialized embed model in GPU bound inference using TextEmbeddingsInference with the following parameters: "
-        f"model_name={CONFIG.rag_embed_model_name}, timeout=60 seconds, embed_batch_size=10, base_url={CONFIG.rag_embed_server_base}"
-    )
-    embed_model = TextEmbeddingsInference(
-        model_name=CONFIG.rag_embed_model_name,  # required for formatting inference text,
-        timeout=60,  # timeout in seconds
-        embed_batch_size=10,  # batch size for embeddin
-        base_url=CONFIG.rag_embed_server_base,
-    )
-else:
-    logger.info(
-        f"Initialized embed model on CPU using HuggingFaceEmbedding with model name: {CONFIG.rag_embed_model_name}"
-    )
-    embed_model = HuggingFaceEmbedding(CONFIG.rag_embed_model_name, device="cpu")
-
-chroma_client = chromadb.PersistentClient(
-    path=CONFIG.rag_chromadb_persist_dir,
-    settings=chromadb.config.Settings(anonymized_telemetry=False, is_persistent=True),
-)
+embed_model = get_embed_model()
+chroma_client = get_chroma_client()
 
 
 def get_vectorstore(
@@ -47,11 +25,14 @@ def get_vectorstore(
     """
     Get or Create a VectorStore.
     """
+    embedding_function = LlamaIndexEmbeddingAdapter(embed_model)
     if create_collection_if_not_exists:
-        chroma_collection = chroma_client.get_or_create_collection(collection_name, metadata=metadata)
+        chroma_collection = chroma_client.get_or_create_collection(
+            collection_name, metadata=metadata, embedding_function=embedding_function
+        )
     else:
         try:
-            chroma_collection = chroma_client.get_collection(collection_name)
+            chroma_collection = chroma_client.get_collection(collection_name, embedding_function=embedding_function)
         except ValueError:
             return None
     return ChromaVectorStore.from_collection(chroma_collection)
@@ -74,7 +55,6 @@ def get_or_create_index(
     return index
 
 
-@lru_cache
 def get_index(collection_name: str) -> VectorStoreIndex | None:
     """
     Get index only by collection name.

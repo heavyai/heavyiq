@@ -297,3 +297,19 @@ class BulkInsertSnippetsResponse(BaseModel):
     """
 
     snippet_ids: list[str] = Field(default=[], description="List of inserted snippet ids")
+
+
+class ReEmbedDocumentsRequest(BaseModel):
+    """
+    Re-embed collection data request.
+    """
+
+    collection_name: str = Field(..., description="Name of the collection that you want to re-embed docs on it.")
+
+
+class ReEmbedDocumentsResponse(BaseModel):
+    """
+    Re-embed collection data response.
+    """
+
+    success: bool = Field(..., description="re-embed docs response")

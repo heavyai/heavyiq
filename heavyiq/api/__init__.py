@@ -33,6 +33,20 @@ def stripped_down_api() -> FastAPI:
     return app
 
 
+def rag_initialize():
+    """
+    Intialize heavyrag.
+    """
+    from heavyrag import initialize_rag
+    from heavyrag.database import ragdb
+
+    # initialize RAG DB
+    ragdb.create_tables()
+    # set embed model on master process in-order to avoid avoid multiprocessing.fork error
+    # initializes embedding model and chroma client
+    initialize_rag()
+
+
 def app_initialize(config: HeavyIQConfig, config_path: str):
     """
     App initialization code which get excuted before gunicorn process fork upon using `--preload` option.
@@ -51,14 +65,11 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
     # we might endup in request pending issue.
     HeavyDB.initialize()
 
-    # initialize RAG DB
-    from heavyrag.database import ragdb
-
-    ragdb.create_tables()
-
     # LLM Cache
     if config.enable_llm_cache:
         set_llm_cache(InMemoryLLMCache())
+    if config.enable_rag:
+        rag_initialize()
 
 
 def add_rag_db_exception_handlers(app: FastAPI) -> None:
@@ -74,7 +85,7 @@ def include_rag_routers(app: FastAPI) -> None:
     """
     Include RAG routers
     """
-    from heavyiq.rag.router import doc_router, facts_db_router, table_router
+    from heavyiq.rag.router import collection_router, doc_router, facts_db_router, table_router
 
     app.include_router(
         doc_router,
@@ -102,6 +113,17 @@ def include_rag_routers(app: FastAPI) -> None:
         facts_db_router,
         prefix="/rag/snippets",
         tags=["rag.snippets"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "model": ErrorResponse,
+            }
+        },
+    )
+    app.include_router(
+        collection_router,
+        prefix="/rag/collection",
+        tags=["rag.collection"],
         responses={
             500: {
                 "description": "Internal Server Error",
@@ -169,7 +191,6 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
     app.add_exception_handler(GenerateTableMetadataException, exh.generate_table_metadata_exception_handler)
     app.add_exception_handler(NLtoTableException, exh.nl_to_tables_exception_handler)
     app.add_exception_handler(Exception, exh.unhandled_exception_handler)
-    add_rag_db_exception_handlers(app)
 
     # Include your API routes
     app.include_router(defaultrouter)
@@ -228,8 +249,10 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
             }
         },
     )
-    # RAG routers
-    include_rag_routers(app)
+    if config.enable_rag:
+        add_rag_db_exception_handlers(app)
+        # RAG routers
+        include_rag_routers(app)
 
     if config.enable_debug_endpoints:
         from heavyiq.api.routes.debug_router import debug_router
@@ -255,7 +278,6 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         """
         # initialize chains and RAG
         import heavyiq.lcel.chains
-        import heavyrag.main
         from heavyiq.logging_utils import heavyiq_logger as logger
 
         global _config_provided

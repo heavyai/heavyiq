@@ -335,3 +335,17 @@ async def ask_about_snippets(
         passing=passing,
         score=score,
     )
+
+
+collection_router = APIRouter()
+
+
+@collection_router.post("/re-embed", response_model=md.ReEmbedDocumentsResponse)
+def reembed_documents_in_chroma_collection(request: md.ReEmbedDocumentsRequest) -> md.ReEmbedDocumentsResponse:
+    """
+    re-embed docs.
+    """
+    from heavyrag.ingest import re_embed_documents
+
+    success = re_embed_documents(request.collection_name)
+    return md.ReEmbedDocumentsResponse(success=success)
