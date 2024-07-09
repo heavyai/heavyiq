@@ -17,7 +17,11 @@ def backup_collection(collection: chromadb.Collection) -> str:
 
     # Create a backup file with a timestamp
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    backup_file = f"backup_{timestamp}.json"
+    backup_dir = CONFIG.rag_chromadb_collection_backup_dir
+    backup_file = f"{backup_dir}/backup_{timestamp}.json"
+
+    # create backup dir if not exists
+    os.makedirs(backup_dir, exist_ok=True)
 
     # Write the data to the backup file
     with open(backup_file, "w") as file:
