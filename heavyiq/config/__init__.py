@@ -97,6 +97,9 @@ def get_config(file: str = "./config.toml", config_provided=True) -> HeavyIQConf
         app_config.iq.rag_database_uri = (
             f'sqlite:///{app_config.iq.data}/ragdb/{app_config.iq.rag_database_uri.split("sqlite:///")[1]}'
         )
+        app_config.iq.rag_chromadb_collection_backup_dir = (
+            app_config.iq.data + "/" + app_config.iq.rag_chromadb_collection_backup_dir
+        )
 
         _config = app_config.iq
 
