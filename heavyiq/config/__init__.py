@@ -59,14 +59,12 @@ def validate_config(iq: HeavyIQConfig) -> AppConfig:
         if iq.custom_llm_api_base.strip() == "":
             raise ValueError("Custom LLM type is set to 'API_VLLM', but API base URL is not set.")
     else:
-        raise ValueError(
-            f"Invalid custom LLM type (valid options are AZURE or API or API_VLLM): {iq.custom_llm_type}"
-        )
+        raise ValueError(f"Invalid custom LLM type (valid options are AZURE or API or API_VLLM): {iq.custom_llm_type}")
 
     return iq
 
 
-def get_config(file: str = "./config.toml", config_provided = True) -> HeavyIQConfig:
+def get_config(file: str = "./config.toml", config_provided=True) -> HeavyIQConfig:
     """If called with a non-default file path, must be called before importing any other modules that use the config."""
     global _config
 
@@ -87,9 +85,18 @@ def get_config(file: str = "./config.toml", config_provided = True) -> HeavyIQCo
             if app_config.data:
                 app_config.iq.data = app_config.data
             else:
-                app_config.iq.data = "./storage"
+                app_config.iq.data = "storage"
         if not os.path.exists(app_config.iq.data):
             os.makedirs(app_config.iq.data)
+
+        # set rag storage and source dirs
+        app_config.iq.rag_storage_persist_dir = app_config.iq.data + "/" + app_config.iq.rag_storage_persist_dir
+        app_config.iq.rag_documents_source_dir = app_config.iq.data + "/" + app_config.iq.rag_documents_source_dir
+        app_config.iq.rag_chromadb_persist_dir = app_config.iq.data + "/" + app_config.iq.rag_chromadb_persist_dir
+
+        app_config.iq.rag_database_uri = (
+            f'sqlite:///{app_config.iq.data}/ragdb/{app_config.iq.rag_database_uri.split("sqlite:///")[1]}'
+        )
 
         _config = app_config.iq
 
