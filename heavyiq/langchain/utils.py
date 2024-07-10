@@ -484,7 +484,7 @@ async def aget_table_info_wrt_token_limit(
         # set caches for each table
         table_info_split = re.split(r"\n(?=CREATE TABLE)", table_info)
         for info in table_info_split:
-            table_name = re.search(r"^CREATE TABLE (\w+)", info).group(1)
+            table_name = re.search(r'^CREATE TABLE "?(\w+)', info).group(1)
             single_table_cache_key = TABLES_CACHE.create_cache_key_for_single_table(
                 database=heavydb._dbname,
                 table=table_name,
