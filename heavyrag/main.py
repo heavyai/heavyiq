@@ -151,7 +151,7 @@ async def get_relevant_facts_info(
             loginfo += "\n" + facts_info
         logger.debug(loginfo)
     except IndexNotFound:
-        logger.info(f"Relevant Collection {heavydb_name} does not exists!")
+        logger.info(f"Relevant Collection {heavydb_name} does not exist!")
     return facts_info
 
 
