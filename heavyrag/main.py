@@ -131,21 +131,27 @@ async def get_relevant_facts_info(
     """
     facts_info = ""
     logger.debug(f"Getting relevant facts from {heavydb_name} collection for question: {question}...")
-    retrieved_facts = await ask_facts(
-        question=question,
-        heavydb_name=heavydb_name,
-        only_retrieve=True,
-        similarity_cutoff=similarity_cutoff,
-        similarity_top_k=similarity_top_k,
-        with_reranker=with_reranker,
-        reranker_top_k=reranker_top_k,
-        reranker_cutoff=reranker_cutoff,
-    )
-    for fact, metadata, score in retrieved_facts:
-        facts_info += fact + "\n\n"
+    try:
+        retrieved_facts = await ask_facts(
+            question=question,
+            heavydb_name=heavydb_name,
+            only_retrieve=True,
+            similarity_cutoff=similarity_cutoff,
+            similarity_top_k=similarity_top_k,
+            with_reranker=with_reranker,
+            reranker_top_k=reranker_top_k,
+            reranker_cutoff=reranker_cutoff,
+        )
+        for fact, metadata, score in retrieved_facts:
+            facts_info += fact + "\n\n"
 
-    facts_info = facts_info.strip()
-    logger.debug(f"Facts found? {True if facts_info else False}")
+        facts_info = facts_info.strip()
+        loginfo = f"Facts found? {True if facts_info else False}"
+        if facts_info:
+            loginfo += "\n" + facts_info
+        logger.debug(loginfo)
+    except IndexNotFound:
+        logger.info(f"Relevant Collection {heavydb_name} does not exists!")
     return facts_info
 
 
