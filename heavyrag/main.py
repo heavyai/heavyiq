@@ -16,9 +16,9 @@ from heavyrag.index import get_index
 from heavyrag.ingest import sync_table_index
 from heavyrag.llm import get_llm
 from heavyrag.logger import logger
-from heavyrag.postprocessor import OverridedLLMRerank, TextEmbeddingsInferenceRerank
+from heavyrag.postprocessor import OverridedLLMRerank
 from heavyrag.prompts import FACTS_QA_PROMPT, TEXT_QA_PROMPT
-from heavyrag.utils import get_nodes, is_document_node_in_index, is_facts_node_in_index
+from heavyrag.utils import get_document_node_count_in_index, get_facts_node_count_in_index, get_nodes
 
 
 async def ask_document(
@@ -69,16 +69,18 @@ async def retrieve_facts(
     logger.debug("Started retrieving facts...")
 
     doc_nodes_with_score, facts_nodes_with_score = [], []
-    has_doc_node, has_facts_node = await asyncio.gather(is_document_node_in_index(index), is_facts_node_in_index(index))
-
-    if has_doc_node:
+    doc_node_count, facts_node_count = await asyncio.gather(
+        get_document_node_count_in_index(index), get_facts_node_count_in_index(index)
+    )
+    logger.debug(f"Snippets node count: {facts_node_count}, Document node count: {doc_node_count}")
+    if doc_node_count > 0:
         doc_engine = index.as_retriever(
             filters=document_filters,
             similarity_top_k=similarity_top_k,
         )
         doc_nodes_with_score = await doc_engine.aretrieve(question)
 
-    if has_facts_node:
+    if facts_node_count > 0:
         facts_engine = index.as_retriever(
             filters=get_facts_filter_matches(heavydb_name),
             similarity_top_k=similarity_top_k,
@@ -129,21 +131,27 @@ async def get_relevant_facts_info(
     """
     facts_info = ""
     logger.debug(f"Getting relevant facts from {heavydb_name} collection for question: {question}...")
-    retrieved_facts = await ask_facts(
-        question=question,
-        heavydb_name=heavydb_name,
-        only_retrieve=True,
-        similarity_cutoff=similarity_cutoff,
-        similarity_top_k=similarity_top_k,
-        with_reranker=with_reranker,
-        reranker_top_k=reranker_top_k,
-        reranker_cutoff=reranker_cutoff,
-    )
-    for fact, metadata, score in retrieved_facts:
-        facts_info += fact + "\n\n"
+    try:
+        retrieved_facts = await ask_facts(
+            question=question,
+            heavydb_name=heavydb_name,
+            only_retrieve=True,
+            similarity_cutoff=similarity_cutoff,
+            similarity_top_k=similarity_top_k,
+            with_reranker=with_reranker,
+            reranker_top_k=reranker_top_k,
+            reranker_cutoff=reranker_cutoff,
+        )
+        for fact, metadata, score in retrieved_facts:
+            facts_info += fact + "\n\n"
 
-    facts_info = facts_info.strip()
-    logger.debug(f"Facts found? {True if facts_info else False}")
+        facts_info = facts_info.strip()
+        loginfo = f"Facts found? {True if facts_info else False}"
+        if facts_info:
+            loginfo += "\n" + facts_info
+        logger.debug(loginfo)
+    except IndexNotFound:
+        logger.info(f"Relevant Collection {heavydb_name} does not exist!")
     return facts_info
 
 

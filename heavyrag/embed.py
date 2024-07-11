@@ -27,7 +27,7 @@ def set_embed_model():
     if CONFIG.rag_embed_server_base:
         logger.info(
             "Initialized embed model in GPU bound inference using TextEmbeddingsInference with the following parameters: "
-            f"model_name={CONFIG.rag_embed_model_name}, timeout=60 seconds, embed_batch_size=10, base_url={CONFIG.rag_embed_server_base}"
+            f"timeout=60 seconds, embed_batch_size=10, base_url={CONFIG.rag_embed_server_base}"
         )
         EMBED_MODEL = TextEmbeddingsInference(
             model_name=CONFIG.rag_embed_model_name,  # required for formatting inference text,

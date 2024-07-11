@@ -3,7 +3,6 @@ from langchain.schema.runnable import Runnable, RunnableBranch, RunnableLambda, 
 
 from heavyiq.langchain.heavydb import get_config, get_db
 from heavyiq.lcel.types import AutoSQLChainInputType, AutoSQLChainOutputType
-from heavyrag import IndexNotFound
 
 from .sql_chain import chain as sql_chain
 from .table_chain import tables_list_chain
@@ -29,18 +28,15 @@ async def get_relevant_info_using_rag(inputs: dict) -> str:
 
     heavydb = await get_db(inputs["session_id"])
 
-    try:
-        relevant_facts = await get_relevant_facts_info(
-            question=inputs["question"],
-            heavydb_name=heavydb._dbname,
-            similarity_cutoff=CONFIG.rag_facts_similarity_cutoff_score,
-            similarity_top_k=CONFIG.rag_facts_similarity_top_k,
-            with_reranker=True,
-            reranker_top_k=CONFIG.rag_facts_reranker_top_k,
-            reranker_cutoff=CONFIG.rag_facts_reranker_cutoff_score,
-        )
-    except IndexNotFound:
-        return ""
+    relevant_facts = await get_relevant_facts_info(
+        question=inputs["question"],
+        heavydb_name=heavydb._dbname,
+        similarity_cutoff=CONFIG.rag_facts_similarity_cutoff_score,
+        similarity_top_k=CONFIG.rag_facts_similarity_top_k,
+        with_reranker=True,
+        reranker_top_k=CONFIG.rag_facts_reranker_top_k,
+        reranker_cutoff=CONFIG.rag_facts_reranker_cutoff_score,
+    )
 
     if not relevant_facts:
         return ""

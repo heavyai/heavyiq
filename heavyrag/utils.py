@@ -39,3 +39,19 @@ async def is_facts_node_in_index(index: VectorStoreIndex) -> bool:
     if await get_nodes(index=index, filters=facts_filters, limit=1):
         return True
     return False
+
+
+async def get_document_node_count_in_index(index: VectorStoreIndex) -> int:
+    """
+    Get the total number of node count of type document.
+    """
+    nodes = await get_nodes(index=index, filters=document_filters, limit=None)
+    return len(nodes)
+
+
+async def get_facts_node_count_in_index(index: VectorStoreIndex) -> int:
+    """
+    Get the total number of node count of type document.
+    """
+    nodes = await get_nodes(index=index, filters=facts_filters, limit=None)
+    return len(nodes)
