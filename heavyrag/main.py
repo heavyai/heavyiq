@@ -16,9 +16,9 @@ from heavyrag.index import get_index
 from heavyrag.ingest import sync_table_index
 from heavyrag.llm import get_llm
 from heavyrag.logger import logger
-from heavyrag.postprocessor import OverridedLLMRerank, TextEmbeddingsInferenceRerank
+from heavyrag.postprocessor import OverridedLLMRerank
 from heavyrag.prompts import FACTS_QA_PROMPT, TEXT_QA_PROMPT
-from heavyrag.utils import get_nodes, is_document_node_in_index, is_facts_node_in_index
+from heavyrag.utils import get_document_node_count_in_index, get_facts_node_count_in_index, get_nodes
 
 
 async def ask_document(
@@ -69,16 +69,18 @@ async def retrieve_facts(
     logger.debug("Started retrieving facts...")
 
     doc_nodes_with_score, facts_nodes_with_score = [], []
-    has_doc_node, has_facts_node = await asyncio.gather(is_document_node_in_index(index), is_facts_node_in_index(index))
-
-    if has_doc_node:
+    doc_node_count, facts_node_count = await asyncio.gather(
+        get_document_node_count_in_index(index), get_facts_node_count_in_index(index)
+    )
+    logger.debug(f"Snippets node count: {facts_node_count}, Document node count: {doc_node_count}")
+    if doc_node_count > 0:
         doc_engine = index.as_retriever(
             filters=document_filters,
             similarity_top_k=similarity_top_k,
         )
         doc_nodes_with_score = await doc_engine.aretrieve(question)
 
-    if has_facts_node:
+    if facts_node_count > 0:
         facts_engine = index.as_retriever(
             filters=get_facts_filter_matches(heavydb_name),
             similarity_top_k=similarity_top_k,
