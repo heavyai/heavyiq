@@ -10,7 +10,6 @@ from heavyiq.lcel.chains.utils import configure_step, get_value_from_runnable_bi
 from heavyiq.lcel.llms import llm_runnable
 from heavyiq.lcel.prompts import to_tables_prompt_runnable
 from heavyiq.lcel.types import TableChainInputType, TableChainOutputType
-from heavyrag import IndexNotFound
 
 CONFIG = get_config()
 
@@ -118,18 +117,15 @@ async def get_relevant_info_using_rag(inputs: dict) -> str:
 
     heavydb = await get_db(inputs["session_id"])
 
-    try:
-        relevant_facts = await get_relevant_facts_info(
-            question=inputs["question"],
-            heavydb_name=heavydb._dbname,
-            similarity_cutoff=CONFIG.rag_facts_similarity_cutoff_score,
-            similarity_top_k=CONFIG.rag_facts_similarity_top_k,
-            with_reranker=True,
-            reranker_top_k=CONFIG.rag_facts_reranker_top_k,
-            reranker_cutoff=CONFIG.rag_facts_reranker_cutoff_score,
-        )
-    except IndexNotFound:
-        return ""
+    relevant_facts = await get_relevant_facts_info(
+        question=inputs["question"],
+        heavydb_name=heavydb._dbname,
+        similarity_cutoff=CONFIG.rag_facts_similarity_cutoff_score,
+        similarity_top_k=CONFIG.rag_facts_similarity_top_k,
+        with_reranker=True,
+        reranker_top_k=CONFIG.rag_facts_reranker_top_k,
+        reranker_cutoff=CONFIG.rag_facts_reranker_cutoff_score,
+    )
 
     if not relevant_facts:
         return ""

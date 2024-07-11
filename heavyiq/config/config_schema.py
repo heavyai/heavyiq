@@ -46,7 +46,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     """Used for the access log of the web server."""
     heavyiq_log_level: str = "INFO"
     """Used for the log of the application code."""
-    heavyrag_log_level: str = "INFO"
+    heavyrag_log_level: str = "DEBUG"
     """Used for the log of the heavyrag code."""
     access_log_max_file_size: int = 104857600
     """Default Access logs max file size is 100 MB"""
@@ -115,7 +115,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     table_schema_check_interval_minutes: int = 1
     # prompts
     # nl to sql
-    custom_prompt_nl_to_sql_include_relevant_info: bool = False
+    custom_prompt_nl_to_sql_include_relevant_info: bool = True
     custom_prompt_nl_to_sql_start_token: str = "<|sql prompt|>\n"
     custom_prompt_nl_to_sql_body: Optional[str] = None
     custom_prompt_nl_to_sql_end_token: str = "\n<|sql answer|>\n"
@@ -132,7 +132,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     custom_prompt_sql_to_answer_body: Optional[str] = None
     custom_prompt_sql_to_answer_end_token: str = "\n<|english answer|>\n"
     # nl to tables
-    custom_prompt_nl_to_tables_include_relevant_info: bool = False
+    custom_prompt_nl_to_tables_include_relevant_info: bool = True
     custom_prompt_nl_to_tables_start_token: str = "<|table prompt|>\n"
     custom_prompt_nl_to_tables_body: Optional[str] = None
     custom_prompt_nl_to_tables_end_token: str = "\n<|table answer|>\n"

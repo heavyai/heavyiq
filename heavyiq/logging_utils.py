@@ -221,7 +221,7 @@ def init_logs():
             max_file_size=LOG_CONFIG.heavyiq_log_max_file_size,
         )
 
-        rag_symlink = os.path.join(log_dir, "heavyrag.RAG")
+        rag_symlink = os.path.join(log_dir, "heavyiq.RAG")
         if os.path.islink(rag_symlink):
             try:
                 os.remove(rag_symlink)
