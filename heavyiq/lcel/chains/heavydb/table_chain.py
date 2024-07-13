@@ -1,11 +1,12 @@
 import re
 
 from langchain.schema import StrOutputParser
-from langchain.schema.runnable import Runnable, RunnableLambda, RunnablePassthrough
+from langchain_core.runnables import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
 
 from heavyiq.langchain.heavydb import get_config, get_db
 from heavyiq.langchain.llms import LLMType, is_using_custom_trained_llm
 from heavyiq.langchain.utils import aget_table_info_wrt_token_limit
+from heavyiq.lcel.chains.heavydb.relevant_info_chain import chain as relevant_info_chain
 from heavyiq.lcel.chains.utils import configure_step, get_value_from_runnable_binding
 from heavyiq.lcel.llms import llm_runnable
 from heavyiq.lcel.prompts import to_tables_prompt_runnable
@@ -102,39 +103,13 @@ async def parse_output(text: str) -> dict[str, int]:
 
 
 # Step 0
-async def get_relevant_info_using_rag(inputs: dict) -> str:
-    """
-    Helps to get the table info for the prompt based upon the allowed token limit.
-    """
-    from heavyrag.main import get_relevant_facts_info
-
-    if not CONFIG.custom_prompt_nl_to_tables_include_relevant_info:
-        return ""
-
-    pre_calculated_relevant_info = inputs.get("pre_calculated_relevant_info", None)
-    if pre_calculated_relevant_info is not None:
-        return pre_calculated_relevant_info
-
-    heavydb = await get_db(inputs["session_id"])
-
-    relevant_facts = await get_relevant_facts_info(
-        question=inputs["question"],
-        heavydb_name=heavydb._dbname,
-        similarity_cutoff=CONFIG.rag_facts_similarity_cutoff_score,
-        similarity_top_k=CONFIG.rag_facts_similarity_top_k,
-        with_reranker=True,
-        reranker_top_k=CONFIG.rag_facts_reranker_top_k,
-        reranker_cutoff=CONFIG.rag_facts_reranker_cutoff_score,
-    )
-
-    if not relevant_facts:
-        return ""
-    # has relevant facts
-    return f"Relevant info:\n\n{relevant_facts}\n"
-
-
 # calculating relevant info (RAG)
-relevant_info_lambda: Runnable = RunnableLambda(get_relevant_info_using_rag).with_config(
+relevant_info_lambda: Runnable = RunnableBranch(
+    (lambda x: not (CONFIG.custom_prompt_nl_to_tables_include_relevant_info), lambda x: ""),
+    (lambda x: x.get("pre_calculated_relevant_info"), lambda x: x.get("pre_calculated_relevant_info")),
+    (lambda x: CONFIG.custom_prompt_nl_to_tables_include_relevant_info, relevant_info_chain),
+    lambda x: "",
+).with_config(
     config={
         "tags": ["intermediate-step"],
         "run_name": "Get Relevant Info for NLtoTables",

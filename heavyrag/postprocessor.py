@@ -357,7 +357,7 @@ class ReRanker:
             )
         elif reranker_type == ReRankerType.OverridedLLMReRanker:
             # custom LLM reranker which includes
-            self.instance = OverridedLLMRerank()
+            self.instance = OverridedLLMRerank(top_n=top_n)
         elif reranker_type == ReRankerType.TEIReRanker:
             self.instance = TextEmbeddingsInferenceRerank(
                 base_url=CONFIG.rag_rerank_server_base,
