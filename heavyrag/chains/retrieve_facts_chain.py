@@ -49,7 +49,7 @@ def fetch_index(inputs: dict) -> VectorStoreIndex | IndexError:
     collection_name = inputs["collection_name"]
     index = get_index(collection_name=collection_name)
     if not index:
-        raise IndexNotFound(f"VectorStoreIndex not found {collection_name} collection.")
+        None
     return index
 
 
@@ -74,12 +74,13 @@ async def retrieve_relevant_snippets(inputs: dict) -> list[Any]:
     return await facts_engine.aretrieve(question)
 
 
-async def filter_by_similarity_cutoff(inputs: dict) -> list[Any]:
+async def retrieve_and_filter_snippets(inputs: dict) -> list[Any]:
     """
-    Filter snippets by similarity cutoff
+    Retrieve and filter snippets by similarity cutoff.
     """
+    nodes = await retrieve_relevant_snippets(inputs)
     processor = SimilarityPostprocessor(similarity_cutoff=inputs["similarity_cutoff"])
-    filtered_nodes = processor.postprocess_nodes(inputs["nodes"])
+    filtered_nodes = processor.postprocess_nodes(nodes)
     return filtered_nodes
 
 
@@ -98,19 +99,21 @@ async def apply_reranker_and_filter_top_n(inputs: dict) -> list[Any]:
 
 rerank_snippets_chain: Runnable = RunnablePassthrough.assign(nodes=apply_reranker_and_filter_top_n)
 
-retrieve_snippets_chain: Runnable = (
-    RunnablePassthrough.assign(nodes=retrieve_relevant_snippets)
-    | RunnablePassthrough.assign(nodes=filter_by_similarity_cutoff)
-    | RunnableBranch((lambda x: x["use_reranker"], rerank_snippets_chain), lambda x: x)
+retrieve_snippets_chain: Runnable = RunnablePassthrough.assign(nodes=retrieve_and_filter_snippets) | RunnableBranch(
+    (lambda x: x["use_reranker"], rerank_snippets_chain), lambda x: x
+)
+
+has_index_chain: Runnable = (
+    RunnablePassthrough.assign(available_snippets_count=calculate_available_snippets_count)
+    | RunnableBranch((lambda x: x["available_snippets_count"] > 0, retrieve_snippets_chain), lambda x: None)
+    | RunnableLambda(lambda x: x.get("nodes") if x else [])
 )
 
 snippet_nodes_chain: Runnable = (
     # Context.setter("inputs")
     # | Context.setter("index", fetch_index)
     RunnablePassthrough.assign(index=fetch_index)
-    | RunnablePassthrough.assign(available_snippets_count=calculate_available_snippets_count)
-    | RunnableBranch((lambda x: x["available_snippets_count"] > 0, retrieve_snippets_chain), lambda x: None)
-    | RunnableLambda(lambda x: x.get("nodes") if x else [])
+    | RunnableBranch((lambda x: x["index"], has_index_chain), lambda x: [])
 ).with_types(
     input_type=RetrieveFactsInputType  # type: ignore
 )  # return list[NodeWithScore]
