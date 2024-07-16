@@ -9,11 +9,14 @@ from llama_index.core import VectorStoreIndex
 from llama_index.core.postprocessor import SimilarityPostprocessor
 from pydantic import BaseModel, Field
 
-from heavyrag import IndexNotFound
+from heavyiq.lcel.callbacks.file_callback import LogFileCallbackHandler
+from heavyiq.logging_utils import get_heavyrag_logger
 from heavyrag.filters import get_facts_filter_matches
 from heavyrag.index import get_index
 from heavyrag.postprocessor import ReRanker, ReRankerType
 from heavyrag.utils import get_facts_node_count_in_index
+
+rag_logger = get_heavyrag_logger()
 
 
 class RetrieveFactsInputType(BaseModel):
@@ -120,4 +123,5 @@ snippet_nodes_chain: Runnable = (
 
 snippets_chain: Runnable = snippet_nodes_chain | RunnableLambda(lambda x: [i.get_text() for i in x])
 
-chain = snippets_chain
+# Adding callbacks to the chain enables automatic logging when the chain is invoked
+chain = snippets_chain.with_config(callbacks=[LogFileCallbackHandler(logger=rag_logger)])  # type: ignore

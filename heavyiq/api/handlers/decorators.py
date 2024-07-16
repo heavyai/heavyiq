@@ -4,6 +4,7 @@ from uuid import UUID
 
 from langchain import callbacks
 from langchain.callbacks.base import AsyncCallbackHandler
+from langchain_core.tracers.langchain import wait_for_all_tracers
 from pydantic import BaseModel
 
 from heavyiq.config import get_config
@@ -29,8 +30,16 @@ def with_db(coro: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
 
     @functools.wraps(coro)
     async def wrapper(request: BaseModel, db: HeavyDB) -> T:
+        logger = get_heavyiq_logger()
         async with heavydb_context(db):  # type: ignore
-            return await coro(request.dict(), config={"callbacks": [LogFileCallbackHandler()]})
+            try:
+                response = await coro(request.dict(), config={"callbacks": [LogFileCallbackHandler(logger=logger)]})
+            except Exception as e:
+                raise e
+            else:
+                return response
+            finally:
+                wait_for_all_tracers()
 
     return wrapper
 
