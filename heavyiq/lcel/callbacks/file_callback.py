@@ -1,12 +1,14 @@
+import logging
 import re
 from typing import Any
 
+from langchain.callbacks.tracers.logging import LoggingCallbackHandler
 from langchain.callbacks.tracers.stdout import FunctionCallbackHandler
 
 from heavyiq.logging_utils import get_heavyiq_logger
 
 
-class LogFileCallbackHandler(FunctionCallbackHandler):
+class LogFileWOColorCodeCallbackHandler(FunctionCallbackHandler):
     """Tracer that writes to the default log file."""
 
     name: str = "logfile_callback_handler"
@@ -22,7 +24,7 @@ class LogFileCallbackHandler(FunctionCallbackHandler):
         """
         Check whether the message received is of type error or not.
         """
-        return LogFileCallbackHandler.error_code in text
+        return LogFileWOColorCodeCallbackHandler.error_code in text
 
     def callback(self, text: str):
         """
@@ -39,3 +41,23 @@ class LogFileCallbackHandler(FunctionCallbackHandler):
         text = self.remove_color_codes_rgx.sub("", text)
 
         func(text, depth=1)
+
+
+class OverridedLoggingCallbackHandler(LoggingCallbackHandler):
+    def __init__(
+        self,
+        logger: logging.Logger | None = None,
+        log_level: int = logging.DEBUG,
+        extra: dict | None = None,
+        **kwargs: Any
+    ) -> None:
+        """
+        By default it logs only on DEBUG level.
+        """
+        # use iq logger by default
+        if logger is None:
+            logger = get_heavyiq_logger()  # type: ignore
+        super().__init__(logger, log_level, extra, **kwargs)
+
+
+LogFileCallbackHandler = OverridedLoggingCallbackHandler
