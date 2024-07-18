@@ -3,7 +3,6 @@
 #############
 from typing import Any
 
-from langchain_core.beta.runnables.context import Context
 from langchain_core.runnables import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
 from llama_index.core import VectorStoreIndex
 from llama_index.core.postprocessor import SimilarityPostprocessor
@@ -100,28 +99,32 @@ async def apply_reranker_and_filter_top_n(inputs: dict) -> list[Any]:
     return reranked_nodes
 
 
-rerank_snippets_chain: Runnable = RunnablePassthrough.assign(nodes=apply_reranker_and_filter_top_n)
-
-retrieve_snippets_chain: Runnable = RunnablePassthrough.assign(nodes=retrieve_and_filter_snippets) | RunnableBranch(
-    (lambda x: x["use_reranker"], rerank_snippets_chain), lambda x: x
+rerank_snippets_chain: Runnable = RunnablePassthrough.assign(nodes=apply_reranker_and_filter_top_n).with_config(
+    run_name="ReRankSnippets"
 )
 
+retrieve_snippets_chain: Runnable = RunnablePassthrough.assign(nodes=retrieve_and_filter_snippets).with_config(
+    run_name="RetrieveAndFilterSnippets"
+) | RunnableBranch((lambda x: x["use_reranker"], rerank_snippets_chain), lambda x: x)
+
 has_index_chain: Runnable = (
-    RunnablePassthrough.assign(available_snippets_count=calculate_available_snippets_count)
+    RunnablePassthrough.assign(available_snippets_count=calculate_available_snippets_count).with_config(
+        run_name="AvailableSnippetsCount"
+    )
     | RunnableBranch((lambda x: x["available_snippets_count"] > 0, retrieve_snippets_chain), lambda x: None)
     | RunnableLambda(lambda x: x.get("nodes") if x else [])
 )
 
 snippet_nodes_chain: Runnable = (
-    # Context.setter("inputs")
-    # | Context.setter("index", fetch_index)
     RunnablePassthrough.assign(index=fetch_index)
     | RunnableBranch((lambda x: x["index"], has_index_chain), lambda x: [])
 ).with_types(
     input_type=RetrieveFactsInputType  # type: ignore
 )  # return list[NodeWithScore]
 
-snippets_chain: Runnable = snippet_nodes_chain | RunnableLambda(lambda x: [i.get_text() for i in x])
 
+snippets_chain: Runnable = snippet_nodes_chain | RunnableLambda(lambda x: [i.get_text() for i in x]).with_config(
+    run_name="FinalSnippets", serialized_objects={"foo": "bar"}
+)
 # Adding callbacks to the chain enables automatic logging when the chain is invoked
-chain = snippets_chain.with_config(callbacks=[LogFileCallbackHandler(logger=rag_logger)])  # type: ignore
+chain = snippets_chain.with_config(callbacks=[LogFileCallbackHandler(logger=rag_logger, use_valid_runs=True)])  # type: ignore
