@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sys
 from typing import Any
 
@@ -279,8 +280,27 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         # initialize chains and RAG
         import heavyiq.lcel.chains
         from heavyiq.logging_utils import heavyiq_logger as logger
+        from heavyrag.embed import SHARED_REFRESH_FILE, set_chroma_client
 
         global _config_provided
+
+        def refresh_chromadb():
+            set_chroma_client()
+
+        async def check_for_refresh_signal():
+            if os.path.exists(SHARED_REFRESH_FILE):
+                logger.info("Refresing chormadb client...")
+                refresh_chromadb()
+                await asyncio.sleep(2)
+                try:
+                    os.remove(SHARED_REFRESH_FILE)
+                except:
+                    pass
+
+        async def background_refresh_checker():
+            while True:
+                await check_for_refresh_signal()
+                await asyncio.sleep(5)
 
         async def enable_telemetrics_for_free_license_daemon():
             """
@@ -316,6 +336,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         # run a background task to check license_edition got cached or not
         # if yes, and it's a free edition then enable langsmith telemetry
         asyncio.create_task(enable_telemetrics_for_free_license_daemon())
+        asyncio.create_task(background_refresh_checker())
 
     @app.on_event("shutdown")
     async def shutdown():

@@ -8,7 +8,7 @@ from llama_index.readers.file import PDFReader
 from heavyiq.config import get_config
 from heavyiq.langchain.heavydb import HeavyDB
 from heavyiq.utils import semaphore_gather
-from heavyrag.readers import HeavyDBTableReader, OverrideSmartPDFLoader, TxtFileReader
+from heavyrag.readers import HeavyDBTableReader, TxtFileReader
 
 CONFIG = get_config()
 
@@ -99,7 +99,8 @@ async def aload_tables(heavydb: HeavyDB, exlude_tables: list[str] | None = None)
     exlude_tables = exlude_tables or []
     reader = HeavyDBTableReader(heavydb=heavydb)
     tasks = [reader.aload_data(table_name=i) for i in heavydb.get_usable_table_names() if i not in exlude_tables]
-    result = await semaphore_gather(5, tasks)  # run only 5 tasks at a time
+    # run only 5 tasks at a time
+    result = await semaphore_gather(5, tasks)  # type: ignore
     flattened_list = list(chain.from_iterable(result))
     return _exclude_metadata(flattened_list)
 
@@ -109,7 +110,7 @@ def load_facts(facts: list[tuple[str, str]], heavydb_name: str, table_name: str 
     Form a document from the passed facts.
     """
     return [
-        TextNode(text=fact, id_=fact_id, metadata={"dbname": heavydb_name, "type": "facts", "id": fact_id})
+        TextNode(text=fact, id_=fact_id, metadata={"dbname": heavydb_name, "type": "facts", "id": fact_id})  # type: ignore
         for fact_id, fact in facts
     ]
 
@@ -118,4 +119,11 @@ def load_fact(fact_id: str, fact: str, heavydb_name: str) -> TextNode:
     """
     Form a textnode from fact string.
     """
-    return TextNode(text=fact, id_=fact_id, metadata={"dbname": heavydb_name, "type": "facts", "id": fact_id})
+    return TextNode(text=fact, id_=fact_id, metadata={"dbname": heavydb_name, "type": "facts", "id": fact_id})  # type: ignore
+
+
+def load_facts_as_docs(facts: list[tuple[str, str]], heavydb_name: str) -> list[Document]:
+    return [
+        Document(text=fact, id_=fact_id, metadata={"dbname": heavydb_name, "type": "facts", "id": fact_id})  # type: ignore
+        for fact_id, fact in facts
+    ]

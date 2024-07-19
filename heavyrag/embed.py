@@ -1,4 +1,5 @@
 import chromadb
+from chromadb.api import ClientAPI
 from llama_index.core.base.embeddings.base import BaseEmbedding
 from llama_index.core.schema import TextNode
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -8,6 +9,7 @@ from heavyiq.config import get_config
 from heavyrag.logger import logger
 
 CONFIG, EMBED_MODEL, CHROMA_CLIENT = get_config(), None, None
+SHARED_REFRESH_FILE = "chromadb_refresh_signal"
 
 
 class LlamaIndexEmbeddingAdapter(chromadb.EmbeddingFunction):
@@ -16,6 +18,11 @@ class LlamaIndexEmbeddingAdapter(chromadb.EmbeddingFunction):
 
     def __call__(self, input: chromadb.Documents) -> chromadb.Embeddings:
         return [node.embedding for node in self.ef([TextNode(text=doc) for doc in input])]
+
+
+def create_refresh_file():
+    print("Creating chormadb client refresh file...")
+    open(SHARED_REFRESH_FILE, "w").close()
 
 
 def set_embed_model():
@@ -42,7 +49,7 @@ def set_embed_model():
         EMBED_MODEL = HuggingFaceEmbedding(CONFIG.rag_embed_model_name, device="cpu")
 
 
-def get_embed_model():
+def get_embed_model() -> BaseEmbedding:
     """
     Get the embed model.
     """
@@ -51,15 +58,16 @@ def get_embed_model():
     return EMBED_MODEL
 
 
-def set_chroma_client():
+def set_chroma_client() -> None:
     global CHROMA_CLIENT
+    print("Setting chormadb client...")
     CHROMA_CLIENT = chromadb.PersistentClient(
         path=CONFIG.rag_chromadb_persist_dir,
         settings=chromadb.config.Settings(anonymized_telemetry=False, is_persistent=True),
     )
 
 
-def get_chroma_client():
+def get_chroma_client() -> ClientAPI:
     if CHROMA_CLIENT is None:
         set_chroma_client()
     return CHROMA_CLIENT
