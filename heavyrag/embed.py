@@ -1,4 +1,5 @@
 import chromadb
+from chromadb.api import ClientAPI
 from llama_index.core.base.embeddings.base import BaseEmbedding
 from llama_index.core.schema import TextNode
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -42,7 +43,7 @@ def set_embed_model():
         EMBED_MODEL = HuggingFaceEmbedding(CONFIG.rag_embed_model_name, device="cpu")
 
 
-def get_embed_model():
+def get_embed_model() -> BaseEmbedding:
     """
     Get the embed model.
     """
@@ -51,15 +52,8 @@ def get_embed_model():
     return EMBED_MODEL
 
 
-def set_chroma_client():
-    global CHROMA_CLIENT
-    CHROMA_CLIENT = chromadb.PersistentClient(
+def get_chroma_client() -> ClientAPI:
+    return chromadb.PersistentClient(
         path=CONFIG.rag_chromadb_persist_dir,
         settings=chromadb.config.Settings(anonymized_telemetry=False, is_persistent=True),
     )
-
-
-def get_chroma_client():
-    if CHROMA_CLIENT is None:
-        set_chroma_client()
-    return CHROMA_CLIENT
