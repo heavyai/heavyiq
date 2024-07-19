@@ -16,7 +16,6 @@ DOCUMENTS_INDEX_NODE = IndexNode(index_id=DOCUMENTS_INDEX_ID, text="Document Ind
 HEAVYDB_INDEX_NODE = IndexNode(index_id=HEAVYDB_INDEX_ID, text="HeavyDB Index")
 
 embed_model = get_embed_model()
-chroma_client = get_chroma_client()
 
 
 def get_vectorstore(
@@ -25,6 +24,7 @@ def get_vectorstore(
     """
     Get or Create a VectorStore.
     """
+    chroma_client = get_chroma_client()
     embedding_function = LlamaIndexEmbeddingAdapter(embed_model)
     if create_collection_if_not_exists:
         chroma_collection = chroma_client.get_or_create_collection(
