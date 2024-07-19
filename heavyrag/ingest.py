@@ -11,6 +11,7 @@ from llama_index.vector_stores.chroma.base import _to_chroma_filter
 
 from heavyiq.langchain.heavydb import HeavyDB
 from heavyrag.chroma_ops import update_embeddings
+from heavyrag.embed import create_refresh_file
 from heavyrag.index import acreate_index_and_insert_nodes, get_index, get_or_create_index
 from heavyrag.loaders import aload_file, aload_files_from_directory, aload_table, aload_tables, load_fact, load_facts
 from heavyrag.logger import logger
@@ -160,7 +161,10 @@ async def ainsert_facts(facts: list[tuple[str, str]], heavydb_name: str) -> Base
     """
     logger.info(f"Index: Bulk inserting facts into {heavydb_name} collection.")
     nodes = load_facts(facts=facts, heavydb_name=heavydb_name)
-    return await get_or_create_index_and_insert_nodes(collection_name=heavydb_name, nodes=nodes)
+    index = await get_or_create_index_and_insert_nodes(collection_name=heavydb_name, nodes=nodes)
+    # create a refresh file after chormadb updation to notify all the gunciorn workers
+    create_refresh_file()
+    return index
 
 
 def delete_nodes(collection: Collection, where: dict, batch_size: int = 166) -> bool:

@@ -4,7 +4,7 @@
 from typing import Any
 
 from langchain_core.beta.runnables.context import Context
-from langchain_core.runnables import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
+from langchain_core.runnables import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough, RunnableSequence
 from llama_index.core import VectorStoreIndex
 from llama_index.core.postprocessor import SimilarityPostprocessor
 from pydantic import BaseModel, Field
@@ -60,7 +60,7 @@ async def calculate_available_snippets_count(inputs: dict) -> int:
     return await get_facts_node_count_in_index(inputs["index"])
 
 
-async def retrieve_relevant_snippets(inputs: dict) -> list[Any]:
+async def retrieve_relevant_snippets(inputs: dict) -> dict:
     """
     Supposed to retrieve snippets relevant to the asked question.
     """
@@ -74,7 +74,15 @@ async def retrieve_relevant_snippets(inputs: dict) -> list[Any]:
         filters=get_facts_filter_matches(collection_name),
         similarity_top_k=similarity_top_k,
     )
-    return await facts_engine.aretrieve(question)
+    nodes = await facts_engine.aretrieve(question)
+    inputs["nodes"] = nodes
+    return inputs
+
+
+async def filter_snippets(inputs: dict) -> list[Any]:
+    processor = SimilarityPostprocessor(similarity_cutoff=inputs["similarity_cutoff"])
+    filtered_nodes = processor.postprocess_nodes(inputs["nodes"])
+    return filtered_nodes
 
 
 async def retrieve_and_filter_snippets(inputs: dict) -> list[Any]:
@@ -102,9 +110,9 @@ async def apply_reranker_and_filter_top_n(inputs: dict) -> list[Any]:
 
 rerank_snippets_chain: Runnable = RunnablePassthrough.assign(nodes=apply_reranker_and_filter_top_n)
 
-retrieve_snippets_chain: Runnable = RunnablePassthrough.assign(nodes=retrieve_and_filter_snippets) | RunnableBranch(
-    (lambda x: x["use_reranker"], rerank_snippets_chain), lambda x: x
-)
+retrieve_snippets_chain: Runnable = RunnablePassthrough.assign(
+    nodes=RunnableSequence(RunnableLambda(retrieve_relevant_snippets) | RunnableLambda(filter_snippets))
+) | RunnableBranch((lambda x: x["use_reranker"], rerank_snippets_chain), lambda x: x)
 
 has_index_chain: Runnable = (
     RunnablePassthrough.assign(available_snippets_count=calculate_available_snippets_count)
