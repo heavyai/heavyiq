@@ -19,6 +19,7 @@ CONFIG = get_config()
 chain: Runnable = (
     RunnablePassthrough.assign(
         pre_calculated_relevant_info=RunnableBranch(
+            (lambda x: not (CONFIG.enable_rag), lambda x: ""),
             (
                 lambda x: CONFIG.custom_prompt_nl_to_tables_include_relevant_info
                 or CONFIG.custom_prompt_nl_to_sql_include_relevant_info,
