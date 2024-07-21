@@ -57,7 +57,7 @@ def get_embed_model():
 def set_chroma_client():
     global CHROMA_CLIENT
     try:
-        host, port = get_host_and_port(CONFIG.rag_chormadb_server_base)
+        host, port = get_host_and_port(CONFIG.rag_chromadb_server_base)
         CHROMA_CLIENT = chromadb.HttpClient(
             host=host,
             port=port,
