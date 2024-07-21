@@ -60,6 +60,7 @@ async def get_table_info(sql_chain_inputs: dict) -> str:
 # Step 1a
 # calculating relevant info (RAG)
 relevant_info_lambda: Runnable = RunnableBranch(
+    (lambda x: not (CONFIG.enable_rag), lambda x: ""),
     (lambda x: not (CONFIG.custom_prompt_nl_to_sql_include_relevant_info), lambda x: ""),
     (lambda x: x.get("pre_calculated_relevant_info"), lambda x: x.get("pre_calculated_relevant_info")),
     (lambda x: CONFIG.custom_prompt_nl_to_sql_include_relevant_info, relevant_info_chain),

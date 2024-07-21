@@ -27,6 +27,8 @@ def get_vectorstore(
     """
     embedding_function = LlamaIndexEmbeddingAdapter(embed_model)
     if create_collection_if_not_exists:
+        metadata = metadata or {}
+        metadata.update({"hnsw:space": "cosine"})
         chroma_collection = chroma_client.get_or_create_collection(
             collection_name, metadata=metadata, embedding_function=embedding_function
         )

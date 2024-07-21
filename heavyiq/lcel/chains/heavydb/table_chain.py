@@ -30,7 +30,6 @@ async def get_tables(inputs: dict, use_rag: bool = False) -> list[str]:
     """
     Return a list of allowed tables by doing similarity search on chroma db when tables length goes beyond certain limit.
     """
-    from heavyrag.main import determine_table_names
 
     db, config = await get_db(inputs["session_id"]), get_config()
 
@@ -40,8 +39,16 @@ async def get_tables(inputs: dict, use_rag: bool = False) -> list[str]:
 
     found_tables: list[str] = []
 
+    async def retrieve_table_names_from_vectordb() -> list[str]:
+        """
+        Retrieve relevant table names for the asked question from vectordb through RAG search.
+        """
+        from heavyrag.main import determine_table_names
+
+        return await determine_table_names(question=inputs["question"], heavydb=db)
+
     if (len(allowed_tables) > config.allowed_tables_max_count_nl_to_tables) or use_rag:
-        found_tables = await determine_table_names(question=inputs["question"], heavydb=db)
+        found_tables = await retrieve_table_names_from_vectordb()
 
     return found_tables or allowed_tables
 
@@ -105,6 +112,7 @@ async def parse_output(text: str) -> dict[str, int]:
 # Step 0
 # calculating relevant info (RAG)
 relevant_info_lambda: Runnable = RunnableBranch(
+    (lambda x: not (CONFIG.enable_rag), lambda x: ""),
     (lambda x: not (CONFIG.custom_prompt_nl_to_tables_include_relevant_info), lambda x: ""),
     (lambda x: x.get("pre_calculated_relevant_info"), lambda x: x.get("pre_calculated_relevant_info")),
     (lambda x: CONFIG.custom_prompt_nl_to_tables_include_relevant_info, relevant_info_chain),
