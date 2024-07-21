@@ -10,4 +10,3 @@ def initialize_rag():
     Initialize models and clients (ie. HF models and chorma clients) relevant to heavyrag.
     """
     set_embed_model()
-    set_chroma_client()

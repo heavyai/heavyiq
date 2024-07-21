@@ -1,7 +1,11 @@
 from __future__ import print_function
+
 import json
 import multiprocessing
+import os
+import subprocess
 import threading
+import time
 
 try:
     import jwt
@@ -9,7 +13,72 @@ except ImportError:
     # Ensure jwt is installed or handled appropriately
     pass
 
-def cache_license_edition_background_task(conf_file_path):
+chromadb_process, DB_PATH, PORT = None, None, None
+
+
+def start_chromadb_server_process():
+    """
+    Helps to start ChormaDB server process.
+    """
+    global chromadb_process, DB_PATH, PORT
+
+    if "CHROMADB_STARTED" not in os.environ:
+        assert DB_PATH and PORT
+        # Open log file
+        log_file = open("chromadb.log", "a")
+        # Start the ChromaDB server and redirect stdout and stderr to the log file
+        chromadb_process = subprocess.Popen(
+            ["chroma", "run", "--path", DB_PATH, "--port", f"{PORT}"], stdout=log_file, stderr=log_file
+        )
+        os.environ["CHROMADB_STARTED"] = "1"
+        print(f"Started chormadb server...\nArgs:\n--path {DB_PATH}\n--port {PORT}\nSee logs at {log_file.name}")
+        return True
+
+    return False
+
+
+def monitor_chromadb():
+    """
+    Helps to monitor the server and does automatic restart on failure.
+    """
+    print("Started monitoring chromaDB server process...")
+    while True:
+        if chromadb_process and chromadb_process.poll() is not None:
+            print("ChromaDB server exited unexpectedly. Restarting...")
+            os.environ.pop("CHROMADB_STARTED")
+            start_chromadb_server_process()
+        time.sleep(5)
+
+
+def check_and_initiate_chormadb_thread(conf_file_path: str):
+    """
+    Parser the configuration file and optionally initiate the chormadb server.
+    """
+    from heavyiq.config import get_config
+    from heavyiq.utils import get_host_and_port
+
+    global DB_PATH, PORT
+
+    if conf_file_path:
+        config = get_config(conf_file_path)
+    else:
+        config = get_config()
+
+    server_base = config.rag_chormadb_server_base
+    if not server_base:
+        return None
+
+    _, PORT = get_host_and_port(server_base)
+    DB_PATH = config.rag_chromadb_persist_dir
+
+    is_started = start_chromadb_server_process()
+    if not is_started:
+        print("Failed to start chormadb server.")
+    # run background chormadb monitor thread
+    chromadb_monitor_thread()
+
+
+def cache_license_edition_background_task(conf_file_path: str):
     """
     Find and set license edition on the shared cache dict.
     """
@@ -46,9 +115,20 @@ def cache_license_edition_background_task(conf_file_path):
     # print("Background task cache_license_edition completed.")
 
 
-def run_background_task_in_thread(conf_file_path):
+def run_background_task_in_thread(conf_file_path: str):
     thread = threading.Thread(target=cache_license_edition_background_task, args=(conf_file_path,))
     thread.start()
+
+
+def run_background_chromadb_initiate_task_in_thread(conf_file_path: str):
+    thread = threading.Thread(target=check_and_initiate_chormadb_thread, args=(conf_file_path,))
+    thread.start()
+
+
+def chromadb_monitor_thread():
+    # Start monitoring thread
+    monitor_thread = threading.Thread(target=monitor_chromadb, daemon=True)
+    monitor_thread.start()
 
 
 def print_gunicorn_args(settings):
@@ -79,6 +159,8 @@ def on_starting(server):
 
     proc_name = gunicorn_args["default_proc_name"].get()
     conf_file_path = proc_name.split("(")[1].split(")")[0].split("=")[-1].strip("'").strip('"')
+    # check_and_initiate_chormadb_thread(conf_file_path)
+    check_and_initiate_chormadb_thread(conf_file_path)
     run_background_task_in_thread(conf_file_path)
 
 
@@ -92,11 +174,18 @@ def post_worker_init(worker):
 def on_exit(server):
     from heavyiq.utils import SharedDictSingleton
 
+    os.environ.pop("CHROMADB_STARTED")
+
     shared_instance = SharedDictSingleton._instance  # Removed type hint
-    if shared_instance and hasattr(shared_instance, '_manager') and shared_instance._manager._state.value == 1:
+    if shared_instance and hasattr(shared_instance, "_manager") and shared_instance._manager._state.value == 1:
         # print("Shutting down shared instance")
         shared_instance._manager.shutdown()
     # print("Server exiting...")
+    # exit chormadb server
+    global chromadb_process
+    if chromadb_process:
+        chromadb_process.terminate()
+        chromadb_process.wait()
 
 
 cores = multiprocessing.cpu_count()
