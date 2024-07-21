@@ -115,8 +115,9 @@ SQL 5:
 
 Question:  <question>
 \n<|sql judge answer|>\n
-SQL 1 : 0|1
+SQL 1: 0|1
 SQL 2: 0|1
+...
 SQL 5: 0|1
 
 Let's try this now:
