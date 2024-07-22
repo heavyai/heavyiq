@@ -28,10 +28,10 @@ def start_chromadb_server_process():
         log_file = open("chromadb.log", "a")
         # Start the ChromaDB server and redirect stdout and stderr to the log file
         chromadb_process = subprocess.Popen(
-            ["chroma", "run", "--path", DB_PATH, "--port", f"{PORT}"], stdout=log_file, stderr=log_file
+            ["chroma", "run", "--path", DB_PATH, "--port", str(PORT)], stdout=log_file, stderr=log_file
         )
         os.environ["CHROMADB_STARTED"] = "1"
-        print(f"Started chromadb server...\nArgs:\n--path {DB_PATH}\n--port {PORT}\nSee logs at {log_file.name}")
+        print("Started chromadb server...\nArgs:\n--path {}\n--port {}\nSee logs at {}".format(DB_PATH, PORT, log_file.name))
         return True
 
     return False
@@ -50,7 +50,7 @@ def monitor_chromadb():
         time.sleep(5)
 
 
-def check_and_initiate_chromadb_thread(conf_file_path: str):
+def check_and_initiate_chromadb_thread(conf_file_path):
     """
     Parser the configuration file and optionally initiate the chromadb server.
     """
@@ -79,7 +79,7 @@ def check_and_initiate_chromadb_thread(conf_file_path: str):
     chromadb_monitor_thread()
 
 
-def cache_license_edition_background_task(conf_file_path: str):
+def cache_license_edition_background_task(conf_file_path):
     """
     Find and set license edition on the shared cache dict.
     """
@@ -116,12 +116,12 @@ def cache_license_edition_background_task(conf_file_path: str):
     # print("Background task cache_license_edition completed.")
 
 
-def run_background_task_in_thread(conf_file_path: str):
+def run_background_task_in_thread(conf_file_path):
     thread = threading.Thread(target=cache_license_edition_background_task, args=(conf_file_path,))
     thread.start()
 
 
-def run_background_chromadb_initiate_task_in_thread(conf_file_path: str):
+def run_background_chromadb_initiate_task_in_thread(conf_file_path):
     thread = threading.Thread(target=check_and_initiate_chromadb_thread, args=(conf_file_path,))
     thread.start()
 
@@ -140,8 +140,8 @@ def print_gunicorn_args(settings):
     filtered_args = dict((key, str(value.get())) for key, value in settings.items())  # Compatible with both versions
 
     formatted_args = json.dumps(filtered_args, indent=2)
-    # print("Gunicorn Args (filtered):")
-    # print(formatted_args)
+    print("Gunicorn Args (filtered):")
+    print(formatted_args)
 
 
 def on_starting(server):
@@ -156,7 +156,7 @@ def on_starting(server):
     """
 
     gunicorn_args = server.cfg.settings
-    print_gunicorn_args(gunicorn_args)
+    # print_gunicorn_args(gunicorn_args)
 
     proc_name = gunicorn_args["default_proc_name"].get()
     conf_file_path = proc_name.split("(")[1].split(")")[0].split("=")[-1].strip("'").strip('"')
