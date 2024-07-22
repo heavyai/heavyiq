@@ -15,7 +15,6 @@ except ImportError:
 
 chromadb_process, DB_PATH, PORT = None, None, None
 
-
 def start_chromadb_server_process():
     """
     Helps to start ChromaDB server process.
@@ -28,14 +27,13 @@ def start_chromadb_server_process():
         log_file = open("chromadb.log", "a")
         # Start the ChromaDB server and redirect stdout and stderr to the log file
         chromadb_process = subprocess.Popen(
-            ["chroma", "run", "--path", DB_PATH, "--port", f"{PORT}"], stdout=log_file, stderr=log_file
+            ["chroma", "run", "--path", DB_PATH, "--port", str(PORT)], stdout=log_file, stderr=log_file
         )
         os.environ["CHROMADB_STARTED"] = "1"
-        print(f"Started chromadb server...\nArgs:\n--path {DB_PATH}\n--port {PORT}\nSee logs at {log_file.name}")
+        print("Started chromadb server...\nArgs:\n--path {}\n--port {}\nSee logs at {}".format(DB_PATH, PORT, log_file.name))
         return True
 
     return False
-
 
 def monitor_chromadb():
     """
@@ -49,8 +47,7 @@ def monitor_chromadb():
             start_chromadb_server_process()
         time.sleep(5)
 
-
-def check_and_initiate_chromadb_thread(conf_file_path: str):
+def check_and_initiate_chromadb_thread(conf_file_path):
     """
     Parser the configuration file and optionally initiate the chromadb server.
     """
@@ -78,8 +75,7 @@ def check_and_initiate_chromadb_thread(conf_file_path: str):
     # run background chromadb monitor thread
     chromadb_monitor_thread()
 
-
-def cache_license_edition_background_task(conf_file_path: str):
+def cache_license_edition_background_task(conf_file_path):
     """
     Find and set license edition on the shared cache dict.
     """
@@ -115,22 +111,18 @@ def cache_license_edition_background_task(conf_file_path: str):
 
     # print("Background task cache_license_edition completed.")
 
-
-def run_background_task_in_thread(conf_file_path: str):
+def run_background_task_in_thread(conf_file_path):
     thread = threading.Thread(target=cache_license_edition_background_task, args=(conf_file_path,))
     thread.start()
 
-
-def run_background_chromadb_initiate_task_in_thread(conf_file_path: str):
+def run_background_chromadb_initiate_task_in_thread(conf_file_path):
     thread = threading.Thread(target=check_and_initiate_chromadb_thread, args=(conf_file_path,))
     thread.start()
-
 
 def chromadb_monitor_thread():
     # Start monitoring thread
     monitor_thread = threading.Thread(target=monitor_chromadb, daemon=True)
     monitor_thread.start()
-
 
 def print_gunicorn_args(settings):
     """
@@ -142,7 +134,6 @@ def print_gunicorn_args(settings):
     formatted_args = json.dumps(filtered_args, indent=2)
     # print("Gunicorn Args (filtered):")
     # print(formatted_args)
-
 
 def on_starting(server):
     """
@@ -164,13 +155,11 @@ def on_starting(server):
     check_and_initiate_chromadb_thread(conf_file_path)
     run_background_task_in_thread(conf_file_path)
 
-
 def post_worker_init(worker):
     import atexit
     from multiprocessing.util import _exit_function
 
     atexit.unregister(_exit_function)
-
 
 def on_exit(server):
     from heavyiq.utils import SharedDictSingleton
@@ -187,7 +176,6 @@ def on_exit(server):
     if chromadb_process:
         chromadb_process.terminate()
         chromadb_process.wait()
-
 
 cores = multiprocessing.cpu_count()
 workers_per_core = 2
