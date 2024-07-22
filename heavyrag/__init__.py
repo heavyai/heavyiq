@@ -7,6 +7,6 @@ class IndexNotFound(Exception):
 
 def initialize_rag():
     """
-    Initialize models and clients (ie. HF models and chorma clients) relevant to heavyrag.
+    Initialize models and clients (ie. HF models and chroma clients) relevant to heavyrag.
     """
     set_embed_model()

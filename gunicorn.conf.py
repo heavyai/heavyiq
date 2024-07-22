@@ -18,7 +18,7 @@ chromadb_process, DB_PATH, PORT = None, None, None
 
 def start_chromadb_server_process():
     """
-    Helps to start ChormaDB server process.
+    Helps to start ChromaDB server process.
     """
     global chromadb_process, DB_PATH, PORT
 
@@ -31,7 +31,7 @@ def start_chromadb_server_process():
             ["chroma", "run", "--path", DB_PATH, "--port", f"{PORT}"], stdout=log_file, stderr=log_file
         )
         os.environ["CHROMADB_STARTED"] = "1"
-        print(f"Started chormadb server...\nArgs:\n--path {DB_PATH}\n--port {PORT}\nSee logs at {log_file.name}")
+        print(f"Started chromadb server...\nArgs:\n--path {DB_PATH}\n--port {PORT}\nSee logs at {log_file.name}")
         return True
 
     return False
@@ -50,9 +50,9 @@ def monitor_chromadb():
         time.sleep(5)
 
 
-def check_and_initiate_chormadb_thread(conf_file_path: str):
+def check_and_initiate_chromadb_thread(conf_file_path: str):
     """
-    Parser the configuration file and optionally initiate the chormadb server.
+    Parser the configuration file and optionally initiate the chromadb server.
     """
     from heavyiq.config import get_config
     from heavyiq.utils import get_host_and_port
@@ -64,8 +64,9 @@ def check_and_initiate_chormadb_thread(conf_file_path: str):
     else:
         config = get_config()
 
-    server_base = config.rag_chormadb_server_base
+    server_base = config.rag_chromadb_server_base
     if not server_base:
+        print("Failed to start chromadb server, no chromadb server base found on config.")
         return None
 
     _, PORT = get_host_and_port(server_base)
@@ -73,8 +74,8 @@ def check_and_initiate_chormadb_thread(conf_file_path: str):
 
     is_started = start_chromadb_server_process()
     if not is_started:
-        print("Failed to start chormadb server.")
-    # run background chormadb monitor thread
+        print("Failed to start chromadb server.")
+    # run background chromadb monitor thread
     chromadb_monitor_thread()
 
 
@@ -121,7 +122,7 @@ def run_background_task_in_thread(conf_file_path: str):
 
 
 def run_background_chromadb_initiate_task_in_thread(conf_file_path: str):
-    thread = threading.Thread(target=check_and_initiate_chormadb_thread, args=(conf_file_path,))
+    thread = threading.Thread(target=check_and_initiate_chromadb_thread, args=(conf_file_path,))
     thread.start()
 
 
@@ -159,8 +160,8 @@ def on_starting(server):
 
     proc_name = gunicorn_args["default_proc_name"].get()
     conf_file_path = proc_name.split("(")[1].split(")")[0].split("=")[-1].strip("'").strip('"')
-    # check_and_initiate_chormadb_thread(conf_file_path)
-    check_and_initiate_chormadb_thread(conf_file_path)
+    # check_and_initiate_chromadb_thread(conf_file_path)
+    check_and_initiate_chromadb_thread(conf_file_path)
     run_background_task_in_thread(conf_file_path)
 
 
@@ -174,14 +175,14 @@ def post_worker_init(worker):
 def on_exit(server):
     from heavyiq.utils import SharedDictSingleton
 
-    os.environ.pop("CHROMADB_STARTED")
+    os.environ.pop("CHROMADB_STARTED", None)
 
     shared_instance = SharedDictSingleton._instance  # Removed type hint
     if shared_instance and hasattr(shared_instance, "_manager") and shared_instance._manager._state.value == 1:
         # print("Shutting down shared instance")
         shared_instance._manager.shutdown()
     # print("Server exiting...")
-    # exit chormadb server
+    # exit chromadb server
     global chromadb_process
     if chromadb_process:
         chromadb_process.terminate()
