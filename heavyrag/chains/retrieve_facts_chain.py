@@ -12,7 +12,6 @@ from pydantic import BaseModel, Field
 from heavyiq.lcel.callbacks.file_callback import LogFileCallbackHandler
 from heavyiq.logging_utils import get_heavyrag_logger
 from heavyrag.filters import get_facts_filter_matches
-from heavyrag.index import get_index
 from heavyrag.postprocessor import ReRanker, ReRankerType
 from heavyrag.utils import get_facts_node_count_in_index
 
@@ -49,6 +48,8 @@ def fetch_index(inputs: dict) -> VectorStoreIndex | IndexError:
     """
     Get index by heavydb name.
     """
+    from heavyrag.index import get_index
+
     collection_name = inputs["collection_name"]
     index = get_index(collection_name=collection_name)
     if not index:

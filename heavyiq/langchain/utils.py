@@ -203,7 +203,7 @@ async def update_table_index_on_schema_change_callback(session: str, table: str)
     except Exception as e:
         logger.exception(f"Failed to update index for {table} table, {e}")
     else:
-        logger.debug(f"Successfully re-indexed the document for the {table} table on ChormaDB VectorStore.")
+        logger.debug(f"Successfully re-indexed the document for the {table} table on ChromaDB VectorStore.")
     finally:
         await shared_dict.delete(key)
 

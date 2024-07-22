@@ -9,10 +9,7 @@ from pydantic import BaseModel
 from heavyiq.cli.decorators import coro
 from heavyiq.config import get_config
 from heavyrag.filters import get_facts_filter_matches
-from heavyrag.index import get_index
-from heavyrag.ingest import ainsert_facts
 from heavyrag.logger import logger
-from heavyrag.main import ask_facts
 from heavyrag.postprocessor import ReRanker, ReRankerType
 
 from .utils import read_and_group_csv, read_csv_as_lists, string_to_list, write_csv
@@ -39,6 +36,8 @@ async def insert(dataset: str):
     """
     Insert snippets into sqlite db and chroma vectorstore.
     """
+    from heavyrag.ingest import ainsert_facts
+
     tasks = []
     for dbname, rows in read_and_group_csv(dataset, group_by_column_idx=1, header=True).items():
         altered_rows = [(row[0], row[2]) for row in rows]  # make list of tuples like (guidance_id, guidance_snippet)
@@ -60,6 +59,8 @@ async def retrieve_facts(args: RetrieveFactsArgs) -> list[tuple[str, dict, float
     """
     Retrieve aand re-rank snippets/facts.
     """
+    from heavyrag.index import get_index
+
     index = get_index(collection_name=args.dbname)
     if not index:
         raise ValueError(f"VectorStoreIndex not found {args.dbname} collection.")
