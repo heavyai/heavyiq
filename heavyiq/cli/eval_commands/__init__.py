@@ -868,7 +868,7 @@ async def run_config_model_on_questions_lcel(
                     question,
                     gold_query,
                     pred_query,
-                    " ".join(results),
+                    "".join(results),
                     score,
                     judge_prompt,
                     judge_answer,

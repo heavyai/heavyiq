@@ -147,9 +147,9 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     custom_prompt_instruct_body: Optional[str] = None
     custom_prompt_instruct_end_token: str = "\n<|prompt|>\n"
     # judge
-    custom_prompt_nl_to_multiple_sql_judge_start_token: str = "<|prompt|>\n"
+    custom_prompt_nl_to_multiple_sql_judge_start_token: str = "<|sql judge prompt|>\n"
     custom_prompt_nl_to_multiple_sql_judge_body: Optional[str] = None
-    custom_prompt_nl_to_multiple_sql_judge_end_token: str = "\n<|answer|>\n"
+    custom_prompt_nl_to_multiple_sql_judge_end_token: str = "\n<|sql judge answer|>\n"
     # RAG
     rag_storage_persist_dir: str = "rag_storage"
     rag_documents_source_dir: str = "rag_sources"
