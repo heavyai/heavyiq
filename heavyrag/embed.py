@@ -58,7 +58,6 @@ def set_chroma_client():
     global CHROMA_CLIENT
     try:
         host, port = get_host_and_port(CONFIG.rag_chromadb_server_base)
-        print(host, port)
         CHROMA_CLIENT = chromadb.HttpClient(
             host=host,
             port=port,
