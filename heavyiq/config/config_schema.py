@@ -149,7 +149,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     rag_storage_persist_dir: str = "rag_storage"
     rag_documents_source_dir: str = "rag_sources"
     rag_chromadb_persist_dir: str = rag_storage_persist_dir + "/chromadb"  # persistant client
-    rag_chromadb_server_base: Optional[str] = None
+    rag_chromadb_server_base: Optional[str] = "http://localhost:8009"
     rag_document_pdf_parser_url: str = ""
     rag_embed_model_name: str = "BAAI/bge-large-en-v1.5"
     rag_embed_server_base: Optional[str] = None

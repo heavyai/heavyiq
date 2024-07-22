@@ -35,7 +35,7 @@ def get_vectorstore(
     else:
         try:
             chroma_collection = chroma_client.get_collection(collection_name, embedding_function=embedding_function)
-        except ValueError:
+        except Exception:
             return None
     return ChromaVectorStore.from_collection(chroma_collection)
 
