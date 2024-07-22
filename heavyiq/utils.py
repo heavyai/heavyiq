@@ -8,6 +8,7 @@ from multiprocessing import Manager
 from multiprocessing.managers import SyncManager
 from pathlib import Path
 from typing import Any, Generic, Optional, TypeVar
+from urllib.parse import urlparse
 
 import aiofiles
 from fastapi.concurrency import run_in_threadpool
@@ -418,3 +419,11 @@ async def semaphore_gather(num: int, coros: list[Awaitable], return_exceptions: 
             return await coro
 
     return await asyncio.gather(*(_wrap_coro(coro) for coro in coros), return_exceptions=return_exceptions)
+
+
+def get_host_and_port(url: str) -> tuple[str, int]:
+    parsed_url = urlparse(url)
+    host = parsed_url.hostname
+    port = parsed_url.port
+
+    return host, port

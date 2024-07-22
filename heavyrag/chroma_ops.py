@@ -44,13 +44,13 @@ def get_latest_backup_file(directory: str = CONFIG.rag_chromadb_collection_backu
 
 def restore_collection(new_collection: chromadb.Collection, backup_file: str, batch_size: int = 166):
     """
-    Restore data from backup file to new chormadb collection.
+    Restore data from backup file to new chromadb collection.
     """
     # Read data from the backup file
     with open(backup_file, "r") as file:
         data = json.load(file)
 
-    # Embed data with newer embed model and then put it to the chormadb collection
+    # Embed data with newer embed model and then put it to the chromadb collection
     # since the chroma_collection was created with the custom embedding function
     # it automatically re-embeds the documents if there wasn't any embeddings value passed to the below add method
     def batch():
@@ -75,7 +75,7 @@ def update_embeddings(collection: chromadb.Collection, batch_size: int = 166):
     """
     backup_file = backup_collection(collection)
     collection_name = collection.name
-    logger.info(f"Chormadb collection {collection_name} backedup successfully")
+    logger.info(f"Chromadb collection {collection_name} backedup successfully")
     # delete the collection
     collection._client.delete_collection(collection.name)
     # re-create the same collection
