@@ -4,17 +4,24 @@ from langchain.schema.runnable import Runnable, RunnableBranch, RunnableLambda, 
 from heavyiq.lcel.types import AutoAnswerChainInputType, AutoAnswerChainOutputType
 
 from .answer_chain import chain as answer_chain
-from .table_chain import tables_list_chain
+from .table_chain import tables_dict_chain
 
 
-def format_output(inputs: dict) -> dict:
-    return {**inputs["output"], "tables": inputs["tables"]}
+def output(inputs: dict) -> dict:
+    """
+    Chain's final Output.
+    """
+    return {**inputs["output"], "tables": inputs["tables"], "snippet_ids": inputs["snippet_ids"]}
 
 
 chain: Runnable = (
-    RunnablePassthrough().assign(tables=tables_list_chain)
-    | RunnablePassthrough().assign(output=RunnableBranch((lambda x: x["tables"], answer_chain), lambda x: {}))
-    | RunnableLambda(format_output)
+    RunnablePassthrough.assign(table_chain_response=tables_dict_chain)
+    | RunnablePassthrough.assign(
+        tables=lambda x: x["table_chain_response"]["tables"],
+        snippet_ids=lambda x: x["table_chain_response"]["snippet_ids"],
+    )
+    | RunnablePassthrough.assign(output=RunnableBranch((lambda x: x["tables"], answer_chain), lambda x: {}))
+    | RunnableLambda(output)
 ).with_types(
     input_type=AutoAnswerChainInputType, output_type=AutoAnswerChainOutputType  # type: ignore
 )

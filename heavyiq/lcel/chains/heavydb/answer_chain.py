@@ -74,6 +74,7 @@ async def change_format(inputs: dict) -> Any:
         sql_complexity=inputs["sql_complexity"],
         results=str(inputs["sql_result"]),
         answer=inputs["answer"],
+        snippet_ids=inputs["snippet_ids"],
         fail_reason=(
             "" if inputs["do_forward"] else output_fail_reasons["max_size_reached"]
         ),  # Fix this for more than 1 fail reasons
@@ -202,6 +203,7 @@ handle_query_error_branch: Runnable = RunnableBranch(
     RunnablePassthrough.assign(
         sql_cmd=lambda x: x["sql_chain_output"]["query"],
         sql_complexity=lambda x: x["sql_chain_output"]["sql_complexity"],
+        snippet_ids=lambda x: x["sql_chain_output"]["snippet_ids"],
     )
     | generate_sql_resultset_step
     | should_forward_resultset_to_llm_step

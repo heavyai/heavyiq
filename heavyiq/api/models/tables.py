@@ -35,12 +35,16 @@ class TablesResponse(BaseModel):
         default="",
         description="A unique identifier for this request that can be used to submit feedback about the response",
     )
+    snippet_ids: list[str] = Field(
+        default=[], description="List of snippet IDs where the relevant snippets have been used in the prompt"
+    )
 
     class Config:
         json_schema_extra = {
             "examples": [
                 {
                     "tables": {"usa_states": 1},
+                    "snippet_ids": ["saddsasdw12123fd23e"],
                     "feedback_id": "(Optional) xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
                 }
             ]

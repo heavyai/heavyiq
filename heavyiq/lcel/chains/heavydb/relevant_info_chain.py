@@ -14,15 +14,17 @@ async def get_collection_name(inputs: dict) -> str:
     return heavydb._dbname
 
 
-async def form_relevant_info(infos: list) -> str:
+async def form_relevant_info(infos: list) -> dict[str, list | str]:
     """
     Forms the relevant_info as a prompt patch.
     """
-    if not infos:
-        return ""
-
-    joined_infos = "\n\n".join(infos)
-    return f"Relevant info:\n\n{joined_infos}\n"
+    node_ids = []
+    node_contents = []
+    for id_, text in infos:
+        node_ids.append(id_)
+        node_contents.append(text)
+    joined_infos = "\n\n".join(node_contents)
+    return {"snippet_ids": node_ids, "relevant_info": f"Relevant info:\n\n{joined_infos}\n" if joined_infos else ""}
 
 
 chain: Runnable = (
@@ -38,3 +40,6 @@ chain: Runnable = (
     | snippets_chain
     | form_relevant_info
 )
+# Sample Chain Output
+# {"snippet_ids": ["fosioewwe23213", "dc3sddscdscdsc"], "relevant_info": f"Relevant info:\n\n{joined_infos}\n"}
+# {"snippet_ids": [], "relevant_info": f"}

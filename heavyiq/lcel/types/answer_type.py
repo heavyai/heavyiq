@@ -17,3 +17,6 @@ class AnswerChainOutputType(BaseModel):
     results: str = Field(..., description="Result of the generated query.")
     answer: str = Field(..., description="Output produced by the llm using the HeavyDB result.")
     fail_reason: str = Field(..., description="Contain reason about why the SQLtoAnswer LLM failed to generate answer.")
+    snippet_ids: list[str] = Field(
+        default=[], description="List of snippet IDs where the relevant snippets have been used in the prompt"
+    )
