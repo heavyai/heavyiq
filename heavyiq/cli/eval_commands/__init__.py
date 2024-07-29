@@ -858,9 +858,9 @@ async def run_config_model_on_questions_lcel(
         if gen_id and judge:
             results = []
             for i, j in enumerate(valid_sqls, start=1):
-                sql_result = await sql_rate_reply(gold_query, j.strip(), db_id, question)
+                sql_result = await sql_rate_reply(gold_query, j.strip(), db_id=db_id, question=question)
                 success = "1" if sql_result["success"] == True else "0"
-                results.append(f'SQL {i}: {success}\n')
+                results.append(f"SQL {i}: {success}\n")
             row_data.extend(
                 [
                     db_id,
@@ -894,7 +894,7 @@ async def run_config_model_on_questions_lcel(
             row_data.extend(
                 [db_id, question, gold_query, pred_query, eval_res_success, eval_res_status, eval_res_error or ""]
             )
-        #row_data = [str(item).replace("\n", " ").replace("\r", " ") for item in row_data]
+        # row_data = [str(item).replace("\n", " ").replace("\r", " ") for item in row_data]
         return row_data
 
     async def consumer(output_queue: asyncio.Queue, output_file_path: str, enable_query_stats: bool = False):
