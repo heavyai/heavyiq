@@ -29,11 +29,11 @@ def get_value_from_runnable_binding(
         return binding.default
     value = binding.bound._prepare(binding.config)  # type: ignore
     if value and isinstance(value, tuple):
-        actual_value = value[0]
+        actual_value, attached_config = value
         if isinstance(actual_value, RunnableConfigurableFields):
             config = config or {}
             # merge the default config and the passed config
-            merged_config = merge_dicts(value[1], config)
+            merged_config = merge_dicts(attached_config, config)
             return actual_value._prepare(merged_config)[0]  # type: ignore
         return actual_value
     return value

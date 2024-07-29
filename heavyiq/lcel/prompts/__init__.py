@@ -17,6 +17,9 @@ CUSTOM_NL_TO_SQL_COT_TEMPLATE = get_prompt_by_llm_type(LLMType.NL_TO_SQL_COT, pr
 NL_TO_SQL_COT_TEMPLATE = get_prompt_by_llm_type(LLMType.NL_TO_SQL_COT, prompt_type="openai")
 NL_TO_SQL_COT_ERROR_TEMPLATE = get_prompt_by_llm_type(LLMType.NL_TO_SQL_COT_ERROR, prompt_type="openai")
 CUSTOM_NL_TO_SQL_COT_ERROR_TEMPLATE = get_prompt_by_llm_type(LLMType.NL_TO_SQL_COT_ERROR, prompt_type="custom")
+CUSTOM_NL_TO_MULTIPLE_SQL_JUDGE_TEMPLATE = get_prompt_by_llm_type(
+    LLMType.NL_TO_MULTIPLE_SQL_JUDGE, prompt_type="custom"
+)
 
 to_sql_prompt_runnable = PromptTemplate.from_template(NL_TO_SQL_TEMPLATE).configurable_alternatives(
     # This gives this field an id
@@ -57,3 +60,5 @@ to_sql_with_cot_prompt_runnable = PromptTemplate.from_template(NL_TO_SQL_COT_TEM
     openai_error=PromptTemplate.from_template(NL_TO_SQL_COT_ERROR_TEMPLATE),
     custom_error=PromptTemplate.from_template(CUSTOM_NL_TO_SQL_COT_ERROR_TEMPLATE),
 )
+
+multiple_sql_judge_prompt = PromptTemplate.from_template(CUSTOM_NL_TO_MULTIPLE_SQL_JUDGE_TEMPLATE)

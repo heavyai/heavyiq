@@ -47,3 +47,14 @@ class SqlChainIntermediateDict(TypedDict):
     question: str
     max_revisions: int
     tables: list[str]
+
+
+class SQLwithScore(BaseModel):
+    sql: str = Field(..., description="Generated query.")
+    score: float = Field(..., description="sql score")
+
+
+class SqlMultipleChainOutputType(BaseModel):
+    """NLtoSQL chain output type."""
+
+    queries: list[SQLwithScore] = Field(..., description="Generated SQL query with score.")
