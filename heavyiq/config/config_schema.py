@@ -65,6 +65,8 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     custom_llm_api_nl_to_sql_context_window: int = 15552  # LLMType.NL_TO_SQL
     custom_llm_api_nl_to_sql_error_base: Optional[str] = None  # LLMType.NL_TO_SQL_ERROR
     custom_llm_api_nl_to_sql_error_context_window: int = 15552  # LLMType.NL_TO_SQL_ERROR
+    custom_llm_api_nl_to_multiple_sql_judge_top_k: int = 1
+    custom_llm_api_nl_to_multiple_sql_judge_cutoff_score: float = 0.0
     custom_llm_api_sql_to_answer_base: Optional[str] = None  # LLMType.SQL_TO_ANSWER
     custom_llm_api_sql_to_answer_context_window: int = 15552  # LLMType.SQL_TO_ANSWER
     custom_llm_api_nl_to_tables_base: Optional[str] = None  # LLMType.NL_TO_TABLES
@@ -144,6 +146,10 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     custom_prompt_instruct_start_token: str = "<|prompt|>\n"
     custom_prompt_instruct_body: Optional[str] = None
     custom_prompt_instruct_end_token: str = "\n<|prompt|>\n"
+    # judge
+    custom_prompt_nl_to_multiple_sql_judge_start_token: str = "<|sql judge prompt|>\n"
+    custom_prompt_nl_to_multiple_sql_judge_body: Optional[str] = None
+    custom_prompt_nl_to_multiple_sql_judge_end_token: str = "\n<|sql judge answer|>\n"
     # RAG
     enable_rag: bool = True  # enable/disable RAG
     rag_storage_persist_dir: str = "rag_storage"

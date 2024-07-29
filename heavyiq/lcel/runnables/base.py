@@ -1,9 +1,12 @@
 import json
 from abc import ABCMeta, abstractmethod
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, TypedDict
 
 from langchain.schema.runnable import Runnable, RunnableConfig, RunnableSerializable
+from langchain_community.llms.openai import BaseOpenAI
 from langchain_core.language_models import BaseLanguageModel
+from langchain_core.language_models.llms import LLMResult
+from langchain_core.outputs.generation import Generation
 from langchain_core.runnables import RunnableConfig, ensure_config
 from langchain_core.runnables.utils import Input
 
@@ -73,28 +76,42 @@ class StreamLLMRunnableWrapper(BaseRunnableWrapper):
                     yield {"event": "output", "data": json.dumps(step_value)}
 
 
-class LLMGenerationRunnable(Runnable):
+class LLMGeneratorItem(TypedDict):
+    text: str
+    logprobs: dict | None
+
+
+class LLMGeneratorRunnable(Runnable):
     """
     Mainly used to wrap the LanguageModel runnable to return LLMResult Generations.
     """
 
-    def __init__(self, target: RunnableSerializable) -> None:
-        super().__init__()
-        self.target = target
+    def __init__(
+        self,
+        llm_runnable: Any,
+        name: str | None = None,
+    ) -> None:
+        self.llm_runnable = None
+        self.llm = None
+        if isinstance(llm_runnable, BaseOpenAI):
+            self.llm = llm_runnable
+        else:
+            self.llm_runnable = llm_runnable
+        self.name = name or "LLMGeneratorRunnable"
 
-    def invoke(self, input: Any, config: RunnableConfig | None = None) -> Any:
-        return super().invoke(input, config)
-
-    async def ainvoke(self, input: Any, config: RunnableConfig | None = None, **kwargs: Any) -> list[str]:
+    async def _ainvoke(self, input_: Any, config: RunnableConfig | None = None, **kwargs: Any) -> list[Generation]:
         """
-        Always call the parent runnable with "ainvoke" in order to trigger this method.
+        Custom ainvoke method.
         """
+        print(f"Invoking {self.name}")
         config = ensure_config(config)
         # prepare and get value from the target runnable
         # this helps to create new LLM instance using the passed config options
-        llm: BaseLanguageModel = get_value_from_runnable_binding(self.target, config=config)  # type: ignore
-        llm_result = await llm.agenerate_prompt(
-            [llm._convert_input(input)],
+        llm: BaseLanguageModel = self.llm
+        if not llm:
+            llm = get_value_from_runnable_binding(self.llm_runnable, config=config)
+        result: LLMResult = await llm.agenerate_prompt(
+            [llm._convert_input(input_)],
             callbacks=config.get("callbacks"),
             tags=config.get("tags"),
             metadata=config.get("metadata"),
@@ -102,10 +119,41 @@ class LLMGenerationRunnable(Runnable):
             **kwargs,
         )
         generations = []
-        for gen in llm_result.generations[0]:
-            generations.append(gen.text)
-
+        for gen in result.generations[0]:
+            generations.append(gen)
         return generations
+
+    def _invoke(self, input_: Any, config: RunnableConfig | None = None, **kwargs: Any) -> list[Generation]:
+        """
+        sync method
+        """
+        config = ensure_config(config)
+        llm: BaseLanguageModel = self.llm
+        if not llm:
+            llm = get_value_from_runnable_binding(self.llm_runnable, config=config)
+        result: LLMResult = llm.generate_prompt(
+            [llm._convert_input(input_)],
+            callbacks=config.get("callbacks"),
+            tags=config.get("tags"),
+            metadata=config.get("metadata"),
+            run_name=config.get("run_name"),
+            **kwargs,
+        )
+        generations = []
+        for gen in result.generations[0]:
+            generations.append(gen)
+        return generations
+
+    def invoke(self, input: Any, config: RunnableConfig | None = None, **kwargs: Any) -> list[LLMGeneratorItem]:
+        items = self._invoke(input, config=config, **kwargs)
+        return [{"text": i.text, "logprobs": i.generation_info["logprobs"]} for i in items]
+
+    async def ainvoke(self, input: Any, config: RunnableConfig | None = None, **kwargs: Any) -> list[LLMGeneratorItem]:
+        """
+        Always call the parent runnable with "ainvoke" in order to trigger this method.
+        """
+        items = await self._ainvoke(input, config=config, **kwargs)
+        return [{"text": i.text, "logprobs": i.generation_info["logprobs"]} for i in items]
 
 
 class SessionRunnable(Runnable):

@@ -6,6 +6,7 @@ from heavyiq.config import get_config
 from heavyiq.langchain.llms import LLMType
 from heavyiq.lcel.prompts.default import (
     DEFAULT_INSTRUCT_PROMPT,
+    DEFAULT_NL_TO_MULTIPLE_SQL_JUDGE_PROMPT,
     DEFAULT_NL_TO_SQL_COT_ERROR_PROMPT,
     DEFAULT_NL_TO_SQL_COT_PROMPT,
     DEFAULT_NL_TO_SQL_ERROR_PROMPT,
@@ -81,11 +82,18 @@ class BasePromptBuilder(metaclass=ABCMeta):
                 config.custom_prompt_instruct_body,
                 config.custom_prompt_instruct_end_token,
             )
+        if llm_type == LLMType.NL_TO_MULTIPLE_SQL_JUDGE:
+            return (
+                config.custom_prompt_nl_to_multiple_sql_judge_start_token,
+                config.custom_prompt_nl_to_multiple_sql_judge_body,
+                config.custom_prompt_nl_to_multiple_sql_judge_end_token,
+            )
         if llm_type == LLMType.NL_TO_SQL_COT:
             return (None, None, None)
         if llm_type == LLMType.NL_TO_SQL_COT_ERROR:
             return (None, None, None)
-        raise ValueError(f"Prompt builder config not available for {llm_type} llm type")
+        # return None for remaining all
+        return None, None, None
 
     @property
     @abstractmethod
@@ -146,6 +154,20 @@ class NLtoSQLErrorPromptBuilder(BasePromptBuilder):
     @property
     def default_prompt(self) -> tuple[str, str, str]:
         return DEFAULT_NL_TO_SQL_ERROR_PROMPT
+
+
+class NLtoMultipleSQLJudgePromptBuider(BasePromptBuilder):
+    """
+    Builds NL to multiple SQL prompt for judge llm.
+    """
+
+    @property
+    def llm_type(self) -> LLMType:
+        return LLMType.NL_TO_MULTIPLE_SQL_JUDGE
+
+    @property
+    def default_prompt(self) -> tuple[str, str, str]:
+        return DEFAULT_NL_TO_MULTIPLE_SQL_JUDGE_PROMPT
 
 
 class SQLtoAnswerPromptBuilder(BasePromptBuilder):
@@ -241,6 +263,7 @@ LLMTypeBuilderMapping: dict[LLMType, BasePromptBuilder] = {
     LLMType.INSTRUCT: InstructPromptBuilder(),
     LLMType.NL_TO_SQL_COT: NLtoSQLwithCOTPromptBuilder(),
     LLMType.NL_TO_SQL_COT_ERROR: NLtoSQLwithCOTErrorPromptBuilder(),
+    LLMType.NL_TO_MULTIPLE_SQL_JUDGE: NLtoMultipleSQLJudgePromptBuider(),
 }
 
 
