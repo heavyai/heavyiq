@@ -1,11 +1,14 @@
 from langchain.prompts.prompt import PromptTemplate
 from langchain.schema.runnable import ConfigurableField
 
-from heavyiq.langchain.chains.heavydb.nl_to_answer import ANSWER_TEMPLATE
-from heavyiq.langchain.chains.heavydb.nl_to_sql import NL_TO_SQL_ERROR_TEMPLATE, NL_TO_SQL_TEMPLATE
-from heavyiq.langchain.chains.heavydb.nl_to_tables import NL_TO_TABLES_TEMPLATE
 from heavyiq.langchain.llms import LLMType
 from heavyiq.lcel.prompts.base import get_prompt_by_llm_type
+from heavyiq.lcel.prompts.openai import (
+    ANSWER_TEMPLATE,
+    NL_TO_SQL_ERROR_TEMPLATE,
+    NL_TO_SQL_TEMPLATE,
+    NL_TO_TABLES_TEMPLATE,
+)
 from heavyiq.lcel.prompts.question_prompt import TABLES_TO_NL_QUESTIONS_TEMPLATE
 
 CUSTOM_NL_TO_SQL_TEMPLATE = get_prompt_by_llm_type(LLMType.NL_TO_SQL)

@@ -3,11 +3,9 @@ from typing import Awaitable, Callable, TypeVar
 from uuid import UUID
 
 from langchain import callbacks
-from langchain.callbacks.base import AsyncCallbackHandler
 from langchain_core.tracers.langchain import wait_for_all_tracers
 from pydantic import BaseModel
 
-from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.heavydb import heavydb_context
 from heavyiq.lcel.callbacks.file_callback import LogFileCallbackHandler
@@ -15,12 +13,6 @@ from heavyiq.logging_utils import get_heavyiq_logger
 
 # Define a type variable for the wrapped coroutine function
 T = TypeVar("T")
-
-
-def get_file_callback() -> AsyncCallbackHandler:
-    config, logger = get_config(), get_heavyiq_logger()
-    file_callback_handler = logger.async_langchain_cb_handler(to_stdout=config.log_to_stdout)
-    return file_callback_handler
 
 
 def with_db(coro: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
