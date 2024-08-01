@@ -36,6 +36,9 @@ class QueryResponse(BaseModel):
     )
     logprobs: dict = Field(..., description="Log probs for each generated token.")
     total_score: float | None = Field(default=None, description="Total probablity score of all the Logprobs data.")
+    snippet_ids: list[str] = Field(
+        default=[], description="List of snippet IDs where the relevant snippets have been used in the prompt"
+    )
 
     class Config:
         json_schema_extra = {

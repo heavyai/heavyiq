@@ -61,6 +61,9 @@ class QuestionResponse(BaseModel):
     feedback_id: str = Field(
         ..., description="A unique identifier for this request that can be used to submit feedback about the response"
     )
+    snippet_ids: list[str] = Field(
+        default=[], description="List of snippet IDs where the relevant snippets have been used in the prompt"
+    )
 
     class Config:
         json_schema_extra = {
@@ -71,12 +74,14 @@ class QuestionResponse(BaseModel):
                     "sql_result": "[(1, 'Alaska'), (1, 'Arizona'), (1, 'Arkansas'), (1, 'Alabama')]",
                     "sql_complexity": 3,
                     "feedback_id": "(Optional) xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+                    "snippet_ids": ["sdsdasafdff"],
                 },
                 {
                     "answer": "Generated SQL query resultset exceeds the defined maximum result set size.",
                     "sql": "SELECT COUNT(*) AS num_states, STATE_NAME FROM usa_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;",
                     "sql_complexity": 3,
                     "feedback_id": "(Optional) xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+                    "snippet_ids": ["sdsdasafdff"],
                 },
             ]
         }

@@ -1,6 +1,7 @@
 import re
 
 from langchain.schema import StrOutputParser
+from langchain_core.beta.runnables.context import Context
 from langchain_core.runnables import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
 
 from heavyiq.langchain.heavydb import get_config, get_db
@@ -109,14 +110,16 @@ async def parse_output(text: str) -> dict[str, int]:
     return {x: int(y) for x, y in re.findall(r"(\w+):\s*([01])", text)}
 
 
+relevant_info_default_values = {"snippet_ids": [], "relevant_info": ""}
+
 # Step 0
 # calculating relevant info (RAG)
 relevant_info_lambda: Runnable = RunnableBranch(
-    (lambda x: not (CONFIG.enable_rag), lambda x: ""),
-    (lambda x: not (CONFIG.custom_prompt_nl_to_tables_include_relevant_info), lambda x: ""),
-    (lambda x: x.get("pre_calculated_relevant_info"), lambda x: x.get("pre_calculated_relevant_info")),
+    (lambda x: not (CONFIG.enable_rag), lambda x: relevant_info_default_values),
+    (lambda x: not (CONFIG.custom_prompt_nl_to_tables_include_relevant_info), lambda x: relevant_info_default_values),
+    (lambda x: x.get("pre_calculated_relevant_info_dict"), lambda x: x.get("pre_calculated_relevant_info_dict")),
     (lambda x: CONFIG.custom_prompt_nl_to_tables_include_relevant_info, relevant_info_chain),
-    lambda x: "",
+    lambda x: relevant_info_default_values,
 ).with_config(
     config={
         "tags": ["intermediate-step"],
@@ -148,16 +151,29 @@ parse_output_lambda = configure_step(
 
 chain: Runnable = (
     (
-        RunnablePassthrough.assign(relevant_info=relevant_info_lambda)
+        RunnablePassthrough.assign(relevant_info_table_dict=relevant_info_lambda)
+        | RunnablePassthrough.assign(
+            snippet_ids=lambda x: x["relevant_info_table_dict"]["snippet_ids"],
+            relevant_info=lambda x: x["relevant_info_table_dict"]["relevant_info"],
+        )
+        | Context.setter("context")
         | RunnablePassthrough.assign(table_info=get_and_retrieve_table_info_lambda, input=lambda x: x["question"])
         | prompt
         | model
         | StrOutputParser()  # needed for chat models to efficiently convert chat message instance to str
         | parse_output_lambda
+        | {"result": RunnablePassthrough(), "context": Context.getter("context")}
+        | RunnableLambda(
+            lambda x: {
+                "tables": x["result"],  # pick only the tables which got a match
+                "snippet_ids": x["context"]["snippet_ids"],
+                "relevant_info": x["context"]["relevant_info"],
+            }
+        )
     )
     .with_config(config={"tags": ["NLtoTablesChainRunnable"], "run_name": "NL to Tables Chain Runnable"})
     .with_types(input_type=TableChainInputType, output_type=TableChainOutputType)  # type: ignore
 )
-
+tables_dict_chain = chain | RunnableLambda(lambda x: {**x, "tables": [k for k, v in x["tables"].items() if v == 1]})
 # chain which returns found tables as a list
-tables_list_chain = chain | RunnableLambda(lambda x: [k for k, v in x.items() if v == 1])
+tables_list_chain = chain | RunnableLambda(lambda x: [k for k, v in x["tables"].items() if v == 1])

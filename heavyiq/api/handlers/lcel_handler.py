@@ -54,6 +54,7 @@ async def handle_lcel_query_request(request_dict: dict, config: dict | None = No
         feedback_id="",
         logprobs=logprobs,
         total_score=total_score,
+        snippet_ids=out.get("snippet_ids", []),
     )
 
 
@@ -80,7 +81,12 @@ async def handle_lcel_auto_query_request(
         )
 
     return AutoQueryResponse(
-        sql=out["query"], sql_complexity=out["sql_complexity"], feedback_id="", tables=out["tables"], logprobs={}
+        sql=out["query"],
+        sql_complexity=out["sql_complexity"],
+        feedback_id="",
+        tables=out["tables"],
+        logprobs={},
+        snippet_ids=out["snippet_ids"],
     )
 
 
@@ -120,6 +126,7 @@ async def handle_lcel_question_request(request_dict: dict, config: dict | None =
         sql_complexity=result["sql_complexity"],
         answer=result["answer"],
         feedback_id="",
+        snippet_ids=result["snippet_ids"],
     )
 
 
@@ -165,6 +172,7 @@ async def handle_lcel_auto_question_request(
         answer=result["answer"],
         feedback_id="",
         tables=result["tables"],
+        snippet_ids=result["snippet_ids"],
     )
 
 
@@ -211,7 +219,7 @@ async def handle_lcel_tables_request(request_dict: dict, config: dict | None = N
     from heavyiq.lcel.chains import table_chain
 
     result = await table_chain.ainvoke(request_dict, config=config)  # type: ignore
-    return TablesResponse(tables=result)
+    return TablesResponse(tables=result["tables"], snippet_ids=result["snippet_ids"])
 
 
 @with_db

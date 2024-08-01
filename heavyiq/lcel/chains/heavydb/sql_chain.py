@@ -1,5 +1,6 @@
 from typing import Any
 
+from langchain_core.beta.runnables.context import Context
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
 
@@ -57,14 +58,15 @@ async def get_table_info(sql_chain_inputs: dict) -> str:
     return table_info
 
 
+relevant_info_default_values = {"snippet_ids": [], "relevant_info": ""}
 # Step 1a
 # calculating relevant info (RAG)
 relevant_info_lambda: Runnable = RunnableBranch(
-    (lambda x: not (CONFIG.enable_rag), lambda x: ""),
-    (lambda x: not (CONFIG.custom_prompt_nl_to_sql_include_relevant_info), lambda x: ""),
-    (lambda x: x.get("pre_calculated_relevant_info"), lambda x: x.get("pre_calculated_relevant_info")),
+    (lambda x: not (CONFIG.enable_rag), lambda x: relevant_info_default_values),
+    (lambda x: not (CONFIG.custom_prompt_nl_to_sql_include_relevant_info), lambda x: relevant_info_default_values),
+    (lambda x: x.get("pre_calculated_relevant_info_dict"), lambda x: x.get("pre_calculated_relevant_info_dict")),
     (lambda x: CONFIG.custom_prompt_nl_to_sql_include_relevant_info, relevant_info_chain),
-    lambda x: "",
+    lambda x: relevant_info_default_values,
 ).with_config(  # type: ignore
     config={
         "tags": ["intermediate-step"],
@@ -85,8 +87,12 @@ table_info_runnable_lambda: Runnable = RunnableLambda(get_table_info).with_confi
 
 # Step 1
 query_variables = (
-    RunnablePassthrough.assign(relevant_info=relevant_info_lambda)
-    | RunnablePassthrough.assign(table_info=table_info_runnable_lambda, input=lambda x: x["question"])
+    # RunnablePassthrough.assign(relevant_info_sql_dict=relevant_info_lambda)
+    # | RunnablePassthrough.assign(
+    #     snippet_ids=lambda x: x["relevant_info_sql_dict"]["snippet_ids"],
+    #     relevant_info=lambda x: x["relevant_info_sql_dict"]["relevant_info"],
+    # )
+    RunnablePassthrough.assign(table_info=table_info_runnable_lambda, input=lambda x: x["question"])
 ).with_config(  # type: ignore
     config={
         "tags": ["intermediate-step"],
@@ -261,6 +267,7 @@ final_step = RunnableLambda(
         "query": strip_sql_comments(x.get("query", x.get("sql_cmd"))),
         "sql_complexity": x.get("sql_complexity", 0),
         "error": x["error"] or "",
+        "snippet_ids": x["snippet_ids"],
     }
 ).with_config(
     config={
@@ -278,7 +285,12 @@ do_string_correction_and_calculate_complexity_or_passthrough_branch: Runnable = 
 
 chain: Runnable[Any, Any] = (
     (
-        RunnablePassthrough().assign(sql_cmd=query_runnable, max_revisions=lambda x: CONFIG.max_retries_nl_to_sql)
+        RunnablePassthrough.assign(relevant_info_sql_dict=relevant_info_lambda)
+        | RunnablePassthrough.assign(
+            snippet_ids=lambda x: x["relevant_info_sql_dict"]["snippet_ids"],
+            relevant_info=lambda x: x["relevant_info_sql_dict"]["relevant_info"],
+        )
+        | RunnablePassthrough().assign(sql_cmd=query_runnable, max_revisions=lambda x: CONFIG.max_retries_nl_to_sql)
         | validation_step
         | revise_lambda
         | do_string_correction_and_calculate_complexity_or_passthrough_branch

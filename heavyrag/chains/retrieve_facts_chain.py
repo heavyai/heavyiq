@@ -3,7 +3,6 @@
 #############
 from typing import Any
 
-from langchain_core.beta.runnables.context import Context
 from langchain_core.runnables import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
 from llama_index.core import VectorStoreIndex
 from llama_index.core.postprocessor import SimilarityPostprocessor
@@ -114,15 +113,14 @@ has_index_chain: Runnable = (
 )
 
 snippet_nodes_chain: Runnable = (
-    # Context.setter("inputs")
-    # | Context.setter("index", fetch_index)
     RunnablePassthrough.assign(index=fetch_index)
     | RunnableBranch((lambda x: x["index"], has_index_chain), lambda x: [])
 ).with_types(
     input_type=RetrieveFactsInputType  # type: ignore
 )  # return list[NodeWithScore]
 
-snippets_chain: Runnable = snippet_nodes_chain | RunnableLambda(lambda x: [i.get_text() for i in x])
+snippets_chain: Runnable = snippet_nodes_chain | RunnableLambda(lambda x: [(i.node_id, i.get_text()) for i in x])
 
 # Adding callbacks to the chain enables automatic logging when the chain is invoked
 chain = snippets_chain.with_config(callbacks=[LogFileCallbackHandler(logger=rag_logger)])  # type: ignore
+# Output Syntax: [(<node_id_1>, <node_text_1>), (<node_id_2>, <node_text_2>)], Example [('w1232e3dedscdqwecd', 'Node content')]
