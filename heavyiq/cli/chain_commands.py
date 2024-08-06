@@ -4,7 +4,7 @@ from typing import Callable
 import click
 from fastapi.concurrency import run_in_threadpool
 from langchain.chat_models.base import BaseChatModel
-from langchain.llms.base import BaseLLM
+from langchain_community.llms import BaseLLM
 
 from heavyiq.cli.decorators import coro
 from heavyiq.langchain import HeavyDB
@@ -14,14 +14,9 @@ from heavyiq.langchain.chains import (
     SQLMetadataQuestionTransformerChain,
     get_nl_to_sql_chain_by_llm,
 )
-from heavyiq.langchain.index.heavydb import create_index_if_nonexistent, acreate_index_if_nonexistent
+from heavyiq.langchain.index.heavydb import acreate_index_if_nonexistent, create_index_if_nonexistent
 from heavyiq.langchain.index.utils import SearchType
-from heavyiq.langchain.llms import (
-    LLMType,
-    _get_custom_api_llm,
-    _get_custom_api_vllm_llm,
-    get_openai_llm_by_model_name,
-)
+from heavyiq.langchain.llms import LLMType, _get_custom_api_llm, _get_custom_api_vllm_llm, get_openai_llm_by_model_name
 from heavyiq.langchain.logging import log_chain_call_async
 
 
