@@ -6,6 +6,7 @@ import requests
 from cachetools import LRUCache, TTLCache, cached
 from langchain.chat_models.base import BaseChatModel
 from langchain_community.llms import BaseLLM
+from langchain_community.llms.openai import BaseOpenAI
 from langchain_openai.chat_models import AzureChatOpenAI, ChatOpenAI
 from langchain_openai.llms import AzureOpenAI
 
@@ -13,12 +14,13 @@ from heavyiq.config import get_config
 from heavyiq.logging_utils import get_heavyiq_logger
 from heavyiq.utils import SharedDictSingleton
 
-from .overrides import OverrideOpenAI, OverrideVLLMOpenAI
+from .overrides import OverrideChatOpenAI, OverrideOpenAI, OverrideVLLMOpenAI
 
 
 class LLMType(Enum):
     DEFAULT = "default"
     NL_TO_SQL = "nl_to_sql"
+    NL_TO_SQL_CHAT = "nl_to_sql_chat"
     NL_TO_SQL_COT = "nl_to_sql_cot"
     NL_TO_MULTIPLE_SQL = "nl_to_multiple_sql"
     NL_TO_MULTIPLE_SQL_JUDGE = "nl_to_multiple_sql_judge"
@@ -66,6 +68,18 @@ def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str
         model_kwargs["use_beam_search"] = True
         kwargs["best_of"] = config.custom_llm_api_vllm_beam_width
         kwargs["n"] = 1
+    if model_type == LLMType.NL_TO_SQL_CHAT:
+        # chat model
+        # model_kwargs["use_beam_search"] = True
+        kwargs["n"] = 1
+        extra_body = {
+            "stop": ["user\n"],
+            "chat_template": "{% set loop_messages = messages %}{% for message in loop_messages %}{% set content = '' + message['role'] + '\\n\\n'+ message['content'] | trim + '' %}{% if loop.index0 == 0 %}{% set content = bos_token + content %}{% endif %}{{ content }}{% endfor %}{{ 'assistant\\n\\n' }}",
+        }
+        if config.custom_llm_api_vllm_beam_width >= 2:
+            extra_body["best_of"] = config.custom_llm_api_vllm_beam_width  # type: ignore
+        kwargs["max_tokens"] = config.custom_llm_api_vllm_max_tokens
+        model_kwargs.update(extra_body)
     if model_type == LLMType.NL_TO_SQL_GEN:
         kwargs["max_tokens"] = config.custom_llm_api_vllm_max_tokens
         # set best_of >= n for sql generations
@@ -156,7 +170,7 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
         return _get_custom_llm(model_type, api_base, context_window, **kwargs)  # type: ignore
 
 
-def _get_custom_api_llm(model_type: LLMType, api_base: str, context_window: int, **kwargs):
+def _get_custom_api_llm(model_type: LLMType, api_base: str, context_window: int, **kwargs) -> BaseOpenAI:
     """
     Return the corresponding LLM class for the custom llm type API.(ie. llama2)
     """
@@ -166,10 +180,19 @@ def _get_custom_api_llm(model_type: LLMType, api_base: str, context_window: int,
         model=f"CUSTOM_LLM_{model_type.value}",
         context_window=context_window,
         **kwargs,
-    )
+    )  # type: ignore
 
 
-def _get_custom_api_vllm_llm(model_type: LLMType, api_base: str, context_window: int, **kwargs):
+def is_chat_model_type(model_type: LLMType) -> bool:
+    """
+    Chat model types.
+    """
+    return model_type in [LLMType.NL_TO_SQL_CHAT]
+
+
+def _get_custom_api_vllm_llm(
+    model_type: LLMType, api_base: str, context_window: int, **kwargs
+) -> BaseChatModel | BaseOpenAI:
     """
     Return the corresponding LLM class for the custom llm type API_VLLM.(ie. VLLM)
     """
@@ -177,6 +200,17 @@ def _get_custom_api_vllm_llm(model_type: LLMType, api_base: str, context_window:
     # unhashable type list (ie. mutable) when passing a mutable object.
     vllm_kwargs, model_kwargs = get_vllm_model_kwargs(model_type)
     model_name = get_vllm_model_name(api_base)
+    if is_chat_model_type(model_type):
+        # chat model
+        return OverrideChatOpenAI(
+            openai_api_key="nothing",
+            openai_api_base=api_base,
+            model=model_name,
+            extra_body=model_kwargs.get("extra_body"),
+            context_window=context_window,
+            **kwargs,
+            **vllm_kwargs,
+        )  # type: ignore
     return OverrideVLLMOpenAI(
         openai_api_key="nothing",
         openai_api_base=api_base,
@@ -185,10 +219,12 @@ def _get_custom_api_vllm_llm(model_type: LLMType, api_base: str, context_window:
         context_window=context_window,
         **kwargs,
         **vllm_kwargs,
-    )
+    )  # type: ignore
 
 
-def _get_custom_llm(model_type: LLMType, api_base: str, context_window: int, **kwargs) -> BaseLLM:
+def _get_custom_llm(
+    model_type: LLMType, api_base: str, context_window: int, **kwargs
+) -> BaseLLM | BaseChatModel | BaseOpenAI:
     config = get_config()
     if config.custom_llm_type == "API":
         return _get_custom_api_llm(model_type=model_type, api_base=api_base, context_window=context_window, **kwargs)
@@ -206,7 +242,7 @@ def get_openai_llm_by_model_name(model: str, **kwargs) -> BaseLLM | BaseChatMode
     return _get_openai_llm(model, **kwargs)
 
 
-def _get_openai_llm(model: str, **kwargs) -> BaseLLM:
+def _get_openai_llm(model: str, **kwargs) -> BaseLLM | BaseOpenAI:
     config = get_config()
     if config.custom_llm_type == "AZURE":
         return AzureOpenAI(
@@ -217,8 +253,8 @@ def _get_openai_llm(model: str, **kwargs) -> BaseLLM:
             tiktoken_model_name=azure_model_to_openai(model),
             model=model,
             **kwargs,
-        )
-    return OverrideOpenAI(model=model, openai_api_key=config.openai_api_key, **kwargs)
+        )  # type: ignore
+    return OverrideOpenAI(model=model, openai_api_key=config.openai_api_key, **kwargs)  # type: ignore
 
 
 def _get_openai_chat_llm(model: str, **kwargs) -> BaseChatModel:
@@ -232,9 +268,9 @@ def _get_openai_chat_llm(model: str, **kwargs) -> BaseChatModel:
             tiktoken_model_name=azure_model_to_openai(model),
             model=model,
             **kwargs,
-        )
+        )  # type: ignore
 
-    return ChatOpenAI(model=model, openai_api_key=config.openai_api_key, **kwargs)
+    return ChatOpenAI(model=model, openai_api_key=config.openai_api_key, **kwargs)  # type: ignore
 
 
 def get_llm(**kwargs) -> BaseLLM | BaseChatModel:
@@ -259,7 +295,7 @@ def get_chat_llm(model: str, **kwargs) -> BaseChatModel:
                 tiktoken_model_name=azure_model_to_openai(model),
                 model=model,
                 **kwargs,
-            )
+            )  # type: ignore
         else:
             raise NotImplementedError("Custom LLMs are not supported for chat models yet.")
-    return ChatOpenAI(model=model, openai_api_key=config.openai_api_key, **kwargs)
+    return ChatOpenAI(model=model, openai_api_key=config.openai_api_key, **kwargs)  # type: ignore

@@ -1,17 +1,16 @@
-from typing import Optional, Any
+from typing import Any, Optional
 
+from langchain.base_language import BaseLanguageModel
 from langchain.chains.combine_documents.map_reduce import MapReduceDocumentsChain
 from langchain.chains.combine_documents.stuff import StuffDocumentsChain
 from langchain.chains.llm import LLMChain
 from langchain.chains.summarize import map_reduce_prompt
-from langchain.prompts.base import BasePromptTemplate
-from langchain.output_parsers import PydanticOutputParser
-from langchain.base_language import BaseLanguageModel
-from pydantic import BaseModel, Field
-
-from langchain.chat_models import ChatOpenAI
 from langchain.docstore.document import Document
+from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import PromptTemplate
+from langchain.prompts.base import BasePromptTemplate
+from langchain_community.chat_models import ChatOpenAI
+from pydantic import BaseModel, Field
 
 from heavyiq.langchain import HeavyDB
 

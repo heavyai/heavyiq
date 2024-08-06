@@ -2,19 +2,19 @@ from pathlib import Path
 
 import click
 from fastapi.concurrency import run_in_threadpool
-from langchain.vectorstores import Chroma
+from langchain_community.vectorstores import Chroma
 
-from heavyiq.utils import is_path_exists
 from heavyiq.cli.decorators import coro
+from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.index.heavydb import (
-    create_and_write_table_document,
     acreate_and_write_table_document,
+    aupdate_tables_in_index,
+    create_and_write_table_document,
     get_vectorstore_index_creator,
     update_tables_in_index,
-    aupdate_tables_in_index,
 )
-from heavyiq.config import get_config
+from heavyiq.utils import is_path_exists
 
 
 @click.group()
