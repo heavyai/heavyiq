@@ -3,8 +3,8 @@ from typing import Callable
 
 import click
 from fastapi.concurrency import run_in_threadpool
-from langchain.chat_models.base import BaseChatModel
 from langchain_community.llms import BaseLLM
+from langchain_core.language_models.chat_models import BaseChatModel
 
 from heavyiq.cli.decorators import coro
 from heavyiq.langchain import HeavyDB

@@ -4,12 +4,12 @@ import re
 from typing import Any, Optional
 
 from langchain.callbacks.manager import AsyncCallbackManagerForChainRun, CallbackManagerForChainRun
-from langchain.chat_models.base import BaseChatModel
 from langchain.prompts import HumanMessagePromptTemplate, SystemMessagePromptTemplate
 from langchain.prompts.chat import BaseChatPromptTemplate, ChatPromptTemplate
 from langchain.prompts.prompt import PromptTemplate
 from langchain.schema import AIMessage, BasePromptTemplate, HumanMessage, LLMResult
 from langchain.schema.language_model import BaseLanguageModel
+from langchain_core.language_models.chat_models import BaseChatModel
 from pydantic import Extra
 
 from heavyiq.config import get_config

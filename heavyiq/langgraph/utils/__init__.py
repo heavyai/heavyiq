@@ -30,9 +30,9 @@ async def make_heavydb_context(config: RunnableConfig) -> AsyncGenerator[HeavyDB
         ctx = HeavyDBContext(db=db)
         yield ctx
     except KeyError:
-        raise ValueError('HeavyDB Context expects "session_id" to be passed as part of the config.')
+        # raise ValueError('HeavyDB Context expects "session_id" to be passed as part of the config.')
+        yield None
     finally:
-        print("context closes")
         heavydb_var.set(None)
         if ctx:
             ctx.db._conn.close()

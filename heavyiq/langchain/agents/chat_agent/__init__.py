@@ -3,10 +3,10 @@ from typing import Optional
 
 from langchain.agents import AgentExecutor, AgentOutputParser, LLMSingleActionAgent
 from langchain.chains import LLMChain
-from langchain.chat_models.base import BaseChatModel
 from langchain.prompts import BaseChatPromptTemplate
 from langchain.schema import AgentAction, AgentFinish, BaseMessage, HumanMessage
 from langchain.tools import BaseTool
+from langchain_core.language_models.chat_models import BaseChatModel
 
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB

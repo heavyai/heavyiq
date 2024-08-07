@@ -1,24 +1,19 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Optional, TYPE_CHECKING
-
-from pydantic import Extra
+from typing import TYPE_CHECKING, Any, Optional
 
 from fastapi.concurrency import run_in_threadpool
-from langchain.chat_models.base import BaseChatModel
-from langchain.output_parsers import StructuredOutputParser, ResponseSchema
-from langchain.schema.language_model import BaseLanguageModel
-from langchain.callbacks.manager import (
-    AsyncCallbackManagerForChainRun,
-    CallbackManagerForChainRun,
-)
-from langchain.schema import BasePromptTemplate, LLMResult
+from langchain.callbacks.manager import AsyncCallbackManagerForChainRun, CallbackManagerForChainRun
+from langchain.output_parsers import ResponseSchema, StructuredOutputParser
 from langchain.prompts.prompt import PromptTemplate
+from langchain.schema import BasePromptTemplate, LLMResult
+from langchain.schema.language_model import BaseLanguageModel
+from pydantic import Extra
 
-from heavyiq.langchain.exceptions import GenerateTableMetadataException
-from heavyiq.langchain.chains import BaseChain
 from heavyiq.langchain import HeavyDB
+from heavyiq.langchain.chains import BaseChain
+from heavyiq.langchain.exceptions import GenerateTableMetadataException
 from heavyiq.langchain.utils import populate_table_info_wrt_token_limit
 
 if TYPE_CHECKING:

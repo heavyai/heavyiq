@@ -4,9 +4,9 @@ from typing import Any
 
 import requests
 from cachetools import LRUCache, TTLCache, cached
-from langchain.chat_models.base import BaseChatModel
 from langchain_community.llms import BaseLLM
 from langchain_community.llms.openai import BaseOpenAI
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_openai.chat_models import AzureChatOpenAI, ChatOpenAI
 from langchain_openai.llms import AzureOpenAI
 

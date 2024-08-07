@@ -258,8 +258,8 @@ final_step = RunnableLambda(
     lambda x: {
         "query": strip_sql_comments(x.get("query", x.get("sql_cmd"))),
         "sql_complexity": x.get("sql_complexity", 0),
-        "error": x["error"] or "",
-        "snippet_ids": x["snippet_ids"],
+        "error": x.get("error", ""),
+        "snippet_ids": x.get("snippet_ids", []),
     }
 ).with_config(
     config={
@@ -292,4 +292,8 @@ chain: Runnable[Any, Any] = (
         config={"tags": ["NLtoSQLChainRunnable"], "run_name": "NL to SQL Chain Runnable"}  # type: ignore
     )
     .with_types(input_type=SqlChainInputType, output_type=SqlChainOutputType)  # type: ignore
+)
+
+validate_and_revise_chain = (
+    validation_step | revise_lambda | do_string_correction_and_calculate_complexity_or_passthrough_branch | final_step
 )
