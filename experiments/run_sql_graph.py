@@ -1,5 +1,6 @@
 import asyncio
 import itertools
+import logging
 import sys
 
 from langchain_core.messages import SystemMessage
@@ -7,6 +8,8 @@ from langchain_core.runnables.graph import CurveStyle, MermaidDrawMethod, NodeSt
 from langchain_core.tools import tool
 from langchain_core.tracers.langchain import wait_for_all_tracers
 from langgraph.prebuilt import create_react_agent
+
+logging.getLogger().setLevel(logging.ERROR)  # hide warning log
 
 RED = "\033[31m"
 GREEN = "\033[32m"
@@ -24,6 +27,11 @@ def print_answer(final_values: dict) -> None:
         print(f'{RED}{final_values["error"]}{RESET}')
     else:
         print(f'{GREEN}{final_values["query"]}{RESET}')
+        answer, results = final_values.get("answer"), final_values.get("results")
+        if results:
+            print(f"{BLUE}{results}{RESET}")
+        if answer:
+            print(f"{MAGENTA}{answer}{RESET}")
 
 
 done = False
@@ -47,7 +55,7 @@ async def main():
     from heavyiq.langchain.utils import init_telemetrics
     from heavyiq.langgraph.graphs.sql_graph import graph
 
-    # init_telemetrics()
+    init_telemetrics()
     global done
     dbname = input(f"{MAGENTA}Database Name: {RESET}")
     allowed_tables = input(f"{GREEN}Allowed Tables: {RESET}")
@@ -60,12 +68,17 @@ async def main():
         "session_id": session_id,
         "allowed_tables": allowed_tables.split(","),
     }
-    config = {"configurable": {"session_id": inputs["session_id"], "thread_id": thread_id}}
+    config = {"configurable": {"session_id": inputs["session_id"], "thread_id": thread_id, "do_generate_answer": False}}
 
     try:
         final_values = None
-        async for i in graph.astream(inputs, config=config, stream_mode="values"):
-            final_values = i
+        async for event in graph.astream_events(inputs, config=config, version="v2"):
+            event_name, ee, event_data = event["name"], event["event"], event["data"]
+            final_output = event_data.get("output", None)
+            if final_output:
+                # print the event_name only when the runnable produces the output
+                # print(event_name, ee)
+                final_values = final_output
         done = True
         await task
         print_answer(final_values)
@@ -76,6 +89,7 @@ async def main():
                 break
             done = False
             task = asyncio.create_task(spinner())
+            # reset all
             await graph.aupdate_state(
                 config,
                 {
@@ -84,15 +98,25 @@ async def main():
                     "session_id": inputs["session_id"],
                     "snippet_ids": [],
                     "relevant_info": None,  # reset relevant_info for next question
+                    "sql_complexity": None,
+                    "error": None,
+                    "query": None,
+                    "answer": None,
+                    "results": None,
                 },
-                as_node="generate_sql",
+                # as_node="generate_sql",
             )
             # print("---\n---\nUpdated state!")
             # updated_state = await graph.aget_state(config)
             # print(updated_state.values)
             # print("=" * 100)
-            async for event in graph.astream(None, config, stream_mode="values"):
-                final_values = event
+            async for event in graph.astream_events(None, config, version="v2"):
+                event_name, ee, event_data = event["name"], event["event"], event["data"]
+                final_output = event_data.get("output", None)
+                if final_output:
+                    # print the event_name only when the runnable produces the output
+                    # print(event_name, ee)
+                    final_values = final_output
 
             done = True
             await task
@@ -115,7 +139,7 @@ async def main():
     finally:
         done = True
         await graph.checkpointer.conn.close()
-        # wait_for_all_tracers()
+        wait_for_all_tracers()
         await task
 
 

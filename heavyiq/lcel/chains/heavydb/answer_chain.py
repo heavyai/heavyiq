@@ -203,7 +203,7 @@ handle_query_error_branch: Runnable = RunnableBranch(
     RunnablePassthrough.assign(
         sql_cmd=lambda x: x["sql_chain_output"]["query"],
         sql_complexity=lambda x: x["sql_chain_output"]["sql_complexity"],
-        snippet_ids=lambda x: x["sql_chain_output"]["snippet_ids"],
+        snippet_ids=lambda x: x["sql_chain_output"].get("snippet_ids", []),
     )
     | generate_sql_resultset_step
     | should_forward_resultset_to_llm_step

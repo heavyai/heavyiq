@@ -1,17 +1,19 @@
 import operator
 from typing import Annotated, TypedDict
 
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.pydantic_v1 import BaseModel
 from langchain_core.runnables import RunnableLambda
+from langchain_core.runnables.base import Runnable
+from langchain_core.runnables.config import RunnableConfig
 from langgraph.channels.context import Context
 from langgraph.checkpoint.aiosqlite import AsyncSqliteSaver
 from langgraph.graph import END, START, StateGraph
 
 from heavyiq.langchain.heavydb import get_config
 from heavyiq.langgraph.utils import HeavyDBContext, make_heavydb_context
+from heavyiq.lcel.chains.heavydb.answer_chain import chain as answer_chain
 from heavyiq.lcel.chains.heavydb.relevant_info_chain import chain as relevant_info_chain
-from heavyiq.lcel.chains.heavydb.sql_chain import StrOutputParser
-from heavyiq.lcel.chains.heavydb.sql_chain import chain as sql_chain
 from heavyiq.lcel.chains.heavydb.sql_chain import get_table_info, query_llm, query_prompt, validate_and_revise_chain
 from heavyiq.lcel.chains.heavydb.table_chain import tables_dict_chain
 
@@ -40,6 +42,7 @@ class OverallState(BaseModel):
     table_info: str | None
     sql_complexity: int | None
     error: str | None
+    results: str | None
 
 
 class ConfigSchema(TypedDict):
@@ -48,6 +51,12 @@ class ConfigSchema(TypedDict):
     """
 
     session_id: str
+    do_generate_answer: bool
+
+
+# runnable which helps to convert the pydantic model object to dict
+# which then passed to the following runnable as input
+model_to_dict_runnable: Runnable = RunnableLambda(lambda x: x.dict())
 
 
 # Define the function that determines whether to continue or not
@@ -65,6 +74,15 @@ def should_continue_after_sql_generation(state: OverallState) -> bool:
     Whether to continue after sql generation and validation.
     """
     return state.should_continue
+
+
+def should_generate_answer(state: OverallState, config: RunnableConfig) -> bool:
+    """
+    Decides whether to generate answer from sql or not.
+    """
+    if config["configurable"].get("do_generate_answer", False) == True:
+        return True
+    return False
 
 
 def route_to_retrieve_relevant_info(state: OverallState) -> bool:
@@ -120,8 +138,6 @@ def append_relevant_info_to_table_info_if_not_exists(overallstate: OverallState)
     return {"table_info": table_info, "input": state["question"], "relevant_info": state["relevant_info"]}
 
 
-# async def generate_validate_regenerate_query(state: )
-
 # Define a new graph
 workflow = StateGraph(OverallState, config_schema=ConfigSchema)
 memory = AsyncSqliteSaver.from_conn_string(":memory:")
@@ -134,17 +150,15 @@ workflow.add_node("merge_state_after_snippets", lambda x: {"question": x.questio
 
 workflow.add_node(
     "retrieve_tables",
-    RunnableLambda(lambda x: x.dict()) | tables_dict_chain,
+    model_to_dict_runnable | tables_dict_chain,
 )
-# workflow.add_node(
-#     "generate_sql", RunnableLambda(lambda x: x.dict()) | sql_chain | RunnableLambda(lambda x: {"sql": x.get("query")})
-# )
-workflow.add_node("get_table_info", {"table_info": RunnableLambda(lambda x: x.dict()) | get_table_info})
+
+workflow.add_node("get_table_info", {"table_info": model_to_dict_runnable | get_table_info})
 
 # Sub Graph
 query_sub_graph = StateGraph(OverallState)
 query_sub_graph.add_node("should_retrieve_snippets", lambda x: {"question": x.question})
-query_sub_graph.add_node("rag_retrieve_relevant_info_for_sql", RunnableLambda(lambda x: x.dict()) | relevant_info_chain)
+query_sub_graph.add_node("rag_retrieve_relevant_info_for_sql", model_to_dict_runnable | relevant_info_chain)
 query_sub_graph.add_node(
     "generate_query",
     {
@@ -166,9 +180,7 @@ query_sub_graph.add_node(
         lambda x: {"sql_cmd": x.query, "max_revisions": CONFIG.max_retries_nl_to_sql, "session_id": x.session_id}
     )
     | validate_and_revise_chain,
-    # | RunnableLambda(lambda x: {"query": x["query"], "sql_complexity": x["sql_complexity"], "error": x["error"]}),
 )
-# query_sub_graph.add_node("pass_to_parent", lambda x: {"sql": x.query, "query": x.error})
 # Sub-graph edges
 query_sub_graph.add_edge(START, "should_retrieve_snippets")
 query_sub_graph.add_conditional_edges(
@@ -179,10 +191,11 @@ query_sub_graph.add_conditional_edges(
 query_sub_graph.add_edge("rag_retrieve_relevant_info_for_sql", "generate_query")
 query_sub_graph.add_edge("generate_query", "validate_and_revise_query")
 query_sub_graph.add_edge("validate_and_revise_query", END)
-# query_sub_graph.add_edge("pass_to_parent", END)
 
 
 workflow.add_node("generate_sql", query_sub_graph.compile())
+workflow.add_node("generate_answer", model_to_dict_runnable | answer_chain)
+workflow.add_node("final", lambda x: {"question": x.question})
 
 # Edges
 # Step 1: Decides whether to route to retrieve relevant_info runnable or not
@@ -216,9 +229,11 @@ workflow.add_conditional_edges(
 )
 workflow.add_edge("get_table_info", "generate_sql")
 
-workflow.add_conditional_edges("generate_sql", should_continue_after_sql_generation, {True: "generate_sql", False: END})
+workflow.add_conditional_edges("generate_sql", should_generate_answer, {True: "generate_answer", False: "final"})
+workflow.add_edge("generate_answer", "final")
+workflow.add_conditional_edges("final", should_continue_after_sql_generation, {True: "generate_sql", False: END})
 
 # Finally, we compile it!
 # This compiles it into a LangChain Runnable,
 # meaning you can use it as you would any other runnable
-graph = workflow.compile(checkpointer=memory, interrupt_after=["generate_sql"])
+graph = workflow.compile(checkpointer=memory, interrupt_after=["final"])
