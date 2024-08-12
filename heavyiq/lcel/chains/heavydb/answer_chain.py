@@ -173,11 +173,11 @@ answer_decider_branch = (
 to_sql_chain_or_not_branch = RunnableBranch(
     (
         lambda x: "query" in x and "sql_complexity" in x,
-        RunnableLambda(lambda x: {"query": x["query"], "sql_complexity": x["sql_complexity"]}),  # type: ignore
+        RunnableLambda(lambda x: {"query": x["query"], "sql_complexity": x["sql_complexity"], "snippet_ids": x.get("snippet_ids", [])}),  # type: ignore
     ),
     (
         lambda x: "query" in x and "sql_complexity" not in x,
-        RunnablePassthrough().assign(sql_complexity=RunnableLambda(calculate_sql_complexity)) | RunnableLambda(lambda x: {"query": x["query"], "sql_complexity": x["sql_complexity"]}),  # type: ignore
+        RunnablePassthrough().assign(sql_complexity=RunnableLambda(calculate_sql_complexity)) | RunnableLambda(lambda x: {"query": x["query"], "sql_complexity": x["sql_complexity"], "snippet_ids": x.get("snippet_ids", [])}),  # type: ignore
     ),
     nl_to_sql_chain_with_sql_complexity,
 ).with_config(config={"run_name": "Find Query or Passthrough Branch"})
@@ -203,7 +203,7 @@ handle_query_error_branch: Runnable = RunnableBranch(
     RunnablePassthrough.assign(
         sql_cmd=lambda x: x["sql_chain_output"]["query"],
         sql_complexity=lambda x: x["sql_chain_output"]["sql_complexity"],
-        snippet_ids=lambda x: x["sql_chain_output"]["snippet_ids"],
+        snippet_ids=lambda x: x["sql_chain_output"].get("snippet_ids", []),
     )
     | generate_sql_resultset_step
     | should_forward_resultset_to_llm_step
