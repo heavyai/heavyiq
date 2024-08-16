@@ -11,7 +11,7 @@ from langgraph.checkpoint.aiosqlite import AsyncSqliteSaver
 from langgraph.graph import END, START, StateGraph
 
 from heavyiq.langchain.heavydb import get_config
-from heavyiq.langgraph.utils import HeavyDBContext, make_heavydb_context
+from heavyiq.langgraph.utils import HeavyDBContext, make_heavydb_context, remove_duplicates
 from heavyiq.lcel.chains.heavydb.answer_chain import chain as answer_chain
 from heavyiq.lcel.chains.heavydb.relevant_info_chain import chain as relevant_info_chain
 from heavyiq.lcel.chains.heavydb.sql_chain import get_table_info, query_llm, query_prompt, validate_and_revise_chain
@@ -27,8 +27,8 @@ class OverallState(BaseModel):
 
     question: str
     session_id: str
-    tables: Annotated[list[str], operator.add]
-    allowed_tables: Annotated[list[str], operator.add]
+    tables: Annotated[list[str], remove_duplicates]
+    allowed_tables: Annotated[list[str], remove_duplicates]
     """
     context gets called and assigned before the graph starts
     and it won't be appear in graph response or while make persistant state
@@ -36,7 +36,7 @@ class OverallState(BaseModel):
     context: Annotated[HeavyDBContext | None, Context(make_heavydb_context)]
     query: str | None
     answer: str | None
-    snippet_ids: Annotated[list[str], operator.add]
+    snippet_ids: Annotated[list[str], remove_duplicates]
     relevant_info: str | None
     should_continue: bool | None = False
     table_info: str | None
@@ -118,15 +118,6 @@ def prepare_table_chain_inputs(state: OverallState):
     }
 
 
-async def route_to_retrieve_relevant_info_for_sql(state: OverallState) -> bool:
-    """
-    Calulate relevnat_info before sql generation.
-    """
-    if CONFIG.enable_rag and CONFIG.custom_prompt_nl_to_sql_include_relevant_info:
-        return True
-    return False
-
-
 def append_relevant_info_to_table_info_if_not_exists(overallstate: OverallState) -> dict:
     """
     Appends relevevant_info to table_info text.
@@ -144,7 +135,7 @@ memory = AsyncSqliteSaver.from_conn_string(":memory:")
 
 # Nodes
 workflow.add_node("start", lambda x: {"should_continue": False})
-workflow.add_node("rag_retrieve_relevant_info", relevant_info_chain)
+workflow.add_node("rag_retrieve_relevant_info", model_to_dict_runnable | relevant_info_chain)
 workflow.add_node("dont_retrieve_relevant_info", lambda x: {"relevant_info": ""})
 workflow.add_node("merge_state_after_snippets", lambda x: {"question": x.question})
 
@@ -153,12 +144,10 @@ workflow.add_node(
     model_to_dict_runnable | tables_dict_chain,
 )
 
-workflow.add_node("get_table_info", {"table_info": model_to_dict_runnable | get_table_info})
+workflow.add_node("get_table_info", {"table_info": model_to_dict_runnable | get_table_info})  # this adds relevant_info
 
 # Sub Graph
 query_sub_graph = StateGraph(OverallState)
-query_sub_graph.add_node("should_retrieve_snippets", lambda x: {"question": x.question})
-query_sub_graph.add_node("rag_retrieve_relevant_info_for_sql", model_to_dict_runnable | relevant_info_chain)
 query_sub_graph.add_node(
     "generate_query",
     {
@@ -174,6 +163,14 @@ query_sub_graph.add_node(
 )
 
 
+def final_node(state: OverallState) -> dict:
+    """
+    Final node.
+    """
+    do_include = ["answer", "tables", "query", "error", "results", "sql_complexity"]
+    return {k: v for k, v in state.dict().items() if k in do_include}
+
+
 query_sub_graph.add_node(
     "validate_and_revise_query",
     RunnableLambda(
@@ -182,20 +179,14 @@ query_sub_graph.add_node(
     | validate_and_revise_chain,
 )
 # Sub-graph edges
-query_sub_graph.add_edge(START, "should_retrieve_snippets")
-query_sub_graph.add_conditional_edges(
-    "should_retrieve_snippets",
-    route_to_retrieve_relevant_info_for_sql,
-    {True: "rag_retrieve_relevant_info_for_sql", False: "generate_query"},
-)
-query_sub_graph.add_edge("rag_retrieve_relevant_info_for_sql", "generate_query")
+query_sub_graph.add_edge(START, "generate_query")
 query_sub_graph.add_edge("generate_query", "validate_and_revise_query")
 query_sub_graph.add_edge("validate_and_revise_query", END)
 
 
 workflow.add_node("generate_sql", query_sub_graph.compile())
 workflow.add_node("generate_answer", model_to_dict_runnable | answer_chain)
-workflow.add_node("final", lambda x: {"question": x.question})
+workflow.add_node("final", final_node)
 
 # Edges
 # Step 1: Decides whether to route to retrieve relevant_info runnable or not

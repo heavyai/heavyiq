@@ -28,7 +28,7 @@ async def make_heavydb_context(config: RunnableConfig) -> AsyncGenerator[HeavyDB
         db = await HeavyDB.from_session_async(session_id=session_id)
         heavydb_var.set(db)
         ctx = HeavyDBContext(db=db)
-        yield ctx
+        yield None
     except KeyError:
         # raise ValueError('HeavyDB Context expects "session_id" to be passed as part of the config.')
         yield None
@@ -36,3 +36,30 @@ async def make_heavydb_context(config: RunnableConfig) -> AsyncGenerator[HeavyDB
         heavydb_var.set(None)
         if ctx:
             ctx.db._conn.close()
+
+
+# reducer
+def remove_duplicates(left: list | None, right: list | None) -> list:
+    """
+    Reducer function that removes duplicate items from a list.
+
+    Args:
+        left (list | None): The existing list of items.
+        right (list | None): The new list of items to be added.
+
+    Returns:
+        list: The updated list with duplicates removed.
+    """
+    if left is None:
+        left = []
+    if right is None:
+        right = []
+
+    # Create a set to store unique items
+    unique_items = set(left)
+
+    # Add new items to the set, which will automatically remove duplicates
+    unique_items.update(right)
+
+    # Convert the set back to a list and return it
+    return list(unique_items)

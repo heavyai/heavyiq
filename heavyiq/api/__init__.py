@@ -14,7 +14,7 @@ from starlette.exceptions import HTTPException
 from heavyiq.api.handlers import exception_handler as exh
 from heavyiq.api.middlewares import AsyncLoggingMiddleware
 from heavyiq.api.models.error import ErrorResponse
-from heavyiq.api.routes import bgrouter, defaultrouter, iqrouter, lcelrouter, llmrouter, streamrouter
+from heavyiq.api.routes import bgrouter, defaultrouter, graph_router, iqrouter, lcelrouter, llmrouter, streamrouter
 from heavyiq.config import HeavyIQConfig, get_config
 from heavyiq.langchain.exceptions import (
     GenerateTableMetadataException,
@@ -220,6 +220,17 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         lcelrouter,
         prefix="/api/v1/lcel",
         tags=["api.v1.lcel"],
+        responses={
+            500: {
+                "description": "Internal Server Error",
+                "model": ErrorResponse,
+            }
+        },
+    )
+    app.include_router(
+        graph_router,
+        prefix="/api/v1/graph",
+        tags=["api.v1.graph"],
         responses={
             500: {
                 "description": "Internal Server Error",
