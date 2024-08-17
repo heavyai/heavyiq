@@ -26,8 +26,9 @@ def get_value_from_runnable_binding(
     Passed config would be used to prepare the default runnable of RunnableConfigurableFields instance.
     """
     if isinstance(binding, RunnableConfigurableAlternatives):
-        return binding.default
-    value = binding.bound._prepare(binding.config)  # type: ignore
+        value = binding._prepare(binding.config)
+    else:
+        value = binding.bound._prepare(binding.config)  # type: ignore
     if value and isinstance(value, tuple):
         actual_value, attached_config = value
         if isinstance(actual_value, RunnableConfigurableFields):
@@ -39,7 +40,7 @@ def get_value_from_runnable_binding(
     return value
 
 
-def configure_step(runnable: Runnable, run_name: str, step: str) -> Runnable:
+def configure_step(runnable: Runnable | RunnableConfigurableAlternatives, run_name: str, step: str) -> Runnable:
     """
     Configure a runnable to act as an intermediate step.
     This function adds run_name, metadata to the runnable.
@@ -49,11 +50,14 @@ def configure_step(runnable: Runnable, run_name: str, step: str) -> Runnable:
         run_name: run name
         step: step description
     """
-    runnable_with_config = runnable.with_config(
-        config={
-            "run_name": run_name,
-            "tags": ["intermediate-step"],
-            "metadata": {"step": step},
-        }
-    )
+    # it's essential to merge the existing config with the newer ones
+    new_config = {
+        "run_name": run_name,
+        "tags": ["intermediate-step"],
+        "metadata": {"step": step},
+    }
+    if isinstance(runnable, RunnableConfigurableAlternatives):
+        base_config = runnable.config or {}
+        new_config = merge_dicts(base_config, new_config)
+    runnable_with_config = runnable.with_config(config=new_config)
     return runnable_with_config

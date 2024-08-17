@@ -8,6 +8,7 @@ from heavyiq.langchain.heavydb import get_config, get_db
 from heavyiq.langchain.llms import is_using_custom_trained_llm
 from heavyiq.langchain.utils import aget_table_info_wrt_token_limit, extract_error_message_from_exception
 from heavyiq.lcel.chains.heavydb.relevant_info_chain import chain as relevant_info_chain
+from heavyiq.lcel.chains.utils import configure_step as configure_intermediate_step
 from heavyiq.lcel.chains.utils import get_value_from_runnable_binding
 from heavyiq.lcel.llms import llm_runnable
 from heavyiq.lcel.prompts import to_sql_prompt_runnable
@@ -21,6 +22,8 @@ from heavyiq.utils import strip_sql_comments
 
 CONFIG = get_config()
 # var endswith `rbl` means it's an runnable
+# Note: don't call .with_config for more than 1 time else you might endup with the recent config
+# and thus overriding the previous config, so always use configure_step which in-turn merges the configs instead of overwriting
 nl_to_sql_llm_rbl = llm_runnable.with_config(
     configurable={"llm": "nl_to_sql", "llm_temperature": 0}, config={"tags": ["nl_to_sql_llm"]}  # type: ignore
 )
@@ -64,6 +67,10 @@ relevant_info_default_values = {"snippet_ids": [], "relevant_info": ""}
 relevant_info_lambda: Runnable = RunnableBranch(
     (lambda x: not (CONFIG.enable_rag), lambda x: relevant_info_default_values),
     (lambda x: not (CONFIG.custom_prompt_nl_to_sql_include_relevant_info), lambda x: relevant_info_default_values),
+    (
+        lambda x: x.get("snippet_ids") and x.get("relevant_info"),
+        lambda x: {"snippet_ids": x.get("snippet_ids"), "relevant_info": x.get("relevant_info")},
+    ),
     (lambda x: x.get("pre_calculated_relevant_info_dict"), lambda x: x.get("pre_calculated_relevant_info_dict")),
     (lambda x: CONFIG.custom_prompt_nl_to_sql_include_relevant_info, relevant_info_chain),
     lambda x: relevant_info_default_values,
@@ -102,22 +109,13 @@ query_variables = (
 )
 
 # Step 2
-query_prompt: Runnable = nl_to_sql_prompt_rbl.with_config(  # type: ignore
-    config={
-        "tags": ["intermediate-step"],
-        "run_name": "Preparing NL-SQL Prompt",
-        "metadata": {"step": "Constructing prompt with input variables."},
-    }
+query_prompt: Runnable = configure_intermediate_step(
+    nl_to_sql_prompt_rbl, run_name="Preparing NL-SQL Prompt", step="Constructing prompt with input variables."
 )
 # Step 3
-query_llm: Runnable = nl_to_sql_llm_rbl.bind(stop=["\nSQLResult:", "\n<|sql result|>", "\n<|sql answer|>"]).with_config(  # type: ignore
-    config={
-        "tags": ["intermediate-step"],
-        "run_name": "Calling LLM",
-        "metadata": {"step": "Invoking the LLM for SQL query prediction."},
-    }
-)
-
+query_llm: Runnable = configure_intermediate_step(
+    nl_to_sql_llm_rbl, run_name="Call LLM", step="Invoking the LLM for SQL query prediction."
+).bind(stop=["\nSQLResult:", "\n<|sql result|>", "\n<|sql answer|>"])
 
 # Supposed to return the SQL query predicted by the llm
 query_runnable = (
@@ -137,22 +135,16 @@ retry_query_variables = (RunnablePassthrough.assign(relevant_info=relevant_info_
     }
 )
 # Step 2
-retry_query_prompt: Runnable = nl_to_sql_retry_prompt_rbl.with_config(  # type: ignore
-    config={
-        "tags": ["intermediate-step"],
-        "run_name": "Preparing NL-SQL Error Prompt",
-        "metadata": {"step": "Constructing error prompt with input variables."},
-    }
+retry_query_prompt: Runnable = configure_intermediate_step(
+    nl_to_sql_retry_prompt_rbl,
+    run_name="Prepare NL-SQL Error Prompt",
+    step="Constructing error prompt with input variables.",
 )
 
 # Step 3
-retry_query_llm: Runnable = nl_to_sql_error_llm_rbl.bind(stop=["\nSQLResult:", "\n<|sql result|>", "\n<|sql error answer|>"]).with_config(  # type: ignore
-    config={
-        "tags": ["intermediate-step"],
-        "run_name": "ReCalling LLM",
-        "metadata": {"step": "Invoking the LLM for SQL query retry prediction."},
-    }
-)
+retry_query_llm: Runnable = configure_intermediate_step(
+    nl_to_sql_error_llm_rbl, run_name="ReCall LLM", step="Invoking the LLM for SQL query retry prediction."
+).bind(stop=["\nSQLResult:", "\n<|sql result|>", "\n<|sql error answer|>"])
 
 # SQL retry runnable
 retry_query_runnable = (retry_query_variables | retry_query_prompt | retry_query_llm | StrOutputParser()).with_config(
@@ -266,8 +258,8 @@ final_step = RunnableLambda(
     lambda x: {
         "query": strip_sql_comments(x.get("query", x.get("sql_cmd"))),
         "sql_complexity": x.get("sql_complexity", 0),
-        "error": x["error"] or "",
-        "snippet_ids": x["snippet_ids"],
+        "error": x.get("error", ""),
+        "snippet_ids": x.get("snippet_ids", []),
     }
 ).with_config(
     config={
@@ -300,4 +292,8 @@ chain: Runnable[Any, Any] = (
         config={"tags": ["NLtoSQLChainRunnable"], "run_name": "NL to SQL Chain Runnable"}  # type: ignore
     )
     .with_types(input_type=SqlChainInputType, output_type=SqlChainOutputType)  # type: ignore
+)
+
+validate_and_revise_chain = (
+    validation_step | revise_lambda | do_string_correction_and_calculate_complexity_or_passthrough_branch | final_step
 )

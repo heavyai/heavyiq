@@ -1,7 +1,18 @@
+from uuid import uuid4
+
 from pydantic import BaseModel, Field
 
 
-class QueryRequest(BaseModel):
+class RequestBase(BaseModel):
+    """
+    Base fields for all the request models.
+    """
+
+    session_id: str = Field(..., max_length=32, min_length=32, description="Valid HeavyDB Session ID")
+    thread_id: str = Field(default_factory=lambda: uuid4().hex)
+
+
+class QueryRequest(RequestBase):
     """
     /query endpoint's request schema class.
     """
@@ -17,6 +28,7 @@ class QueryRequest(BaseModel):
             "examples": [
                 {
                     "session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+                    "thread_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
                     "question": "How many states begin with the letter A? What are they?",
                     "tables": ["usa_states"],
                 }
@@ -39,6 +51,7 @@ class QueryResponse(BaseModel):
     snippet_ids: list[str] = Field(
         default=[], description="List of snippet IDs where the relevant snippets have been used in the prompt"
     )
+    thread_id: str | None = Field(default=None, description="Graph thread id.")
 
     class Config:
         json_schema_extra = {
@@ -373,13 +386,12 @@ class QueryResponse(BaseModel):
         }
 
 
-class AutoQueryRequest(BaseModel):
+class AutoQueryRequest(RequestBase):
     """
     /auto/query endpoint's request schema class.
     """
 
     question: str = Field(..., description="Natural language question (prompts accepted)")
-    session_id: str = Field(..., max_length=32, min_length=32, description="Valid HeavyDB Session ID")
     allowed_tables: list[str] = Field(
         default=[],
         description="Optional field representing a list of tables to consider. If this list is empty, all the database tables will be included.",
@@ -389,6 +401,7 @@ class AutoQueryRequest(BaseModel):
         json_schema_extra = {
             "examples": [
                 {
+                    "thread_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
                     "session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
                     "question": "How many states begin with the letter A? What are they?",
                     "allowed_tables": ["usa_states", "countries"],
@@ -412,6 +425,7 @@ class AutoQueryResponse(QueryResponse):
                     "sql_complexity": 3,
                     "tables": ["usa_states"],
                     "feedback_id": "(Optional) xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+                    "thread_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
                 }
             ]
         }

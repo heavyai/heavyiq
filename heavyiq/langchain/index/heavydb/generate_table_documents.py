@@ -4,9 +4,9 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
 from fastapi.concurrency import run_in_threadpool
-from langchain.chat_models.openai import ChatOpenAI
 from langchain.docstore.document import Document
 from langchain.schema import HumanMessage, SystemMessage
+from langchain_community.chat_models.openai import ChatOpenAI
 
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB

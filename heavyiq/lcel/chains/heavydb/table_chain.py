@@ -117,6 +117,10 @@ relevant_info_default_values = {"snippet_ids": [], "relevant_info": ""}
 relevant_info_lambda: Runnable = RunnableBranch(
     (lambda x: not (CONFIG.enable_rag), lambda x: relevant_info_default_values),
     (lambda x: not (CONFIG.custom_prompt_nl_to_tables_include_relevant_info), lambda x: relevant_info_default_values),
+    (
+        lambda x: x.get("snippet_ids") and x.get("relevant_info"),
+        lambda x: {"snippet_ids": x.get("snippet_ids"), "relevant_info": x.get("relevant_info")},
+    ),
     (lambda x: x.get("pre_calculated_relevant_info_dict"), lambda x: x.get("pre_calculated_relevant_info_dict")),
     (lambda x: CONFIG.custom_prompt_nl_to_tables_include_relevant_info, relevant_info_chain),
     lambda x: relevant_info_default_values,

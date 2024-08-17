@@ -4,6 +4,7 @@ from uuid import UUID
 
 from langchain import callbacks
 from langchain.callbacks.base import AsyncCallbackHandler
+from langchain.callbacks.tracers.logging import LoggingCallbackHandler
 from langchain_core.tracers.langchain import wait_for_all_tracers
 from pydantic import BaseModel
 
@@ -21,6 +22,14 @@ def get_file_callback() -> AsyncCallbackHandler:
     config, logger = get_config(), get_heavyiq_logger()
     file_callback_handler = logger.async_langchain_cb_handler(to_stdout=config.log_to_stdout)
     return file_callback_handler
+
+
+def get_logging_callback() -> LoggingCallbackHandler:
+    """
+    Gets the logging callback handler which deals with sending intermediate messages as logs to the corresponding logger.
+    Which in turn passes the logs to stdout or file or etc.
+    """
+    return LogFileCallbackHandler(logger=get_heavyiq_logger())
 
 
 def with_db(coro: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:

@@ -1,13 +1,13 @@
 from pathlib import Path
 
-from langchain.vectorstores import Chroma
-from langchain.vectorstores.base import VectorStore
+from langchain_community.vectorstores import Chroma
+from langchain_core.vectorstores.base import VectorStore
 
 from heavyiq.config import get_config
 
+from ..utils import get_vectorstore_index_creator
 from .heavyai_docs_index import HeavyAIDocsIndex
 from .utils import get_latest_heavyai_docs
-from ..utils import get_vectorstore_index_creator
 
 heavyai_docs_index = None
 

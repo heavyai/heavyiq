@@ -1,26 +1,26 @@
 import json
 import re
-from typing import Any, Optional
 from collections.abc import Sequence
+from typing import Any, Optional
 
 from langchain.agents import AgentExecutor, AgentOutputParser, BaseMultiActionAgent, BaseSingleActionAgent
 from langchain.agents.conversational_chat.base import ConversationalChatAgent
 from langchain.agents.conversational_chat.prompt import PREFIX, SUFFIX
 from langchain.callbacks.base import BaseCallbackManager, Callbacks
-from langchain.chat_models.base import BaseChatModel
 from langchain.memory import CombinedMemory, ConversationBufferMemory
-from langchain.schema.prompt_template import BasePromptTemplate
-from langchain.schema.messages import BaseMessage
 from langchain.prompts.chat import (
+    BaseChatPromptTemplate,
+    BaseMessagePromptTemplate,
     ChatPromptTemplate,
     HumanMessagePromptTemplate,
     MessagesPlaceholder,
     SystemMessagePromptTemplate,
-    BaseMessagePromptTemplate,
-    BaseChatPromptTemplate,
 )
 from langchain.schema import AgentAction, AgentFinish, BaseOutputParser
+from langchain.schema.messages import BaseMessage
+from langchain.schema.prompt_template import BasePromptTemplate
 from langchain.tools import BaseTool
+from langchain_core.language_models.chat_models import BaseChatModel
 
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
@@ -29,7 +29,6 @@ from heavyiq.langchain.callbacks import ConvoAgentCallbackHandler
 from heavyiq.langchain.llms import get_chat_llm
 from heavyiq.langchain.memory import HeavyIQQueryBufferWindowMemory
 from heavyiq.logging_utils import get_heavyiq_logger
-
 
 SYSTEM_MESSAGE = """Assistant is a large language model trained by OpenAI.
 

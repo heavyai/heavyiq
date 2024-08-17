@@ -7,10 +7,10 @@ import click
 from aiocsv.readers import AsyncReader
 from aiocsv.writers import AsyncWriter
 from fastapi.concurrency import run_in_threadpool
-from langchain.chat_models.base import BaseChatModel
 from langchain.globals import set_verbose
-from langchain.llms.base import BaseLLM
 from langchain.pydantic_v1 import BaseModel
+from langchain_community.llms import BaseLLM
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.tracers.log_stream import RunLogPatch
 from langsmith import Client
 from thrift.transport.TTransport import TTransportException
