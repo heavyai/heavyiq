@@ -6,6 +6,7 @@ from langchain_core.runnables.config import RunnableConfig
 from langgraph.checkpoint.memory import MemorySaver
 
 from heavyiq.api.handlers.decorators import get_logging_callback, with_db, with_feedback_id
+from heavyiq.api.handlers.utils import ainvoke_logprobs, compute_total_probability
 from heavyiq.api.models import (
     AnswerResponse,
     AutoQueryRequest,
@@ -45,7 +46,17 @@ async def handle_graph_query_request(request: QueryRequest) -> QueryResponse | N
         "configurable": {"session_id": request.session_id, "do_generate_answer": False, "thread_id": request.thread_id},
         "callbacks": callbacks,
     }
-    response = await graph.ainvoke(request.dict(), config=config)
+
+    if is_logprobs_enabled:
+        output_with_logprobs = await ainvoke_logprobs(graph, request.dict(), config=config)  # type: ignore
+        output, logprobs = output_with_logprobs.output, output_with_logprobs.logprobs
+        response = output[-1]["final"]
+        if len(logprobs) > 0:
+            total_score = compute_total_probability(logprobs["token_logprobs"])
+
+    else:
+        response = await graph.ainvoke(request.dict(), config=config)  # type: ignore
+
     if response["error"]:
         raise NLtoSQLException(
             f"Language model failed to generate a valid SQL query after {max_retries} tries.",

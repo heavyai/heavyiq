@@ -167,7 +167,7 @@ def final_node(state: OverallState) -> dict:
     """
     Final node.
     """
-    do_include = ["answer", "tables", "query", "error", "results", "sql_complexity"]
+    do_include = ["answer", "tables", "query", "error", "results", "sql_complexity", "snippet_ids"]
     return {k: v for k, v in state.dict().items() if k in do_include}
 
 
