@@ -1277,8 +1277,8 @@ class HeavyDB:
     async def aextract_string_literal_ops(self, detailed_query_plan: str) -> dict[str, tuple[str, str]]:
         self.logger.debug(f"Extracting string literal operations from query plan: {detailed_query_plan}")
         result = {}
-        pattern1 = r"(NOT\()?(LIKE|PG_ILIKE|>=|<=|<>|=)\(\$(\d+),\s*'((?:''|[^']+))'\)"
-        pattern2 = r"(NOT\()?(LIKE|PG_ILIKE|>=|<=|<>|=)\('((?:''|[^']+))',\s*\$(\d+)\)"
+        pattern1 = r"(NOT\()?(LIKE|PG_ILIKE|>=|<=|<>|=)\(\$(\d+),\s*'((?:''|[^'])+)'\)"
+        pattern2 = r"(NOT\()?(LIKE|PG_ILIKE|>=|<=|<>|=)\('((?:''|[^'])+)',\s*\$(\d+)\)"
 
         matches1 = re.findall(pattern1, detailed_query_plan)
         matches2 = re.findall(pattern2, detailed_query_plan)
