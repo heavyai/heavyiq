@@ -4,6 +4,7 @@ from chromadb.config import Settings as ChromaDBSettings
 from llama_index.core.base.embeddings.base import BaseEmbedding
 from llama_index.core.schema import TextNode
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.embeddings.text_embeddings_inference import TextEmbeddingsInference
 
 from heavyiq.config import get_config
@@ -27,9 +28,20 @@ def set_embed_model():
     """
     global EMBED_MODEL
 
-    if CONFIG.rag_embed_server_base:
+    if CONFIG.rag_embed_server_base and CONFIG.rag_embed_server_base.endswith("/v1"):
         logger.info(
-            "Initialized embed model in GPU bound inference using TextEmbeddingsInference with the following parameters: "
+            "Initialized embed model using OpenAIEmbedding client with the following parameters: "
+            f"timeout=60 seconds, embed_batch_size=100, model_name={CONFIG.rag_embed_model_name}, base_url={CONFIG.rag_embed_server_base}"
+        )
+        EMBED_MODEL = OpenAIEmbedding(
+            api_key="nothing",
+            api_base=CONFIG.rag_embed_server_base,
+            model_name=CONFIG.rag_embed_model_name,
+            embed_batch_size=100,
+        )
+    elif CONFIG.rag_embed_server_base:
+        logger.info(
+            "Initialized embed model in GPU bound inference using TextEmbeddingsInference client with the following parameters: "
             f"timeout=60 seconds, embed_batch_size=10, base_url={CONFIG.rag_embed_server_base}"
         )
         EMBED_MODEL = TextEmbeddingsInference(
