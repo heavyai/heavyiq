@@ -26,18 +26,21 @@ def set_embed_model():
     """
     Supposed to set the embed model
     """
+    from heavyiq.langchain.llms import get_vllm_model_name
+
     global EMBED_MODEL
 
     if CONFIG.rag_embed_server_base and CONFIG.rag_embed_server_base.endswith("/v1"):
-        logger.info(
-            "Initialized embed model using OpenAIEmbedding client with the following parameters: "
-            f"timeout=60 seconds, embed_batch_size=100, model_name={CONFIG.rag_embed_model_name}, base_url={CONFIG.rag_embed_server_base}"
-        )
+        model_name = get_vllm_model_name(CONFIG.rag_embed_server_base)
         EMBED_MODEL = OpenAIEmbedding(
             api_key="nothing",
             api_base=CONFIG.rag_embed_server_base,
-            model_name=CONFIG.rag_embed_model_name,
+            model_name=model_name,
             embed_batch_size=100,
+        )
+        logger.info(
+            "Initialized embed model using OpenAIEmbedding client with the following parameters: "
+            f"timeout=60 seconds, embed_batch_size=100, model_name={model_name}, base_url={CONFIG.rag_embed_server_base}"
         )
     elif CONFIG.rag_embed_server_base:
         logger.info(
