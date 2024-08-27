@@ -1,3 +1,4 @@
+import sqlite_override
 import asyncio
 import sys
 from typing import Any
