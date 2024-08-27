@@ -1,8 +1,8 @@
-import sqlite_override
 import asyncio
 import sys
 from typing import Any
 
+from . import sqlite_override
 from asgi_correlation_id import CorrelationIdMiddleware
 from fastapi import FastAPI
 from fastapi.concurrency import run_in_threadpool
