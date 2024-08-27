@@ -11,8 +11,8 @@ python3 -m venv venv
 
 # Install Requirements
 mkdir -p ./dist
+cat requirements-rhel.txt >> requirements.txt
 cp requirements.txt ./dist/requirements.txt
-cp requirements-rhel.txt ./dist/requirements-rhel.txt
 
 # if INTERNALLY_RELEASED_PYHEAVYDB is set
 # (see common_fn.sh argument processing)
@@ -29,7 +29,6 @@ test_for_internally_release_pyheavydb
 test_for_include_all_deps ./dist/requirements.txt
 
 pip install -r ./dist/requirements.txt
-pip install -r ./dist/requirements-rhel.txt
 pip freeze -l > ./dist/requirements.txt
 
 # pip freeze -l inserts an absolute path
