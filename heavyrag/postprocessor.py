@@ -369,6 +369,9 @@ class ReRanker:
     async def _apostprocess_nodes(
         self, nodes: List[NodeWithScore], query_bundle: Optional[QueryBundle] = None, query_str: Optional[str] = None
     ) -> List[NodeWithScore]:
+        """
+        Does the job of both reranking and filtering by it's cut-off score.
+        """
         if not query_bundle:
             query_bundle = QueryBundle(query_str=query_str)
 
@@ -389,4 +392,35 @@ class ReRanker:
             processor = SimilarityPostprocessor(similarity_cutoff=self.cutoff_score)
             filtered_nodes = processor.postprocess_nodes(rearranged_nodes)
 
+        return filtered_nodes
+
+    async def _rerank_nodes(
+        self, nodes: List[NodeWithScore], query_bundle: Optional[QueryBundle] = None, query_str: Optional[str] = None
+    ) -> List[NodeWithScore]:
+        """
+        Applies the node reranking.
+        """
+        if not query_bundle:
+            query_bundle = QueryBundle(query_str=query_str)
+
+        rearranged_nodes: list[NodeWithScore] = []
+        if isinstance(self.instance, TextEmbeddingsInferenceRerank):
+            # apply top-n and similarity cut-off
+            rearranged_nodes = await self.instance._apostprocess_nodes(nodes=nodes, query_bundle=query_bundle)
+        elif isinstance(self.instance, OverridedLLMRerank):
+            # greedily grab all the nodes having the score 1
+            rearranged_nodes = self.instance._postprocess_nodes(nodes=nodes, query_bundle=query_bundle)
+        elif isinstance(self.instance, LLMRerank):
+            # apply top-n and similarity cut-off
+            rearranged_nodes = self.instance._postprocess_nodes(nodes=nodes, query_bundle=query_bundle)
+
+        return rearranged_nodes
+
+    async def _filter_nodes(self, nodes: List[NodeWithScore]) -> List[NodeWithScore]:
+        """
+        Filter out the nodes which are greater than rerank cutoff score.
+        Should be called next to _rerank_nodes method.
+        """
+        processor = SimilarityPostprocessor(similarity_cutoff=self.cutoff_score)
+        filtered_nodes = processor.postprocess_nodes(nodes)
         return filtered_nodes

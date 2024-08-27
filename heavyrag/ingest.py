@@ -139,11 +139,13 @@ async def adelete_fact(fact_id: str, heavydb_name: str) -> BaseIndex:
     return index
 
 
-async def adelete_facts(heavydb_name: str, fact_ids: list[str] | None = None) -> BaseIndex:
+async def adelete_facts(heavydb_name: str, fact_ids: list[str] | None = None) -> None | BaseIndex:
     """
     Delete a all database facts or specific facts.
     """
     index = get_index(collection_name=heavydb_name)
+    if not index:
+        return None
     if fact_ids:
         # delete only the facts associated with the passed facts ids
         await adelete_facts_by_ids(index=index, heavydb_name=heavydb_name, facts_ids=fact_ids)

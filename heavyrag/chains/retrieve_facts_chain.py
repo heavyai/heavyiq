@@ -100,7 +100,32 @@ async def apply_reranker_and_filter_top_n(inputs: dict) -> list[Any]:
     return reranked_nodes
 
 
-rerank_snippets_chain: Runnable = RunnablePassthrough.assign(nodes=apply_reranker_and_filter_top_n)
+async def rerank_nodes(inputs: dict) -> dict:
+    """
+    Rerank nodes.
+    """
+    reranker = ReRanker(
+        reranker_type=ReRankerType.OverridedLLMReRanker,
+        top_n=inputs["reranker_top_k"],
+        cutoff_score=inputs["reranker_cutoff"],
+    )
+    reranked_nodes = await reranker._rerank_nodes(inputs["nodes"], query_str=inputs["question"])
+    return {"reranked_nodes": reranked_nodes, "reranker_cutoff": inputs["reranker_cutoff"]}
+
+
+def filter_nodes_by_reranker_cutoff(inputs: dict) -> list[Any]:
+    """
+    Filter nodes by reranker cutoff.
+    """
+    from llama_index.core.postprocessor import SimilarityPostprocessor
+
+    processor = SimilarityPostprocessor(similarity_cutoff=inputs["reranker_cutoff"])
+    filtered_nodes = processor.postprocess_nodes(inputs["reranked_nodes"])
+    return filtered_nodes
+
+
+rerank_filter_runnable: Runnable = RunnableLambda(rerank_nodes) | RunnableLambda(filter_nodes_by_reranker_cutoff)  # type: ignore
+rerank_snippets_chain: Runnable = RunnablePassthrough.assign(nodes=rerank_filter_runnable)
 
 retrieve_snippets_chain: Runnable = RunnablePassthrough.assign(nodes=retrieve_and_filter_snippets) | RunnableBranch(
     (lambda x: x["use_reranker"], rerank_snippets_chain), lambda x: x
