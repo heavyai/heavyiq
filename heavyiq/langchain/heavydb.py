@@ -1388,7 +1388,9 @@ class HeavyDB:
                         altered_literal["literal"] = f"{lower_literal_prefix}%"
                     else:
                         # Only one prefix match, use the full matched string
-                        altered_literal["literal"] = prefix_matches[0][0]
+                        # correct the prefix_match before adding it to the altered query
+                        # since it's a result of another query
+                        altered_literal["literal"] = re.sub(r"'+", "''", prefix_matches[0][0])
                     if literal["operator"] in ("<>", "!=", "NOT LIKE", "NOT PG_ILIKE", "NOT ILIKE", "NOT PG_ILIKE"):
                         altered_literal["operator"] = "NOT ILIKE"
                     else:
