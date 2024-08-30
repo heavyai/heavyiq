@@ -31,7 +31,11 @@ def start_chromadb_server_process():
             ["chroma", "run", "--path", DB_PATH, "--port", str(PORT)], stdout=log_file, stderr=log_file
         )
         os.environ["CHROMADB_STARTED"] = "1"
-        print("Started chromadb server...\nArgs:\n--path {}\n--port {}\nSee logs at {}".format(DB_PATH, PORT, log_file.name))
+        print(
+            "Started chromadb server...\nArgs:\n--path {}\n--port {}\nSee logs at {}".format(
+                DB_PATH, PORT, log_file.name
+            )
+        )
         return True
 
     return False
@@ -63,6 +67,10 @@ def check_and_initiate_chromadb_thread(conf_file_path):
         config = get_config(conf_file_path)
     else:
         config = get_config()
+
+    if not config.enable_rag:
+        print('Failed to start chromadb server, "enable_rag" config flag is set to false.')
+        return None
 
     server_base = config.rag_chromadb_server_base
     if not server_base:
