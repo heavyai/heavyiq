@@ -13,19 +13,19 @@ except ImportError:
     # Ensure jwt is installed or handled appropriately
     pass
 
-chromadb_process, DB_PATH, PORT, HOST = None, None, None, None
+chromadb_process, DB_PATH, PORT, HOST, LOG_PATH = None, None, None, None, None
 
 
 def start_chromadb_server_process():
     """
     Helps to start ChromaDB server process.
     """
-    global chromadb_process, DB_PATH, PORT, HOST
+    global chromadb_process, DB_PATH, PORT, HOST, LOG_PATH
 
     if "CHROMADB_STARTED" not in os.environ:
-        assert DB_PATH and PORT and HOST
+        assert DB_PATH and PORT and HOST and LOG_PATH
         # Open log file
-        log_file = open("chromadb.log", "a")
+        log_file = open(LOG_PATH, "a")
         # Start the ChromaDB server and redirect stdout and stderr to the log file
         chromadb_process = subprocess.Popen(
             ["chroma", "run", "--path", DB_PATH, "--host", HOST, "--port", str(PORT)], stdout=log_file, stderr=log_file
@@ -61,7 +61,7 @@ def check_and_initiate_chromadb_thread(conf_file_path):
     from heavyiq.config import get_config
     from heavyiq.utils import get_host_and_port
 
-    global DB_PATH, PORT, HOST
+    global DB_PATH, PORT, HOST, LOG_PATH
 
     if conf_file_path:
         config = get_config(conf_file_path)
@@ -79,6 +79,7 @@ def check_and_initiate_chromadb_thread(conf_file_path):
 
     HOST, PORT = get_host_and_port(server_base)
     DB_PATH = config.rag_chromadb_persist_dir
+    LOG_PATH = config.data + "/log/chromadb.log"
 
     is_started = start_chromadb_server_process()
     if not is_started:
