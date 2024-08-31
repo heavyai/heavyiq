@@ -1,7 +1,12 @@
+from typing import Any, Sequence
+
 from langchain_core.runnables import Runnable, RunnableLambda
 
 from heavyiq.langchain.heavydb import get_config, get_db
+from heavyiq.logging_utils import get_heavyiq_logger
 from heavyrag.chains.retrieve_facts_chain import chain as snippets_chain
+
+logger = get_heavyiq_logger()
 
 CONFIG = get_config()
 
@@ -14,7 +19,7 @@ async def get_collection_name(inputs: dict) -> str:
     return heavydb._dbname
 
 
-async def form_relevant_info(infos: list) -> dict[str, list | str]:
+async def form_relevant_info(infos: list) -> dict[str, Sequence[Any] | str]:
     """
     Forms the relevant_info as a prompt patch.
     """
@@ -24,7 +29,9 @@ async def form_relevant_info(infos: list) -> dict[str, list | str]:
         node_ids.append(id_)
         node_contents.append(text)
     joined_infos = "\n\n".join(node_contents)
-    return {"snippet_ids": node_ids, "relevant_info": f"Relevant info:\n\n{joined_infos}\n" if joined_infos else ""}
+    info = {"snippet_ids": node_ids, "relevant_info": f"Relevant info:\n\n{joined_infos}\n" if joined_infos else ""}
+    logger.info(f"Relevant Info and snippet ids: {info}")
+    return info
 
 
 chain: Runnable = (

@@ -46,8 +46,6 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     """Used for the access log of the web server."""
     heavyiq_log_level: str = "INFO"
     """Used for the log of the application code."""
-    heavyrag_log_level: str = "DEBUG"
-    """Used for the log of the heavyrag code."""
     access_log_max_file_size: int = 104857600
     """Default Access logs max file size is 100 MB"""
     heavyiq_log_max_file_size: int = 104857600

@@ -209,29 +209,30 @@ def init_logs():
 
         default_logger = heavyiq_logger
 
-    if heavyrag_logger is None:
-        app_log_name = get_log_name("RAG", package_name="heavyrag")
-        # Ensure log_dir exists
-        os.makedirs(log_dir, exist_ok=True)
-        heavyrag_logger = HeavyIQLogger(
-            name="heavyrag",
-            log_file_path=os.path.join(log_dir, app_log_name),
-            level=LOG_CONFIG.heavyrag_log_level,
-            enable_console_logging=LOG_CONFIG.log_to_stdout,
-            max_file_size=LOG_CONFIG.heavyiq_log_max_file_size,
-        )
+    # [Obselete] use the heavyiq logger instead
+    # if heavyrag_logger is None:
+    #     app_log_name = get_log_name("RAG", package_name="heavyrag")
+    #     # Ensure log_dir exists
+    #     os.makedirs(log_dir, exist_ok=True)
+    #     heavyrag_logger = HeavyIQLogger(
+    #         name="heavyrag",
+    #         log_file_path=os.path.join(log_dir, app_log_name),
+    #         level=LOG_CONFIG.heavyrag_log_level,
+    #         enable_console_logging=LOG_CONFIG.log_to_stdout,
+    #         max_file_size=LOG_CONFIG.heavyiq_log_max_file_size,
+    #     )
 
-        rag_symlink = os.path.join(log_dir, "heavyiq.RAG")
-        if os.path.islink(rag_symlink):
-            try:
-                os.remove(rag_symlink)
-            except OSError as e:
-                print(f"Failed to delete symlink: {e}")
+    #     rag_symlink = os.path.join(log_dir, "heavyiq.RAG")
+    #     if os.path.islink(rag_symlink):
+    #         try:
+    #             os.remove(rag_symlink)
+    #         except OSError as e:
+    #             print(f"Failed to delete symlink: {e}")
 
-        try:
-            os.symlink(os.path.join("./", app_log_name), rag_symlink)
-        except OSError as e:
-            print(f"Failed to create symlink: {e}")
+    #     try:
+    #         os.symlink(os.path.join("./", app_log_name), rag_symlink)
+    #     except OSError as e:
+    #         print(f"Failed to create symlink: {e}")
 
 
 def _get_access_logger() -> _AccessLogger:
@@ -249,7 +250,9 @@ def get_heavyiq_logger() -> HeavyIQLogger:
 
 
 def get_heavyrag_logger() -> HeavyIQLogger:
-    global heavyrag_logger
-    if heavyrag_logger is None:
-        init_logs()
-    return heavyrag_logger  # type: ignore
+    # global heavyrag_logger
+    # if heavyrag_logger is None:
+    #     init_logs()
+    # return heavyrag_logger  # type: ignore
+    # use the iq logger
+    return get_heavyiq_logger()
