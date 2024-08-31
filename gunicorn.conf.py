@@ -13,27 +13,27 @@ except ImportError:
     # Ensure jwt is installed or handled appropriately
     pass
 
-chromadb_process, DB_PATH, PORT = None, None, None
+chromadb_process, DB_PATH, PORT, HOST = None, None, None, None
 
 
 def start_chromadb_server_process():
     """
     Helps to start ChromaDB server process.
     """
-    global chromadb_process, DB_PATH, PORT
+    global chromadb_process, DB_PATH, PORT, HOST
 
     if "CHROMADB_STARTED" not in os.environ:
-        assert DB_PATH and PORT
+        assert DB_PATH and PORT and HOST
         # Open log file
         log_file = open("chromadb.log", "a")
         # Start the ChromaDB server and redirect stdout and stderr to the log file
         chromadb_process = subprocess.Popen(
-            ["chroma", "run", "--path", DB_PATH, "--port", str(PORT)], stdout=log_file, stderr=log_file
+            ["chroma", "run", "--path", DB_PATH, "--host", HOST, "--port", str(PORT)], stdout=log_file, stderr=log_file
         )
         os.environ["CHROMADB_STARTED"] = "1"
         print(
-            "Started chromadb server...\nArgs:\n--path {}\n--port {}\nSee logs at {}".format(
-                DB_PATH, PORT, log_file.name
+            "Started chromadb server...\nArgs:\n--path {}\n--host {}\n--port {}\nSee logs at {}".format(
+                DB_PATH, HOST, PORT, log_file.name
             )
         )
         return True
@@ -61,7 +61,7 @@ def check_and_initiate_chromadb_thread(conf_file_path):
     from heavyiq.config import get_config
     from heavyiq.utils import get_host_and_port
 
-    global DB_PATH, PORT
+    global DB_PATH, PORT, HOST
 
     if conf_file_path:
         config = get_config(conf_file_path)
@@ -77,7 +77,7 @@ def check_and_initiate_chromadb_thread(conf_file_path):
         print("Failed to start chromadb server, no chromadb server base found on config.")
         return None
 
-    _, PORT = get_host_and_port(server_base)
+    HOST, PORT = get_host_and_port(server_base)
     DB_PATH = config.rag_chromadb_persist_dir
 
     is_started = start_chromadb_server_process()
