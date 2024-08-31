@@ -20,7 +20,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     heavydb_dbname: Optional[str] = None
     heavydb_username: Optional[str] = None
     heavydb_password: Optional[str] = None
-    heavydb_host: str = "localhost"
+    heavydb_host: str = "127.0.0.1"
     heavydb_port: int = 6274
     heavydb_protocol: str = "binary"
     huggingface_embed_model: str = "sentence-transformers/all-mpnet-base-v2"
@@ -56,7 +56,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     enable_debug_endpoints: bool = False
     enable_llm_cache: bool = False
     # CUSTOM LLM
-    custom_llm_type: Optional[str] = "API_VLLM"
+    custom_llm_type: str = "API_VLLM"
 
     """ 'API' or 'API_VLLM' or 'AZURE' """
     custom_llm_api_base: str = "https://api.heavy.ai/v1"  # LLMType.DEFAULT
@@ -155,10 +155,10 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     rag_storage_persist_dir: str = "rag_storage"
     rag_documents_source_dir: str = "rag_sources"
     rag_chromadb_persist_dir: str = rag_storage_persist_dir + "/chromadb"  # persistant client
-    rag_chromadb_server_base: Optional[str] = "http://127.0.0.1:6271"
+    rag_chromadb_server_base: str = "http://127.0.0.1:6271"
     rag_document_pdf_parser_url: str = ""
     rag_embed_model_name: str = "BAAI/bge-large-en-v1.5"
-    rag_embed_server_base: Optional[str] = "https://embeddings.heavy.ai"
+    rag_embed_server_base: str = "https://embeddings.heavy.ai"
     rag_rerank_server_base: Optional[str] = None
     rag_rerank_llm_start_token: str = "<|prompt|>\n"
     rag_rerank_llm_end_token: str = "\n<|answer|>\n"

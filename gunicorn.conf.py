@@ -59,6 +59,7 @@ def check_and_initiate_chromadb_thread(conf_file_path):
     Parser the configuration file and optionally initiate the chromadb server.
     """
     from heavyiq.config import get_config
+    from heavyiq.logging_utils import get_log_dir
     from heavyiq.utils import get_host_and_port
 
     global DB_PATH, PORT, HOST, LOG_PATH
@@ -79,7 +80,7 @@ def check_and_initiate_chromadb_thread(conf_file_path):
 
     HOST, PORT = get_host_and_port(server_base)
     DB_PATH = config.rag_chromadb_persist_dir
-    LOG_PATH = config.data + "/log/chromadb.log"
+    LOG_PATH = os.path.join(get_log_dir(), "chromadb.log")
 
     is_started = start_chromadb_server_process()
     if not is_started:
