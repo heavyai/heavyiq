@@ -148,20 +148,27 @@ def get_log_name(lvl: str, package_name: str = "heavyiq") -> str:
     return f"{package_name}.{h}.{u}.log.{lvl}.{t}"
 
 
-# had to add this so the logs didn't init the config before we passed the config path
-def init_logs():
-    global _access_logger, heavyiq_logger, default_logger, heavyrag_logger
-    LOG_CONFIG = get_config()
-    data: str = LOG_CONFIG.data  # type: ignore
+def get_log_dir() -> str:
+    """
+    Supposed to return logs directory.
+    """
+    data: str = get_config().data  # type: ignore
     if data is None:
         data = "./storage"
     log_dir = os.path.join(data, "log")
+    # Ensure log_dir exists
+    os.makedirs(log_dir, exist_ok=True)
+    return log_dir
 
+
+# had to add this so the logs didn't init the config before we passed the config path
+def init_logs():
+    global _access_logger, heavyiq_logger, default_logger, heavyrag_logger
+
+    LOG_CONFIG = get_config()
+    log_dir = get_log_dir()
     if _access_logger is None:
         access_log_name = get_log_name("ACCESS")
-        # Ensure log_dir exists
-        os.makedirs(log_dir, exist_ok=True)
-
         _access_logger = _AccessLogger(
             log_file_path=os.path.join(log_dir, access_log_name),
             level=LOG_CONFIG.access_log_level,
@@ -184,9 +191,6 @@ def init_logs():
 
     if heavyiq_logger is None:
         app_log_name = get_log_name("APP")
-        # Ensure log_dir exists
-        os.makedirs(log_dir, exist_ok=True)
-
         heavyiq_logger = HeavyIQLogger(
             log_file_path=os.path.join(log_dir, app_log_name),
             level=LOG_CONFIG.heavyiq_log_level,
@@ -211,8 +215,6 @@ def init_logs():
 
     if heavyrag_logger is None:
         app_log_name = get_log_name("RAG", package_name="heavyrag")
-        # Ensure log_dir exists
-        os.makedirs(log_dir, exist_ok=True)
         heavyrag_logger = HeavyIQLogger(
             name="heavyrag",
             log_file_path=os.path.join(log_dir, app_log_name),
