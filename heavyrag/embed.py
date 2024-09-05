@@ -26,6 +26,10 @@ def set_embed_model():
     Supposed to set the embed model
     """
     global EMBED_MODEL
+    if not CONFIG.enable_rag:
+        msg = "Failed to initialize the embedding model. The enable_rag setting is being turned off."
+        logger.error(msg)
+        raise ValueError(msg)
 
     if CONFIG.rag_embed_server_base:
         logger.info(
