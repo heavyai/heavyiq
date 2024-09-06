@@ -80,7 +80,7 @@ def check_and_initiate_chromadb_thread(conf_file_path):
 
     HOST, PORT = get_host_and_port(server_base)
     DB_PATH = config.rag_chromadb_persist_dir
-    LOG_PATH = os.path.join(get_log_dir(), "chromadb.log")
+    LOG_PATH = os.path.join(get_log_dir(), "heavyiq_chroma.log")
 
     is_started = start_chromadb_server_process()
     if not is_started:
