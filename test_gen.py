@@ -145,9 +145,9 @@ def main():
         print(f"Successful Requests: {cb.successful_requests}")
         print(f"Total Cost (USD): ${cb.total_cost}")
 
-    file_name = "output_questions.csv"
+    file_name = "experiments/output_questions.csv"
     write_headers = not os.path.exists(file_name)
-    with open("output_questions.csv", "a", newline="", encoding="utf-8") as csvfile:
+    with open("experiments/output_questions.csv", "a", newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
         if write_headers:
             writer.writerow(["primary_table", "is_multi_table", "secondary_table", "question"])

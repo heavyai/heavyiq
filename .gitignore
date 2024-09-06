@@ -1,5 +1,6 @@
 venv/
 
+data/
 storage/
 
 *.pyc
@@ -10,9 +11,11 @@ instance/
 .pytest_cache/
 .coverage
 htmlcov/
+security/report.html
 
 dist/
 build/
+packages/
 *.egg-info/
 
 .DS_STORE
