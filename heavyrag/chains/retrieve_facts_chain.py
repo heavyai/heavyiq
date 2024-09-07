@@ -1,6 +1,7 @@
 #############
 # Chain/Runnable which is supposed to RAG retrieve relevant facts
 #############
+import json
 from typing import Any
 
 from langchain_core.runnables import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
@@ -74,7 +75,12 @@ async def retrieve_relevant_snippets(inputs: dict) -> list[Any]:
         filters=get_facts_filter_matches(collection_name),
         similarity_top_k=similarity_top_k,
     )
-    return await facts_engine.aretrieve(question)
+    try:
+        return await facts_engine.aretrieve(question)
+    except json.JSONDecodeError:
+        msg = 'Invalid response from Embeddings API: check embeddings server ("rag_embed_server_base") is reachable or not.'
+        rag_logger.error(msg)
+        raise ValueError(msg)
 
 
 async def retrieve_and_filter_snippets(inputs: dict) -> list[Any]:
