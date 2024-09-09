@@ -59,7 +59,7 @@ function test_for_include_all_deps() {
     pip download --prefer-binary -r $requirements_file --dest ./packages/
   else
     ## Download additional RHEL requirements if provided
-    pip download --prefer-binary -r $requirements_file -r $requirements_file_rhel --dest ./packages/
+    pip download --only-binary -r $requirements_file -r $requirements_file_rhel --dest ./packages/
 
     # Replace the downloaded chromadb-0.5.3-py3-none-any.whl with the one in scripts/assets
     cp scripts/assets/chromadb-0.5.3-py3-none-any.whl ./packages/
