@@ -59,11 +59,14 @@ function test_for_include_all_deps() {
     pip download --prefer-binary -r $requirements_file --dest ./packages/
   else
     ## Download additional RHEL requirements if provided
-    ## Require binary versions of PyPika
-    pip download --only-binary=pypika -r $requirements_file -r $requirements_file_rhel --dest ./packages/
+    pip download -r $requirements_file -r $requirements_file_rhel --dest ./packages/
 
     # Replace the downloaded chromadb-0.5.3-py3-none-any.whl with the one in scripts/assets
     cp scripts/assets/chromadb-0.5.3-py3-none-any.whl ./packages/
+
+    # Replace PyPika with a binary version found in scripts/assets
+    rm ./packages/PyPika-0.48.9.tar.gz
+    cp scripts/assets/PyPika-0.48.9-py2.py3-none-any.whl ./packages/
   fi
 
   ## generate a new requirements file than will use the
