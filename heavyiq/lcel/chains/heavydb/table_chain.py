@@ -48,9 +48,17 @@ async def get_tables(inputs: dict, use_rag: bool = False) -> list[str]:
 
         return await determine_table_names(question=inputs["question"], heavydb=db)
 
-    if (len(allowed_tables) > config.allowed_tables_max_count_nl_to_tables) or use_rag:
+    if use_rag:
         found_tables = await retrieve_table_names_from_vectordb()
-
+    else:
+        if config.enable_rag:
+            # rag only when allowed tables is greater than 20, otherwise let llm to pick the appr table
+            if len(allowed_tables) > config.allowed_tables_max_count_nl_to_tables:
+                found_tables = await retrieve_table_names_from_vectordb()
+        else:
+            # rag only when allowed tables is greater than 50 (which should throw an error), otherwise let llm to pick the appr table
+            if len(allowed_tables) > (config.allowed_tables_max_count_nl_to_tables + 30):
+                found_tables = await retrieve_table_names_from_vectordb()
     return found_tables or allowed_tables
 
 

@@ -29,6 +29,10 @@ def set_embed_model():
     from heavyiq.langchain.llms import get_vllm_model_name
 
     global EMBED_MODEL
+    if not CONFIG.enable_rag:
+        msg = "Failed to initialize the embedding model. The enable_rag setting is being turned off."
+        logger.error(msg)
+        raise ValueError(msg)
 
     if CONFIG.rag_embed_server_base and CONFIG.rag_embed_server_base.endswith("/v1"):
         model_name = get_vllm_model_name(CONFIG.rag_embed_server_base)

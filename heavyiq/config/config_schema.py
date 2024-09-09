@@ -29,6 +29,9 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     """If True, then it uses multiple processes for embedding documents"""
     metadata_index_dir: str = "db"
     docs_index_dir: str = "heavyai_docs"
+    # [Obselete], remove "table_documents_dir" flag since the index update is done through heavyrag (sync_table_index method)
+    # which involves generating table schema directly and updates the vectordb index without storing the
+    # schema in an intermediate text file
     table_documents_dir: str = "table_documents"
     enable_str_literal_correction: bool = True
     column_top_k_cardinality_threshold: int = 5
