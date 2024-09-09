@@ -1,9 +1,11 @@
+import json
 import math
 from abc import abstractproperty
 from enum import Enum, auto
 from functools import partial
 from typing import Any, Callable, List, Literal, Optional, Union
 
+import httpx
 from llama_index.core.bridge.pydantic import Field
 from llama_index.core.callbacks import CBEventType, EventPayload
 from llama_index.core.llms.llm import LLM
@@ -31,8 +33,22 @@ class TEIServerFetchMixin:
     def action(self):
         pass
 
+    def handle_response(self, response: httpx.Response) -> dict | list:
+        """
+        Handle TEI server response.
+        Raises ValueError if the response cannot be decoded as JSON.
+        """
+        if response.is_error:
+            raise ValueError(f"Error response from Embedding API: {response.status_code} - {response.text}")
+
+        try:
+            response_data = response.json()
+        except json.JSONDecodeError:
+            raise ValueError(f"Invalid response from Embeddings API: {response.text}")
+
+        return response_data
+
     async def _acall_api(self, json_data: dict) -> Any:
-        import httpx
 
         headers = {"Content-Type": "application/json"}
         if self.auth_token is not None:
@@ -49,10 +65,9 @@ class TEIServerFetchMixin:
                 timeout=self.timeout,
             )
 
-        return response.json()
+        return self.handle_response(response)
 
     def _call_api(self, json_data: dict) -> Any:
-        import httpx
 
         headers = {"Content-Type": "application/json"}
         if self.auth_token is not None:
@@ -69,7 +84,7 @@ class TEIServerFetchMixin:
                 timeout=self.timeout,
             )
 
-        return response.json()
+        return self.handle_response(response)
 
 
 class TextEmbeddingsInferenceRerank(TEIServerFetchMixin, BaseNodePostprocessor):
