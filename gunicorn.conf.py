@@ -24,6 +24,10 @@ def start_chromadb_server_process():
 
     if "CHROMADB_STARTED" not in os.environ:
         assert DB_PATH and PORT and HOST and LOG_PATH
+
+        # chromadb telemetry opt-out
+        os.environ["ANONYMIZED_TELEMETRY"] = "false"
+
         # Open log file
         log_file = open(LOG_PATH, "a")
         # Start the ChromaDB server and redirect stdout and stderr to the log file
