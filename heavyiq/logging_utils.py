@@ -7,7 +7,6 @@ import time
 from loguru import logger as loguru_logger
 
 from heavyiq.config import get_config
-from heavyiq.langchain.callbacks import AsyncLogFileCallbackHandler, FileCallbackHandler
 
 from .loguru_logging import BaseAsyncLogger, access_formatter, iq_formatter
 
@@ -53,32 +52,6 @@ class HeavyIQLogger(BaseAsyncLogger):
             max_file_size=max_file_size,
         )
         self.info(f"{name.upper()} Logger initialized")
-
-    def langchain_cb_handler(self, to_stdout: bool = True) -> FileCallbackHandler:
-        """
-        Returns a file callback handler created from the log file.
-
-        Args:
-            to_stdout (bool, optional): whether to log stdout as well. Defaults to True.
-
-        Returns:
-            FileCallbackHandler: callback handler mainly passed as callback for chains.
-        """
-        assert self.log_file_path
-        return FileCallbackHandler(self.log_file_path, to_stdout=to_stdout)
-
-    def async_langchain_cb_handler(self, to_stdout: bool = True) -> AsyncLogFileCallbackHandler:
-        """
-        Returns a file callback handler created from the log file.
-
-        Args:
-            to_stdout (bool, optional): whether to log stdout as well. Defaults to True.
-
-        Returns:
-            FileCallbackHandler: callback handler mainly passed as callback for chains.
-        """
-        assert self.log_file_path
-        return AsyncLogFileCallbackHandler(self.log_file_path, to_stdout=to_stdout)
 
 
 class _AccessLogger(BaseAsyncLogger):

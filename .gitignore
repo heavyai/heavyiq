@@ -33,3 +33,5 @@ pyheavydb.whl.version
 pyheavydb*.whl
 *.sqlite
 rag_storage/
+eval/
+table_documents/
