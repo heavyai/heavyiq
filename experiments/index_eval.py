@@ -97,7 +97,7 @@ def test_stuff(question_dicts: list[dict[str, Any]]) -> tuple[str, dict]:
 
 
 def main():
-    questions_file = "sample_questions.csv"
+    questions_file = "experiments/sample_questions.csv"
     question_dicts = read_csv_file(questions_file)
     total_questions = len(question_dicts)
 
