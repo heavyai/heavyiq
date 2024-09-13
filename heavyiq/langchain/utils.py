@@ -178,34 +178,20 @@ async def aget_table_info_from_cache_or_calculate(
     return table_info
 
 
-async def update_table_index_on_schema_change_callback(session: str, table: str):
+async def update_table_index_on_schema_change_callback(session: str, table: str) -> bool | None:
     """
     Callback coroutine which gets executed on table schema change.
-    This function helps re-genrate table document and then reindex it's metadata on chromadb vectorstore index.
+    This function helps to update the table data exists on the heavyrag index.
     """
-    from heavyiq.langchain.index.heavydb.create_index import acreate_index_if_nonexistent
+    config = get_config()
+    if not config.enable_rag:
+        return None
 
-    logger, shared_dict = get_heavyiq_logger(), SharedDictSingleton()  # type: ignore
-    key = f"is_background_index_update_for_{table}_table_in_progress"
-    has_key = await shared_dict.get(key)
+    from heavyrag.ingest import update_table
 
-    if has_key:
-        logger.debug(f"An index update is already in progress for {table} table, so skipping.")
-        return
-
-    try:
-        heavydb = await HeavyDB.from_session_async(session_id=session)
-        await shared_dict.put(key, True)
-        await asyncio.sleep(1)
-        index = await acreate_index_if_nonexistent(session)
-        logger.debug("Regenerating the table document and subsequently re-indexing it in ChromaDB VectorStore.")
-        await index.agenerate_and_reindex_table_document(heavydb, table)
-    except Exception as e:
-        logger.exception(f"Failed to update index for {table} table, {e}")
-    else:
-        logger.debug(f"Successfully re-indexed the document for the {table} table on ChromaDB VectorStore.")
-    finally:
-        await shared_dict.delete(key)
+    heavydb = await get_db(session)
+    await update_table(heavydb=heavydb, table_name=table)
+    return True
 
 
 TABLE_SCHEMA_ONLY_RGX: re.Pattern = re.compile(r"(?is)^create table .*?\);(?=\n|$)")

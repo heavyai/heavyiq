@@ -127,6 +127,21 @@ async def derive_table_names(
     return await determine_table_names(question=request.question, heavydb=heavydb)
 
 
+@table_router.post("/index/nodes")
+async def get_table_nodes(
+    request: md.GetSnippetsfromIndexRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
+) -> md.GetSnippetsfromIndexResponse:
+    """
+    Get facts from vectorDB index.
+    """
+    from heavyrag.main import get_table_nodes
+
+    nodes = await get_table_nodes(heavydb_name=heavydb._dbname, limit=request.limit)
+    return md.GetSnippetsfromIndexResponse(
+        nodes=[md.GetSnippetsfromIndexResponse.Node(content=i.get_text(), metadata=i.metadata) for i in nodes]
+    )
+
+
 # RAG database router
 # which helps to make CRUD operations on RAG database, especially for facts
 facts_db_router = APIRouter()

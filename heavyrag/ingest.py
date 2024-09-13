@@ -79,6 +79,22 @@ async def ainsert_table(heavydb: HeavyDB, table_name: str) -> BaseIndex:
     return index
 
 
+async def update_table(heavydb: HeavyDB, table_name: str) -> BaseIndex:
+    """
+    Update table information on RAG index.
+    """
+    logger.debug(f"Index: Updating {table_name} table information on {heavydb} index/collection.")
+    index = get_or_create_index(collection_name=heavydb._dbname)
+    # delete existing table information
+    await delete_table_nodes(index, table_name)
+    # re-insert the latest schema
+    documents = await aload_table(heavydb=heavydb, table_name=table_name)
+    nodes = await atransform(documents=documents)
+    index.insert_nodes(nodes=nodes, show_progress=True)
+    logger.debug(f"Successfully updated {table_name} table information.")
+    return index
+
+
 async def get_or_create_index_and_insert_nodes(collection_name: str, nodes: list[BaseNode]) -> BaseIndex:
     """
     Added nodes to the existing or newly created index.
@@ -99,7 +115,7 @@ async def ainsert_tables(heavydb: HeavyDB) -> BaseIndex:
     nodes = await atransform(documents=documents)
     index = get_or_create_index(collection_name=heavydb._dbname)
     index.insert_nodes(nodes=nodes, show_progress=True)
-    logger.info(f"Successfully Bulk Inserted table info into {heavydb} collection.")
+    logger.info(f"Successfully Bulk Inserted table info into {heavydb._dbname} collection.")
     return index
 
 

@@ -11,7 +11,13 @@ from llama_index.core.schema import NodeWithScore
 from heavyiq.langchain.heavydb import HeavyDB
 from heavyrag import IndexNotFound
 from heavyrag.evaluate import aevaluate_response_by_relevancy
-from heavyrag.filters import document_filters, get_document_filter_matches, get_facts_filter_matches, table_filters
+from heavyrag.filters import (
+    document_filters,
+    get_document_filter_matches,
+    get_facts_filter_matches,
+    get_table_filter_matches,
+    table_filters,
+)
 from heavyrag.index import get_index
 from heavyrag.ingest import sync_table_index
 from heavyrag.llm import get_llm
@@ -190,6 +196,17 @@ async def get_facts(heavydb_name: str, limit: int = 100) -> list[NodeWithScore]:
     return nodes
 
 
+async def get_table_nodes(heavydb_name: str, limit: int = 100) -> list[NodeWithScore]:
+    """
+    Get all the table nodes specific to a particular database(ie. collection) without querying the vectorDB.
+    """
+    index = get_index(collection_name=heavydb_name)
+    if not index:
+        raise IndexNotFound(f"VectorStoreIndex not found {heavydb_name} collection.")
+    nodes = await get_nodes(index=index, filters=table_filters, limit=limit)
+    return nodes
+
+
 async def ask_facts(
     question: str,
     heavydb_name: str,
@@ -273,6 +290,6 @@ async def determine_table_names(question: str, heavydb: HeavyDB, force_sync: boo
         if table_name not in tables:
             tables.append(table_name)
 
-    logger.debug("Retrieved tables: {tables}")
+    logger.debug(f"Retrieved tables: {tables}")
 
     return tables
