@@ -18,7 +18,6 @@ from thrift.transport.TTransport import TTransportException
 from heavyiq.cli.decorators import coro
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
-from heavyiq.langchain.chains import get_nl_to_sql_chain_by_llm
 from heavyiq.langchain.exceptions import NLtoSQLException
 from heavyiq.langchain.heavydb import heavydb_context
 from heavyiq.langchain.llms import LLMType, get_llm_by_type
@@ -142,109 +141,6 @@ async def get_db(dbname: str) -> HeavyDB:
         await asyncio.sleep(1)
         db = await HeavyDB.from_env_async(dbname)
     return db
-
-
-async def process_eval_row(
-    semaphore: asyncio.Semaphore,
-    row: tuple | list,
-    has_id: bool,
-    eval_str: str,
-    llm: BaseLLM | BaseChatModel,
-    verbose: bool = True,
-    enable_logprobs: bool = True,
-    enable_querystats: bool = True,
-    langsmith_client: Client | None = None,
-):
-    """
-    Function to process each row exists on eval dataset.
-    """
-    from heavyiq.langchain.utils import is_langsmith_active
-
-    logger = get_heavyiq_logger()
-
-    if has_id:
-        query_id, db_id, question, gold_query = row
-    else:
-        query_id = None
-        db_id, question, gold_query = row
-    async with semaphore:
-        logger.info(f"Processing Question: {question}")
-        db = await get_db(db_id)
-        async with heavydb_context(db):
-            chain = get_nl_to_sql_chain_by_llm(llm)(
-                database=db, llm=llm, callbacks=None if verbose else [], verbose=verbose, tags=[eval_str, "cli"]
-            )
-
-            await process_question(
-                question,
-                is_langsmith_active,
-                chain,
-                db,
-                gold_query,
-                logger,
-                eval_str,
-                db_id,
-                query_id,
-                enable_logprobs=enable_logprobs,
-                enable_querystats=enable_querystats,
-                langsmith_client=langsmith_client,
-            )
-
-
-@eval.command()
-@coro
-@click.option("--temperature", default=0.0, help="Temperature for LLM (Defaults to 0.0)", type=float)
-@click.option("--verbose", default=False, help="Verbose output", type=bool)
-@click.argument("eval_dataset_csv", type=str)
-@click.pass_context  # type: ignore
-async def run_config_model_on_questions(
-    ctx: click.Context, eval_dataset_csv: str, temperature: float, verbose: bool
-) -> None:
-    from heavyiq.langchain.utils import is_langsmith_active
-
-    logger = get_heavyiq_logger()
-
-    if not await run_in_threadpool(os.path.exists, eval_dataset_csv):
-        raise Exception(f"eval_dataset_csv does not exist: {eval_dataset_csv}")
-
-    eval_id = uuid4().hex[:8]
-    eval_str = f"eval_{eval_id}"
-    logger.info(f"Eval ID: {eval_id}")
-
-    tasks, semaphore = [], asyncio.Semaphore(30)  # Limit to 10 concurrent tasks
-
-    llm = await run_in_threadpool(get_llm_by_type, LLMType.NL_TO_SQL, temperature=temperature)
-
-    config = get_config()
-    langsmith_client = Client() if is_langsmith_active else None
-
-    # csv must have columns: id (optional), db_id, tables, question, answer
-    async with aiofiles.open(eval_dataset_csv, mode="r") as f:
-        csv_reader = AsyncReader(f)
-        header = await anext(csv_reader)
-        has_id = "id" == header[0]  # type: ignore
-
-        await awrite_eval_results_header(eval_str, has_id, config.enable_logprobs)
-
-        async for row in csv_reader:
-            task = asyncio.create_task(
-                process_eval_row(
-                    semaphore,
-                    row,
-                    has_id=has_id,
-                    eval_str=eval_str,
-                    llm=llm,
-                    verbose=verbose,
-                    enable_logprobs=config.enable_logprobs,
-                    enable_querystats=True,
-                    langsmith_client=langsmith_client,
-                )
-            )
-            tasks.append(task)
-
-    await asyncio.gather(*tasks, return_exceptions=False)
-
-    await run_in_threadpool(summarize_eval_results, eval_str)
 
 
 @eval.command()
