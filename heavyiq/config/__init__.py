@@ -93,6 +93,7 @@ def get_config(file: str = "./config.toml", config_provided=True) -> HeavyIQConf
         app_config.iq.rag_storage_persist_dir = app_config.iq.data + "/" + app_config.iq.rag_storage_persist_dir
         app_config.iq.rag_documents_source_dir = app_config.iq.data + "/" + app_config.iq.rag_documents_source_dir
         app_config.iq.rag_chromadb_persist_dir = app_config.iq.data + "/" + app_config.iq.rag_chromadb_persist_dir
+        app_config.iq.rag_faiss_persist_dir = app_config.iq.data + "/" + app_config.iq.rag_faiss_persist_dir
 
         app_config.iq.rag_database_uri = (
             f'sqlite:///{app_config.iq.data}/ragdb/{app_config.iq.rag_database_uri.split("sqlite:///")[1]}'
