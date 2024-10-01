@@ -1,0 +1,330 @@
+# Controller class which helps to make CRUD operations on the vectorstore irrespective of it's type.
+# CRUD Operations ->
+#     - Snippets/facts
+#       - insert
+#       - list
+#       - delete
+#     - tables
+#       - insert
+#       - list
+#       - delete
+
+
+from abc import ABC, abstractmethod
+
+from llama_index.core import StorageContext, VectorStoreIndex, load_index_from_storage
+from llama_index.core.bridge.pydantic import PrivateAttr
+from llama_index.core.indices.base import BaseIndex
+from llama_index.core.schema import BaseNode, Document, NodeWithScore, TextNode
+from llama_index.core.storage.docstore import SimpleDocumentStore
+from llama_index.core.vector_stores.types import BasePydanticVectorStore
+
+from heavyiq.config import get_config
+from heavyrag.embed import get_embed_model
+from heavyrag.filters import get_facts_filter_matches
+from heavyrag.ingest import adelete_database_facts, adelete_facts_by_ids
+from heavyrag.loaders import aload_table, aload_tables
+from heavyrag.transform import atransform
+from heavyrag.utils import get_nodes
+from heavyrag.vector_stores import ChromaIQVectorStore, FaissIQVectorStore
+
+CONFIG, EMBED_MODEL = get_config(), get_embed_model()
+
+
+class TableAbstract(ABC):
+    """
+    Table abstract class which defines abstract methods for handling table node operations.
+    """
+
+    @abstractmethod
+    def list_table_nodes(self):
+        pass
+
+    @abstractmethod
+    def insert_table_nodes(self):
+        pass
+
+    @abstractmethod
+    def delete_table_nodes(self):
+        pass
+
+    async def _docs_nodes(self, docs: list[Document]) -> list[BaseNode]:
+        """
+        Helps to transform a list of whole single document into multiple text nodes by using sentence splitter.
+        """
+        return await atransform(documents=docs)
+
+    async def _load_table(self, *args, **kwargs) -> list[Document]:
+        """
+        Grab a single table info from database and then form a Document node from that.
+        """
+        return await aload_table(*args, **kwargs)
+
+    async def _load_tables(self, *args, **kwargs) -> list[Document]:
+        """
+        Grab info of all tables from database and then form list of Document nodes from that.
+        """
+        return await aload_tables(*args, **kwargs)
+
+
+class FactAbstract(ABC):
+    """
+    Table abstract class which defines abstract methods for handling fact/snippet node operations.
+    """
+
+    @abstractmethod
+    def list_fact_nodes(self, dbname: str):
+        pass
+
+    @abstractmethod
+    def insert_fact_nodes(self, facts: list[tuple[str, str]], dbname: str):
+        pass
+
+    @abstractmethod
+    def delete_fact_nodes(self, dbname: str, fact_ids: list[str] | None = None):
+        pass
+
+    def _fact_metadata(self, dbname: str, fact_id: str, **kwargs) -> dict:
+        """
+        Generates fcat node's metadata.
+        """
+        return {"dbname": dbname, "type": "facts", "id": fact_id, **kwargs}
+
+    def _load_facts(self, facts: list[tuple[str, str]], dbname: str) -> list[BaseNode]:
+        """
+        Creates TextNode's from the passed list of string tuples.
+        """
+        return [
+            TextNode(text=fact, id_=fact_id, metadata={"dbname": dbname, "type": "facts", "id": fact_id})  # type: ignore
+            for fact_id, fact in facts
+        ]
+
+
+class BaseController(TableAbstract, FactAbstract, ABC):
+    """
+    Base controller class.
+    """
+
+    @property
+    @abstractmethod
+    def persist_dir(self):
+        """
+        Vectorstore specific persist directory where all the files relevant to the vectordb resides.
+        """
+        pass
+
+    @abstractmethod
+    def get_vectorstore(self, *args, **kwargs):
+        """
+        Supposed to get the vectorstore.
+        """
+        pass
+
+    def get_docstore(self) -> SimpleDocumentStore:
+        """
+        Get docstore.
+        """
+        return SimpleDocumentStore.from_persist_dir(self.persist_dir)
+
+    def create_docstore(self) -> SimpleDocumentStore:
+        """
+        Create docstore.
+        """
+        return SimpleDocumentStore()
+
+    def get_or_create_docstore(self) -> SimpleDocumentStore:
+        """
+        Get or create docstore.
+        """
+        try:
+            return self.get_docstore()
+        except FileNotFoundError:
+            return self.create_docstore()
+
+    def get_index(self, vector_store: BasePydanticVectorStore) -> BaseIndex:
+        """
+        Supposed to get vectordb index.
+        """
+        docstore = self.get_docstore()
+        storage_context = StorageContext.from_defaults(
+            docstore=docstore, vector_store=vector_store, persist_dir=self.persist_dir
+        )
+        index = load_index_from_storage(storage_context=storage_context, embed_model=EMBED_MODEL)
+        return index
+
+    def get_or_create_index(self, vector_store: BasePydanticVectorStore) -> BaseIndex:
+        """
+        Get or create index.
+        """
+        try:
+            index = self.get_index(vector_store)
+        except FileNotFoundError:
+            # index not exists so create an empty index
+            docstore = self.get_or_create_docstore()
+            storage_context = StorageContext.from_defaults(docstore=docstore, vector_store=vector_store)
+            index = VectorStoreIndex.from_documents([], storage_context=storage_context, embed_model=EMBED_MODEL)
+            index.storage_context.persist(persist_dir=self.persist_dir)
+        return index
+
+    def insert_nodes(self, index: BaseIndex, nodes: list[BaseNode]) -> None:
+        """
+        Helps to insert nodes into the passed index.
+        """
+        # insert_args get's passed to vectorstore's add method
+        index.insert_nodes(nodes=nodes, show_progress=True)
+
+
+class ChromaController(BaseController):
+    """
+    Controller which helps to interact with chroma vectorstore.
+    """
+
+    @property
+    def persist_dir(self) -> str:
+        return CONFIG.rag_chromadb_persist_dir
+
+    def get_vectorstore(self, collection_name: str, metadata: dict | None = None) -> ChromaIQVectorStore:
+        """
+        Supposed to get the ChromaDB vectorstore.
+        """
+        return ChromaIQVectorStore(
+            collection_name=collection_name,
+            metadata=metadata,
+        )
+
+    def get_index_by_collection(self, collection_name: str) -> BaseIndex:
+        """
+        Helps to get the index from collection_name.
+        """
+        vector_store = self.get_vectorstore(collection_name=collection_name)
+        return self.get_index(vector_store)
+
+    async def insert_fact_nodes(self, facts: list[tuple[str, str]], dbname: str) -> None:
+        """
+        Create fact nodes and then insert it to the index.
+        """
+        vector_store = self.get_vectorstore(collection_name=dbname)
+        index = self.get_or_create_index(vector_store=vector_store)
+        nodes = self._load_facts(facts=facts, dbname=dbname)
+        self.insert_nodes(index=index, nodes=nodes)
+
+    async def list_fact_nodes(self, dbname: str) -> list[NodeWithScore]:
+        """
+        Helps to list all the fact nodes.
+        """
+        index = self.get_index_by_collection(collection_name=dbname)
+        nodes_with_score = await get_nodes(index=index, filters=get_facts_filter_matches(heavydb_name=dbname))  # type: ignore
+        return nodes_with_score
+
+    async def delete_fact_nodes(self, dbname: str, fact_ids: list[str] | None = None) -> None:
+        """
+        Helps to delete all the fact nodes relevant to a database/collection.
+        """
+        index = self.get_index_by_collection(collection_name=dbname)
+        if fact_ids:
+            # delete only the facts associated with the passed facts ids
+            await adelete_facts_by_ids(index=index, heavydb_name=dbname, facts_ids=fact_ids)  # type: ignore
+        else:
+            # delete all the facts relevant to a particular database
+            await adelete_database_facts(index=index, heavydb_name=dbname)  # type: ignore
+
+    def list_table_nodes(self):
+        pass
+
+    def insert_table_nodes(self):
+        pass
+
+    def delete_table_nodes(self):
+        print("Deleting tables from Chroma DB")
+        # Add logic for deleting tables from Chroma DB
+
+
+class FaissController(BaseController):
+    """
+    Controller which helps to interact with faiss vectorstore.
+    """
+
+    _cahed_vector_store = None
+
+    @property
+    def persist_dir(self) -> str:
+        return CONFIG.rag_faiss_persist_dir
+
+    def get_vectorstore(self) -> FaissIQVectorStore:
+        """
+        Supposed to get the Faiss vectorstore.
+        """
+        # cache this vs initialisation so that it won't be readed again and again
+        if self._cahed_vector_store:
+            return self._cahed_vector_store
+        self._cahed_vector_store = FaissIQVectorStore(persist_dir=CONFIG.rag_faiss_persist_dir)
+        return self._cahed_vector_store
+
+    async def insert_fact_nodes(self, facts: list[tuple[str, str]], dbname: str) -> None:
+        """
+        Create fact nodes and then insert it to the index.
+        """
+        vector_store = self.get_vectorstore()
+        index = self.get_or_create_index(vector_store=vector_store)
+        nodes = self._load_facts(facts=facts, dbname=dbname)
+        self.insert_nodes(index=index, nodes=nodes)
+
+    async def list_fact_nodes(self, dbname: str) -> list[NodeWithScore]:
+        """
+        Helps to list all the fact nodes.
+        """
+        vector_store = self.get_vectorstore()
+        index = self.get_or_create_index(vector_store=vector_store)
+        nodes_with_score = await get_nodes(index=index, filters=get_facts_filter_matches(heavydb_name=dbname))  # type: ignore
+        return nodes_with_score
+
+    async def _delete_facts_by_ids(self, index: VectorStoreIndex, dbname: str, fact_ids: list[str]):
+        """
+        Helps to delete facts by fact ids.
+        """
+        nodes_with_score = await get_nodes(index=index, filters=get_facts_filter_matches(heavydb_name=dbname))
+        node_ids_to_delete = [i.node_id for i in nodes_with_score if i.node_id in fact_ids]
+        index.vector_store.remove(node_ids=node_ids_to_delete)  # type: ignore
+
+    async def _delete_database_facts(self, index: VectorStoreIndex, dbname: str):
+        """
+        Delete all facts relevant to a database.
+        """
+        nodes_with_score = await get_nodes(index=index, filters=get_facts_filter_matches(heavydb_name=dbname))
+        node_ids_to_delete = [i.node_id for i in nodes_with_score]
+        index.vector_store.remove(node_ids=node_ids_to_delete)  # type: ignore
+
+    async def delete_fact_nodes(self, dbname: str, fact_ids: list[str] | None = None) -> None:
+        """
+        Helps to delete all the fact nodes relevant to a database/collection.
+        """
+        index = self.get_or_create_index(vector_store=self.get_vectorstore())
+        if fact_ids:
+            # delete only the facts associated with the passed facts ids
+            await self._delete_facts_by_ids(index=index, dbname=dbname, fact_ids=fact_ids)  # type: ignore
+        else:
+            # delete all the facts relevant to a particular database
+            await self._delete_database_facts(index=index, dbname=dbname)  # type: ignore
+
+    def insert_table_nodes(self):
+        pass
+
+    def list_table_nodes(self):
+        pass
+
+    def delete_table_nodes(self):
+        print("Deleting tables from Faiss DB")
+        # Add logic for deleting tables from Faiss DB
+
+
+# Step 4: Method to choose the appropriate controller based on a string argument
+def get_controller(controller_type: str) -> BaseController:
+    if controller_type.lower() == "chroma":
+        return ChromaController()
+    elif controller_type.lower() == "faiss":
+        return FaissController()
+    else:
+        raise ValueError(f"Unknown controller type: {controller_type}")
+
+
+rag_controller = get_controller(CONFIG.rag_vectordb_type)

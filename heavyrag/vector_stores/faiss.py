@@ -5,7 +5,7 @@ from typing import Any, Union, cast
 
 import faiss
 import numpy as np
-from llama_index.core.bridge.pydantic import Field, PrivateAttr
+from llama_index.core.bridge.pydantic import PrivateAttr
 from llama_index.core.schema import BaseNode, TextNode
 from llama_index.core.vector_stores.types import (
     ExactMatchFilter,
@@ -18,6 +18,7 @@ from llama_index.core.vector_stores.types import (
 from llama_index.vector_stores.faiss import FaissVectorStore
 
 from heavyrag.logger import logger
+from heavyrag.utils import uuid4_hex_to_int64
 
 
 class FaissIQVectorStore(FaissVectorStore):
@@ -29,6 +30,7 @@ class FaissIQVectorStore(FaissVectorStore):
     _metadata_store: dict = PrivateAttr()
     _index_file: str = PrivateAttr()
     _metadata_file: str = PrivateAttr()
+    # _faiss_index = PrivateAttr()  # which lets you map custom ids to vectors
 
     def __init__(
         self,
@@ -61,8 +63,10 @@ class FaissIQVectorStore(FaissVectorStore):
             self.load_metadata()
         else:
             logger.info(f"Creating new FAISS index with dimension {dimension}")
-            index = faiss.IndexFlatL2(dimension)  # Create new FAISS index
+            index = faiss.IndexIDMap((faiss.IndexFlatL2(dimension)))  # Create new FAISS index
 
+        # self._faiss_index =
+        print(type(index))
         super().__init__(faiss_index=index)
 
     def load_metadata(self):
@@ -70,18 +74,39 @@ class FaissIQVectorStore(FaissVectorStore):
         Load the metadata from the metadata file.
         """
         if os.path.exists(self._metadata_file):
-            print(f"Loading metadata from {self._metadata_file}")
+            logger.info(f"Loading metadata from {self._metadata_file}")
             with open(self._metadata_file, "rb") as f:
                 self._metadata_store = pickle.load(f)
         else:
-            print("No metadata file found, initializing empty metadata store.")
+            logger.info("No metadata file found, initializing empty metadata store.")
             self._metadata_store = {}
+
+    def remove(self, ids: list[int] | None = None, node_ids: list[str] | None = None) -> None:
+        """
+        Remove vectors from the FAISS index as well as from metadata dump using their IDs.
+        Supports both node_ids(str) as well as the vector store index ids (int).
+        """
+        if ids:
+            ids_to_remove = np.array(ids, dtype=np.int64)
+        elif node_ids:
+            ids_to_remove = np.array([uuid4_hex_to_int64(id_) for id_ in node_ids], dtype=np.int64)
+        else:
+            raise ValueError("ids or node_ids need to be passed!")
+        # Remove the vectors based on their IDs
+        self._faiss_index.remove_ids(ids_to_remove)
+
+        # Remove the corresponding metadata from the metadata store
+        for id_ in ids_to_remove:
+            if id_ in self._metadata_store:
+                del self._metadata_store[id_]
+
+        self.persist()
 
     def add(
         self,
         nodes: Sequence[BaseNode],
         **add_kwargs: Any,
-    ) -> list[str]:
+    ) -> list[int]:
         """Add nodes to index.
 
         NOTE: in the Faiss vector store, we do not store text in Faiss.
@@ -93,35 +118,14 @@ class FaissIQVectorStore(FaissVectorStore):
         new_ids = []
         for node in nodes:
             text_embedding = node.get_embedding()
-            text_embedding_np = np.array(text_embedding, dtype="float32")[np.newaxis, :]
-            new_id = str(self._faiss_index.ntotal)
-            self._faiss_index.add(text_embedding_np)
+            text_embedding_np = np.array(text_embedding, dtype="float32").reshape(1, -1)
+            new_id = uuid4_hex_to_int64(node.node_id)
+            self._faiss_index.add_with_ids(text_embedding_np, np.array([new_id], dtype=np.int64))
             new_ids.append(new_id)
             self._metadata_store[new_id] = {"text": node.get_content(), "metadata": node.metadata}
             # add metadata to the metadatastore with the corresponding doc_id as key
         self.persist()  # do persist to disk after node's addition
         return new_ids
-
-    def add_embeddings(self, embeddings: list[Any], metadatas: list[dict]):
-        """
-        Add multiple embeddings and their associated metadata to the FAISS index.
-
-        Args:
-            embeddings: A list of embeddings to be added.
-            metadatas: A list of metadata corresponding to each embedding.
-        """
-        assert len(embeddings) == len(metadatas)
-        embeddings_np = np.array(embeddings, dtype="float32")
-        current_size = self._faiss_index.ntotal  # Get the current number of vectors in the FAISS index
-
-        self._faiss_index.add(embeddings_np)  # Add embeddings to FAISS index
-
-        # Add metadata with the doc_id as the key
-        for i, metadata in enumerate(metadatas):
-            doc_id = current_size + i  # Current size + i gives the new doc_id
-            self._metadata_store[doc_id] = {"metadata": metadata}  # Add metadata to the store with doc_id as key
-
-        self.persist()
 
     def apply_filter(self, metadata: dict, filter: Union[MetadataFilter, ExactMatchFilter, MetadataFilters]) -> bool:
         """
@@ -177,7 +181,9 @@ class FaissIQVectorStore(FaissVectorStore):
         """
         Create a TextNode from metadata dict. metadata dict must contain text, metadata keys.
         """
-        return TextNode(text=metadata.get("text", ""), metadata=metadata.get("metadata", {}))  # type: ignore
+        node_metadata = metadata.get("metadata", {})
+        node = TextNode(text=metadata.get("text", ""), metadata=node_metadata, id_=node_metadata["id"])  # type: ignore
+        return node
 
     def query(self, query: VectorStoreQuery, **kwargs: Any) -> VectorStoreQueryResult:
         """
