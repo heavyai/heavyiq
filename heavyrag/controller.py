@@ -13,17 +13,17 @@
 from abc import ABC, abstractmethod
 
 from llama_index.core import StorageContext, VectorStoreIndex, load_index_from_storage
-from llama_index.core.bridge.pydantic import PrivateAttr
 from llama_index.core.indices.base import BaseIndex
 from llama_index.core.schema import BaseNode, Document, NodeWithScore, TextNode
 from llama_index.core.storage.docstore import SimpleDocumentStore
 from llama_index.core.vector_stores.types import BasePydanticVectorStore
 
 from heavyiq.config import get_config
+from heavyiq.langchain.heavydb import HeavyDB
 from heavyrag.embed import get_embed_model
-from heavyrag.filters import get_facts_filter_matches
-from heavyrag.ingest import adelete_database_facts, adelete_facts_by_ids
-from heavyrag.loaders import aload_table, aload_tables
+from heavyrag.filters import get_facts_filter_matches, get_table_filter_matches
+from heavyrag.ingest import adelete_database_facts, adelete_facts_by_ids, delete_all_table_nodes, delete_nodes_by_ids
+from heavyrag.loaders import aload_specific_tables, aload_table, aload_tables
 from heavyrag.transform import atransform
 from heavyrag.utils import get_nodes
 from heavyrag.vector_stores import ChromaIQVectorStore, FaissIQVectorStore
@@ -37,18 +37,18 @@ class TableAbstract(ABC):
     """
 
     @abstractmethod
-    def list_table_nodes(self):
+    def get_table_node(self, dbname: str, table_name: str):
         pass
 
     @abstractmethod
-    def insert_table_nodes(self):
+    def list_table_nodes(self, dbname: str):
         pass
 
     @abstractmethod
-    def delete_table_nodes(self):
+    def sync_table_nodes(self, heavydb: HeavyDB, force: bool):
         pass
 
-    async def _docs_nodes(self, docs: list[Document]) -> list[BaseNode]:
+    async def _docs_to_nodes(self, docs: list[Document]) -> list[BaseNode]:
         """
         Helps to transform a list of whole single document into multiple text nodes by using sentence splitter.
         """
@@ -228,15 +228,62 @@ class ChromaController(BaseController):
             # delete all the facts relevant to a particular database
             await adelete_database_facts(index=index, heavydb_name=dbname)  # type: ignore
 
-    def list_table_nodes(self):
-        pass
+    async def get_table_node(self, dbname: str, table_name: str) -> NodeWithScore | None:
+        """
+        Gets the relevant table node.
+        """
+        index = self.get_index_by_collection(collection_name=dbname)
+        nodes_with_score = await get_nodes(index=index, filters=get_table_filter_matches(heavydb_name=dbname, table_name=table_name))  # type: ignore
+        if nodes_with_score:
+            return nodes_with_score[0]
+        return None
 
-    def insert_table_nodes(self):
-        pass
+    async def list_table_nodes(self, dbname: str) -> list[NodeWithScore]:
+        """
+        List all table nodes specific to a particular database.
+        """
+        index = self.get_index_by_collection(collection_name=dbname)
+        nodes_with_score = await get_nodes(index=index, filters=get_table_filter_matches(heavydb_name=dbname))  # type: ignore
+        return nodes_with_score
 
-    def delete_table_nodes(self):
-        print("Deleting tables from Chroma DB")
-        # Add logic for deleting tables from Chroma DB
+    async def sync_table_nodes(self, heavydb: HeavyDB, force: bool = False) -> None:
+        """
+        Synchronize nodes (documents or text content) with a table in the database.
+
+        Parameters:
+            - dbname (str): The name of the database where the nodes are being synchronized.
+            - force (bool, optional): If set to True, the function will force a resynchronization of the nodes
+                    even if they are already up to date. Defaults to False, meaning that
+                    synchronization will only occur if necessary.
+        """
+        dbname = heavydb._dbname
+        index = self.get_index_by_collection(collection_name=dbname)
+        if force:
+            # delete and recreate all the table nodes relevant to a database
+            await delete_all_table_nodes(index=index, dbname=dbname)  # type: ignore
+            docs = await self._load_tables(heavydb)
+            nodes = await self._docs_to_nodes(docs)
+            index.insert_nodes(nodes=nodes, show_progress=True)
+            return None
+
+        all_tables = heavydb.get_usable_table_names()
+        available_tables: dict[str, str] = {}  # store table_name as key and node_id as value
+        for i in await self.list_table_nodes(dbname=dbname):
+            available_tables[i.metadata["name"]] = i.node_id
+
+        # remove deleted tables from the index
+        tables_to_delete = set(available_tables.keys()) - set(all_tables)
+        tables_to_insert = set(all_tables) - set(available_tables.keys())
+
+        ids_to_delete = [available_tables[i] for i in tables_to_delete]
+
+        delete_nodes_by_ids(index=index, ids=ids_to_delete)  # type: ignore
+
+        # insert the missing tables
+        docs = await aload_specific_tables(heavydb=heavydb, tables=tables_to_insert)
+        nodes = await self._docs_to_nodes(docs)
+        index.insert_nodes(nodes=nodes, show_progress=True)
+        return None
 
 
 class FaissController(BaseController):
@@ -257,7 +304,7 @@ class FaissController(BaseController):
         # cache this vs initialisation so that it won't be readed again and again
         if self._cahed_vector_store:
             return self._cahed_vector_store
-        self._cahed_vector_store = FaissIQVectorStore(persist_dir=CONFIG.rag_faiss_persist_dir)
+        self._cahed_vector_store = FaissIQVectorStore(persist_dir=self.persist_dir)
         return self._cahed_vector_store
 
     async def insert_fact_nodes(self, facts: list[tuple[str, str]], dbname: str) -> None:
@@ -306,15 +353,70 @@ class FaissController(BaseController):
             # delete all the facts relevant to a particular database
             await self._delete_database_facts(index=index, dbname=dbname)  # type: ignore
 
-    def insert_table_nodes(self):
-        pass
+    async def get_table_node(self, dbname: str, table_name: str) -> NodeWithScore | None:
+        """
+        Gets the relevant table node.
+        """
+        index = self.get_or_create_index(vector_store=self.get_vectorstore())
+        nodes_with_score = await get_nodes(index=index, filters=get_table_filter_matches(heavydb_name=dbname, table_name=table_name))  # type: ignore
+        if nodes_with_score:
+            return nodes_with_score[0]
+        return None
 
-    def list_table_nodes(self):
-        pass
+    async def list_table_nodes(self, dbname: str) -> list[NodeWithScore]:
+        """
+        List all table nodes specific to a particular database.
+        """
+        index = self.get_or_create_index(vector_store=self.get_vectorstore())
+        nodes_with_score = await get_nodes(index=index, filters=get_table_filter_matches(heavydb_name=dbname))  # type: ignore
+        return nodes_with_score
 
-    def delete_table_nodes(self):
-        print("Deleting tables from Faiss DB")
-        # Add logic for deleting tables from Faiss DB
+    async def _delete_all_table_nodes(self, index: BaseIndex, dbname: str) -> None:
+        """
+        Delete all table nodes.
+        """
+        nodes_with_score = await get_nodes(index=index, filters=get_table_filter_matches(heavydb_name=dbname))  # type: ignore
+        node_ids_to_delete = [i.node_id for i in nodes_with_score]
+        index.vector_store.remove(node_ids=node_ids_to_delete)  # type: ignore
+
+    async def sync_table_nodes(self, heavydb: HeavyDB, force: bool = False) -> None:
+        """
+        Synchronize nodes (documents or text content) with a table in the database.
+
+        Parameters:
+            - dbname (str): The name of the database where the nodes are being synchronized.
+            - force (bool, optional): If set to True, the function will force a resynchronization of the nodes
+                    even if they are already up to date. Defaults to False, meaning that
+                    synchronization will only occur if necessary.
+        """
+        dbname = heavydb._dbname
+        index = self.get_or_create_index(vector_store=self.get_vectorstore())
+        if force:
+            # delete and recreate all the table nodes relevant to a database
+            await self._delete_all_table_nodes(index=index, dbname=dbname)  # type: ignore
+            docs = await self._load_tables(heavydb)
+            nodes = await self._docs_to_nodes(docs)
+            index.insert_nodes(nodes=nodes, show_progress=True)
+            return None
+
+        all_tables = heavydb.get_usable_table_names()
+        available_tables: dict[str, str] = {}  # store table_name as key and node_id as value
+        for i in await self.list_table_nodes(dbname=dbname):
+            available_tables[i.metadata["name"]] = i.node_id
+
+        # remove deleted tables from the index
+        tables_to_delete = set(available_tables.keys()) - set(all_tables)
+        tables_to_insert = set(all_tables) - set(available_tables.keys())
+
+        ids_to_delete = [available_tables[i] for i in tables_to_delete]
+
+        index.vector_store.remove(node_ids=ids_to_delete)  # type: ignore
+
+        # insert the missing tables
+        docs = await aload_specific_tables(heavydb=heavydb, tables=tables_to_insert)
+        nodes = await self._docs_to_nodes(docs)
+        index.insert_nodes(nodes=nodes, show_progress=True)
+        return None
 
 
 # Step 4: Method to choose the appropriate controller based on a string argument
