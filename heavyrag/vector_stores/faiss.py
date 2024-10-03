@@ -102,6 +102,14 @@ class FaissIQVectorStore(FaissVectorStore):
 
         self.persist()
 
+    def reset(self):
+        """
+        Deletes all the index data as well as the metdata.
+        """
+        self._faiss_index.reset()
+        self._metadata_store = {}
+        self.persist()
+
     def add(
         self,
         nodes: Sequence[BaseNode],
