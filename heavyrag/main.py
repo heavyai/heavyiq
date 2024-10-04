@@ -12,13 +12,21 @@ from heavyiq.langchain.heavydb import HeavyDB
 from heavyrag import IndexNotFound
 from heavyrag.evaluate import aevaluate_response_by_relevancy
 from heavyrag.filters import document_filters, get_document_filter_matches, get_facts_filter_matches, table_filters
-from heavyrag.index import get_index
 from heavyrag.ingest import sync_table_index
 from heavyrag.llm import get_llm
 from heavyrag.logger import logger
 from heavyrag.postprocessor import OverridedLLMRerank
 from heavyrag.prompts import FACTS_QA_PROMPT, TEXT_QA_PROMPT
 from heavyrag.utils import get_document_node_count_in_index, get_facts_node_count_in_index, get_nodes
+
+
+def get_index(collection_name: str) -> VectorStoreIndex:
+    """
+    Get Vecstor Store Index.
+    """
+    from heavyrag.controller import rag_controller
+
+    return rag_controller.index(collection_name)
 
 
 async def ask_document(
@@ -260,8 +268,11 @@ async def determine_table_names(question: str, heavydb: HeavyDB, force_sync: boo
     Fetch the approprate table name relevant to the asked question.
     """
     logger.debug("Started determining table names, syncing table index...")
-    index = await sync_table_index(heavydb=heavydb, force_sync=force_sync)
+    from heavyrag.controller import rag_controller
+
+    await rag_controller.sync_table_nodes(heavydb=heavydb)
     logger.debug("Finished syncing table index.")
+    index = rag_controller.index(heavydb._dbname)
     engine = index.as_retriever(
         filters=table_filters,
         similarity_top_k=2,

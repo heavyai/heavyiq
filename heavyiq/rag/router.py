@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import sqlalchemy.exc as sqlalchemy_exc
-from fastapi import APIRouter, Body, Depends, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Body, Depends, Form, HTTPException, Request, UploadFile
 
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
@@ -127,6 +127,24 @@ async def derive_table_names(
     return await determine_table_names(question=request.question, heavydb=heavydb)
 
 
+@table_router.post("/index/nodes")
+async def list_table_nodes(
+    request: md.GetSnippetsfromIndexRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
+) -> md.GetSnippetsfromIndexResponse:
+    """
+    List facts from vectorDB index.
+    """
+    from heavyrag.controller import rag_controller
+
+    try:
+        nodes = await rag_controller.list_table_nodes(dbname=heavydb._dbname)
+        return md.ListNodesResponse(
+            nodes=[md.ListNodesResponse.Node(content=i.get_text(), metadata=i.metadata) for i in nodes]
+        )
+    except FileNotFoundError:
+        return md.ListNodesResponse(nodes=[])
+
+
 # RAG database router
 # which helps to make CRUD operations on RAG database, especially for facts
 facts_db_router = APIRouter()
@@ -140,7 +158,7 @@ async def add_snippet(
     """
     Endpoint for adding a new snippet.
     """
-    from heavyrag.ingest import ainsert_fact
+    from heavyrag.controller import rag_controller
 
     with ragdb.get_db() as session:
         fact_id = None
@@ -148,7 +166,7 @@ async def add_snippet(
             # add db record
             fact_id = FactsModel.add(db_session=session, heavydb_name=heavydb._dbname, fact=request.snippet)
             # add to index
-            await ainsert_fact(fact_id=fact_id, fact=request.snippet, heavydb_name=heavydb._dbname)
+            await rag_controller.insert_fact_nodes(facts=[(fact_id, request.snippet)], dbname=heavydb._dbname)
 
             return md.AddSnippetResponse(snippet_id=fact_id)
         except sqlalchemy_exc.IntegrityError as e:
@@ -167,7 +185,7 @@ async def bulk_insert_snippets(
     """
     Bulk insert snippets into sqlite database and store the relavant embeddings on vector database.
     """
-    from heavyrag.ingest import ainsert_facts
+    from heavyrag.controller import rag_controller
 
     with ragdb.get_db() as session:
         fact_ids: list[str] = []
@@ -175,7 +193,7 @@ async def bulk_insert_snippets(
             # add db record
             fact_ids = FactsModel.bulk_insert(db_session=session, heavydb_name=heavydb._dbname, facts=request.snippets)
             # add to index
-            await ainsert_facts(facts=list(zip(fact_ids, request.snippets)), heavydb_name=heavydb._dbname)
+            await rag_controller.insert_fact_nodes(facts=list(zip(fact_ids, request.snippets)), dbname=heavydb._dbname)
 
             return md.BulkInsertSnippetsResponse(snippet_ids=fact_ids)
         except sqlalchemy_exc.IntegrityError as e:
@@ -194,7 +212,7 @@ async def update_snippet(
     """
     Updates a particular snippet by snippet_id.
     """
-    from heavyrag.ingest import aupdate_fact
+    from heavyrag.controller import rag_controller
 
     with ragdb.get_db() as session:
         try:
@@ -202,8 +220,10 @@ async def update_snippet(
             updated_id = FactsModel.update(db_session=session, id=request.snippet_id, fact=request.snippet)
             if not updated_id:
                 raise ValueError(f"Failed to update fact id, {request.snippet_id}")
-            # add to index
-            await aupdate_fact(fact_id=request.snippet_id, fact=request.snippet, heavydb_name=heavydb._dbname)
+            # delete existing node
+            await rag_controller.delete_fact_nodes(dbname=heavydb._dbname, fact_ids=[updated_id])
+            # add new node with the updated content
+            await rag_controller.insert_fact_nodes(facts=[(updated_id, request.snippet)], dbname=heavydb._dbname)
 
             return md.AddSnippetResponse(snippet_id=request.snippet_id)
         except sqlalchemy_exc.IntegrityError as e:
@@ -220,12 +240,16 @@ async def get_snippet(
     """
     Return a particular snippet by snippet_id.
     """
+    from heavyrag.controller import rag_controller
+
     with ragdb.get_db() as session:
         fact = FactsModel.get(db_session=session, id=request.snippet_id)
         if fact and fact.heavydb_name == heavydb._dbname:
-            return md.SnippetResponse(
-                snippet=fact.fact, snippet_id=fact.id, created_at=fact.created_at, updated_at=fact.updated_at
-            )
+            fact_ids_on_index = [i.node_id for i in await rag_controller.list_fact_nodes(dbname=heavydb._dbname)]
+            if fact.id in fact_ids_on_index:
+                return md.SnippetResponse(
+                    snippet=fact.fact, snippet_id=fact.id, created_at=fact.created_at, updated_at=fact.updated_at
+                )
         raise HTTPException(status_code=404)
 
 
@@ -236,13 +260,13 @@ async def delete_snippets(
     """
     Delete a particular database fact.
     """
-    from heavyrag.ingest import adelete_facts
+    from heavyrag.controller import rag_controller
 
     with ragdb.get_db() as session:
         try:
             deleted = FactsModel.delete(db_session=session, ids=request.snippet_ids)
             if deleted:
-                await adelete_facts(heavydb_name=heavydb._dbname, fact_ids=request.snippet_ids)
+                await rag_controller.delete_fact_nodes(dbname=heavydb._dbname, fact_ids=request.snippet_ids)
                 return md.DeleteSnippetResponse(deleted=True)
             return md.DeleteSnippetResponse(deleted=False)
 
@@ -257,11 +281,15 @@ async def list_snippets(
     """
     List all snippets associated with a database.
     """
+    from heavyrag.controller import rag_controller
+
     with ragdb.get_db() as session:
         facts = FactsModel.list(db_session=session, heavydb_name=heavydb._dbname, serialize=True)
+        fact_node_ids_from_index = [i.node_id for i in await rag_controller.list_fact_nodes(dbname=heavydb._dbname)]
         snippets = [
             {"snippet_id": i["id"], "snippet": i["fact"], "created_at": i["created_at"], "updated_at": i["updated_at"]}
             for i in facts
+            if i["id"] in fact_node_ids_from_index
         ]
         return md.ListSnippetsResponse(snippets=snippets)
 
@@ -273,12 +301,13 @@ async def delete_all_snippets(
     """
     Delete all snippets asscoiated with a database. This involves deleteing database entries and index nodes.
     """
-    from heavyrag.ingest import adelete_facts
+    from heavyrag.controller import rag_controller
 
     with ragdb.get_db() as session:
         try:
             FactsModel.delete_facts_by_database(db_session=session, heavydb_name=heavydb._dbname)
-            await adelete_facts(heavydb_name=heavydb._dbname)
+            # deletes all fact nodes relevant to the current db
+            await rag_controller.delete_fact_nodes(dbname=heavydb._dbname)
             return md.DeleteSnippetResponse(deleted=True)
         except Exception as e:
             raise e
@@ -291,9 +320,9 @@ async def get_snippet_nodes(
     """
     Get facts from vectorDB index.
     """
-    from heavyrag.main import get_facts
+    from heavyrag.controller import rag_controller
 
-    nodes = await get_facts(heavydb_name=heavydb._dbname, limit=request.limit)
+    nodes = await rag_controller.list_fact_nodes(dbname=heavydb._dbname)
     return md.GetSnippetsfromIndexResponse(
         nodes=[md.GetSnippetsfromIndexResponse.Node(content=i.get_text(), metadata=i.metadata) for i in nodes]
     )
@@ -301,13 +330,17 @@ async def get_snippet_nodes(
 
 @facts_db_router.post("/ask", response_model=md.AskSnippetsResponse)
 async def ask_about_snippets(
-    request: md.AskSnippetsRequest, collection_name: str = Depends(get_collection_name)
+    request: md.AskSnippetsRequest,
+    req: Request,
+    collection_name: str = Depends(get_collection_name),
 ) -> md.AskSnippetsResponse:
     """
     Ask questions regrading the uploaded snippets.
     """
     from heavyrag.main import ask_facts
 
+    # from heavyrag.vector_stores.faiss import faiss_index_cvar
+    # faiss_index_cvar.set(req.app.state.faiss_index)
     out = await ask_facts(
         question=request.question,
         heavydb_name=collection_name,

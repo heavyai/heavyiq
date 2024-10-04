@@ -7,8 +7,9 @@ from llama_index.core.vector_stores.types import BasePydanticVectorStore
 from heavyiq.config import get_config
 from heavyiq.logging_utils import get_heavyiq_logger
 from heavyrag.embed import get_embed_model
-from heavyrag.vector_stores import ChromaIQVectorStore, FaissIQVectorStore
 from heavyrag.vector_stores.base import VectorStoreType
+from heavyrag.vector_stores.chroma import ChromaIQVectorStore
+from heavyrag.vector_stores.faiss import FaissIQVectorStore
 
 CONFIG = get_config()
 logger = get_heavyiq_logger()
@@ -38,12 +39,9 @@ def get_vectorstore(
             create_collection_if_not_exists=create_collection_if_not_exists,
         )
     if vector_type == VectorStoreType.FAISS:
-        from heavyrag.vector_stores.base import faiss_vs
 
         vectordb_persist_dir = CONFIG.rag_faiss_persist_dir
-        if faiss_vs is None:
-            return FaissIQVectorStore(persist_dir=CONFIG.rag_faiss_persist_dir)
-        return faiss_vs
+        return FaissIQVectorStore(persist_dir=CONFIG.rag_faiss_persist_dir)
     raise ValueError("Invalid vectorstore.")
 
 

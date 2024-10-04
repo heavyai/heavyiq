@@ -275,6 +275,8 @@ class GetSnippetsfromIndexResponse(BaseModel):
     nodes: list[Node] = Field(..., description="List of nodes")
 
 
+ListNodesResponse = GetSnippetsfromIndexResponse
+
 AskSnippetsResponse = AskDocumentResponse
 
 

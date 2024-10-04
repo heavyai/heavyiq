@@ -9,7 +9,7 @@
 #       - list
 #       - delete
 
-
+import threading
 from abc import ABC, abstractmethod
 
 from llama_index.core import StorageContext, VectorStoreIndex, load_index_from_storage
@@ -26,7 +26,8 @@ from heavyrag.ingest import adelete_database_facts, adelete_facts_by_ids, delete
 from heavyrag.loaders import aload_specific_tables, aload_table, aload_tables
 from heavyrag.transform import atransform
 from heavyrag.utils import get_nodes
-from heavyrag.vector_stores import ChromaIQVectorStore, FaissIQVectorStore
+from heavyrag.vector_stores.chroma import ChromaIQVectorStore
+from heavyrag.vector_stores.faiss import FaissIQVectorStore
 
 CONFIG, EMBED_MODEL = get_config(), get_embed_model()
 
@@ -45,7 +46,7 @@ class TableAbstract(ABC):
         pass
 
     @abstractmethod
-    def sync_table_nodes(self, heavydb: HeavyDB, force: bool):
+    def sync_table_nodes(self, heavydb: HeavyDB, force: bool = False):
         pass
 
     async def _docs_to_nodes(self, docs: list[Document]) -> list[BaseNode]:
@@ -141,6 +142,12 @@ class BaseController(TableAbstract, FactAbstract, ABC):
         except FileNotFoundError:
             return self.create_docstore()
 
+    def index(self, dbname: str) -> VectorStoreIndex:
+        """
+        Gets the index irrespective of the vectorstore type.
+        """
+        return self.get_index(self.get_vectorstore(dbname))  # type: ignore
+
     def get_index(self, vector_store: BasePydanticVectorStore) -> BaseIndex:
         """
         Supposed to get vectordb index.
@@ -172,6 +179,30 @@ class BaseController(TableAbstract, FactAbstract, ABC):
         """
         # insert_args get's passed to vectorstore's add method
         index.insert_nodes(nodes=nodes, show_progress=True)
+
+    def search_fact_nodes(self, dbname: str, question: str, top_k: int = 5) -> list[NodeWithScore]:
+        """
+        Helps to do search on fact nodes.
+        """
+        index = self.index(dbname=dbname)
+        engine = index.as_retriever(
+            filters=get_facts_filter_matches(dbname),
+            similarity_top_k=top_k,
+        )
+        facts_nodes_with_score = engine.retrieve(question)
+        return facts_nodes_with_score
+
+    async def search_table_nodes(self, dbname: str, question: str, top_k: int = 5) -> list[NodeWithScore]:
+        """
+        Helps to do search on table nodes.
+        """
+        index = self.index(dbname=dbname)
+        engine = index.as_retriever(
+            filters=get_table_filter_matches(dbname),
+            similarity_top_k=top_k,
+        )
+        facts_nodes_with_score = await engine.aretrieve(question)
+        return facts_nodes_with_score
 
 
 class ChromaController(BaseController):
@@ -291,21 +322,29 @@ class FaissController(BaseController):
     Controller which helps to interact with faiss vectorstore.
     """
 
-    _cahed_vector_store = None
+    _cached_vector_store = None
+    _lock = threading.Lock()
 
     @property
     def persist_dir(self) -> str:
         return CONFIG.rag_faiss_persist_dir
 
-    def get_vectorstore(self) -> FaissIQVectorStore:
+    def get_vectorstore(self, *args, **kwargs) -> FaissIQVectorStore:
         """
         Supposed to get the Faiss vectorstore.
         """
         # cache this vs initialisation so that it won't be readed again and again
-        if self._cahed_vector_store:
-            return self._cahed_vector_store
-        self._cahed_vector_store = FaissIQVectorStore(persist_dir=self.persist_dir)
-        return self._cahed_vector_store
+        if self._cached_vector_store:
+            return self._cached_vector_store
+
+        # Thread-safe initialization with lock
+        with self._lock:
+            if self._cached_vector_store is None:
+                self._cached_vector_store = FaissIQVectorStore(
+                    persist_dir=self.persist_dir
+                )  # todo: set the dimension here
+
+        return self._cached_vector_store
 
     async def insert_fact_nodes(self, facts: list[tuple[str, str]], dbname: str) -> None:
         """
@@ -339,7 +378,8 @@ class FaissController(BaseController):
         """
         nodes_with_score = await get_nodes(index=index, filters=get_facts_filter_matches(heavydb_name=dbname))
         node_ids_to_delete = [i.node_id for i in nodes_with_score]
-        index.vector_store.remove(node_ids=node_ids_to_delete)  # type: ignore
+        if node_ids_to_delete:
+            index.vector_store.remove(node_ids=node_ids_to_delete)  # type: ignore
 
     async def delete_fact_nodes(self, dbname: str, fact_ids: list[str] | None = None) -> None:
         """
