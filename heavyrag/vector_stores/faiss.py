@@ -27,6 +27,7 @@ process_lock = multiprocessing.Lock()
 faiss.omp_set_num_threads(1)  # important so that gunicorn worker process won't get terminated
 # Create a threading lock (for threads within the same process)
 thread_lock = threading.Lock()
+last_update_time = 0
 
 faiss_index = None
 
@@ -101,11 +102,39 @@ class FaissIQVectorStore(FaissVectorStore):
             logger.info("No metadata file found, initializing empty metadata store.")
             self._metadata_store = {}
 
+    def reload(self):
+        """
+        Helps to reload faiss index and metadata.
+        """
+        global last_update_time
+
+        # Process lock to ensure only one process reloads the index at a time
+        with process_lock:
+            try:
+                # Thread lock to ensure only one thread reloads within the same process
+                with thread_lock:
+                    # Check if the FAISS index file has been updated
+                    if os.path.exists(self._index_file):
+                        file_mod_time = os.path.getmtime(self._index_file)
+                        # Reload the index only if it has been modified since the last reload
+                        if file_mod_time > last_update_time:
+                            self._faiss_index = faiss.read_index(self._index_file)
+                            self.load_metadata()
+                            last_update_time = file_mod_time
+                            print(f"FAISS index reloaded by process {os.getpid()} at {file_mod_time}")
+                        else:
+                            print("No need to reload FAISS index; no changes detected.")
+                    else:
+                        print(f"FAISS index file not found at {self._index_file}")
+            except Exception as e:
+                print(f"Error reloading FAISS index: {e}")
+
     def remove(self, ids: list[int] | None = None, node_ids: list[str] | None = None) -> None:
         """
         Remove vectors from the FAISS index as well as from metadata dump using their IDs.
         Supports both node_ids(str) as well as the vector store index ids (int).
         """
+        self.reload()
         with process_lock:
             with thread_lock:
                 if ids:
@@ -153,6 +182,7 @@ class FaissIQVectorStore(FaissVectorStore):
             nodes: List[BaseNode]: list of nodes with embeddings
 
         """
+        self.reload()
         with process_lock:
             with thread_lock:
                 new_ids = []
@@ -257,6 +287,7 @@ class FaissIQVectorStore(FaissVectorStore):
         Returns:
             VectorStoreQueryResult: The result object containing nodes, similarities, and ids.
         """
+        self.reload()
         query_embedding = query.query_embedding
         top_k = query.similarity_top_k or 5
         metadata_filters = query.filters
@@ -288,13 +319,6 @@ class FaissIQVectorStore(FaissVectorStore):
                 nodes.append(self.create_node(metadata))
                 ids.append(idx)
             return VectorStoreQueryResult(nodes=nodes, similarities=[0] * len(ids), ids=ids)
-
-        # Step 2: Create FAISS IDSelector for filtering
-        # id_selector = faiss.IDSelectorBatch(np.array(filtered_ids, dtype=np.int64))
-
-        # # Step 3: Perform FAISS similarity search with IDSelector
-        # faiss_search_params = faiss.SearchParameters()
-        # faiss_search_params.selector = id_selector  # Apply the ID selector for filtering
 
         # Convert query embedding to the correct format
         query_embedding_np = np.array([query_embedding], dtype="float32").astype("float32")
