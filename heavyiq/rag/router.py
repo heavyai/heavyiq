@@ -1,3 +1,5 @@
+import asyncio
+import multiprocessing
 from pathlib import Path
 
 import sqlalchemy.exc as sqlalchemy_exc
@@ -12,6 +14,7 @@ from heavyrag.database import FactsModel, RAGDBIntegrityError, ragdb
 CONFIG = get_config()
 doc_router = APIRouter()
 logger = get_heavyiq_logger()
+mlock = multiprocessing.Lock()
 
 
 # dependency function which provides HeavyDB instance
@@ -143,6 +146,22 @@ async def list_table_nodes(
         )
     except FileNotFoundError:
         return md.ListNodesResponse(nodes=[])
+
+
+@table_router.post("/sync")
+async def sync_table_nodes(
+    request: md.SyncNodesRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
+) -> md.StatusResponse:
+    """
+    Synchronizes all table nodes with the data from the corresponding database tables.
+    Only one worker can execute this operation at a time using multiprocessing.Lock.
+    """
+    with mlock:
+        from heavyrag.controller import rag_controller
+
+        logger.info("Started syncing tabe nodes.")
+        await rag_controller.sync_table_nodes(heavydb=heavydb, force=request.force)
+        return md.StatusResponse(success=True)
 
 
 # RAG database router

@@ -25,7 +25,7 @@ from heavyrag.filters import get_facts_filter_matches, get_table_filter_matches
 from heavyrag.ingest import adelete_database_facts, adelete_facts_by_ids, delete_all_table_nodes, delete_nodes_by_ids
 from heavyrag.loaders import aload_specific_tables, aload_table, aload_tables
 from heavyrag.transform import atransform
-from heavyrag.utils import get_nodes
+from heavyrag.utils import convert_uuid_str_to_hex, get_nodes
 from heavyrag.vector_stores.chroma import ChromaIQVectorStore
 from heavyrag.vector_stores.faiss import FaissIQVectorStore
 
@@ -308,12 +308,14 @@ class ChromaController(BaseController):
 
         ids_to_delete = [available_tables[i] for i in tables_to_delete]
 
-        delete_nodes_by_ids(index=index, ids=ids_to_delete)  # type: ignore
+        if ids_to_delete:
+            delete_nodes_by_ids(index=index, ids=ids_to_delete)  # type: ignore
 
         # insert the missing tables
-        docs = await aload_specific_tables(heavydb=heavydb, tables=tables_to_insert)
-        nodes = await self._docs_to_nodes(docs)
-        index.insert_nodes(nodes=nodes, show_progress=True)
+        if tables_to_insert:
+            docs = await aload_specific_tables(heavydb=heavydb, tables=tables_to_insert)
+            nodes = await self._docs_to_nodes(docs)
+            index.insert_nodes(nodes=nodes, show_progress=True)
         return None
 
 
@@ -341,7 +343,7 @@ class FaissController(BaseController):
         with self._lock:
             if self._cached_vector_store is None:
                 self._cached_vector_store = FaissIQVectorStore(
-                    persist_dir=self.persist_dir
+                    persist_dir=self.persist_dir, dimension=CONFIG.rag_embed_dimension
                 )  # todo: set the dimension here
 
         return self._cached_vector_store
@@ -403,6 +405,18 @@ class FaissController(BaseController):
             return nodes_with_score[0]
         return None
 
+    async def _docs_to_nodes(self, docs: list[Document]) -> list[BaseNode]:
+        """
+        Helps to transform a list of whole single document into multiple text nodes by using sentence splitter.
+        """
+        nodes = await atransform(documents=docs)
+        # alway keep hex codes as node id
+        for node in nodes:
+            node_id = node.node_id
+            if "-" in node_id:
+                node.id_ = convert_uuid_str_to_hex(node_id)
+        return nodes
+
     async def list_table_nodes(self, dbname: str) -> list[NodeWithScore]:
         """
         List all table nodes specific to a particular database.
@@ -417,7 +431,8 @@ class FaissController(BaseController):
         """
         nodes_with_score = await get_nodes(index=index, filters=get_table_filter_matches(heavydb_name=dbname))  # type: ignore
         node_ids_to_delete = [i.node_id for i in nodes_with_score]
-        index.vector_store.remove(node_ids=node_ids_to_delete)  # type: ignore
+        if node_ids_to_delete:
+            index.vector_store.remove(node_ids=node_ids_to_delete)  # type: ignore
 
     async def sync_table_nodes(self, heavydb: HeavyDB, force: bool = False) -> None:
         """
@@ -450,12 +465,14 @@ class FaissController(BaseController):
 
         ids_to_delete = [available_tables[i] for i in tables_to_delete]
 
-        index.vector_store.remove(node_ids=ids_to_delete)  # type: ignore
+        if ids_to_delete:
+            index.vector_store.remove(node_ids=ids_to_delete)  # type: ignore
 
         # insert the missing tables
-        docs = await aload_specific_tables(heavydb=heavydb, tables=tables_to_insert)
-        nodes = await self._docs_to_nodes(docs)
-        index.insert_nodes(nodes=nodes, show_progress=True)
+        if tables_to_insert:
+            docs = await aload_specific_tables(heavydb=heavydb, tables=tables_to_insert)
+            nodes = await self._docs_to_nodes(docs)
+            index.insert_nodes(nodes=nodes, show_progress=True)
         return None
 
 

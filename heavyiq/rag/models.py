@@ -263,6 +263,18 @@ class GetSnippetsfromIndexRequest(BaseModelWithSessionID):
         json_schema_extra = {"examples": [{"session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "limit": 100}]}
 
 
+class OnlySessionIDRequest(BaseModelWithSessionID):
+    pass
+
+
+class SyncNodesRequest(BaseModelWithSessionID):
+    """
+    Sync nodes with the data from corresponding sources.
+    """
+
+    force: bool = Field(default=False, description="Recreate the whole or insert only the misssing data.")
+
+
 class GetSnippetsfromIndexResponse(BaseModel):
     """
     Get snippets relevant to a particular database.
@@ -315,3 +327,6 @@ class ReEmbedDocumentsResponse(BaseModel):
     """
 
     success: bool = Field(..., description="re-embed docs response")
+
+
+StatusResponse = ReEmbedDocumentsResponse

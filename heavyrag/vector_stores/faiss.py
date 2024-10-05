@@ -38,11 +38,10 @@ def get_faiss_index(persist_dir: str | None = None, dimension: int = 1024):
     """
     global faiss_index
     if faiss_index:
-        print("Reading faiss index from cache")
         return faiss_index
     with process_lock:
         with thread_lock:
-            print("Reading faiss index from disk")
+            logger.info("Reading faiss index from disk")
             _index_file = os.path.join(persist_dir, "faiss_index.bin")
             if os.path.exists(_index_file):
                 faiss_index = faiss.read_index(_index_file, faiss.IO_FLAG_MMAP)
@@ -107,7 +106,7 @@ class FaissIQVectorStore(FaissVectorStore):
         Helps to reload faiss index and metadata.
         """
         global last_update_time
-
+        logger.debug("Started reloading faiss index and metadata.")
         # Process lock to ensure only one process reloads the index at a time
         with process_lock:
             try:
@@ -121,11 +120,11 @@ class FaissIQVectorStore(FaissVectorStore):
                             self._faiss_index = faiss.read_index(self._index_file)
                             self.load_metadata()
                             last_update_time = file_mod_time
-                            print(f"FAISS index reloaded by process {os.getpid()} at {file_mod_time}")
+                            logger.debug(f"FAISS index reloaded by process {os.getpid()} at {file_mod_time}")
                         else:
-                            print("No need to reload FAISS index; no changes detected.")
+                            logger.debug("No need to reload FAISS index; no changes detected.")
                     else:
-                        print(f"FAISS index file not found at {self._index_file}")
+                        logger.debug(f"FAISS index file not found at {self._index_file}")
             except Exception as e:
                 print(f"Error reloading FAISS index: {e}")
 
@@ -193,7 +192,8 @@ class FaissIQVectorStore(FaissVectorStore):
                     self._faiss_index.add_with_ids(text_embedding_np, np.array([new_id], dtype=np.int64))
                     # self._faiss_index.add(text_embedding_np)
                     new_ids.append(new_id)
-                    self._metadata_store[new_id] = {"text": node.get_content(), "metadata": node.metadata}
+                    metadata = {**node.metadata, "id": node.node_id}
+                    self._metadata_store[new_id] = {"text": node.get_content(), "metadata": metadata}
                     # add metadata to the metadatastore with the corresponding doc_id as key
                 self.persist()  # do persist to disk after node's addition
                 return new_ids
@@ -309,7 +309,7 @@ class FaissIQVectorStore(FaissVectorStore):
 
         # If no documents match, return an empty list
         if not filtered_ids:
-            print("No documents match the provided metadata filters.")
+            logger.debug("No documents match the provided metadata filters.")
             return VectorStoreQueryResult(nodes=[], similarities=[], ids=[])
 
         if not query_embedding:
@@ -331,13 +331,23 @@ class FaissIQVectorStore(FaissVectorStore):
         nodes = []
         similarities = []
         ids = []
+
+        # Ensure no zero distances to avoid division by zero
+        adjusted_distances = np.maximum(distances[0], 1e-9)  # Avoid zero distances
+        # Invert the distances (shorter distances mean higher similarity)
+        inverse_distances = 1.0 / adjusted_distances
+        # Normalize the inverted distances to a 0 to 1 range
+        probabilities = inverse_distances / inverse_distances.sum()
+
         for i, idx in enumerate(indices[0]):
             if idx != -1:  # Ensure that we are not referencing an invalid index
                 metadata = id_to_metadata.get(idx) or id_to_metadata.get(str(idx))
                 if not metadata:
                     continue
                 nodes.append(self.create_node(metadata))  # Use metadata as nodes
-                similarities.append(distances[0][i])  # Use distances as similarities
+                similarities.append(
+                    probabilities[i]
+                )  # shorted distances means that the node is so similar to the asked question
                 ids.append(idx)  # Use FAISS doc_ids as ids
 
         return VectorStoreQueryResult(nodes=nodes, similarities=similarities, ids=ids)

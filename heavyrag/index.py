@@ -41,7 +41,7 @@ def get_vectorstore(
     if vector_type == VectorStoreType.FAISS:
 
         vectordb_persist_dir = CONFIG.rag_faiss_persist_dir
-        return FaissIQVectorStore(persist_dir=CONFIG.rag_faiss_persist_dir)
+        return FaissIQVectorStore(persist_dir=CONFIG.rag_faiss_persist_dir, dimension=CONFIG.rag_embed_dimension)
     raise ValueError("Invalid vectorstore.")
 
 

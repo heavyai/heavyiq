@@ -162,6 +162,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     rag_chromadb_server_base: str = "http://127.0.0.1:6271"
     rag_faiss_persist_dir: str = rag_storage_persist_dir + "/faiss"  # persistant client
     rag_document_pdf_parser_url: str = ""
+    rag_embed_dimension: int = 1024
     rag_embed_model_name: str = "BAAI/bge-large-en-v1.5"
     rag_embed_server_base: str = "https://embeddings.heavy.ai"
     rag_rerank_server_base: Optional[str] = None
