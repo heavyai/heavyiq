@@ -36,12 +36,12 @@ async def insert(dataset: str):
     """
     Insert snippets into sqlite db and chroma vectorstore.
     """
-    from heavyrag.ingest import ainsert_facts
+    from heavyrag.controller import rag_controller
 
     tasks = []
     for dbname, rows in read_and_group_csv(dataset, group_by_column_idx=1, header=True).items():
         altered_rows = [(row[0], row[2]) for row in rows]  # make list of tuples like (guidance_id, guidance_snippet)
-        tasks.append(ainsert_facts(altered_rows, heavydb_name=dbname))
+        tasks.append(rag_controller.insert_fact_nodes(facts=altered_rows, dbname=dbname))
     await asyncio.gather(*tasks)
 
 
@@ -59,17 +59,11 @@ async def retrieve_facts(args: RetrieveFactsArgs) -> list[tuple[str, dict, float
     """
     Retrieve aand re-rank snippets/facts.
     """
-    from heavyrag.index import get_index
+    from heavyrag.controller import rag_controller
 
-    index = get_index(collection_name=args.dbname)
-    if not index:
-        raise ValueError(f"VectorStoreIndex not found {args.dbname} collection.")
-
-    facts_engine = index.as_retriever(
-        filters=get_facts_filter_matches(args.dbname),
-        similarity_top_k=args.similarity_top_k,
+    nodes = await rag_controller.search_fact_nodes(
+        dbname=args.dbname, question=args.question, top_k=args.similarity_top_k
     )
-    nodes = await facts_engine.aretrieve(args.question)
     logger.debug(f"Node count after retrieval: {len(nodes)}")
     # apply similarity cutoff
     processor = SimilarityPostprocessor(similarity_cutoff=args.similarity_cutoff)
