@@ -275,6 +275,29 @@ class SyncNodesRequest(BaseModelWithSessionID):
     force: bool = Field(default=False, description="Recreate the whole or insert only the misssing data.")
 
 
+class SearchNodeRequest(BaseModelWithSessionID):
+    """
+    Request model for doing node search on the index.
+    """
+
+    question: str = Field(..., description="A natural language question.")
+    top_k: int = Field(..., description="Number of nodes to be returned")
+
+
+class SearchNodeResponse(BaseModel):
+    """
+    Node search response model.
+    """
+
+    class Node(BaseModel):
+        id: str = Field(..., description="Node ID")
+        content: str = Field(..., description="Node content")
+        score: float = Field(..., description="Similarity Score")
+        metadata: dict = Field(..., description="Node metadata")
+
+    nodes: list[Node] = Field(..., description="List of nodes")
+
+
 class GetSnippetsfromIndexResponse(BaseModel):
     """
     Get snippets relevant to a particular database.

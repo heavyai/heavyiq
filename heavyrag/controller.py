@@ -20,6 +20,8 @@ from llama_index.core.vector_stores.types import BasePydanticVectorStore
 
 from heavyiq.config import get_config
 from heavyiq.langchain.heavydb import HeavyDB
+from heavyrag.database import FactsModel
+from heavyrag.database.database import Database as RAGDatabase
 from heavyrag.embed import get_embed_model
 from heavyrag.filters import get_facts_filter_matches, get_table_filter_matches
 from heavyrag.ingest import adelete_database_facts, adelete_facts_by_ids, delete_all_table_nodes, delete_nodes_by_ids
@@ -180,7 +182,7 @@ class BaseController(TableAbstract, FactAbstract, ABC):
         # insert_args get's passed to vectorstore's add method
         index.insert_nodes(nodes=nodes, show_progress=True)
 
-    def search_fact_nodes(self, dbname: str, question: str, top_k: int = 5) -> list[NodeWithScore]:
+    async def search_fact_nodes(self, dbname: str, question: str, top_k: int = 5) -> list[NodeWithScore]:
         """
         Helps to do search on fact nodes.
         """
@@ -189,7 +191,7 @@ class BaseController(TableAbstract, FactAbstract, ABC):
             filters=get_facts_filter_matches(dbname),
             similarity_top_k=top_k,
         )
-        facts_nodes_with_score = engine.retrieve(question)
+        facts_nodes_with_score = await engine.aretrieve(question)
         return facts_nodes_with_score
 
     async def search_table_nodes(self, dbname: str, question: str, top_k: int = 5) -> list[NodeWithScore]:
@@ -203,6 +205,35 @@ class BaseController(TableAbstract, FactAbstract, ABC):
         )
         facts_nodes_with_score = await engine.aretrieve(question)
         return facts_nodes_with_score
+
+    async def sync_fact_nodes(self, ragdb: RAGDatabase, dbname: str, force: bool = False) -> None:
+        """
+        Synchronize specific fact nodes with facts table in the sqlite database.
+        """
+        # list all the facts available on the rag sqlite database.
+        with ragdb.get_db() as session:
+            try:
+                # list facts
+                facts = FactsModel.list(db_session=session, heavydb_name=dbname, serialize=True)
+                if not facts:
+                    return None
+                if force:
+                    # delete all the fact nodes from index
+                    await self.delete_fact_nodes(dbname=dbname)
+                    # re-populate the index with the above fetched data
+                    await self.insert_fact_nodes(facts=[(i["id"], i["fact"]) for i in facts], dbname=dbname)
+                else:
+                    # iterate over each fact and check for it's presence on the index
+                    # if yes, then skip else make the node insertion
+                    available_ids = [i.node_id for i in await self.list_fact_nodes(dbname=dbname)]
+                    facts_to_insert = []
+                    for fact in facts:
+                        if fact["id"] not in available_ids:
+                            facts_to_insert.append((fact["id"], fact["fact"]))
+                    if facts_to_insert:
+                        await self.insert_fact_nodes(facts=facts_to_insert, dbname=dbname)
+            except Exception as e:
+                raise e
 
 
 class ChromaController(BaseController):

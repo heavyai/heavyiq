@@ -1,4 +1,3 @@
-import asyncio
 import multiprocessing
 from pathlib import Path
 
@@ -164,6 +163,26 @@ async def sync_table_nodes(
         return md.StatusResponse(success=True)
 
 
+@table_router.post("/search")
+async def search_table_nodes(
+    request: md.SearchNodeRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
+) -> md.SearchNodeResponse:
+    """
+    Search for fact nodes relevant to the asked question.
+    """
+    from heavyrag.controller import rag_controller
+
+    nodes = await rag_controller.search_table_nodes(
+        dbname=heavydb._dbname, question=request.question, top_k=request.top_k
+    )
+    return md.SearchNodeResponse(
+        nodes=[
+            md.SearchNodeResponse.Node(id=i.node_id, content=i.text, score=i.get_score(), metadata=i.node.metadata)
+            for i in nodes
+        ]
+    )
+
+
 # RAG database router
 # which helps to make CRUD operations on RAG database, especially for facts
 facts_db_router = APIRouter()
@@ -291,6 +310,42 @@ async def delete_snippets(
 
         except Exception as e:
             raise e
+
+
+@facts_db_router.post("/sync")
+async def sync_fact_nodes(
+    request: md.SyncNodesRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
+) -> md.StatusResponse:
+    """
+    Synchronizes all fact nodes with the data from the corresponding rag/sqlite database.
+    Only one worker can execute this operation at a time using multiprocessing.Lock.
+    """
+    with mlock:
+        from heavyrag.controller import rag_controller
+
+        logger.info("Started syncing fact nodes.")
+        await rag_controller.sync_fact_nodes(ragdb=ragdb, dbname=heavydb._dbname, force=request.force)
+        return md.StatusResponse(success=True)
+
+
+@facts_db_router.post("/search")
+async def search_fact_nodes(
+    request: md.SearchNodeRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
+) -> md.SearchNodeResponse:
+    """
+    Search for fact nodes relevant to the asked question.
+    """
+    from heavyrag.controller import rag_controller
+
+    nodes = await rag_controller.search_fact_nodes(
+        dbname=heavydb._dbname, question=request.question, top_k=request.top_k
+    )
+    return md.SearchNodeResponse(
+        nodes=[
+            md.SearchNodeResponse.Node(id=i.node_id, content=i.text, score=i.get_score(), metadata=i.node.metadata)
+            for i in nodes
+        ]
+    )
 
 
 @facts_db_router.post("/list")
