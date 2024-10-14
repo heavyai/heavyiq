@@ -12,6 +12,7 @@ python3 -m venv venv
 # Install Requirements
 mkdir -p ./dist
 cp requirements.txt ./dist/requirements.txt
+cp requirements-rhel.txt ./dist/requirements-rhel.txt
 
 # if INTERNALLY_RELEASED_PYHEAVYDB is set
 # (see common_fn.sh argument processing)
@@ -23,9 +24,9 @@ test_for_internally_release_pyheavydb
 # (see common_fn.sh argument processing)
 # 1. Download all of the deps and store in
 # ./packages
-# 2. Update ./dist/requirments to use the
+# 2. Update ./dist/requirements to use the
 # packages stored in ./packages
-test_for_include_all_deps ./dist/requirements.txt
+test_for_include_all_deps ./dist/requirements.txt ./dist/requirements-rhel.txt
 
 pip install -r ./dist/requirements.txt
 pip freeze -l > ./dist/requirements.txt
