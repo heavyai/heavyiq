@@ -63,6 +63,7 @@ function test_for_include_all_deps() {
 
     # Replace the downloaded chromadb-0.5.3-py3-none-any.whl with the one in scripts/assets
     cp scripts/assets/chromadb-0.5.3-py3-none-any.whl ./packages/
+    cp scripts/assets/pysqlite3_binary-0.5.3-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl ./packages/
 
     # Replace PyPika with a binary version found in scripts/assets
     rm ./packages/PyPika-0.48.9.tar.gz
