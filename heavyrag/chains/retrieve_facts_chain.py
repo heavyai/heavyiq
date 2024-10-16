@@ -12,7 +12,6 @@ from pydantic import BaseModel, Field
 from heavyiq.lcel.callbacks.file_callback import LogFileCallbackHandler
 from heavyiq.logging_utils import get_heavyrag_logger
 from heavyrag.filters import get_facts_filter_matches
-from heavyrag.main import filter_snippets_using_reranker, list_database_facts
 from heavyrag.postprocessor import ReRanker, ReRankerType
 from heavyrag.utils import get_facts_node_count_in_index
 
@@ -135,6 +134,8 @@ async def fetch_and_filter_snippets_by_reranker(inputs: dict) -> list[Any]:
     """
     Fetch all database-related snippets from RAGDB and pass them to the reranker to filter out the relevant snippets.
     """
+    from heavyrag.main import filter_snippets_using_reranker, list_database_facts
+
     facts = list_database_facts(database_name=inputs["collection_name"])
     nodes = await filter_snippets_using_reranker(
         question=inputs["question"],
