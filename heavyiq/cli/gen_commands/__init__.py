@@ -17,7 +17,6 @@ from langsmith import Client
 from heavyiq.cli.decorators import coro
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
-from heavyiq.langchain.chains import get_nl_to_sql_chain_by_llm
 from heavyiq.langchain.exceptions import NLtoSQLException
 from heavyiq.langchain.heavydb import heavydb_context
 from heavyiq.langchain.llms import LLMType, get_llm_by_type
@@ -100,75 +99,6 @@ async def process_gen_row_lcel(
                             correct_gens.append(pred_query)
                             num_correct_gens += 1
 
-        print(correct_gens)
-        if include_gold_query:
-            await awrite_gen_results_row(
-                gen_str,
-                "0",
-                db_id,
-                question,
-                gold_query,
-                query_id=query_id,
-            )
-        for idx, gen in enumerate(correct_gens):
-            await awrite_gen_results_row(gen_str, str(idx + 1), db_id, question, gen, query_id=query_id)
-
-
-async def process_gen_row(
-    semaphore: asyncio.Semaphore,
-    row: tuple | list,
-    has_id: bool,
-    gen_str: str,
-    llm: BaseLLM | BaseChatModel,
-    max_gens: int,
-    max_correct_gens: int,
-    include_gold_query: bool = True,
-    verbose: bool = True,
-):
-    """
-    Function to process each row exists on eval dataset.
-    """
-    from heavyiq.langchain.utils import is_langsmith_active
-
-    logger = get_heavyiq_logger()
-
-    if has_id:
-        query_id, db_id, question, gold_query = row
-    else:
-        query_id = None
-        db_id, question, gold_query = row
-    async with semaphore:
-        logger.info(f"Processing Question: {question}")
-        db = await HeavyDB.from_env_async(db_name=db_id)
-        tables = extract_tables_from_query(db._conn, gold_query)
-        chain = get_nl_to_sql_chain_by_llm(llm)(
-            database=db, llm=llm, callbacks=None if verbose else [], verbose=verbose, tags=[gen_str, "cli"]
-        )
-
-        correct_gens = []
-        gen_idx = 0
-        num_correct_gens = 0
-
-        while gen_idx < max_gens and num_correct_gens < max_correct_gens:
-            query_stats = None
-            try:
-                gen_idx += 1
-                res = await chain.acall(
-                    {chain.input_key: question, "tables": tables}, include_run_info=is_langsmith_active
-                )
-                pred_query = res[chain.output_key]
-                print(pred_query)
-                eval_res, query_stats = await asyncio.gather(
-                    run_in_threadpool(sql_rate_reply, gold_query, pred_query, db=db), db.aquery_stats(pred_query)
-                )
-                if eval_res["success"] and pred_query not in correct_gens:
-                    correct_gens.append(pred_query)
-                    num_correct_gens += 1
-                # print(f"Generated query: {pred_query}")
-            except NLtoSQLException as e:
-                logger.exception(f"Failed to generate SQL: {e}")
-            except Exception as e:
-                logger.exception(f"Failed to generate SQL: {e}")
         print(correct_gens)
         if include_gold_query:
             await awrite_gen_results_row(
