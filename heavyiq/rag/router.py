@@ -147,8 +147,11 @@ async def add_snippet(
         try:
             # add db record
             fact_id = FactsModel.add(db_session=session, heavydb_name=heavydb._dbname, fact=request.snippet)
-            # add to index
-            await ainsert_fact(fact_id=fact_id, fact=request.snippet, heavydb_name=heavydb._dbname)
+            try:
+                # add to index
+                await ainsert_fact(fact_id=fact_id, fact=request.snippet, heavydb_name=heavydb._dbname)
+            except Exception as e:
+                logger.error(f"Failed to insert snippet on RAG index, {e}")
 
             return md.AddSnippetResponse(snippet_id=fact_id)
         except sqlalchemy_exc.IntegrityError as e:
@@ -174,8 +177,11 @@ async def bulk_insert_snippets(
         try:
             # add db record
             fact_ids = FactsModel.bulk_insert(db_session=session, heavydb_name=heavydb._dbname, facts=request.snippets)
-            # add to index
-            await ainsert_facts(facts=list(zip(fact_ids, request.snippets)), heavydb_name=heavydb._dbname)
+            try:
+                # add to index
+                await ainsert_facts(facts=list(zip(fact_ids, request.snippets)), heavydb_name=heavydb._dbname)
+            except Exception as e:
+                logger.error(f"Failed to insert snippet on RAG index, {e}")
 
             return md.BulkInsertSnippetsResponse(snippet_ids=fact_ids)
         except sqlalchemy_exc.IntegrityError as e:
@@ -202,8 +208,11 @@ async def update_snippet(
             updated_id = FactsModel.update(db_session=session, id=request.snippet_id, fact=request.snippet)
             if not updated_id:
                 raise ValueError(f"Failed to update fact id, {request.snippet_id}")
-            # add to index
-            await aupdate_fact(fact_id=request.snippet_id, fact=request.snippet, heavydb_name=heavydb._dbname)
+            try:
+                # add to index
+                await aupdate_fact(fact_id=request.snippet_id, fact=request.snippet, heavydb_name=heavydb._dbname)
+            except Exception as e:
+                logger.error(f"Failed to update snippet on RAG index, {e}")
 
             return md.AddSnippetResponse(snippet_id=request.snippet_id)
         except sqlalchemy_exc.IntegrityError as e:

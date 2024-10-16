@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from heavyiq.lcel.callbacks.file_callback import LogFileCallbackHandler
 from heavyiq.logging_utils import get_heavyrag_logger
 from heavyrag.filters import get_facts_filter_matches
+from heavyrag.main import filter_snippets_using_reranker, list_database_facts
 from heavyrag.postprocessor import ReRanker, ReRankerType
 from heavyrag.utils import get_facts_node_count_in_index
 
@@ -130,6 +131,20 @@ def filter_nodes_by_reranker_cutoff(inputs: dict) -> list[Any]:
     return filtered_nodes
 
 
+async def fetch_and_filter_snippets_by_reranker(inputs: dict) -> list[Any]:
+    """
+    Fetch all database-related snippets from RAGDB and pass them to the reranker to filter out the relevant snippets.
+    """
+    facts = list_database_facts(database_name=inputs["collection_name"])
+    nodes = await filter_snippets_using_reranker(
+        question=inputs["question"],
+        snippets=facts,
+        reranker_top_k=inputs["reranker_top_k"],
+        reranker_cutoff=inputs["reranker_cutoff"],
+    )
+    return nodes
+
+
 rerank_filter_runnable: Runnable = RunnableLambda(rerank_nodes) | RunnableLambda(filter_nodes_by_reranker_cutoff)  # type: ignore
 rerank_snippets_chain: Runnable = RunnablePassthrough.assign(nodes=rerank_filter_runnable)
 
@@ -145,7 +160,7 @@ has_index_chain: Runnable = (
 
 snippet_nodes_chain: Runnable = (
     RunnablePassthrough.assign(index=fetch_index)
-    | RunnableBranch((lambda x: x["index"], has_index_chain), lambda x: [])
+    | RunnableBranch((lambda x: x["index"], has_index_chain), fetch_and_filter_snippets_by_reranker)
 ).with_types(
     input_type=RetrieveFactsInputType  # type: ignore
 )  # return list[NodeWithScore]

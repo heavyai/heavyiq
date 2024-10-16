@@ -58,10 +58,11 @@ def set_embed_model():
             base_url=CONFIG.rag_embed_server_base,
         )
     else:
-        logger.info(
-            f"Initialized embed model on CPU using HuggingFaceEmbedding with model name: {CONFIG.rag_embed_model_name}"
-        )
-        EMBED_MODEL = HuggingFaceEmbedding(CONFIG.rag_embed_model_name, device="cpu")
+        # logger.info(
+        #    f"Initialized embed model on CPU using HuggingFaceEmbedding with model name: {CONFIG.rag_embed_model_name}"
+        # )
+        # EMBED_MODEL = HuggingFaceEmbedding(CONFIG.rag_embed_model_name, device="cpu") # this fails to generate embeddings
+        EMBED_MODEL = None
 
 
 def get_embed_model():

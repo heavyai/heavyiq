@@ -25,6 +25,8 @@ def get_vectorstore(
     """
     Get or Create a VectorStore.
     """
+    if embed_model is None:
+        return None
     embedding_function = LlamaIndexEmbeddingAdapter(embed_model)
     if create_collection_if_not_exists:
         metadata = metadata or {}
