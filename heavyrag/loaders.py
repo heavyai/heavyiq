@@ -1,5 +1,6 @@
 # Module for loading documents using various readers such as PDFReader, DatabasReader, etc
 from itertools import chain
+from typing import Iterable
 
 from llama_index.core import SimpleDirectoryReader
 from llama_index.core.schema import Document, TextNode
@@ -90,6 +91,17 @@ async def aload_table(heavydb: HeavyDB, table_name: str) -> list[Document]:
     reader = HeavyDBTableReader(heavydb=heavydb)
     documents = await reader.aload_data(table_name=table_name)
     return _exclude_metadata(documents)
+
+
+async def aload_specific_tables(heavydb: HeavyDB, tables: Iterable[str]) -> list[Document]:
+    """
+    Load specific tables.
+    """
+    reader = HeavyDBTableReader(heavydb=heavydb)
+    tasks = [reader.aload_data(table_name=i) for i in tables]
+    result = await semaphore_gather(5, tasks)  # run only 5 tasks at a time
+    flattened_list = list(chain.from_iterable(result))
+    return _exclude_metadata(flattened_list)
 
 
 async def aload_tables(heavydb: HeavyDB, exlude_tables: list[str] | None = None) -> list[Document]:

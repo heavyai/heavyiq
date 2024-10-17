@@ -1,6 +1,6 @@
-import chromadb
-from chromadb.api import ClientAPI
-from chromadb.config import Settings as ChromaDBSettings
+# import chromadb
+# from chromadb.api import ClientAPI
+# from chromadb.config import Settings as ChromaDBSettings
 from llama_index.core.base.embeddings.base import BaseEmbedding
 from llama_index.core.schema import TextNode
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -11,15 +11,7 @@ from heavyiq.config import get_config
 from heavyiq.utils import get_host_and_port
 from heavyrag.logger import logger
 
-CONFIG, EMBED_MODEL, CHROMA_CLIENT = get_config(), None, None
-
-
-class LlamaIndexEmbeddingAdapter(chromadb.EmbeddingFunction):
-    def __init__(self, ef: BaseEmbedding):
-        self.ef = ef
-
-    def __call__(self, input: chromadb.Documents) -> chromadb.Embeddings:
-        return [node.embedding for node in self.ef([TextNode(text=doc) for doc in input])]
+CONFIG, EMBED_MODEL = get_config(), None
 
 
 def set_embed_model():
@@ -71,23 +63,3 @@ def get_embed_model():
     if EMBED_MODEL is None:
         set_embed_model()
     return EMBED_MODEL
-
-
-def set_chroma_client():
-    global CHROMA_CLIENT
-    try:
-        host, port = get_host_and_port(CONFIG.rag_chromadb_server_base)
-        CHROMA_CLIENT = chromadb.HttpClient(
-            host=host,
-            port=port,
-            settings=ChromaDBSettings(anonymized_telemetry=False),
-        )
-
-    except Exception as e:
-        raise ValueError(f"Failed to create ChromaDB HTTP Client, {e}")
-
-
-def get_chroma_client() -> ClientAPI:
-    if CHROMA_CLIENT is None:
-        set_chroma_client()
-    return CHROMA_CLIENT
