@@ -370,13 +370,30 @@ async def list_snippets(
 
     with ragdb.get_db() as session:
         facts = FactsModel.list(db_session=session, heavydb_name=heavydb._dbname, serialize=True)
-        fact_node_ids_from_index = [i.node_id for i in await rag_controller.list_fact_nodes(dbname=heavydb._dbname)]
-        snippets = [
-            {"snippet_id": i["id"], "snippet": i["fact"], "created_at": i["created_at"], "updated_at": i["updated_at"]}
-            for i in facts
-            if i["id"] in fact_node_ids_from_index
-        ]
-        return md.ListSnippetsResponse(snippets=snippets)
+
+        if request.verify:
+            fact_node_ids_from_index = [i.node_id for i in await rag_controller.list_fact_nodes(dbname=heavydb._dbname)]
+            snippets = [
+                {
+                    "snippet_id": i["id"],
+                    "snippet": i["fact"],
+                    "created_at": i["created_at"],
+                    "updated_at": i["updated_at"],
+                }
+                for i in facts
+                if i["id"] in fact_node_ids_from_index
+            ]
+        else:
+            snippets = [
+                {
+                    "snippet_id": i["id"],
+                    "snippet": i["fact"],
+                    "created_at": i["created_at"],
+                    "updated_at": i["updated_at"],
+                }
+                for i in facts
+            ]
+        return md.ListSnippetsResponse(snippets=snippets)  # type: ignore
 
 
 @facts_db_router.post("/delete_all")

@@ -122,8 +122,13 @@ class ListSnippetsRequest(BaseModelWithSessionID):
     Get snippets relevant to a particular database.
     """
 
+    verify: bool = Field(
+        default=False,
+        description="Verify the snippet available on ragdb against the vectorstore index. If true, then the endpoint should return only the snippets which has corresponding embeddings on vectordb.",
+    )
+
     class Config:
-        json_schema_extra = {"examples": [{"session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}]}
+        json_schema_extra = {"examples": [{"session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "verify": False}]}
 
 
 class GetSnippetRequest(BaseModelWithSessionID):

@@ -150,10 +150,12 @@ class BaseController(TableAbstract, FactAbstract, ABC):
         """
         return self.get_index(self.get_vectorstore(dbname))  # type: ignore
 
-    def get_index(self, vector_store: BasePydanticVectorStore) -> BaseIndex:
+    def get_index(self, vector_store: None | BasePydanticVectorStore) -> None | BaseIndex:
         """
         Supposed to get vectordb index.
         """
+        if vector_store is None:
+            return None
         docstore = self.get_docstore()
         storage_context = StorageContext.from_defaults(
             docstore=docstore, vector_store=vector_store, persist_dir=self.persist_dir
@@ -161,7 +163,7 @@ class BaseController(TableAbstract, FactAbstract, ABC):
         index = load_index_from_storage(storage_context=storage_context, embed_model=EMBED_MODEL)
         return index
 
-    def get_or_create_index(self, vector_store: BasePydanticVectorStore) -> BaseIndex:
+    def get_or_create_index(self, vector_store: None | BasePydanticVectorStore) -> None | BaseIndex:
         """
         Get or create index.
         """
@@ -210,6 +212,9 @@ class BaseController(TableAbstract, FactAbstract, ABC):
         """
         Synchronize specific fact nodes with facts table in the sqlite database.
         """
+        vector_store = self.get_vectorstore(collection_name=dbname)
+        if not vector_store:
+            return None
         # list all the facts available on the rag sqlite database.
         with ragdb.get_db() as session:
             try:
@@ -245,10 +250,12 @@ class ChromaController(BaseController):
     def persist_dir(self) -> str:
         return CONFIG.rag_chromadb_persist_dir
 
-    def get_vectorstore(self, collection_name: str, metadata: dict | None = None) -> ChromaIQVectorStore:
+    def get_vectorstore(self, collection_name: str, metadata: dict | None = None) -> None | ChromaIQVectorStore:
         """
         Supposed to get the ChromaDB vectorstore.
         """
+        if not EMBED_MODEL:
+            return None
         return ChromaIQVectorStore(
             collection_name=collection_name,
             metadata=metadata,
@@ -275,6 +282,9 @@ class ChromaController(BaseController):
         Helps to list all the fact nodes.
         """
         index = self.get_index_by_collection(collection_name=dbname)
+        if not index:
+            # return an empty list if in-case of no embed server
+            return []
         nodes_with_score = await get_nodes(index=index, filters=get_facts_filter_matches(heavydb_name=dbname))  # type: ignore
         return nodes_with_score
 
@@ -283,6 +293,8 @@ class ChromaController(BaseController):
         Helps to delete all the fact nodes relevant to a database/collection.
         """
         index = self.get_index_by_collection(collection_name=dbname)
+        if not index:
+            return None
         if fact_ids:
             # delete only the facts associated with the passed facts ids
             await adelete_facts_by_ids(index=index, heavydb_name=dbname, facts_ids=fact_ids)  # type: ignore
@@ -305,6 +317,8 @@ class ChromaController(BaseController):
         List all table nodes specific to a particular database.
         """
         index = self.get_index_by_collection(collection_name=dbname)
+        if not index:
+            return []
         nodes_with_score = await get_nodes(index=index, filters=get_table_filter_matches(heavydb_name=dbname))  # type: ignore
         return nodes_with_score
 
@@ -320,6 +334,8 @@ class ChromaController(BaseController):
         """
         dbname = heavydb._dbname
         index = self.get_index_by_collection(collection_name=dbname)
+        if not index:
+            return None
         if force:
             # delete and recreate all the table nodes relevant to a database
             await delete_all_table_nodes(index=index, dbname=dbname)  # type: ignore
@@ -362,13 +378,16 @@ class FaissController(BaseController):
     def persist_dir(self) -> str:
         return CONFIG.rag_faiss_persist_dir
 
-    def get_vectorstore(self, *args, **kwargs) -> FaissIQVectorStore:
+    def get_vectorstore(self, *args, **kwargs) -> None | FaissIQVectorStore:
         """
         Supposed to get the Faiss vectorstore.
         """
         # cache this vs initialisation so that it won't be readed again and again
         if self._cached_vector_store:
             return self._cached_vector_store
+
+        if not EMBED_MODEL:
+            return None
 
         # Thread-safe initialization with lock
         with self._lock:
@@ -403,7 +422,8 @@ class FaissController(BaseController):
         """
         nodes_with_score = await get_nodes(index=index, filters=get_facts_filter_matches(heavydb_name=dbname))
         node_ids_to_delete = [i.node_id for i in nodes_with_score if i.node_id in fact_ids]
-        index.vector_store.remove(node_ids=node_ids_to_delete)  # type: ignore
+        if node_ids_to_delete:
+            index.vector_store.remove(node_ids=node_ids_to_delete)  # type: ignore
 
     async def _delete_database_facts(self, index: VectorStoreIndex, dbname: str):
         """
@@ -477,6 +497,8 @@ class FaissController(BaseController):
         """
         dbname = heavydb._dbname
         index = self.get_or_create_index(vector_store=self.get_vectorstore())
+        if not index:
+            return None
         if force:
             # delete and recreate all the table nodes relevant to a database
             await self._delete_all_table_nodes(index=index, dbname=dbname)  # type: ignore
