@@ -1,7 +1,8 @@
+import multiprocessing
 from pathlib import Path
 
 import sqlalchemy.exc as sqlalchemy_exc
-from fastapi import APIRouter, Body, Depends, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Body, Depends, Form, HTTPException, Request, UploadFile
 
 from heavyiq.config import get_config
 from heavyiq.langchain import HeavyDB
@@ -12,6 +13,7 @@ from heavyrag.database import FactsModel, RAGDBIntegrityError, ragdb
 CONFIG = get_config()
 doc_router = APIRouter()
 logger = get_heavyiq_logger()
+mlock = multiprocessing.Lock()
 
 
 # dependency function which provides HeavyDB instance
@@ -127,6 +129,60 @@ async def derive_table_names(
     return await determine_table_names(question=request.question, heavydb=heavydb)
 
 
+@table_router.post("/index/nodes")
+async def list_table_nodes(
+    request: md.GetSnippetsfromIndexRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
+) -> md.GetSnippetsfromIndexResponse:
+    """
+    List facts from vectorDB index.
+    """
+    from heavyrag.controller import rag_controller
+
+    try:
+        nodes = await rag_controller.list_table_nodes(dbname=heavydb._dbname)
+        return md.ListNodesResponse(
+            nodes=[md.ListNodesResponse.Node(content=i.get_text(), metadata=i.metadata) for i in nodes]
+        )
+    except FileNotFoundError:
+        return md.ListNodesResponse(nodes=[])
+
+
+@table_router.post("/sync")
+async def sync_table_nodes(
+    request: md.SyncNodesRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
+) -> md.StatusResponse:
+    """
+    Synchronizes all table nodes with the data from the corresponding database tables.
+    Only one worker can execute this operation at a time using multiprocessing.Lock.
+    """
+    with mlock:
+        from heavyrag.controller import rag_controller
+
+        logger.info("Started syncing tabe nodes.")
+        await rag_controller.sync_table_nodes(heavydb=heavydb, force=request.force)
+        return md.StatusResponse(success=True)
+
+
+@table_router.post("/search")
+async def search_table_nodes(
+    request: md.SearchNodeRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
+) -> md.SearchNodeResponse:
+    """
+    Search for fact nodes relevant to the asked question.
+    """
+    from heavyrag.controller import rag_controller
+
+    nodes = await rag_controller.search_table_nodes(
+        dbname=heavydb._dbname, question=request.question, top_k=request.top_k
+    )
+    return md.SearchNodeResponse(
+        nodes=[
+            md.SearchNodeResponse.Node(id=i.node_id, content=i.text, score=i.get_score(), metadata=i.node.metadata)
+            for i in nodes
+        ]
+    )
+
+
 # RAG database router
 # which helps to make CRUD operations on RAG database, especially for facts
 facts_db_router = APIRouter()
@@ -140,7 +196,7 @@ async def add_snippet(
     """
     Endpoint for adding a new snippet.
     """
-    from heavyrag.ingest import ainsert_fact
+    from heavyrag.controller import rag_controller
 
     with ragdb.get_db() as session:
         fact_id = None
@@ -149,7 +205,7 @@ async def add_snippet(
             fact_id = FactsModel.add(db_session=session, heavydb_name=heavydb._dbname, fact=request.snippet)
             try:
                 # add to index
-                await ainsert_fact(fact_id=fact_id, fact=request.snippet, heavydb_name=heavydb._dbname)
+                await rag_controller.insert_fact_nodes(facts=[(fact_id, request.snippet)], dbname=heavydb._dbname)
             except Exception as e:
                 logger.error(f"Failed to insert snippet on RAG index, {e}")
 
@@ -170,7 +226,7 @@ async def bulk_insert_snippets(
     """
     Bulk insert snippets into sqlite database and store the relavant embeddings on vector database.
     """
-    from heavyrag.ingest import ainsert_facts
+    from heavyrag.controller import rag_controller
 
     with ragdb.get_db() as session:
         fact_ids: list[str] = []
@@ -179,7 +235,9 @@ async def bulk_insert_snippets(
             fact_ids = FactsModel.bulk_insert(db_session=session, heavydb_name=heavydb._dbname, facts=request.snippets)
             try:
                 # add to index
-                await ainsert_facts(facts=list(zip(fact_ids, request.snippets)), heavydb_name=heavydb._dbname)
+                await rag_controller.insert_fact_nodes(
+                    facts=list(zip(fact_ids, request.snippets)), dbname=heavydb._dbname
+                )
             except Exception as e:
                 logger.error(f"Failed to insert snippet on RAG index, {e}")
 
@@ -200,7 +258,7 @@ async def update_snippet(
     """
     Updates a particular snippet by snippet_id.
     """
-    from heavyrag.ingest import aupdate_fact
+    from heavyrag.controller import rag_controller
 
     with ragdb.get_db() as session:
         try:
@@ -209,8 +267,10 @@ async def update_snippet(
             if not updated_id:
                 raise ValueError(f"Failed to update fact id, {request.snippet_id}")
             try:
-                # add to index
-                await aupdate_fact(fact_id=request.snippet_id, fact=request.snippet, heavydb_name=heavydb._dbname)
+                # delete existing node
+                await rag_controller.delete_fact_nodes(dbname=heavydb._dbname, fact_ids=[updated_id])
+                # add new node with the updated content
+                await rag_controller.insert_fact_nodes(facts=[(updated_id, request.snippet)], dbname=heavydb._dbname)
             except Exception as e:
                 logger.error(f"Failed to update snippet on RAG index, {e}")
 
@@ -229,12 +289,16 @@ async def get_snippet(
     """
     Return a particular snippet by snippet_id.
     """
+    from heavyrag.controller import rag_controller
+
     with ragdb.get_db() as session:
         fact = FactsModel.get(db_session=session, id=request.snippet_id)
         if fact and fact.heavydb_name == heavydb._dbname:
-            return md.SnippetResponse(
-                snippet=fact.fact, snippet_id=fact.id, created_at=fact.created_at, updated_at=fact.updated_at
-            )
+            fact_ids_on_index = [i.node_id for i in await rag_controller.list_fact_nodes(dbname=heavydb._dbname)]
+            if fact.id in fact_ids_on_index:
+                return md.SnippetResponse(
+                    snippet=fact.fact, snippet_id=fact.id, created_at=fact.created_at, updated_at=fact.updated_at
+                )
         raise HTTPException(status_code=404)
 
 
@@ -245,18 +309,54 @@ async def delete_snippets(
     """
     Delete a particular database fact.
     """
-    from heavyrag.ingest import adelete_facts
+    from heavyrag.controller import rag_controller
 
     with ragdb.get_db() as session:
         try:
             deleted = FactsModel.delete(db_session=session, ids=request.snippet_ids)
             if deleted:
-                await adelete_facts(heavydb_name=heavydb._dbname, fact_ids=request.snippet_ids)
+                await rag_controller.delete_fact_nodes(dbname=heavydb._dbname, fact_ids=request.snippet_ids)
                 return md.DeleteSnippetResponse(deleted=True)
             return md.DeleteSnippetResponse(deleted=False)
 
         except Exception as e:
             raise e
+
+
+@facts_db_router.post("/sync")
+async def sync_fact_nodes(
+    request: md.SyncNodesRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
+) -> md.StatusResponse:
+    """
+    Synchronizes all fact nodes with the data from the corresponding rag/sqlite database.
+    Only one worker can execute this operation at a time using multiprocessing.Lock.
+    """
+    with mlock:
+        from heavyrag.controller import rag_controller
+
+        logger.info("Started syncing fact nodes.")
+        await rag_controller.sync_fact_nodes(ragdb=ragdb, dbname=heavydb._dbname, force=request.force)
+        return md.StatusResponse(success=True)
+
+
+@facts_db_router.post("/search")
+async def search_fact_nodes(
+    request: md.SearchNodeRequest, heavydb: HeavyDB = Depends(get_current_heavydb_instance)
+) -> md.SearchNodeResponse:
+    """
+    Search for fact nodes relevant to the asked question.
+    """
+    from heavyrag.controller import rag_controller
+
+    nodes = await rag_controller.search_fact_nodes(
+        dbname=heavydb._dbname, question=request.question, top_k=request.top_k
+    )
+    return md.SearchNodeResponse(
+        nodes=[
+            md.SearchNodeResponse.Node(id=i.node_id, content=i.text, score=i.get_score(), metadata=i.node.metadata)
+            for i in nodes
+        ]
+    )
 
 
 @facts_db_router.post("/list")
@@ -266,11 +366,15 @@ async def list_snippets(
     """
     List all snippets associated with a database.
     """
+    from heavyrag.controller import rag_controller
+
     with ragdb.get_db() as session:
         facts = FactsModel.list(db_session=session, heavydb_name=heavydb._dbname, serialize=True)
+        fact_node_ids_from_index = [i.node_id for i in await rag_controller.list_fact_nodes(dbname=heavydb._dbname)]
         snippets = [
             {"snippet_id": i["id"], "snippet": i["fact"], "created_at": i["created_at"], "updated_at": i["updated_at"]}
             for i in facts
+            if i["id"] in fact_node_ids_from_index
         ]
         return md.ListSnippetsResponse(snippets=snippets)
 
@@ -282,12 +386,13 @@ async def delete_all_snippets(
     """
     Delete all snippets asscoiated with a database. This involves deleteing database entries and index nodes.
     """
-    from heavyrag.ingest import adelete_facts
+    from heavyrag.controller import rag_controller
 
     with ragdb.get_db() as session:
         try:
             FactsModel.delete_facts_by_database(db_session=session, heavydb_name=heavydb._dbname)
-            await adelete_facts(heavydb_name=heavydb._dbname)
+            # deletes all fact nodes relevant to the current db
+            await rag_controller.delete_fact_nodes(dbname=heavydb._dbname)
             return md.DeleteSnippetResponse(deleted=True)
         except Exception as e:
             raise e
@@ -300,9 +405,9 @@ async def get_snippet_nodes(
     """
     Get facts from vectorDB index.
     """
-    from heavyrag.main import get_facts
+    from heavyrag.controller import rag_controller
 
-    nodes = await get_facts(heavydb_name=heavydb._dbname, limit=request.limit)
+    nodes = await rag_controller.list_fact_nodes(dbname=heavydb._dbname)
     return md.GetSnippetsfromIndexResponse(
         nodes=[md.GetSnippetsfromIndexResponse.Node(content=i.get_text(), metadata=i.metadata) for i in nodes]
     )
@@ -310,13 +415,17 @@ async def get_snippet_nodes(
 
 @facts_db_router.post("/ask", response_model=md.AskSnippetsResponse)
 async def ask_about_snippets(
-    request: md.AskSnippetsRequest, collection_name: str = Depends(get_collection_name)
+    request: md.AskSnippetsRequest,
+    req: Request,
+    collection_name: str = Depends(get_collection_name),
 ) -> md.AskSnippetsResponse:
     """
     Ask questions regrading the uploaded snippets.
     """
     from heavyrag.main import ask_facts
 
+    # from heavyrag.vector_stores.faiss import faiss_index_cvar
+    # faiss_index_cvar.set(req.app.state.faiss_index)
     out = await ask_facts(
         question=request.question,
         heavydb_name=collection_name,

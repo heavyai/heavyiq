@@ -65,7 +65,7 @@ class FactsModel(Base):
         db_session.commit()
         # return the id which got updated, if there isn't any update happens
         # then a None value should be returned
-        return updated_id  # type: ignore
+        return updated_id[0]  # type: ignore
 
     @classmethod
     def add(

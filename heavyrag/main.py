@@ -11,10 +11,9 @@ from llama_index.core.schema import NodeWithScore, TextNode
 from heavyiq.langchain.heavydb import HeavyDB
 from heavyrag import IndexNotFound
 from heavyrag.database import FactsModel, ragdb
+from heavyrag.embed import get_embed_model
 from heavyrag.evaluate import aevaluate_response_by_relevancy
 from heavyrag.filters import document_filters, get_document_filter_matches, get_facts_filter_matches, table_filters
-from heavyrag.index import get_index
-from heavyrag.ingest import sync_table_index
 from heavyrag.llm import get_llm
 from heavyrag.logger import logger
 from heavyrag.postprocessor import OverridedLLMRerank, ReRanker, ReRankerType
@@ -30,6 +29,19 @@ def list_database_facts(database_name: str) -> list[tuple[str, str]]:
         facts = FactsModel.list(db_session=session, heavydb_name=database_name)
         snippets = [(i.id, i.fact) for i in facts]  # type: ignore
         return snippets  # type: ignore
+
+
+def get_index(collection_name: str) -> None | VectorStoreIndex:
+    """
+    Get Vecstor Store Index.
+    """
+    from heavyrag.controller import rag_controller
+
+    if not get_embed_model():
+        # no embed server, so we can't embed the question for doing RAG search against the vectordb
+        return None
+
+    return rag_controller.index(collection_name)
 
 
 async def ask_document(
@@ -93,10 +105,6 @@ async def retrieve_facts(
     """
     Retrieve only the fact nodes which are relevant to the asked question without using llm.
     """
-    from heavyiq.config import get_config
-
-    config = get_config()
-
     logger.debug("Started retrieving facts...")
 
     doc_nodes_with_score, facts_nodes_with_score = [], []
@@ -290,16 +298,16 @@ async def determine_table_names(question: str, heavydb: HeavyDB, force_sync: boo
     """
     Fetch the approprate table name relevant to the asked question.
     """
-    from heavyiq.config import get_config
-
-    config = get_config()
-    if not config.rag_embed_server_base:
+    if not get_embed_model():
         # no embed server, so we can't embed the question for doing RAG search against the vectordb
         return []
 
     logger.debug("Started determining table names, syncing table index...")
-    index = await sync_table_index(heavydb=heavydb, force_sync=force_sync)
+    from heavyrag.controller import rag_controller
+
+    await rag_controller.sync_table_nodes(heavydb=heavydb)
     logger.debug("Finished syncing table index.")
+    index = rag_controller.index(heavydb._dbname)
     engine = index.as_retriever(
         filters=table_filters,
         similarity_top_k=2,

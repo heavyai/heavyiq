@@ -70,7 +70,7 @@ class HeavyDBTableReader(BaseReader):
     async def aload_data(self, table_name: str, extra_info: dict | None = None) -> List[Document]:
         text = await self.heavydb.aget_single_table_info(
             table_name=table_name,
-            include_samples=True,
+            include_samples=False,
             include_top_k=False,
             include_timestamp=False,
             include_comments=True,

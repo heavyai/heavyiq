@@ -49,7 +49,7 @@ def monitor_chromadb():
     while True:
         if chromadb_process and chromadb_process.poll() is not None:
             print("ChromaDB server exited unexpectedly. Restarting...")
-            os.environ.pop("CHROMADB_STARTED")
+            os.environ.pop("CHROMADB_STARTED", None)
             start_chromadb_server_process()
         time.sleep(5)
 
@@ -68,6 +68,10 @@ def check_and_initiate_chromadb_thread(conf_file_path):
         config = get_config(conf_file_path)
     else:
         config = get_config()
+
+    # don't start chromadb server if the rag_vector_type is not equal to chroma
+    if config.rag_vectordb_type != "chroma":
+        return None
 
     if not config.enable_rag:
         print('Failed to start chromadb server, "enable_rag" config flag is set to false.')
