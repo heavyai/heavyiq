@@ -213,12 +213,22 @@ async def adelete_document(file_name: str, heavydb_name: str) -> bool:
     return delete_nodes(collection=collection, where={"$and": [{"name": file_name}, {"type": "document"}]})
 
 
-async def delete_table_nodes(index: VectorStoreIndex, table_name: str) -> bool:
+async def delete_table_nodes(index: VectorStoreIndex, dbname: str, table_name: str) -> bool:
     """
     Delete all the nodes associated with a table.
     """
     collection = index.vector_store._collection  # type: ignore
-    return delete_nodes(collection=collection, where={"$and": [{"name": table_name}, {"type": "table"}]})
+    return delete_nodes(
+        collection=collection, where={"$and": [{"name": table_name}, {"dbname": dbname}, {"type": "table"}]}
+    )
+
+
+async def delete_all_table_nodes(index: VectorStoreIndex, dbname: str) -> bool:
+    """
+    Delete all the table nodes associated with a database.
+    """
+    collection = index.vector_store._collection  # type: ignore
+    return delete_nodes(collection=collection, where={"$and": [{"dbname": dbname}, {"type": "table"}]})
 
 
 def delete_nodes_by_ids(index: VectorStoreIndex, ids: list[str]) -> bool:
@@ -266,7 +276,8 @@ async def sync_table_index(heavydb: HeavyDB, force_sync: bool = False) -> Vector
     Supposed to sync a table index.
     """
     # check for collection exists
-    index = get_index(collection_name=heavydb._dbname)
+    dbname = heavydb._dbname
+    index = get_index(collection_name=dbname)
     if not index:
         # collection doesn't exists, so create one and do the nodes ingestion
         index = await ainsert_tables(heavydb=heavydb)
@@ -283,7 +294,7 @@ async def sync_table_index(heavydb: HeavyDB, force_sync: bool = False) -> Vector
                 # delete all the nodes specifc to a particulatr table
                 # re-fetch table info and then re-ingest it
                 for table in tables:
-                    await delete_table_nodes(index=index, table_name=table)
+                    await delete_table_nodes(index=index, dbname=dbname, table_name=table)
                 # re-fetch and re-insert all
                 index = await ainsert_tables(heavydb=heavydb)
             else:
@@ -292,7 +303,7 @@ async def sync_table_index(heavydb: HeavyDB, force_sync: bool = False) -> Vector
                 # else skip it
                 exclude_tables = []
                 for table in tables:
-                    if await has_table_node(index=index, table_name=table):
+                    if await has_table_node(index=index, dbname=dbname, table_name=table):
                         exclude_tables.append(table)
 
                 documents = await aload_tables(heavydb=heavydb, exlude_tables=exclude_tables)

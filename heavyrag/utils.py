@@ -1,3 +1,4 @@
+import uuid
 from typing import Optional
 
 from llama_index.core import VectorStoreIndex
@@ -55,3 +56,23 @@ async def get_facts_node_count_in_index(index: VectorStoreIndex) -> int:
     """
     nodes = await get_nodes(index=index, filters=facts_filters, limit=None)
     return len(nodes)
+
+
+def convert_uuid_str_to_hex(uuid_str: str) -> str:
+    """
+    Converts uuid str to hex.
+    """
+    uid = uuid.UUID(uuid_str)
+    return uid.hex
+
+
+# Convert UUID4 hex string to a 64-bit integer
+def uuid4_hex_to_int64(uuid_hex: str) -> int:
+    # Use the first 16 characters of the hex string (64 bits)
+    return int(uuid_hex[:10], 16)
+
+
+# Convert a 64-bit integer back to a hex string (partial UUID)
+def int64_to_uuid4_hex(int64_val: int) -> str:
+    # Convert the int64 back to a hex string (16 characters)
+    return format(int64_val, "010x")

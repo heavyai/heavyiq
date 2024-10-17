@@ -263,6 +263,41 @@ class GetSnippetsfromIndexRequest(BaseModelWithSessionID):
         json_schema_extra = {"examples": [{"session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "limit": 100}]}
 
 
+class OnlySessionIDRequest(BaseModelWithSessionID):
+    pass
+
+
+class SyncNodesRequest(BaseModelWithSessionID):
+    """
+    Sync nodes with the data from corresponding sources.
+    """
+
+    force: bool = Field(default=False, description="Recreate the whole or insert only the misssing data.")
+
+
+class SearchNodeRequest(BaseModelWithSessionID):
+    """
+    Request model for doing node search on the index.
+    """
+
+    question: str = Field(..., description="A natural language question.")
+    top_k: int = Field(..., description="Number of nodes to be returned")
+
+
+class SearchNodeResponse(BaseModel):
+    """
+    Node search response model.
+    """
+
+    class Node(BaseModel):
+        id: str = Field(..., description="Node ID")
+        content: str = Field(..., description="Node content")
+        score: float = Field(..., description="Similarity Score")
+        metadata: dict = Field(..., description="Node metadata")
+
+    nodes: list[Node] = Field(..., description="List of nodes")
+
+
 class GetSnippetsfromIndexResponse(BaseModel):
     """
     Get snippets relevant to a particular database.
@@ -274,6 +309,8 @@ class GetSnippetsfromIndexResponse(BaseModel):
 
     nodes: list[Node] = Field(..., description="List of nodes")
 
+
+ListNodesResponse = GetSnippetsfromIndexResponse
 
 AskSnippetsResponse = AskDocumentResponse
 
@@ -313,3 +350,6 @@ class ReEmbedDocumentsResponse(BaseModel):
     """
 
     success: bool = Field(..., description="re-embed docs response")
+
+
+StatusResponse = ReEmbedDocumentsResponse

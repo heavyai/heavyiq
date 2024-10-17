@@ -10,12 +10,15 @@ document_filters = MetadataFilters(filters=[document_filter])
 facts_filters = MetadataFilters(filters=[facts_filter])
 
 
-def get_table_filter_matches(table_name: str) -> MetadataFilters:
+def get_table_filter_matches(heavydb_name: str, table_name: str | None = None) -> MetadataFilters:
     """
     Table filter which was extended to match a particular tablename.
     """
+    filters = [table_filter, MetadataFilter(key="dbname", operator=FilterOperator.EQ, value=heavydb_name)]
+    if table_name:
+        filters.append(MetadataFilter(key="name", operator=FilterOperator.EQ, value=table_name))
     return MetadataFilters(
-        filters=[table_filter, MetadataFilter(key="name", operator=FilterOperator.EQ, value=table_name)],
+        filters=filters,  # type: ignore
         condition=FilterCondition.AND,
     )
 
