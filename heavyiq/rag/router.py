@@ -203,8 +203,11 @@ async def add_snippet(
         try:
             # add db record
             fact_id = FactsModel.add(db_session=session, heavydb_name=heavydb._dbname, fact=request.snippet)
-            # add to index
-            await rag_controller.insert_fact_nodes(facts=[(fact_id, request.snippet)], dbname=heavydb._dbname)
+            try:
+                # add to index
+                await rag_controller.insert_fact_nodes(facts=[(fact_id, request.snippet)], dbname=heavydb._dbname)
+            except Exception as e:
+                logger.error(f"Failed to insert snippet on RAG index, {e}")
 
             return md.AddSnippetResponse(snippet_id=fact_id)
         except sqlalchemy_exc.IntegrityError as e:
@@ -230,8 +233,13 @@ async def bulk_insert_snippets(
         try:
             # add db record
             fact_ids = FactsModel.bulk_insert(db_session=session, heavydb_name=heavydb._dbname, facts=request.snippets)
-            # add to index
-            await rag_controller.insert_fact_nodes(facts=list(zip(fact_ids, request.snippets)), dbname=heavydb._dbname)
+            try:
+                # add to index
+                await rag_controller.insert_fact_nodes(
+                    facts=list(zip(fact_ids, request.snippets)), dbname=heavydb._dbname
+                )
+            except Exception as e:
+                logger.error(f"Failed to insert snippet on RAG index, {e}")
 
             return md.BulkInsertSnippetsResponse(snippet_ids=fact_ids)
         except sqlalchemy_exc.IntegrityError as e:
@@ -258,10 +266,13 @@ async def update_snippet(
             updated_id = FactsModel.update(db_session=session, id=request.snippet_id, fact=request.snippet)
             if not updated_id:
                 raise ValueError(f"Failed to update fact id, {request.snippet_id}")
-            # delete existing node
-            await rag_controller.delete_fact_nodes(dbname=heavydb._dbname, fact_ids=[updated_id])
-            # add new node with the updated content
-            await rag_controller.insert_fact_nodes(facts=[(updated_id, request.snippet)], dbname=heavydb._dbname)
+            try:
+                # delete existing node
+                await rag_controller.delete_fact_nodes(dbname=heavydb._dbname, fact_ids=[updated_id])
+                # add new node with the updated content
+                await rag_controller.insert_fact_nodes(facts=[(updated_id, request.snippet)], dbname=heavydb._dbname)
+            except Exception as e:
+                logger.error(f"Failed to update snippet on RAG index, {e}")
 
             return md.AddSnippetResponse(snippet_id=request.snippet_id)
         except sqlalchemy_exc.IntegrityError as e:
@@ -359,13 +370,30 @@ async def list_snippets(
 
     with ragdb.get_db() as session:
         facts = FactsModel.list(db_session=session, heavydb_name=heavydb._dbname, serialize=True)
-        fact_node_ids_from_index = [i.node_id for i in await rag_controller.list_fact_nodes(dbname=heavydb._dbname)]
-        snippets = [
-            {"snippet_id": i["id"], "snippet": i["fact"], "created_at": i["created_at"], "updated_at": i["updated_at"]}
-            for i in facts
-            if i["id"] in fact_node_ids_from_index
-        ]
-        return md.ListSnippetsResponse(snippets=snippets)
+
+        if request.verify:
+            fact_node_ids_from_index = [i.node_id for i in await rag_controller.list_fact_nodes(dbname=heavydb._dbname)]
+            snippets = [
+                {
+                    "snippet_id": i["id"],
+                    "snippet": i["fact"],
+                    "created_at": i["created_at"],
+                    "updated_at": i["updated_at"],
+                }
+                for i in facts
+                if i["id"] in fact_node_ids_from_index
+            ]
+        else:
+            snippets = [
+                {
+                    "snippet_id": i["id"],
+                    "snippet": i["fact"],
+                    "created_at": i["created_at"],
+                    "updated_at": i["updated_at"],
+                }
+                for i in facts
+            ]
+        return md.ListSnippetsResponse(snippets=snippets)  # type: ignore
 
 
 @facts_db_router.post("/delete_all")

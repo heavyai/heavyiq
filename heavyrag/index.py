@@ -28,6 +28,10 @@ def get_vectorstore(
     """
     Get or Create a VectorStore.
     """
+    if embed_model is None:
+        # return None if embed model is set to None
+        return None
+
     global vectordb_persist_dir
     vector_type = VectorStoreType.from_name(CONFIG.rag_vectordb_type)
     if vector_type == VectorStoreType.CHROMA:
@@ -39,7 +43,6 @@ def get_vectorstore(
             create_collection_if_not_exists=create_collection_if_not_exists,
         )
     if vector_type == VectorStoreType.FAISS:
-
         vectordb_persist_dir = CONFIG.rag_faiss_persist_dir
         return FaissIQVectorStore(persist_dir=CONFIG.rag_faiss_persist_dir, dimension=CONFIG.rag_embed_dimension)
     raise ValueError("Invalid vectorstore.")
@@ -52,6 +55,8 @@ def get_or_create_index(
     Get or create new index if not exists.
     """
     vector_store = get_vectorstore(collection_name, metadata=collection_metadata, create_collection_if_not_exists=True)
+    if not vector_store:
+        return None
     try:
         storage_context = StorageContext.from_defaults(
             vector_store=vector_store, persist_dir=CONFIG.rag_faiss_persist_dir

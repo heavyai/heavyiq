@@ -1,14 +1,10 @@
 # import chromadb
 # from chromadb.api import ClientAPI
 # from chromadb.config import Settings as ChromaDBSettings
-from llama_index.core.base.embeddings.base import BaseEmbedding
-from llama_index.core.schema import TextNode
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.embeddings.text_embeddings_inference import TextEmbeddingsInference
 
 from heavyiq.config import get_config
-from heavyiq.utils import get_host_and_port
 from heavyrag.logger import logger
 
 CONFIG, EMBED_MODEL = get_config(), None
@@ -50,10 +46,11 @@ def set_embed_model():
             base_url=CONFIG.rag_embed_server_base,
         )
     else:
-        logger.info(
-            f"Initialized embed model on CPU using HuggingFaceEmbedding with model name: {CONFIG.rag_embed_model_name}"
-        )
-        EMBED_MODEL = HuggingFaceEmbedding(CONFIG.rag_embed_model_name, device="cpu")
+        # logger.info(
+        #    f"Initialized embed model on CPU using HuggingFaceEmbedding with model name: {CONFIG.rag_embed_model_name}"
+        # )
+        # EMBED_MODEL = HuggingFaceEmbedding(CONFIG.rag_embed_model_name, device="cpu") # this fails to generate embeddings
+        EMBED_MODEL = None
 
 
 def get_embed_model():

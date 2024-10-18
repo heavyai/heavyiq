@@ -77,6 +77,11 @@ def check_and_initiate_chromadb_thread(conf_file_path):
         print('Failed to start chromadb server, "enable_rag" config flag is set to false.')
         return None
 
+    # don't start chromadb server if the embedding server isn't set
+    if not config.rag_embed_server_base:
+        print("Failed to start chromadb server, no embed server base found on config.")
+        return None
+
     server_base = config.rag_chromadb_server_base
     if not server_base:
         print("Failed to start chromadb server, no chromadb server base found on config.")

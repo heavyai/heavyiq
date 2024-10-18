@@ -1,6 +1,7 @@
 import multiprocessing
 import os
 import pickle
+import sys
 import threading
 from collections.abc import Sequence
 from typing import Any, Union, cast
@@ -27,7 +28,8 @@ process_lock = multiprocessing.Lock()
 
 # Uncomment this line only on mac, for ubuntu/prod we can leave as it is
 # this line should fix gunciorn worker reloading issue upon doing RAG search on FAISS index (MAC M1 only)
-# faiss.omp_set_num_threads(1)  # important so that gunicorn worker process won't get terminated
+if sys.platform == "darwin":
+    faiss.omp_set_num_threads(1)  # important so that gunicorn worker process won't get terminated
 
 # Create a threading lock (for threads within the same process)
 thread_lock = threading.Lock()

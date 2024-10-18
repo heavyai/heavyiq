@@ -32,10 +32,13 @@ def set_chroma_client():
         )
 
     except Exception as e:
-        raise ValueError(f"Failed to create ChromaDB HTTP Client, {e}")
+        print(f"Failed to create ChromaDB HTTP Client, {e}")
+        CHROMA_CLIENT = None
 
 
-def get_chroma_client() -> ClientAPI:
+def get_chroma_client() -> ClientAPI | None:
+    if not get_embed_model():
+        return None
     if CHROMA_CLIENT is None:
         set_chroma_client()
     return CHROMA_CLIENT
