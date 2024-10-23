@@ -315,8 +315,11 @@ async def delete_snippets(
         try:
             deleted = FactsModel.delete(db_session=session, ids=request.snippet_ids)
             if deleted:
-                await rag_controller.delete_fact_nodes(dbname=heavydb._dbname, fact_ids=request.snippet_ids)
-                return md.DeleteSnippetResponse(deleted=True)
+                try:
+                    await rag_controller.delete_fact_nodes(dbname=heavydb._dbname, fact_ids=request.snippet_ids)
+                    return md.DeleteSnippetResponse(deleted=True)
+                except Exception as e:
+                    logger.error(f"Failed to delete snippet on RAG index, {e}")
             return md.DeleteSnippetResponse(deleted=False)
 
         except Exception as e:

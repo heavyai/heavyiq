@@ -2,7 +2,6 @@
 
 from fastapi import APIRouter, BackgroundTasks, Request
 
-from heavyiq.api.handlers import handle_update_index_request
 from heavyiq.api.models import UpdateIndexRequest, UpdateIndexResponse
 
 bgrouter = APIRouter()
@@ -20,4 +19,6 @@ async def update_index(
     \f
     :param UpdateIndexRequest request: Request Body
     """
+    from heavyiq.api.handlers.bg_handler import handle_update_index_request
+
     return await handle_update_index_request(http_request, request, background_tasks)
