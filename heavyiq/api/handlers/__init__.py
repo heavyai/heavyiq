@@ -1,4 +1,3 @@
-from .bg_handler import handle_update_index_request
 from .lcel_handler import (
     handle_lcel_answer_request,
     handle_lcel_auto_query_request,

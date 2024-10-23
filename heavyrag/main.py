@@ -137,11 +137,6 @@ async def retrieve_facts(
     if with_reranker:
         logger.debug("Started re-ranking filtered nodes...")
         # configure reranker
-        # reranker = TextEmbeddingsInferenceRerank(
-        #     base_url=config.rag_rerank_server_base,
-        #     top_n=reranker_top_k,
-        # )
-        # filtered_nodes = await reranker.apostprocess_nodes(filtered_nodes, query_str=question)
         reranker = OverridedLLMRerank(top_n=reranker_top_k)
         filtered_nodes = reranker.postprocess_nodes(filtered_nodes, query_str=question)
         logger.debug(

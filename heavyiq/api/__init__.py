@@ -227,17 +227,19 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
             }
         },
     )
-    app.include_router(
-        bgrouter,
-        prefix="/bgtask",
-        tags=["bgtask"],
-        responses={
-            500: {
-                "description": "Internal Server Error",
-                "model": ErrorResponse,
-            }
-        },
-    )
+    # @deprecated
+    # now we have endpoints for syncing table and facts/snippets index
+    # app.include_router(
+    #     bgrouter,
+    #     prefix="/bgtask",
+    #     tags=["bgtask"],
+    #     responses={
+    #         500: {
+    #             "description": "Internal Server Error",
+    #             "model": ErrorResponse,
+    #         }
+    #     },
+    # )
     if config.enable_rag:
         add_rag_db_exception_handlers(app)
         # RAG routers
