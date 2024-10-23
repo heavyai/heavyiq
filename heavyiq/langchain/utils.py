@@ -555,6 +555,10 @@ def get_tokenizer() -> Any:
     elif ("mixtral" in model_name) or ("wizard" in model_name):
         tokenizer_cls = AutoTokenizer
         model_local_path = "./heavyiq/langchain/tokenizer_models/mixtral_model"
+    elif "qwen" in model_name:
+        print("Qwen used")
+        tokenizer_cls = AutoTokenizer
+        model_local_path = "./heavyiq/langchain/tokenizer_models/qwen_model"
     else:
         raise ValueError("Unsupported model found for tokenization.")
 
