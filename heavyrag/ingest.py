@@ -1,4 +1,5 @@
-# Module for ingesting/inserting or deleting data into vectorDB
+# Module for ingesting/inserting or deleting data into vectorDB specifically for chromadb
+# Import this module only if the vector_db_type is set to chroma
 import asyncio
 from collections import defaultdict
 

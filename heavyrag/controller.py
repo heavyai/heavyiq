@@ -24,12 +24,9 @@ from heavyrag.database import FactsModel
 from heavyrag.database.database import Database as RAGDatabase
 from heavyrag.embed import get_embed_model
 from heavyrag.filters import get_facts_filter_matches, get_table_filter_matches
-from heavyrag.ingest import adelete_database_facts, adelete_facts_by_ids, delete_all_table_nodes, delete_nodes_by_ids
 from heavyrag.loaders import aload_specific_tables, aload_table, aload_tables
 from heavyrag.transform import atransform
 from heavyrag.utils import convert_uuid_str_to_hex, get_nodes
-from heavyrag.vector_stores.chroma import ChromaIQVectorStore
-from heavyrag.vector_stores.faiss import FaissIQVectorStore
 
 CONFIG, EMBED_MODEL = get_config(), get_embed_model()
 
@@ -250,10 +247,12 @@ class ChromaController(BaseController):
     def persist_dir(self) -> str:
         return CONFIG.rag_chromadb_persist_dir
 
-    def get_vectorstore(self, collection_name: str, metadata: dict | None = None) -> None | ChromaIQVectorStore:
+    def get_vectorstore(self, collection_name: str, metadata: dict | None = None) -> None | BasePydanticVectorStore:
         """
         Supposed to get the ChromaDB vectorstore.
         """
+        from heavyrag.vector_stores.chroma import ChromaIQVectorStore
+
         if not EMBED_MODEL:
             return None
         return ChromaIQVectorStore(
@@ -292,6 +291,8 @@ class ChromaController(BaseController):
         """
         Helps to delete all the fact nodes relevant to a database/collection.
         """
+        from heavyrag.ingest import adelete_database_facts, adelete_facts_by_ids
+
         index = self.get_index_by_collection(collection_name=dbname)
         if not index:
             return None
@@ -332,6 +333,8 @@ class ChromaController(BaseController):
                     even if they are already up to date. Defaults to False, meaning that
                     synchronization will only occur if necessary.
         """
+        from heavyrag.ingest import delete_all_table_nodes, delete_nodes_by_ids
+
         dbname = heavydb._dbname
         index = self.get_index_by_collection(collection_name=dbname)
         if not index:
@@ -378,10 +381,12 @@ class FaissController(BaseController):
     def persist_dir(self) -> str:
         return CONFIG.rag_faiss_persist_dir
 
-    def get_vectorstore(self, *args, **kwargs) -> None | FaissIQVectorStore:
+    def get_vectorstore(self, *args, **kwargs) -> None | BasePydanticVectorStore:
         """
         Supposed to get the Faiss vectorstore.
         """
+        from heavyrag.vector_stores.faiss import FaissIQVectorStore
+
         # cache this vs initialisation so that it won't be readed again and again
         if self._cached_vector_store:
             return self._cached_vector_store
