@@ -21,6 +21,7 @@ from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.exceptions import NLtoSQLException
 from heavyiq.langchain.heavydb import heavydb_context
 from heavyiq.langchain.llms import LLMType, get_llm_by_type
+from heavyiq.langchain.utils import NoopLangChainTracer
 from heavyiq.logging_utils import get_heavyiq_logger
 
 from .utils import (
@@ -32,6 +33,8 @@ from .utils import (
     sql_rate_reply,
     summarize_eval_results,
 )
+
+eval_callbacks = [NoopLangChainTracer(client=1)] if get_config().eval_tracing is False else []
 
 
 @click.group()
@@ -153,7 +156,6 @@ async def get_db(dbname: str) -> HeavyDB:
 async def run_config_model_on_tables(
     ctx: click.Context, eval_dataset_csv: str, batch_size: int, temperature: float, verbose: bool
 ) -> None:
-    from heavyiq.langchain.utils import is_langsmith_active
     from heavyiq.lcel.chains.eval.eval_table_chain import chain
 
     logger = get_heavyiq_logger()
@@ -201,7 +203,9 @@ async def run_config_model_on_tables(
             if not batch_inputs:
                 break
 
-            chain_output = await chain.abatch(batch_inputs, config={"configurable": {"llm_temperature": temperature}})
+            chain_output = await chain.abatch(
+                batch_inputs, config={"configurable": {"llm_temperature": temperature}, "callbacks": eval_callbacks}
+            )
             row_datas = []
             for data in chain_output:
                 row_datas.append(list(data.values()))
@@ -296,7 +300,7 @@ async def run_config_model_on_auto_questions(
             db = await HeavyDB.from_env_async(db_id)
             async with heavydb_context(db):
                 chain_output = await chain.ainvoke(
-                    chain_inputs, config={"configurable": {"llm_temperature": temperature}}
+                    chain_inputs, config={"configurable": {"llm_temperature": temperature}, "callbacks": eval_callbacks}
                 )
             query_stats = chain_output["query_stats"].values()
             if not query_stats:
@@ -483,7 +487,7 @@ async def run_config_model_on_questions_lcel(
             if not generate:
                 out = await chain.ainvoke(
                     {"question": question, "tables": tables, "session_id": db._conn._session},
-                    config={"configurable": {"llm_n": n, "llm_temperature": temperature}},
+                    config={"configurable": {"llm_n": n, "llm_temperature": temperature}, "callbacks": eval_callbacks},
                 )
                 return [out["query"]], out["error"]
             elif generate and judge:
@@ -500,7 +504,7 @@ async def run_config_model_on_questions_lcel(
                 judge_prompt, judge_llm_output, out, valid_sqls = None, None, None, []
                 async for patch in chain.astream_log(
                     {"question": question, "tables": tables, "session_id": db._conn._session},
-                    config={"configurable": llm_args},
+                    config={"configurable": llm_args, "callbacks": eval_callbacks},
                     include_tags=["gen_sqls", "judge_prompt", "judge_llm_output"],
                 ):
                     for op in patch.ops:
@@ -525,7 +529,7 @@ async def run_config_model_on_questions_lcel(
                 }
                 out = await chain.ainvoke(
                     {"question": question, "tables": tables, "session_id": db._conn._session},
-                    config={"configurable": llm_args},
+                    config={"configurable": llm_args, "callbacks": eval_callbacks},
                 )
                 return out, ""
 
@@ -926,7 +930,10 @@ async def run_config_model_on_questions_cot_lcel(
         out: dict = {"query": None, "error": None}
         async with heavydb_context(db):
             tables = await aextract_tables_from_query(db, gold_query)
-            out = await sql_cot_chain.ainvoke({"question": question, "tables": tables, "session_id": db._conn._session})
+            out = await sql_cot_chain.ainvoke(
+                {"question": question, "tables": tables, "session_id": db._conn._session},
+                config={"callbacks": eval_callbacks},
+            )
         return out["query"], out["error"], out["cot"]
 
     async def processor(input_queue: asyncio.Queue, output_queue: asyncio.Queue, processor_id: int):
