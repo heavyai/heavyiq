@@ -51,16 +51,13 @@ function test_for_include_all_deps() {
       "the script is being run from the wrong place"
     return
   fi
+
   ## If a local copy of pyheavydb hasn't already been added then
   ## the ./packages dir will not have been created. Hence mkdir -p
   mkdir -p ./packages
+  pip download -r $requirements_file --dest ./packages/
 
-  if [[ -z $requirements_file_rhel ]]; then
-    pip download --prefer-binary -r $requirements_file --dest ./packages/
-  else
-    ## Download additional RHEL requirements if provided
-    pip download -r $requirements_file -r $requirements_file_rhel --dest ./packages/
-
+  if [[ -n $requirements_file_rhel ]]; then
     # Replace the downloaded chromadb-0.5.3-py3-none-any.whl with the one in scripts/assets
     cp scripts/assets/chromadb-0.5.3-py3-none-any.whl ./packages/
     cp scripts/assets/pysqlite3_binary-0.5.3-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl ./packages/
