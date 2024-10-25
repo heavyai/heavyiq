@@ -89,11 +89,18 @@ class FactsModel(Base):
         """
         Bulk insert facts.
         """
-        ids = db_session.scalars(
-            insert(cls).values(heavydb_name=heavydb_name).returning(cls.id, sort_by_parameter_order=True),
-            [{"fact": fact} for fact in facts],
-        ).all()
-        db_session.commit()
+        # This works on all envs except for RHEL where we need to install pysqlite3 binary manually
+        # which does not support returning of ids upon bulk insertion
+        # so do a simple insertion of each snippet iteratively and return the final ids
+        # ids = db_session.scalars(
+        #     insert(cls).values(heavydb_name=heavydb_name).returning(cls.id, sort_by_parameter_order=True),
+        #     [{"fact": fact} for fact in facts],
+        # ).all()
+        # db_session.commit()
+        ids = []
+        for fact in facts:
+            id_ = cls.add(db_session=db_session, heavydb_name=heavydb_name, fact=fact)
+            ids.append(id_)
         return ids  # type: ignore
 
     @classmethod
