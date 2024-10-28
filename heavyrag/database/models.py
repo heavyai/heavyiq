@@ -58,14 +58,13 @@ class FactsModel(Base):
         """
         Update database fact.
         """
-        stmt = update(cls).returning(cls.id).where(cls.id == id).values(fact=fact)
+        stmt = update(cls).where(cls.id == id).values(fact=fact)
         # Execute the update statement
-        result = db_session.execute(stmt)
-        updated_id = result.fetchone()
+        db_session.execute(stmt)
         db_session.commit()
         # return the id which got updated, if there isn't any update happens
         # then a None value should be returned
-        return updated_id[0]  # type: ignore
+        return id  # type: ignore
 
     @classmethod
     def add(
@@ -109,13 +108,21 @@ class FactsModel(Base):
         Delete facts.
         """
         assert ids
-        stmt = sqldelete(cls).returning(cls.id).where(cls.id.in_(ids))
-        out = db_session.execute(stmt, execution_options={"synchronize_session": "fetch"})
-        deleted_ids = [i[0] for i in out.fetchall()]  # grab only the first value for all the returned rows
-        has_deleted = sorted(deleted_ids) == sorted(ids)
+        # Query to count existing records with the specified IDs before deletion
+        existing_count = db_session.query(cls).filter(cls.id.in_(ids)).count()
+
+        # Execute the delete statement without RETURNING
+        stmt = sqldelete(cls).where(cls.id.in_(ids))
+        db_session.execute(stmt, execution_options={"synchronize_session": "fetch"})
+
+        # Check if all records were deleted by counting remaining rows with those IDs
+        remaining_count = db_session.query(cls).filter(cls.id.in_(ids)).count()
+
+        has_deleted = (existing_count - remaining_count) == len(ids)
         if has_deleted:
-            # commit only if the passed ids and the ids which are going to be deleted are same
+            # Commit only if all specified IDs were successfully deleted
             db_session.commit()
+
         return has_deleted
 
     @classmethod
