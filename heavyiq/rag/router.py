@@ -294,8 +294,14 @@ async def get_snippet(
     with ragdb.get_db() as session:
         fact = FactsModel.get(db_session=session, id=request.snippet_id)
         if fact and fact.heavydb_name == heavydb._dbname:
-            fact_ids_on_index = [i.node_id for i in await rag_controller.list_fact_nodes(dbname=heavydb._dbname)]
-            if fact.id in fact_ids_on_index:
+            if request.verify:
+                fact_nodes_on_index = await rag_controller.list_fact_nodes(dbname=heavydb._dbname)
+                fact_ids_on_index = [i.node_id for i in fact_nodes_on_index]
+                if fact.id in fact_ids_on_index:
+                    return md.SnippetResponse(
+                        snippet=fact.fact, snippet_id=fact.id, created_at=fact.created_at, updated_at=fact.updated_at
+                    )
+            else:
                 return md.SnippetResponse(
                     snippet=fact.fact, snippet_id=fact.id, created_at=fact.created_at, updated_at=fact.updated_at
                 )
