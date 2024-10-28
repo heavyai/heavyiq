@@ -137,11 +137,19 @@ class GetSnippetRequest(BaseModelWithSessionID):
     """
 
     snippet_id: str = Field(..., description="Snippet database record ID")
+    verify: bool = Field(
+        default=False,
+        description="Verify the snippet available on ragdb against the vectorstore index. If true, then the endpoint should return only the snippets which has corresponding embeddings on vectordb.",
+    )
 
     class Config:
         json_schema_extra = {
             "examples": [
-                {"session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "snippet_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxv"}
+                {
+                    "session_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+                    "snippet_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxv",
+                    "verify": False,
+                }
             ]
         }
 
