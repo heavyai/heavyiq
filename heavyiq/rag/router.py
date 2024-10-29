@@ -326,7 +326,7 @@ async def delete_snippets(
                     return md.DeleteSnippetResponse(deleted=True)
                 except Exception as e:
                     logger.error(f"Failed to delete snippet on RAG index, {e}")
-            return md.DeleteSnippetResponse(deleted=False)
+            return md.DeleteSnippetResponse(deleted=deleted)
 
         except Exception as e:
             raise e
