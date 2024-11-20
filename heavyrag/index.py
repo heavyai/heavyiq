@@ -75,14 +75,18 @@ def get_or_create_index(
 
 def get_index(collection_name: str | None = None) -> BaseIndex | None:
     """
-    Get index only by collection name.
+    Get index only by collection name. If no collection exists then simply return None.
     """
-    vector_store = get_vectorstore(collection_name, create_collection_if_not_exists=False)
-    if not vector_store:
+    try:
+        vector_store = get_vectorstore(collection_name, create_collection_if_not_exists=False)
+        if not vector_store:
+            return None
+        storage_context = StorageContext.from_defaults(vector_store=vector_store, persist_dir=vectordb_persist_dir)
+        index = load_index_from_storage(storage_context=storage_context, embed_model=embed_model)
+        return index
+    except Exception as e:
+        logger.warning(str(e))
         return None
-    storage_context = StorageContext.from_defaults(vector_store=vector_store, persist_dir=vectordb_persist_dir)
-    index = load_index_from_storage(storage_context=storage_context, embed_model=embed_model)
-    return index
 
 
 async def acreate_index_and_insert_nodes(
