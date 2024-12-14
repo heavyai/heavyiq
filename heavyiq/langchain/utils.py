@@ -126,6 +126,7 @@ def get_table_info_wrt_token_limit(
             {"include_samples": False, "include_top_k": False},
         ]
     else:
+        token_counter = custom_model_token_counter
         token_limit = llm.context_window - 306  # type: ignore # (256 response + 50 buffer)
         table_info_options = [
             {"include_samples": False},
@@ -135,7 +136,7 @@ def get_table_info_wrt_token_limit(
     for options in table_info_options:
         table_info = heavydb.get_table_info(table_names=table_names_to_use, **options)
         formatted_prompt = prompt.format(table_info=table_info)
-        if custom_model_token_counter(formatted_prompt) <= token_limit:
+        if token_counter(formatted_prompt) <= token_limit:
             break
     else:  # executed if the loop finished normally (no break)
         raise RuntimeError("Couldn't find suitable prompt provided token limit")
