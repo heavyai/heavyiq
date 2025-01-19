@@ -29,7 +29,10 @@ def aoverride_config(func):
         heavyiq_config = kwargs.get("heavyiq_config")
         if not heavyiq_config:
             raise ValueError("TestCase expects heavyiq_config fixture.")
-        with patch("heavyiq.config.get_config", return_value=heavyiq_config):
+        # disable refresh cache for tables
+        with patch("heavyiq.config.get_config", return_value=heavyiq_config), patch(
+            "heavyiq.langchain.utils.refresh_cache_for_tables", return_value=None
+        ):
             await func(*args, **kwargs)
 
     return wrapper

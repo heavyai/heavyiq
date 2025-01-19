@@ -20,10 +20,11 @@ def override_heavydb_client():
     """
     HeavyDB instance created from the parameters defined on the passed config file.
     """
-    print("Creating heavydb mock client")
     from tests.conftest import CONFIG_FILE
 
     assert CONFIG_FILE
+
+    print(f"Creating heavydb mock client using the config file, {CONFIG_FILE}")
 
     new_source = FileSource(file=CONFIG_FILE)
     try:

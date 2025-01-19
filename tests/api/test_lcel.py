@@ -7,17 +7,17 @@ from tests import aoverride_config, override_config
 
 @pytest.mark.anyio
 @aoverride_config
-async def test_should_pass_lcel_query_endpoint(heavyiq_config, aclient, asession_id):
+async def test_should_pass_lcel_query_endpoint(heavyiq_config, client, session_id):
     """
     Test LCEL query endpoint.
     """
 
     payload = {
-        "session_id": asession_id,  # type: ignore
+        "session_id": session_id,  # type: ignore
         "question": "How many states begin with the letter A? What are they?",
-        "tables": ["usa_states"],
+        "tables": ["heavyai_us_states"],
     }
-    response = await aclient.post("/api/v1/lcel/query", json=payload)
+    response = client.post("/api/v1/lcel/query", json=payload)
     assert response.status_code == 200
     response_json = response.json()
     assert response_json["sql"]
@@ -26,17 +26,17 @@ async def test_should_pass_lcel_query_endpoint(heavyiq_config, aclient, asession
 
 @pytest.mark.anyio
 @aoverride_config
-async def test_should_pass_lcel_question_endpoint(heavyiq_config, aclient, asession_id):
+async def test_should_pass_lcel_question_endpoint(heavyiq_config, client, session_id):
     """
     Test LCEL question endpoint.
     """
 
     payload = {
-        "session_id": asession_id,  # type: ignore
+        "session_id": session_id,  # type: ignore
         "question": "How many states begin with the letter A? What are they?",
-        "tables": ["usa_states"],
+        "tables": ["heavyai_us_states"],
     }
-    response = await aclient.post("/api/v1/lcel/question", json=payload)
+    response = client.post("/api/v1/lcel/question", json=payload)
     assert response.status_code == 200
     response_json = response.json()
     assert response_json["answer"]
@@ -47,35 +47,35 @@ async def test_should_pass_lcel_question_endpoint(heavyiq_config, aclient, asess
 
 @pytest.mark.anyio
 @aoverride_config
-async def test_should_pass_lcel_tables_endpoint(heavyiq_config, aclient, asession_id):
+async def test_should_pass_lcel_tables_endpoint(heavyiq_config, client, session_id):
     """
     Test LCEL tables endpoint.
     """
 
     payload = {
-        "session_id": asession_id,  # type: ignore
+        "session_id": session_id,  # type: ignore
         "question": "How many states begin with the letter A? What are they?",
-        "allowed_tables": ["usa_states", "countries"],
+        "allowed_tables": ["heavyai_us_states", "heavyai_countries"],
     }
-    response = await aclient.post("/api/v1/lcel/tables", json=payload)
+    response = client.post("/api/v1/lcel/tables", json=payload)
     assert response.status_code == 200
     response_json = response.json()
-    assert response_json["tables"]["usa_states"] == 1
-    assert response_json["tables"]["countries"] == 0
+    assert response_json["tables"]["heavyai_us_states"] == 1
+    assert response_json["tables"]["heavyai_countries"] == 0
 
 
 @pytest.mark.anyio
 @aoverride_config
-async def test_should_pass_lcel_auto_query_endpoint(heavyiq_config, aclient, asession_id):
+async def test_should_pass_lcel_auto_query_endpoint(heavyiq_config, client, session_id):
     """
     Test LCEL auto table query endpoint.
     """
     payload = {
-        "session_id": asession_id,  # type: ignore
+        "session_id": session_id,  # type: ignore
         "question": "How many states begin with the letter A? What are they?",
-        "allowed_tables": ["usa_states", "countries"],
+        "allowed_tables": ["heavyai_us_states", "heavyai_countries"],
     }
-    response = await aclient.post("/api/v1/lcel/auto/query", json=payload)
+    response = client.post("/api/v1/lcel/auto/query", json=payload)
     assert response.status_code == 200
     response_json = response.json()
     assert response_json["sql"]
@@ -84,17 +84,17 @@ async def test_should_pass_lcel_auto_query_endpoint(heavyiq_config, aclient, ase
 
 @pytest.mark.anyio
 @aoverride_config
-async def test_should_pass_lcel_auto_question_endpoint(heavyiq_config, aclient, asession_id):
+async def test_should_pass_lcel_auto_question_endpoint(heavyiq_config, client, session_id):
     """
     Test LCEL auto table question endpoint.
     """
-    assert asession_id, "Invalid session"
+    assert session_id, "Invalid session"
     payload = {
-        "session_id": asession_id,
+        "session_id": session_id,
         "question": "How many states begin with the letter A? What are they?",
-        "allowed_tables": ["usa_states", "countries"],
+        "allowed_tables": ["heavyai_us_states", "heavyai_countries"],
     }
-    response = await aclient.post("/api/v1/lcel/auto/question", json=payload)
+    response = client.post("/api/v1/lcel/auto/question", json=payload)
     assert response.status_code == 200
     response_json = response.json()
     assert response_json["answer"]
@@ -105,18 +105,18 @@ async def test_should_pass_lcel_auto_question_endpoint(heavyiq_config, aclient, 
 
 @pytest.mark.anyio
 @override_config
-async def test_should_pass_lcel_answer_endpoint(heavyiq_config, aclient, asession_id):
+async def test_should_pass_lcel_answer_endpoint(heavyiq_config, client, session_id):
     """
     Test LCEL answer endpoint.
     """
 
     payload = {
-        "session_id": asession_id,
-        "query": "SELECT COUNT(DISTINCT STATE_NAME) AS count_states, STATE_NAME FROM usa_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;",
+        "session_id": session_id,
+        "query": "SELECT COUNT(DISTINCT STATE_NAME) AS count_states, STATE_NAME FROM heavyai_us_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;",
         "question": "How many states begin with the letter A? What are they?",
-        "tables": ["usa_states"],
+        "tables": ["heavyai_us_states"],
     }
-    response = await aclient.post("/api/v1/lcel/answer", json=payload)
+    response = client.post("/api/v1/lcel/answer", json=payload)
     assert response.status_code == 200
     response_json = response.json()
     assert response_json["answer"]
@@ -127,7 +127,7 @@ async def test_should_pass_lcel_answer_endpoint(heavyiq_config, aclient, asessio
 
 @pytest.mark.anyio
 @override_config
-async def test_should_pass_call_llm_endpoint(heavyiq_config, aclient):
+async def test_should_pass_call_llm_endpoint(heavyiq_config, client):
     """
     Test LCEL answer endpoint.
     """
@@ -138,7 +138,7 @@ async def test_should_pass_call_llm_endpoint(heavyiq_config, aclient):
         "max_tokens": 256,
         "stop": ["is the capital"],
     }
-    response = await aclient.post("/llm/call-llm", json=payload)
+    response = client.post("/llm/call-llm", json=payload)
     assert response.status_code == 200
     response_json = response.json()
     assert response_json["response"] == "Boise"
