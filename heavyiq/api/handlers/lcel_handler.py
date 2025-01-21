@@ -306,6 +306,10 @@ async def handle_submit_feedback(request: FeedbackRequest) -> FeedbackResponse:
     """
     Handle feedback submission.
     """
+    from heavyiq.langchain.utils import is_langsmith_active
+
+    if not is_langsmith_active:
+        raise HTTPException(status_code=500, detail="Langsmith is not enabled in the config.")
     try:
         client = Client()
         client.create_feedback(
