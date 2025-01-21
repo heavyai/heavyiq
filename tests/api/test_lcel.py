@@ -1,13 +1,15 @@
 # Test LCEL query endpoints (integration tests)
 
 import pytest
+from fastapi.testclient import TestClient
 
+from heavyiq.config import HeavyIQConfig
 from tests import aoverride_config, override_config
 
 
 @pytest.mark.anyio
 @aoverride_config
-async def test_should_pass_lcel_query_endpoint(heavyiq_config, client, session_id):
+async def test_should_pass_lcel_query_endpoint(heavyiq_config: HeavyIQConfig, client: TestClient, session_id: str):
     """
     Test LCEL query endpoint.
     """
@@ -26,7 +28,7 @@ async def test_should_pass_lcel_query_endpoint(heavyiq_config, client, session_i
 
 @pytest.mark.anyio
 @aoverride_config
-async def test_should_pass_lcel_question_endpoint(heavyiq_config, client, session_id):
+async def test_should_pass_lcel_question_endpoint(heavyiq_config: HeavyIQConfig, client: TestClient, session_id: str):
     """
     Test LCEL question endpoint.
     """
@@ -47,7 +49,7 @@ async def test_should_pass_lcel_question_endpoint(heavyiq_config, client, sessio
 
 @pytest.mark.anyio
 @aoverride_config
-async def test_should_pass_lcel_tables_endpoint(heavyiq_config, client, session_id):
+async def test_should_pass_lcel_tables_endpoint(heavyiq_config: HeavyIQConfig, client: TestClient, session_id: str):
     """
     Test LCEL tables endpoint.
     """
@@ -66,7 +68,7 @@ async def test_should_pass_lcel_tables_endpoint(heavyiq_config, client, session_
 
 @pytest.mark.anyio
 @aoverride_config
-async def test_should_pass_lcel_auto_query_endpoint(heavyiq_config, client, session_id):
+async def test_should_pass_lcel_auto_query_endpoint(heavyiq_config: HeavyIQConfig, client: TestClient, session_id: str):
     """
     Test LCEL auto table query endpoint.
     """
@@ -84,7 +86,9 @@ async def test_should_pass_lcel_auto_query_endpoint(heavyiq_config, client, sess
 
 @pytest.mark.anyio
 @aoverride_config
-async def test_should_pass_lcel_auto_question_endpoint(heavyiq_config, client, session_id):
+async def test_should_pass_lcel_auto_question_endpoint(
+    heavyiq_config: HeavyIQConfig, client: TestClient, session_id: str
+):
     """
     Test LCEL auto table question endpoint.
     """
@@ -105,7 +109,7 @@ async def test_should_pass_lcel_auto_question_endpoint(heavyiq_config, client, s
 
 @pytest.mark.anyio
 @override_config
-async def test_should_pass_lcel_answer_endpoint(heavyiq_config, client, session_id):
+async def test_should_pass_lcel_answer_endpoint(heavyiq_config: HeavyIQConfig, client: TestClient, session_id: str):
     """
     Test LCEL answer endpoint.
     """
@@ -127,7 +131,7 @@ async def test_should_pass_lcel_answer_endpoint(heavyiq_config, client, session_
 
 @pytest.mark.anyio
 @override_config
-async def test_should_pass_call_llm_endpoint(heavyiq_config, client):
+async def test_should_pass_call_llm_endpoint(heavyiq_config: HeavyIQConfig, client: TestClient):
     """
     Test LCEL answer endpoint.
     """
