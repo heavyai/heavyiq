@@ -1,8 +1,12 @@
 import functools
+from typing import Callable, TypeVar, cast
 from unittest.mock import patch
 
+# Define a generic type variable for the function inorder to preserve the method signature
+F = TypeVar("F", bound=Callable)
 
-def override_config(func):
+
+def override_config(func: F) -> F:
     """
     Decorator function added to testcase which overrides underlying get_config method
     to return a altered HeavyIQConfig instance from heavyiq_config fixture.
@@ -16,10 +20,10 @@ def override_config(func):
         with patch("heavyiq.config.get_config", return_value=heavyiq_config):
             func(*args, **kwargs)
 
-    return wrapper
+    return cast(F, wrapper)
 
 
-def aoverride_config(func):
+def aoverride_config(func: F) -> F:
     """
     async equivalent of override_config decorator.
     """
@@ -35,4 +39,4 @@ def aoverride_config(func):
         ):
             await func(*args, **kwargs)
 
-    return wrapper
+    return cast(F, wrapper)

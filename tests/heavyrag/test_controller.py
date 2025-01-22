@@ -1,13 +1,15 @@
 # Test RAG controller module (unittests)
-import os
-import shutil
-from unittest.mock import PropertyMock, patch
+from collections.abc import Generator
+from typing import TYPE_CHECKING
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
 
-from heavyiq.config import HeavyIQConfig, get_config
-from tests import aoverride_config
+from heavyiq.config import HeavyIQConfig
+
+if TYPE_CHECKING:
+    from heavyrag.controller import BaseController
 
 
 def get_uuid() -> str:
@@ -50,7 +52,7 @@ def delete_all_collections():
 
 
 @pytest.fixture(scope="function")
-def chroma_controller_patch(heavyiq_config: HeavyIQConfig):
+def chroma_controller_patch(heavyiq_config: HeavyIQConfig) -> Generator["BaseController", None, None]:
     """
     Overrided config w.r.t chroma vectorstore
     """
@@ -69,7 +71,7 @@ def chroma_controller_patch(heavyiq_config: HeavyIQConfig):
 
 
 @pytest.fixture(scope="function")
-def faiss_controller_patch(heavyiq_config: HeavyIQConfig):
+def faiss_controller_patch(heavyiq_config: HeavyIQConfig) -> Generator["BaseController", None, None]:
     """
     Overrided config w.r.t faiss vectorstore
     """
@@ -89,7 +91,9 @@ def faiss_controller_patch(heavyiq_config: HeavyIQConfig):
 
 
 @pytest.mark.anyio
-async def test_chroma_vectorstore_passes_facts_insert_and_list(chroma_controller_patch, facts_data):
+async def test_chroma_vectorstore_passes_facts_insert_and_list(
+    chroma_controller_patch: "BaseController", facts_data: list
+):
     """
     Test insert/listing facts on chroma vectorstore.
     """
@@ -104,7 +108,7 @@ async def test_chroma_vectorstore_passes_facts_insert_and_list(chroma_controller
 
 
 @pytest.mark.anyio
-async def test_chroma_vectorstore_passes_facts_delete(chroma_controller_patch, facts_data):
+async def test_chroma_vectorstore_passes_facts_delete(chroma_controller_patch: "BaseController", facts_data: list):
     """
     Test insert/listing facts on chroma vectorstore.
     """
@@ -135,7 +139,9 @@ async def test_chroma_vectorstore_passes_facts_delete(chroma_controller_patch, f
 
 
 @pytest.mark.anyio
-async def test_faiss_vectorstore_passes_facts_insert_and_list(faiss_controller_patch, facts_data):
+async def test_faiss_vectorstore_passes_facts_insert_and_list(
+    faiss_controller_patch: "BaseController", facts_data: list
+):
     """
     Test insert/listing facts on faiss vectorstore.
     """
@@ -150,7 +156,7 @@ async def test_faiss_vectorstore_passes_facts_insert_and_list(faiss_controller_p
 
 
 @pytest.mark.anyio
-async def test_faiss_vectorstore_passes_facts_delete(faiss_controller_patch, facts_data):
+async def test_faiss_vectorstore_passes_facts_delete(faiss_controller_patch: "BaseController", facts_data: list):
     """
     Test insert/listing facts on chroma vectorstore.
     """
