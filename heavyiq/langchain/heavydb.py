@@ -12,7 +12,8 @@ from contextvars import ContextVar
 from copy import deepcopy
 from multiprocessing.managers import SyncManager
 from threading import Lock
-from typing import Any, Callable, Iterator, NamedTuple, Optional, Sequence, TypedDict
+from typing import (Any, Callable, Iterator, NamedTuple, Optional, Sequence,
+                    TypedDict)
 
 import anyio
 from async_lru import alru_cache
@@ -23,7 +24,8 @@ from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
 from heavyiq.langchain.heavydb_utils import DB_KEYWORDS
-from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
+from heavyiq.utils import (LRUCache, calc_query_stats, is_destructive_sql,
+                           rate_sql_complexity, strip_sql_comments)
 
 
 class CustomColumnDetails(NamedTuple):
@@ -336,7 +338,7 @@ class HeavyDB:
         return cls(conn, **kwargs)
 
     @classmethod
-    @alru_cache(maxsize=128)
+    @alru_cache(maxsize=128, ttl=60 * 5)
     async def _from_session_async_cached(cls: type[HeavyDB], session_id: str, **kwargs: Any) -> HeavyDB:
         """
         Creates a current class instance (which further establishes heavydb connection)

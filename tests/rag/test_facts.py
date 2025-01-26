@@ -3,6 +3,8 @@ from collections.abc import Generator
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
+# import faiss on test module is must or otherwise we should endup in segmentation fault error upon running tcs
+import faiss
 import pytest
 from fastapi.exceptions import HTTPException
 from fastapi.testclient import TestClient
@@ -241,3 +243,75 @@ async def test_delete_snippets_success(
     # check for the facts exists in the RAG index
     node_ids = [i.node_id for i in nodes]
     assert snippet_ids[0] not in node_ids
+
+
+@pytest.mark.anyio
+@aoverride_config
+async def test_sync_snippets_success(
+    heavyiq_config: HeavyIQConfig, pre_clean_table: None, ragdb: "Database", client: TestClient, session_id: str
+):
+    """
+    Test Sync snippets through `/rag/snippets/sync` endpoint.
+    ie. Makes sure the snippet exists on ragdb should have the relevant entry/node on the vectordb ("chroma", "faiss) index.
+    """
+    from heavyrag.controller import rag_controller
+    from heavyrag.database.models import FactsModel
+
+    # create an entry on Facts table, run sync and finally check for relevant node existence in vectorstore.
+    fact, fact_id = "Can you find this fact on vectorstore?", None
+    with ragdb.get_db() as session:
+        fact_id = FactsModel.add(db_session=session, heavydb_name=heavyiq_config.heavydb_dbname, fact=fact)
+    assert fact_id
+
+    payload = {"session_id": session_id, "force": False}  # type: ignore
+    response = client.post("/rag/snippets/sync", json=payload)
+    assert response.status_code == 200
+    response_json = response.json()
+    assert response_json["success"] is True
+
+    nodes = await rag_controller.list_fact_nodes(dbname=heavyiq_config.heavydb_dbname)  # type: ignore
+    # check for the facts exists in the RAG index
+    texts = [i.text for i in nodes]
+    assert fact in texts
+
+
+@pytest.mark.anyio
+@aoverride_config
+async def test_search_snippets_success(
+    heavyiq_config: HeavyIQConfig,
+    pre_clean_table: None,
+    ragdb: "Database",
+    client: TestClient,
+    session_id: str,
+):
+    """
+    Test Search snippets through `/rag/snippets/search` endpoint.
+    """
+    # from heavyrag.vector_stores.faiss import FaissIQVectorStore
+
+    # create an entry on Facts table
+    snippets = [
+        "Python is a versatile programming language used widely for web development, data analysis, and machine learning.",
+        "Django is a popular Python framework for building secure and scalable web applications.",
+        "FastAPI is a modern, fast web framework for building APIs with Python, leveraging asynchronous capabilities.",
+        "NumPy and Pandas are powerful libraries in Python for numerical computation and data manipulation.",
+        "SQLAlchemy is an ORM library in Python that simplifies database operations.",
+        "Python supports multiple programming paradigms, including procedural, object-oriented, and functional programming.",
+        "Machine learning models can be developed using libraries like Scikit-learn and TensorFlow in Python.",
+        "Python's standard library provides extensive functionality, reducing the need for third-party dependencies.",
+        "Testing in Python is streamlined with frameworks like pytest and unittest.",
+        "Jupyter Notebooks are widely used for interactive data analysis and visualization in Python.",
+    ]
+    payload = {"session_id": session_id, "snippets": snippets}
+    response = client.post("/rag/snippets/bulk-insert", json=payload)
+    assert response.status_code == 200
+
+    question = "Which Python libraries are used for numerical computation and data manipulation?"
+    expected_answer = (
+        "NumPy and Pandas are powerful libraries in Python for numerical computation and data manipulation."
+    )
+    payload: dict[str, str | int] = {"session_id": session_id, "question": question, "top_k": 2}
+    response = client.post("/rag/snippets/search", json=payload)
+    assert response.status_code == 200
+    response_json = response.json()
+    assert expected_answer in [i["content"] for i in response_json["nodes"]]
