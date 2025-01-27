@@ -11,50 +11,12 @@ from fastapi.testclient import TestClient
 
 from heavyiq.config import HeavyIQConfig
 from tests import aoverride_config
-from tests.api.conftest import client, session_id
+from tests.api.conftest import client
+from tests.fixtures.app_fixtures import session_id
+from tests.fixtures.rag_fixtures import pre_clean_table, ragdb
 
 if TYPE_CHECKING:
     from heavyrag.database.base import Database
-
-
-@pytest.fixture(scope="module")
-def ragdb(heavyiq_config: HeavyIQConfig) -> Generator["Database", None, None]:
-
-    with patch("heavyrag.database.base.config", heavyiq_config), patch("heavyrag.embed.CONFIG", heavyiq_config):
-
-        from heavyiq.api import rag_initialize
-        from heavyrag.database import ragdb
-
-        rag_initialize()
-        yield ragdb
-        # Extract the file path from the URI
-        if ragdb.database_uri.startswith("sqlite:///"):
-            file_path = ragdb.database_uri.replace("sqlite:///", "", 1)  # Remove the "sqlite:///" prefix
-            # Check if the file exists
-            if os.path.exists(file_path):
-                # Delete the file
-                os.remove(file_path)
-                print(f"Database file '{file_path}' has been deleted.")
-            else:
-                print(f"Database file '{file_path}' does not exist.")
-        else:
-            print("Invalid SQLite URI format.")
-
-
-@pytest.fixture(scope="function")
-async def pre_clean_table(heavyiq_config: HeavyIQConfig, ragdb: "Database"):
-    """
-    Fixture which helps to clean/delete all records in facts table and RAG index before running each testcase.
-    """
-    from heavyrag.controller import rag_controller
-    from heavyrag.database.models import FactsModel
-
-    dbname = heavyiq_config.heavydb_dbname
-    with ragdb.get_db() as session:
-        FactsModel.delete_facts_by_database(db_session=session, heavydb_name=dbname)
-
-    await rag_controller.delete_fact_nodes(dbname=dbname)
-    yield
 
 
 @pytest.mark.anyio
@@ -287,9 +249,7 @@ async def test_search_snippets_success(
     """
     Test Search snippets through `/rag/snippets/search` endpoint.
     """
-    # from heavyrag.vector_stores.faiss import FaissIQVectorStore
-
-    # create an entry on Facts table
+    # create entries on Facts table as well as on vectorstore
     snippets = [
         "Python is a versatile programming language used widely for web development, data analysis, and machine learning.",
         "Django is a popular Python framework for building secure and scalable web applications.",
@@ -315,3 +275,85 @@ async def test_search_snippets_success(
     assert response.status_code == 200
     response_json = response.json()
     assert expected_answer in [i["content"] for i in response_json["nodes"]]
+
+
+@pytest.mark.anyio
+@aoverride_config
+async def test_list_snippets_success(
+    heavyiq_config: HeavyIQConfig,
+    pre_clean_table: None,
+    ragdb: "Database",
+    client: TestClient,
+    session_id: str,  # type: ignore
+):
+    """
+    Test list snippets using `/rag/snippets/list` endpoint.
+    """
+    # from heavyrag.vector_stores.faiss import FaissIQVectorStore
+    snippets = [
+        "Python is a versatile programming language used widely for web development, data analysis, and machine learning.",
+        "Django is a popular Python framework for building secure and scalable web applications.",
+        "FastAPI is a modern, fast web framework for building APIs with Python, leveraging asynchronous capabilities.",
+        "NumPy and Pandas are powerful libraries in Python for numerical computation and data manipulation.",
+        "SQLAlchemy is an ORM library in Python that simplifies database operations.",
+        "Python supports multiple programming paradigms, including procedural, object-oriented, and functional programming.",
+        "Machine learning models can be developed using libraries like Scikit-learn and TensorFlow in Python.",
+        "Python's standard library provides extensive functionality, reducing the need for third-party dependencies.",
+        "Testing in Python is streamlined with frameworks like pytest and unittest.",
+        "Jupyter Notebooks are widely used for interactive data analysis and visualization in Python.",
+    ]
+    payload = {"session_id": session_id, "snippets": snippets}
+    response = client.post("/rag/snippets/bulk-insert", json=payload)
+    assert response.status_code == 200
+
+    payload: dict[str, str | bool] = {
+        "session_id": session_id,
+        "verify": True,
+    }  # verify=True makes sure that the fact/snippet exists on both ragdb and vectordb
+    response = client.post("/rag/snippets/list", json=payload)
+    assert response.status_code == 200
+    response_json = response.json()
+    inserted_snippets = [i["snippet"] for i in response_json["snippets"]]
+    for snippet in snippets:
+        assert snippet in inserted_snippets
+
+
+@pytest.mark.anyio
+@aoverride_config
+async def test_delete_all_snippets_success(
+    heavyiq_config: HeavyIQConfig,
+    pre_clean_table: None,
+    ragdb: "Database",
+    client: TestClient,
+    session_id: str,  # type: ignore
+):
+    """
+    Test delete all snippets using `/rag/snippets/delete_all` endpoint.
+    """
+    from heavyrag.database.models import FactsModel
+
+    snippets = [
+        "Python is a versatile programming language used widely for web development, data analysis, and machine learning.",
+        "Django is a popular Python framework for building secure and scalable web applications.",
+        "FastAPI is a modern, fast web framework for building APIs with Python, leveraging asynchronous capabilities.",
+        "NumPy and Pandas are powerful libraries in Python for numerical computation and data manipulation.",
+        "SQLAlchemy is an ORM library in Python that simplifies database operations.",
+        "Python supports multiple programming paradigms, including procedural, object-oriented, and functional programming.",
+        "Machine learning models can be developed using libraries like Scikit-learn and TensorFlow in Python.",
+        "Python's standard library provides extensive functionality, reducing the need for third-party dependencies.",
+        "Testing in Python is streamlined with frameworks like pytest and unittest.",
+        "Jupyter Notebooks are widely used for interactive data analysis and visualization in Python.",
+    ]
+    payload = {"session_id": session_id, "snippets": snippets}
+    response = client.post("/rag/snippets/bulk-insert", json=payload)
+    assert response.status_code == 200
+
+    payload = {"session_id": session_id}
+    response = client.post("/rag/snippets/delete_all", json=payload)
+    assert response.status_code == 200
+    response_json = response.json()
+    assert response_json["deleted"] == True
+
+    with ragdb.get_db() as session:
+        facts = FactsModel.list(db_session=session, heavydb_name=heavyiq_config.heavydb_dbname)
+        assert not facts
