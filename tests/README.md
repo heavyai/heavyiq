@@ -9,7 +9,7 @@ Set the relevant configuration flags required for establishing the HeavyDB conne
 ```toml
 [iq]
 
-heavydb_host = "138.2.234.112" # 
+heavydb_host = "0.0.0.0"
 heavydb_port = 6274
 heavydb_dbname = "heavyai" # heavyai, overture_wa
 heavydb_username = "admin"
