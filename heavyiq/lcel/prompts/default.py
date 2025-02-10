@@ -133,3 +133,60 @@ DEFAULT_NL_TO_SQL_COT_ERROR_PROMPT = (
     DEFAULT_NL_TO_SQL_ERROR_PROMPT[1],
     "\n<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
 )
+
+CHART_GUIDELINES_AND_EXPECTED_OUTPUT = """Guidelines for Generating Vega-Lite Specification:
+	•	Ensure the Vega-Lite JSON is fully valid and follows the latest Vega-Lite v5 schema.
+	•	Select an appropriate visualization type (mark) based on the user’s intent.
+	•	Encode X and Y axes based on the projected columns in the SQL query.
+	•	Use color, size, shape, and tooltips if necessary to enhance the visualization.
+	•	Assign appropriate data types:
+	•	Use "type": "nominal" for categorical data (e.g., state, region).
+	•	Use "type": "quantitative" for numerical values (e.g., sales, revenue).
+	•	If a column is related to time, set "type": "temporal" and format it correctly.
+	•	Ensure scaling, legends, and axis labels are correctly applied.
+	•	Use meaningful tooltips to display additional information.
+	•	The visualization should reference the data dynamically but should not include example data in the "values" section.
+
+Expected Output:
+	•	Return only a valid Vega-Lite JSON specification, without any extra explanation.
+	•	Replace the "values" field with {data_placeholder} to indicate that real data will be injected dynamically.
+"""
+
+DEFAULT_NL_TO_VEGA_LITE_SPEC_PROMPT = (
+    """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are an expert in data visualization and the Vega-Lite specification language. Your task is to generate complete and valid **Vega-Lite JSON specifications** based on user requirements.
+
+- Follow the **Vega-Lite schema** (https://vega.github.io/schema/vega-lite/v5.json).
+- Ensure the output is correctly formatted as a **JSON specification** without any additional explanations.
+- Use **inline data** for demonstration unless specified otherwise.
+- Support **customization options**, including:
+  - Different chart types (bar, line, scatter, etc.)
+  - Custom X and Y axes
+  - Color encoding based on a categorical field
+  - Interactive features (filters, selections, tooltips, etc.)
+- Always return a **fully structured Vega-Lite specification** without extra text.
+
+Expected Output:
+- Return only a valid Vega-Lite JSON specification without any extra explanation.
+- Replace the `"values"` field with `{data_placeholder}` to indicate that real data will be injected dynamically.<|eot_id|>
+<|start_header_id|>user<|end_header_id|>\n""",
+    """You are an expert in data visualization and the Vega-Lite specification language. Your task is to generate a complete and valid **Vega-Lite JSON specification** based on the given user requirements.
+
+### **Input Information:**
+**Table Schemas:**
+{table_schema}
+
+**SQL Query:**
+```sql
+{sql_query}
+```
+
+### Sample Data (For Reference Only):
+The following sample data represents the structure and expected values of the dataset:
+{sample_data}
+
+Generate an appropriate Vega Lite spec based on the below user's question.
+"{question}"
+""",
+    """<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n""",
+)

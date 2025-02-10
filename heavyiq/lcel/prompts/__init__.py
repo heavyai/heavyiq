@@ -23,6 +23,7 @@ CUSTOM_NL_TO_SQL_COT_ERROR_TEMPLATE = get_prompt_by_llm_type(LLMType.NL_TO_SQL_C
 CUSTOM_NL_TO_MULTIPLE_SQL_JUDGE_TEMPLATE = get_prompt_by_llm_type(
     LLMType.NL_TO_MULTIPLE_SQL_JUDGE, prompt_type="custom"
 )
+CUSTOM_NL_TO_VEGA_LITE_TEMPLATE = get_prompt_by_llm_type(LLMType.NL_TO_VEGA_LITE, prompt_type="custom")
 
 to_sql_prompt_runnable = PromptTemplate.from_template(NL_TO_SQL_TEMPLATE).configurable_alternatives(
     # This gives this field an id
@@ -65,3 +66,5 @@ to_sql_with_cot_prompt_runnable = PromptTemplate.from_template(NL_TO_SQL_COT_TEM
 )
 
 multiple_sql_judge_prompt = PromptTemplate.from_template(CUSTOM_NL_TO_MULTIPLE_SQL_JUDGE_TEMPLATE)
+
+to_vega_lite_prompt_runnable = PromptTemplate.from_template(CUSTOM_NL_TO_VEGA_LITE_TEMPLATE)
