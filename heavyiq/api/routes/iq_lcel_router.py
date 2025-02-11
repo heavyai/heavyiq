@@ -9,8 +9,10 @@ from heavyiq.api.dependencies import (
     valid_question_db_session,
     valid_tables_db_session,
     valid_tables_to_questions_db_session,
+    valid_vega_db_session,
 )
 from heavyiq.api.handlers import (
+    handle_generate_vega_spec_request,
     handle_lcel_answer_request,
     handle_lcel_auto_query_request,
     handle_lcel_auto_question_request,
@@ -28,6 +30,8 @@ from heavyiq.api.models import (
     AutoQuestionRequest,
     AutoQuestionResponse,
     COTQueryResponse,
+    GenerateVegaLiteRequest,
+    GenerateVegaLiteResponse,
     QueryRequest,
     QueryResponse,
     QuestionRequest,
@@ -157,3 +161,22 @@ async def query_with_cot(values: tuple[QueryRequest, HeavyDB] = Depends(valid_qu
     :param QueryRequest: Request Body
     """
     return await handle_lcel_cot_query_request(*values)
+
+
+@lcelrouter.post("/generate-vega", response_model=GenerateVegaLiteResponse)
+async def generate_vega_spec(
+    values: tuple[GenerateVegaLiteRequest, HeavyDB] = Depends(valid_vega_db_session)
+) -> GenerateVegaLiteResponse:
+    """
+    Generates a Vega-Lite specification based on the given input parameters.
+
+    - **question**: The natural language question being visualized.
+    - **query**: The corresponding SQL query.
+    - **tables**: The list of tables used in the query.
+    - **session_id**: The HeavyDB session identifier.
+
+    \f
+    :param values: Tuple containing GenerateVegaLiteRequest and HeavyDB instance.
+    :return: A Vega-Lite specification response.
+    """
+    return await handle_generate_vega_spec_request(*values)

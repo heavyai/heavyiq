@@ -5,6 +5,7 @@ from heavyiq.api.models import (
     AutoQueryRequest,
     AutoQuestionRequest,
     GenerateTableMetadataRequest,
+    GenerateVegaLiteRequest,
     QueryRequest,
     QuestionRequest,
     TablesRequest,
@@ -13,9 +14,19 @@ from heavyiq.api.models import (
 from heavyiq.langchain import HeavyDB
 
 
-async def valid_answer_db_session(request: AnswerRequest = Body(...)) -> tuple[AnswerRequest, HeavyDB]:
+async def valid_vega_db_session(
+    request: GenerateVegaLiteRequest = Body(...),
+) -> tuple[GenerateVegaLiteRequest, HeavyDB]:
     """
     Common db dependency.
+    """
+    db = await HeavyDB.from_session_async(request.session_id, include_tables=request.tables)  # type: ignore
+    return request, db
+
+
+async def valid_answer_db_session(request: AnswerRequest = Body(...)) -> tuple[AnswerRequest, HeavyDB]:
+    """
+    DB dependency for answer endpoint.
     """
     db = await HeavyDB.from_session_async(request.session_id, include_tables=request.tables)  # type: ignore
 

@@ -1,10 +1,11 @@
 import asyncio
+import json
 import re
 from collections import defaultdict
 from typing import Any, Sequence, cast
 
 from langchain.schema.runnable import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
-from langchain_core.pydantic_v1 import BaseModel, Field
+from langchain_core.pydantic_v1 import BaseModel, Field, Json
 
 from heavyiq.langchain.heavydb import get_db
 from heavyiq.langchain.utils import aget_table_info_from_cache_or_calculate
@@ -29,7 +30,7 @@ class ChartChainOutputType(BaseModel):
     ChartChain Output type.
     """
 
-    vega_lite_spec: dict[Any, Any] = Field(..., description="Generate Vega Lite Spec")
+    vega_lite_spec: Json = Field(..., description="Generated Vega Lite Spec")
 
 
 def data_placeholder(_: dict) -> str:
@@ -120,6 +121,12 @@ async def fetch_schemas_for_tables(kwargs: dict) -> str:
     return schemas_with_projected_columns.strip()
 
 
+def output_formatter(values: str) -> dict:
+    return {"vega_lite_spec": values}
+
+
+format_output_rbl = RunnableLambda(output_formatter)
+
 prompt_rbl = to_vega_lite_prompt_runnable
 llm_rbl = llm_runnable.with_config(configurable={"llm": "default_llm"}).bind(extra_body={"guided_regex": "{.*}"})
 
@@ -132,8 +139,8 @@ prompt_variables = RunnablePassthrough.assign(
 )
 
 chain = (
-    (prompt_variables | prompt_rbl | llm_rbl)
-    .with_types(input_type=ChartChainInputType)  # type: ignore
+    (prompt_variables | prompt_rbl | llm_rbl | format_output_rbl)
+    .with_types(input_type=ChartChainInputType, output_type=ChartChainOutputType)  # type: ignore
     .with_config(
         config={"tags": ["NLtoVegaLiteSpecChainRunnable"], "run_name": "NL to Vega Lite Spec Chain"}  # type: ignore
     )

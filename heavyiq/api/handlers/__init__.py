@@ -1,4 +1,5 @@
 from .lcel_handler import (
+    handle_generate_vega_spec_request,
     handle_lcel_answer_request,
     handle_lcel_auto_query_request,
     handle_lcel_auto_question_request,

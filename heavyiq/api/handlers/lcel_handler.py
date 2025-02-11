@@ -1,4 +1,6 @@
-from typing import NoReturn
+from typing import NoReturn, cast
+
+from langchain_core.runnables.config import RunnableConfig
 
 from heavyiq.api.handlers.decorators import with_db, with_feedback_id
 from heavyiq.api.handlers.utils import ainvoke_logprobs, compute_total_probability
@@ -7,6 +9,7 @@ from heavyiq.api.models import (
     AutoQueryResponse,
     AutoQuestionResponse,
     COTQueryResponse,
+    GenerateVegaLiteResponse,
     QueryResponse,
     QuestionResponse,
     TablesResponse,
@@ -294,3 +297,16 @@ async def handle_lcel_cot_query_request(request_dict: dict, config: dict | None 
         logprobs=logprobs,
         total_score=total_score,
     )
+
+
+@with_db
+async def handle_generate_vega_spec_request(
+    request_dict: dict, config: RunnableConfig | None = None
+) -> GenerateVegaLiteResponse | NoReturn:
+    """
+    Async LCEL handler for /query request.
+    """
+    from heavyiq.lcel.chains.heavydb.chart_chain import chain
+
+    response = await chain.ainvoke(request_dict, config=config)
+    return cast(GenerateVegaLiteResponse, response)
