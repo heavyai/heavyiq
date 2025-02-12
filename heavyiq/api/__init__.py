@@ -42,7 +42,7 @@ def rag_initialize():
 
     # initialize RAG DB
     ragdb.create_tables()
-    # set embed model on master process in-order to avoid avoid multiprocessing.fork error
+    # set embed model on master process in-order to avoid multiprocessing.fork error
     # initializes embedding model and chroma client
     initialize_rag()
 
@@ -69,6 +69,10 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
     if config.enable_llm_cache:
         set_llm_cache(InMemoryLLMCache())
     if config.enable_rag:
+        # Note: If you going to use faiss package then it should be imported in the gunicorn's master process
+        # not in the worker process  otherise we might endup in worker process reload.
+        if config.rag_vectordb_type == "faiss":
+            import faiss
         rag_initialize()
 
 

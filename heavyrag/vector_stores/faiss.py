@@ -27,9 +27,10 @@ from heavyrag.utils import uuid4_hex_to_int64
 process_lock = multiprocessing.Lock()
 
 # Uncomment this line only on mac, for ubuntu/prod we can leave as it is
-# this line should fix gunciorn worker reloading issue upon doing RAG search on FAISS index (MAC M1 only)
-if sys.platform == "darwin":
-    faiss.omp_set_num_threads(1)  # important so that gunicorn worker process won't get terminated
+# # this line should fix gunciorn worker reloading issue upon doing RAG search on FAISS index (MAC M1 only)
+# if sys.platform == "darwin":
+#     faiss.omp_set_num_threads(1)  # important so that gunicorn worker process won't get terminated
+# no need for the above code even on mac, all we have to do is, importing faiss package in gunciorn's master process
 
 # Create a threading lock (for threads within the same process)
 thread_lock = threading.Lock()
