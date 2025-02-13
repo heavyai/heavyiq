@@ -215,9 +215,16 @@
     </div>
 
     <script>
-      let socket = new WebSocket("ws://127.0.0.1:8000/chat/ws");
+      // Dynamically construct WebSocket URL
+      let wsProtocol =
+        window.location.protocol === "https:" ? "wss://" : "ws://";
+      let wsHost = window.location.host; // Gets host + port (e.g., 127.0.0.1:8000)
+      let socket = new WebSocket(`${wsProtocol}${wsHost}/chat/ws`);
       let sessionId = null;
 
+      socket.onopen = function () {
+        console.log("✅ WebSocket connected!");
+      };
       socket.onmessage = function (event) {
         let data = JSON.parse(event.data);
         // Remove loading spinner when response arrives
