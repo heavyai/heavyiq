@@ -252,6 +252,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
     if config.enable_debug_endpoints:
         from heavyiq.api.routes.debug_router import debug_router
         from heavyiq.api.routes.runnable_router import runnable_router
+        from heavyiq.api.routes.ui_chat_router import chat_router
 
         app.include_router(
             debug_router,
@@ -265,6 +266,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
             },
         )
         app.include_router(runnable_router, prefix="/runnable", tags=["runnable"])
+        app.include_router(chat_router, prefix="/chat")
 
     @app.on_event("startup")
     async def initialize():

@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HeavyIQ Chat</title>
+    <style>
+      /* General Styles */
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #121212;
+        color: #fff;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        justify-content: center;
+        align-items: center;
+      }
+
+      /* Chat Container */
+      .chat-container {
+        width: 90%;
+        max-width: 800px;
+        height: 85vh;
+        display: flex;
+        flex-direction: column;
+        border-radius: 12px;
+        overflow: hidden;
+        background-color: #222;
+        box-shadow: 0px 4px 10px rgba(255, 255, 255, 0.1);
+      }
+
+      /* Chat Header */
+      .chat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px;
+        background: #1e1e1e;
+        font-size: 20px;
+        font-weight: bold;
+        border-bottom: 1px solid #333;
+        flex-direction: row;
+      }
+
+      /* Subtitle (Align to the Right) */
+      .chat-subtitle {
+        text-align: right;
+        font-size: 12px;
+        color: #ccc;
+        font-weight: normal;
+        line-height: 1.4;
+        margin-right: 10px;
+        padding: 3px 0;
+      }
+
+      /* Add spacing between database and session */
+      .db-info {
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Chat Messages */
+      .chat-box {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        scroll-behavior: smooth;
+      }
+
+      /* Message Styles */
+      .message {
+        padding: 10px;
+        border-radius: 6px;
+        max-width: 75%;
+        word-wrap: break-word;
+        line-height: 1.4;
+        font-size: 14px;
+        font-family: "Arial", sans-serif; /* Clearer font */
+      }
+
+      .sql-message {
+        background-color: #2a2a2a;
+        color: #0f0; /* Green SQL text */
+        font-family: "Courier New", monospace;
+        font-size: 14px;
+        padding: 10px;
+        border-left: 4px solid #0f0; /* Left green border for SQL */
+        white-space: pre-wrap; /* Keeps formatting */
+      }
+
+      .user {
+        background-color: #007aff;
+        align-self: flex-end;
+        text-align: right;
+      }
+
+      .bot {
+        background-color: #444;
+        align-self: flex-start;
+      }
+
+      /* Input Area */
+      .input-container {
+        display: flex;
+        padding: 12px;
+        background-color: #1e1e1e;
+        border-top: 1px solid #333;
+      }
+
+      input {
+        flex: 1;
+        padding: 12px;
+        border: none;
+        border-radius: 5px;
+        font-size: 16px;
+        outline: none;
+        background-color: #333;
+        color: white;
+      }
+
+      button {
+        background-color: #007aff;
+        border: none;
+        color: white;
+        padding: 12px 15px;
+        margin-left: 10px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+
+      button:hover {
+        background-color: #005ecb;
+      }
+
+      /* Spinner Container */
+      .spinner-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 10px;
+      }
+
+      /* Animated Spinner */
+      .spinner {
+        width: 25px;
+        height: 25px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #007aff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      /* Keyframes for Spinner Animation */
+      @keyframes spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Responsive Design */
+      @media (max-width: 600px) {
+        .chat-container {
+          width: 95%;
+          height: 90vh;
+        }
+
+        input {
+          font-size: 14px;
+        }
+
+        button {
+          padding: 10px 14px;
+        }
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+  </head>
+  <body>
+    <div class="chat-container">
+      <!-- Chat Header -->
+      <div class="chat-header">
+        <span>HeavyIQ Chat</span>
+        <div class="chat-subtitle" id="chat-subtitle">
+          <div class="db-info">Connecting...</div>
+        </div>
+      </div>
+
+      <!-- Chat Messages -->
+      <div class="chat-box" id="chat-box"></div>
+
+      <!-- Input Box -->
+      <div class="input-container">
+        <input
+          type="text"
+          id="message"
+          placeholder="Type your message..."
+          onkeypress="handleKeyPress(event)"
+        />
+        <button id="send-button" onclick="sendMessage()">
+          <span id="send-text">Send</span>
+          <span id="loading-spinner" style="display: none">⏳</span>
+        </button>
+      </div>
+    </div>
+
+    <script>
+      let socket = new WebSocket("ws://127.0.0.1:8000/chat/ws");
+      let sessionId = null;
+
+      socket.onmessage = function (event) {
+        let data = JSON.parse(event.data);
+        // Remove loading spinner when response arrives
+        removeLoadingSpinner();
+        if (data.type === "processing") {
+          showLoadingSpinner();
+        } else if (data.type === "session") {
+          sessionId = data.session;
+          document.getElementById("chat-subtitle").innerHTML = `
+                    <div class="db-info">
+                        <div>🔗 <strong>Database:</strong> ${data.database}</div>
+                        <div>🆔 <strong>Session:</strong> ${data.session}</div>
+                    </div>
+                `;
+        } else if (data.type === "chart") {
+          embedChart(data.message);
+        } else if (data.type === "sql") {
+          appendSQLMessage(data.message);
+        } else {
+          appendMessage(data.message, "bot");
+        }
+      };
+
+      function embedChart(chartSpec) {
+        let chatBox = document.getElementById("chat-box");
+
+        // Create a unique container ID
+        let chartId = `chart-container-${Date.now()}`;
+
+        let chartDiv = document.createElement("div");
+        chartDiv.className = "message bot";
+        chartDiv.innerHTML = `<div id="${chartId}"></div>`; // Assign unique ID
+        chatBox.appendChild(chartDiv);
+
+        // Embed the chart using the unique ID
+        vegaEmbed(`#${chartId}`, chartSpec, { actions: false }).catch(
+          console.error
+        );
+
+        // Auto-scroll to latest message
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+
+      function sendMessage() {
+        let input = document.getElementById("message");
+        if (!input.value.trim()) return;
+
+        appendMessage(input.value, "user");
+
+        // Show loading state
+        showLoadingSpinner();
+        socket.send(input.value);
+        input.value = "";
+      }
+
+      function appendMessage(text, sender) {
+        let chatBox = document.getElementById("chat-box");
+        let message = document.createElement("div");
+        message.className = `message ${sender}`;
+        message.innerText = text;
+        chatBox.appendChild(message);
+
+        // Auto-scroll to the latest message
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+
+      function appendSQLMessage(text) {
+        let chatBox = document.getElementById("chat-box");
+        let message = document.createElement("div");
+        message.className = `message bot sql-message`;
+        message.innerText = text;
+        chatBox.appendChild(message);
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+
+      function showLoadingSpinner() {
+        let chatBox = document.getElementById("chat-box");
+
+        let spinnerDiv = document.createElement("div");
+        spinnerDiv.className = "message bot spinner-container";
+        spinnerDiv.innerHTML = `<div class="spinner"></div>`;
+        spinnerDiv.id = "loading-spinner"; // Set an ID to remove it later
+
+        chatBox.appendChild(spinnerDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+
+      function removeLoadingSpinner() {
+        let spinner = document.getElementById("loading-spinner");
+        if (spinner) {
+          spinner.remove();
+        }
+      }
+
+      function resetSendButton() {
+        let sendText = document.getElementById("send-text");
+        let spinner = document.getElementById("loading-spinner");
+
+        sendText.style.display = "inline-block";
+        spinner.style.display = "none";
+        document.getElementById("send-button").disabled = false;
+      }
+
+      function handleKeyPress(event) {
+        if (event.key === "Enter") {
+          sendMessage();
+        }
+      }
+    </script>
+  </body>
+</html>
