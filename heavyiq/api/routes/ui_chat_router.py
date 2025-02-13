@@ -11,6 +11,7 @@ from heavyiq.api.handlers import (
     handle_lcel_auto_question_request,
 )
 from heavyiq.langchain import HeavyDB
+from heavyiq.logging_utils import heavyiq_logger as logger
 
 chat_router = APIRouter()
 
@@ -67,7 +68,7 @@ def fetch_values(query: str, session: str) -> list:
     from heavyiq.lcel.chains.heavydb.chart_chain import apply_limit_to_query
 
     db = HeavyDB.from_session(session_id=session)
-    query = apply_limit_to_query(query)
+    query = apply_limit_to_query(query, limit=500)
     values = db.run(query, fetch="all", to_str=False)
     select_columns = extract_select_columns(query=query)
     if not values:

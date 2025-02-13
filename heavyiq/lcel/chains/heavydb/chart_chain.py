@@ -60,7 +60,7 @@ async def run_sql_query(kwargs: dict) -> str:
     """
     session_id, query = kwargs.get("session_id"), kwargs.get("query")
     heavydb = await get_db(session_id)
-    limit_query = apply_limit_to_query(query=query)
+    limit_query = apply_limit_to_query(query=query, limit=5)
     sql_result = await heavydb.arun(limit_query, to_str=True)
     return cast(str, sql_result)
 
