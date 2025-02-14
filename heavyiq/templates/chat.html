@@ -21,8 +21,8 @@
       /* Chat Container */
       .chat-container {
         width: 95%;
-        max-width: 950px;
-        height: 85vh;
+        max-width: 90%;
+        height: 95vh;
         display: flex;
         flex-direction: column;
         border-radius: 12px;
@@ -74,14 +74,31 @@
 
       /* Ensure charts fit properly */
       .chart-container {
-        width: 100%;
-        max-width: 1100px; /* Ensures it doesn't overflow */
-        height: auto;
-        max-height: 1100px;
         display: flex;
         justify-content: center;
         align-items: center;
         padding: 10px;
+        width: fit-content; /* ✅ Expands based on content */
+        height: fit-content;
+        max-width: 1100px; /* Prevents excessive expansion */
+        max-height: 1100px;
+      }
+
+      /* Ensure Vega Chart Fits Inside the Container */
+      .chart-container > div {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: auto; /* ✅ Ensures the div size is based on chart */
+        height: auto;
+      }
+
+      /* Ensure Vega Canvas Does Not Overflow */
+      .vega-embed canvas {
+        max-width: 100% !important;
+        max-height: 100% !important;
+        width: auto !important;
+        height: auto !important;
       }
 
       /* Message Styles */
@@ -285,14 +302,25 @@
 
         let chartDiv = document.createElement("div");
         chartDiv.className = "chart-container";
-        chartDiv.innerHTML = `<div id="${chartId}" style="width: 800px; height: 800px;"></div>`;
+        // chartDiv.innerHTML = `<div id="${chartId}" style="width: 800px; height: 800px;"></div>`;
         // Append chart outside .chat-box
         chatBox.appendChild(chartDiv);
 
+        let chartInnerDiv = document.createElement("div");
+        chartInnerDiv.id = chartId;
+        chartInnerDiv.className = "vega-embed";
+        chartDiv.appendChild(chartInnerDiv);
+
         // Embed Vega-Lite chart
-        vegaEmbed(`#${chartId}`, chartSpec, { actions: false }).catch(
-          console.error
-        );
+        vegaEmbed(`#${chartId}`, chartSpec, { actions: false })
+          .then(() => {
+            let chartElement = document.querySelector(`#${chartId} canvas`);
+            if (chartElement) {
+              chartDiv.style.width = `${chartElement.width}px`;
+              chartDiv.style.height = `${chartElement.height}px`;
+            }
+          })
+          .catch(console.error);
         // Auto-scroll to latest message
         chatBox.scrollTop = chatBox.scrollHeight;
       }

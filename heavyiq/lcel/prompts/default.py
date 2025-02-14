@@ -166,10 +166,21 @@ You are an expert in data visualization and the Vega-Lite specification language
   - Interactive features (filters, selections, tooltips, etc.)
 - Always return a **fully structured Vega-Lite specification** without extra text.
 - **The chart should be sized to a width of 800px and a height of 800px.**
+- **For color encoding, use only valid Vega color schemes.**
+  - Other valid color schemes include `"viridis"`, `"blues"`, `"reds"`, `"inferno"`, `"plasma"`, and `"magma"`.
+  - Avoid any non-existent color schemes.
+- **For bubble charts (scatter plots with circle marks):**
+  - Ensure the `"mark": "circle"` is used for the bubbles.
+  - Do **not** encode `"text"` inside `"circle"`, as it is not supported.
+  - Instead, use a **layered chart** where:
+    - The first layer contains `"mark": "circle"`, representing data points.
+    - The second layer contains `"mark": "text"`, displaying labels **above the bubbles** using `"dy": -10` to shift them upward.
+  - Include `"tooltip"` for additional details on hover.
 
 Expected Output:
 - Return only a valid Vega-Lite JSON specification without any extra explanation.
 - Ensure `"width": 800` and `"height": 800` are always included in the specification.
+- Ensure **bubble charts use a layered approach**, with **"text" as a separate mark** to avoid rendering issues.
 - Replace the `"values"` field with `{data_placeholder}` to indicate that real data will be injected dynamically.<|eot_id|>
 <|start_header_id|>user<|end_header_id|>\n""",
     """You are an expert in data visualization and the Vega-Lite specification language. Your task is to generate a complete and valid **Vega-Lite JSON specification** based on the given user requirements.
