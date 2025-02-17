@@ -1,6 +1,7 @@
 import json
 import os
 import re
+from typing import AsyncGenerator
 
 from fastapi import APIRouter, WebSocket
 from fastapi.responses import FileResponse
@@ -10,6 +11,13 @@ from heavyiq.api.handlers import (
     handle_lcel_auto_query_request,
     handle_lcel_auto_question_request,
 )
+from heavyiq.api.ws_handlers import (
+    handle_chart_error_message,
+    handle_chart_warn_message,
+    handle_generate_chart_message,
+    handle_other_message,
+)
+from heavyiq.api.ws_handlers.message import WSMessage
 from heavyiq.langchain import HeavyDB
 from heavyiq.logging_utils import heavyiq_logger as logger
 
@@ -35,47 +43,24 @@ async def chat_init() -> dict[str, str]:
     return {"database": db._dbname, "session": db._conn._session}
 
 
-def extract_select_columns(query: str) -> list[str]:
-    """
-    Extract column names from a SQL SELECT query.
-
-    :param query: SQL query string
-    :return: List of column names
-    """
-    # Regex pattern to extract the part between SELECT and FROM
-    pattern = r"(?<=SELECT\s)(.*?)(?=\sFROM)"
-
-    match = re.search(pattern, query, re.IGNORECASE)
-
-    if match:
-        columns, columns_part = [], match.group(1)
-        for col in columns_part.split(","):
-            if " AS " in col:
-                column = col.split(" AS ")[1].strip()
-            else:
-                column = col.strip()
-            columns.append(column)
-        return columns
+async def process_ws_message(message: str, db: HeavyDB) -> AsyncGenerator[WSMessage, None]:
+    """Routes WebSocket messages to the appropriate handler."""
+    if " chart " in message:
+        logger.info("WS: Generate Chart message received!")
+        async for response in handle_generate_chart_message(message, db):
+            yield response
+    elif "chart_error" in message:
+        logger.info("WS: Fix Chart w.r.t error message received!")
+        async for response in handle_chart_error_message(message, db):
+            yield response
+    elif "chart_warning" in message:
+        logger.info("WS: Fix Chart w.r.t warn message received!")
+        async for response in handle_chart_warn_message(message, db):
+            yield response
     else:
-        return []
-
-
-def fetch_values(query: str, session: str) -> list:
-    """
-    Helps to fetch VegaLite Spec Values from HeavyDB database.
-    """
-    from heavyiq.langchain.heavydb import HeavyDB
-    from heavyiq.lcel.chains.heavydb.chart_chain import apply_limit_to_query
-
-    db = HeavyDB.from_session(session_id=session)
-    query = apply_limit_to_query(query, limit=500)
-    values = db.run(query, fetch="all", to_str=False)
-    select_columns = extract_select_columns(query=query)
-    if not values:
-        return []
-    assert len(select_columns) == len(values[0])
-    formatted_values = [dict(zip(select_columns, row)) for row in values]
-    return formatted_values
+        logger.info("WS: NL to Answer message received!")
+        async for response in handle_other_message(message, db):
+            yield response
 
 
 # WebSocket for real-time communication
@@ -83,42 +68,22 @@ def fetch_values(query: str, session: str) -> list:
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     session_info = await chat_init()
-    current_session = session_info["session"]
+    current_session, current_database = session_info["session"], session_info["database"]
     SESSIONS[current_session] = websocket
-    print(f"New session started: {current_session}")
+    logger.info(f"New Chat session started: Session ID: {current_session}, Database: {current_database}")
     # Send session info to frontend
     await websocket.send_json({"type": "session", **session_info})
     db = None
     try:
+        if current_session not in HEAVYDB_INSTANCES:
+            db = await HeavyDB.from_session_async(current_session)
+            HEAVYDB_INSTANCES[current_session] = db
+        else:
+            db = HEAVYDB_INSTANCES[current_session]
         while True:
             message = await websocket.receive_text()
-            input_dict = {"session_id": current_session, "question": message, "allowed_tables": []}
-            if current_session not in HEAVYDB_INSTANCES:
-                db = await HeavyDB.from_session_async(current_session)
-                HEAVYDB_INSTANCES[current_session] = db
-            else:
-                db = HEAVYDB_INSTANCES[current_session]
-            if " chart " in message:
-                # invoke nl-to-vega chain
-                auto_query_response = await handle_lcel_auto_query_request(input_dict, db)
-                query, tables = auto_query_response.sql, auto_query_response.tables
-                # send query to FE
-                await websocket.send_json({"type": "sql", "message": f"{query}"})
-                await websocket.send_json({"type": "processing", "message": ""})
-                input_dict = {"session_id": current_session, "question": message, "query": query, "tables": tables}
-                vega_response = await handle_generate_vega_spec_request(input_dict, db)
-                vega_spec_json = vega_response["vega_lite_spec"]  # type: ignore
-                vega_spec_dict = json.loads(vega_spec_json)
-                values = fetch_values(query=query, session=current_session)
-                if values:
-                    vega_spec_dict["data"] = {"values": values}
-                response = {"type": "chart", "message": vega_spec_dict}
-            else:
-                # invoke nl to answer chain
-                out = await handle_lcel_auto_question_request(input_dict, db)
-                await websocket.send_json({"type": "sql", "message": f"{out.sql}"})
-                response = {"type": "text", "message": f"🤖 AI: {out.answer}"}  # Replace this with AI response logic
-            await websocket.send_json(response)
+            async for response in process_ws_message(message, db):
+                await websocket.send_json(response.dict())
     except Exception as e:
         import traceback
 

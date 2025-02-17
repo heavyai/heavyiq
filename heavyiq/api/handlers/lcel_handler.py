@@ -9,6 +9,7 @@ from heavyiq.api.models import (
     AutoQueryResponse,
     AutoQuestionResponse,
     COTQueryResponse,
+    FixVegaLiteSpecResponse,
     GenerateVegaLiteResponse,
     QueryResponse,
     QuestionResponse,
@@ -304,9 +305,22 @@ async def handle_generate_vega_spec_request(
     request_dict: dict, config: RunnableConfig | None = None
 ) -> GenerateVegaLiteResponse | NoReturn:
     """
-    Async LCEL handler for /query request.
+    Async LCEL handler for generate_vega request.
     """
     from heavyiq.lcel.chains.heavydb.chart_chain import chain
 
     response = await chain.ainvoke(request_dict, config=config)
     return cast(GenerateVegaLiteResponse, response)
+
+
+@with_db
+async def handle_vega_spec_error_correction_request(request_dict: dict, config: RunnableConfig | None = None):
+    """
+    Async LCEL hanlder for error correcting generated vega request.
+    """
+    from heavyiq.lcel.chains.heavydb.chart_errror_chain import chain
+
+    request_dict.pop("session_id", None)
+
+    response = await chain.ainvoke(request_dict, config=config)
+    return cast(FixVegaLiteSpecResponse, response)

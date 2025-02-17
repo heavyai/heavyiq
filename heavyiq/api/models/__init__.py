@@ -2,7 +2,7 @@
 # endpoint's input/output schema.
 from .answer import AnswerRequest, AnswerResponse
 from .ask_heavyai_docs import AskHeavyAIDocsRequest, AskHeavyAIDocsResponse
-from .chart import GenerateVegaLiteRequest, GenerateVegaLiteResponse
+from .chart import FixVegaLiteSpecRequest, FixVegaLiteSpecResponse, GenerateVegaLiteRequest, GenerateVegaLiteResponse
 from .error import ErrorResponse
 from .feedback import FeedbackRequest, FeedbackResponse
 from .index import UpdateIndexRequest, UpdateIndexResponse

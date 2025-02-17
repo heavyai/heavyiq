@@ -134,23 +134,6 @@ DEFAULT_NL_TO_SQL_COT_ERROR_PROMPT = (
     "\n<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
 )
 
-CHART_GUIDELINES_AND_EXPECTED_OUTPUT = """Guidelines for Generating Vega-Lite Specification:
-	•	Ensure the Vega-Lite JSON is fully valid and follows the latest Vega-Lite v5 schema.
-	•	Select an appropriate visualization type (mark) based on the user’s intent.
-	•	Encode X and Y axes based on the projected columns in the SQL query.
-	•	Use color, size, shape, and tooltips if necessary to enhance the visualization.
-	•	Assign appropriate data types:
-	•	Use "type": "nominal" for categorical data (e.g., state, region).
-	•	Use "type": "quantitative" for numerical values (e.g., sales, revenue).
-	•	If a column is related to time, set "type": "temporal" and format it correctly.
-	•	Ensure scaling, legends, and axis labels are correctly applied.
-	•	Use meaningful tooltips to display additional information.
-	•	The visualization should reference the data dynamically but should not include example data in the "values" section.
-
-Expected Output:
-	•	Return only a valid Vega-Lite JSON specification, without any extra explanation.
-	•	Replace the "values" field with {data_placeholder} to indicate that real data will be injected dynamically.
-"""
 
 DEFAULT_NL_TO_VEGA_LITE_SPEC_PROMPT = (
     """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
@@ -200,6 +183,123 @@ The following sample data represents the structure and expected values of the da
 
 Generate an appropriate Vega Lite spec based on the below user's question.
 "{question}"
+""",
+    """<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n""",
+)
+
+VEGA_ERROR_SAMPLE_INPUT = """
+{
+  "vega_spec": {
+    "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+    "data": { "values": [...] },
+    "mark": "circle",
+    "encoding": {
+      "x": {"field": "num_flights", "type": "quantitative"},
+      "y": {"field": "carrier_name", "type": "nominal"},
+      "text": {"field": "carrier_name", "type": "nominal"},
+      "color": {"field": "num_flights", "type": "quantitative", "scale": {"scheme": "greenred"}}
+    }
+  },
+  "errors": ["'greenred' is not a valid color scheme in Vega-Lite."]
+  "warnings": ["text dropped as it is incompatible with 'circle'."]
+}
+"""
+
+VEGA_ERROR_SAMPLE_OUTPUT = """
+{
+  "vega_spec": {
+    "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+    "width": 800,
+    "height": 800,
+    "layer": [
+      {
+        "mark": "circle",
+        "encoding": {
+          "x": {"field": "num_flights", "type": "quantitative"},
+          "y": {"field": "carrier_name", "type": "nominal"},
+          "color": {"field": "num_flights", "type": "quantitative", "scale": {"scheme": "redgreen"}}
+        }
+      },
+      {
+        "mark": {"type": "text", "dy": -10, "fontSize": 12},
+        "encoding": {
+          "x": {"field": "num_flights", "type": "quantitative"},
+          "y": {"field": "carrier_name", "type": "nominal"},
+          "text": {"field": "carrier_name", "type": "nominal"}
+        }
+      }
+    ]
+  },
+  "fixes": [
+    "Fixed 'greenred' color scheme to 'redgreen'.",
+    "Moved 'text' encoding to a separate layer to work with 'circle' marks."
+  ]
+}
+"""
+
+# vega-lite spec error correcting prompt
+DEFAULT_NL_TO_VEGA_LITE_SPEC_ERROR_CORRECTING_PROMPT = (
+    """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are an expert in data visualization and the Vega-Lite specification language. Your task is to debug and correct **Vega-Lite JSON specifications** that contain rendering errors or warnings.
+
+### **Your Responsibilities:**
+1. **Analyze the given Vega-Lite JSON specification.**
+2. **Identify all errors and warnings.**
+3. **Apply necessary corrections** while preserving the intended visualization.
+4. **Ensure the corrected Vega-Lite spec is valid** and follows the official schema.
+5. **Provide a list of fixes** explaining what was changed.
+
+### **Types of Errors to Fix:**
+1. **Color Scheme Issues**
+   - If an invalid color scheme is used (e.g., `"greenred"` which does not exist), replace it with a valid one (`"redgreen"`, `"viridis"`, `"magma"`, etc.).
+
+2. **Encoding Incompatibilities**
+   - If text is incorrectly assigned to a `"circle"` mark (inside a scatter plot), move text to a **separate layer** using a `"text"` mark.
+
+3. **Missing Required Fields**
+   - Ensure all necessary **axes (`x`, `y`), marks, and data sources** are correctly defined.
+
+4. **Sorting and Scaling Issues**
+   - If the x-axis or y-axis uses **incorrect scaling**, adjust `"scale"` settings accordingly.
+
+5. **Data Format Problems**
+   - Ensure `data.values` is properly structured and that fields match encoding specifications.
+---
+### **Input Format**
+You will receive:
+1. A **Vega-Lite JSON specification**.
+2. A **list of warnings/errors** generated when attempting to render the specification.
+
+#### Example Input:
+
+{example_input}
+
+### Expected Output:
+
+- Return a corrected Vega-Lite JSON specification with all fixes applied.
+- Include a brief explanation of what was fixed.
+- Do not return any extra text outside of JSON.
+- Return only a valid Vega-Lite JSON specification without any extra explanation.
+- Ensure `"width": 800` and `"height": 800` are always included in the specification.
+
+#### Example Output:
+
+{example_output}
+
+<|eot_id|>
+<|start_header_id|>user<|end_header_id|>\n""",
+    """You are an expert in data visualization and the Vega-Lite specification language. Your task is to debug and correct **Vega-Lite JSON specifications** that contain rendering errors or warnings.
+
+### **Errors & Warnings That Prevent Rendering**
+Here is the list of warnings/errors that stop the Vega-Lite specification from rendering:
+```json
+{error_list}
+```
+
+Here is a Vega-Lite specification that failed to render:
+```json
+{error_spec}
+```
 """,
     """<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n""",
 )

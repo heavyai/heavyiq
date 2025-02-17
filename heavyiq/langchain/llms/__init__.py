@@ -26,6 +26,7 @@ class LLMType(Enum):
     NL_TO_SQL_ERROR = "nl_to_sql_error"
     NL_TO_SQL_COT_ERROR = "nl_to_sql_cot_error"
     NL_TO_VEGA_LITE = "nl_to_vega_lite"
+    NL_TO_VEGA_LITE_ERROR = "nl_to_vega_lite_error"
     SQL_TO_ANSWER = "sql_to_answer"
     NL_TO_TABLES = "nl_to_tables"
     TABLES_TO_QUESTIONS = "tables_to_questions"

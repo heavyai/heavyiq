@@ -195,6 +195,44 @@
         }
       }
 
+      .error-message {
+        background-color: #ffebee;
+        color: #d32f2f;
+        font-family: "Arial", sans-serif;
+        border-left: 4px solid #d32f2f;
+        padding: 10px;
+        margin-top: 10px;
+        max-width: 80%;
+        word-wrap: break-word;
+      }
+
+      .error-message pre {
+        background-color: #f8f9fa;
+        padding: 5px;
+        border-radius: 4px;
+        overflow-x: auto;
+        font-size: 12px;
+      }
+
+      .warning-message {
+        background-color: #fff3cd;
+        color: #856404;
+        font-family: "Arial", sans-serif;
+        border-left: 4px solid #856404;
+        padding: 10px;
+        margin-top: 10px;
+        max-width: 80%;
+        word-wrap: break-word;
+      }
+
+      .warning-message pre {
+        background-color: #f8f9fa;
+        padding: 5px;
+        border-radius: 4px;
+        overflow-x: auto;
+        font-size: 12px;
+      }
+
       /* Ensure the Chart Resizes on Smaller Screens */
       @media (max-width: 900px) {
         .chat-container {
@@ -285,7 +323,7 @@
                     </div>
                 `;
         } else if (data.type === "chart") {
-          embedChart(data.message);
+          embedChart(data.message, data.new);
         } else if (data.type === "sql") {
           appendSQLMessage(data.message);
         } else {
@@ -293,7 +331,19 @@
         }
       };
 
-      function embedChart(chartSpec) {
+      function keepTopNValues(vegaSpec, N = 1) {
+        // Clone the object to avoid modifying the original
+        let newSpec = JSON.parse(JSON.stringify(vegaSpec));
+
+        // Keep only the first N values
+        if (newSpec.data && Array.isArray(newSpec.data.values)) {
+          newSpec.data.values = newSpec.data.values.slice(0, N);
+        }
+
+        return newSpec;
+      }
+
+      function embedChart(chartSpec, isnew) {
         console.log(JSON.stringify(chartSpec));
         let chatBox = document.querySelector(".chat-box");
 
@@ -302,7 +352,6 @@
 
         let chartDiv = document.createElement("div");
         chartDiv.className = "chart-container";
-        // chartDiv.innerHTML = `<div id="${chartId}" style="width: 800px; height: 800px;"></div>`;
         // Append chart outside .chat-box
         chatBox.appendChild(chartDiv);
 
@@ -310,6 +359,14 @@
         chartInnerDiv.id = chartId;
         chartInnerDiv.className = "vega-embed";
         chartDiv.appendChild(chartInnerDiv);
+
+        // Capture warnings
+        let capturedWarnings = [];
+        let originalWarn = console.warn;
+        console.warn = function (...args) {
+          capturedWarnings.push(args.join(" "));
+          originalWarn.apply(console, args);
+        };
 
         // Embed Vega-Lite chart
         vegaEmbed(`#${chartId}`, chartSpec, { actions: false })
@@ -319,10 +376,82 @@
               chartDiv.style.width = `${chartElement.width}px`;
               chartDiv.style.height = `${chartElement.height}px`;
             }
+            // Restore console.warn
+            console.warn = originalWarn;
+
+            // If warnings were captured, send them back
+            if (capturedWarnings.length > 0) {
+              if (isnew) {
+                // re-send vega spec to correct only for the newly generated vega spec
+                sendWarningMessage(chartSpec, capturedWarnings);
+              }
+            } else {
+              console.log("✅ Chart rendered successfully!");
+            }
           })
-          .catch(console.error);
+          .catch((error) => {
+            console.error("⚠️ Vega-Lite Rendering Error:", error);
+
+            // Remove failed chart div
+            chartDiv.remove();
+            if (isnew) {
+              // Send error message back to the user or backend
+              sendErrorMessage(chartSpec, error.message);
+            }
+          });
         // Auto-scroll to latest message
         chatBox.scrollTop = chatBox.scrollHeight;
+      }
+
+      function sendErrorMessage(failedSpec, errorMsg) {
+        let chatBox = document.getElementById("chat-box");
+
+        let errorDiv = document.createElement("div");
+        errorDiv.className = "message bot error-message";
+        errorDiv.innerHTML = `
+        <strong>⚠️ Chart Rendering Failed!</strong><br>
+        ${errorMsg}<br>
+    `;
+        chatBox.appendChild(errorDiv);
+
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        // remove data from failed spec
+        // Apply the function to get the top 5 entries
+        let updatedSpec = keepTopNValues(failedSpec, 5);
+
+        // (Optional) Send error data back to the backend
+        socket.send(
+          JSON.stringify({
+            type: "chart_error",
+            errors: errorMsg,
+            spec: updatedSpec,
+          })
+        );
+      }
+
+      function sendWarningMessage(failedSpec, warnings) {
+        let chatBox = document.getElementById("chat-box");
+
+        let warningDiv = document.createElement("div");
+        warningDiv.className = "message bot warning-message";
+        warningDiv.innerHTML = `
+        <strong>⚠️ Chart Rendered with Warnings!</strong><br>
+        ${warnings.map((w) => `<div>➜ ${w}</div>`).join("")}
+    `;
+        chatBox.appendChild(warningDiv);
+
+        chatBox.scrollTop = chatBox.scrollHeight;
+        let updatedSpec = keepTopNValues(failedSpec, 5);
+
+        // (Optional) Send warning data back to the backend
+        socket.send(
+          JSON.stringify({
+            type: "chart_warning",
+            warnings: warnings,
+            spec: updatedSpec,
+          })
+        );
       }
 
       function sendMessage() {
