@@ -17,7 +17,7 @@ from heavyiq.api.ws_handlers import (
     handle_generate_chart_message,
     handle_other_message,
 )
-from heavyiq.api.ws_handlers.message import WSMessage
+from heavyiq.api.ws_handlers.message import ChartMessage, WSMessage
 from heavyiq.langchain import HeavyDB
 from heavyiq.logging_utils import heavyiq_logger as logger
 
@@ -43,8 +43,120 @@ async def chat_init() -> dict[str, str]:
     return {"database": db._dbname, "session": db._conn._session}
 
 
+chart_data_1 = {
+    "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+    "width": 800,
+    "height": 600,
+    "projection": {"type": "mercator"},
+    "layer": [
+        {
+            "data": {
+                "url": "https://vega.github.io/vega-lite/data/world-110m.json",
+                "format": {"type": "topojson", "feature": "countries"},
+            },
+            "mark": {"type": "geoshape", "fill": "lightgray", "stroke": "white"},
+        },
+        {
+            "data": {
+                "values": [
+                    {"longitude": -74.006, "latitude": 40.7128, "city": "New York"},
+                    {"longitude": -118.2437, "latitude": 34.0522, "city": "Los Angeles"},
+                    {"longitude": -0.1278, "latitude": 51.5074, "city": "London"},
+                ]
+            },
+            "mark": "circle",
+            "encoding": {
+                "longitude": {"field": "longitude", "type": "quantitative"},
+                "latitude": {"field": "latitude", "type": "quantitative"},
+                "size": {"value": 100},
+                "color": {"value": "red"},
+                "tooltip": {"field": "city", "type": "nominal"},
+            },
+        },
+    ],
+}
+
+chart_data_2 = {
+    "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+    "width": 800,
+    "height": 600,
+    "projection": {"type": "mercator"},
+    "layer": [
+        {
+            "data": {
+                "url": "https://vega.github.io/vega-lite/data/us-10m.json",
+                "format": {"type": "topojson", "feature": "states"},
+            },
+            "transform": [{"filter": "datum.id == '48'"}],
+            "mark": {"type": "geoshape", "fill": "lightgray", "stroke": "white"},
+        },
+        {
+            "data": {
+                "values": [
+                    {"longitude": -98.5, "latitude": 28.0, "well_name": "Well A"},
+                    {"longitude": -98.2, "latitude": 27.9, "well_name": "Well B"},
+                    {"longitude": -97.8, "latitude": 28.1, "well_name": "Well C"},
+                ]
+            },
+            "mark": "circle",
+            "encoding": {
+                "longitude": {"field": "longitude", "type": "quantitative"},
+                "latitude": {"field": "latitude", "type": "quantitative"},
+                "size": {"value": 100},
+                "color": {"value": "red"},
+                "tooltip": {"field": "well_name", "type": "nominal"},
+            },
+        },
+    ],
+}
+
+
+chart_data_3 = {
+    "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+    "width": 800,
+    "height": 600,
+    "projection": {"type": "mercator"},
+    "data": {
+        "url": "https://vega.github.io/vega-lite/data/world-110m.json",
+        "format": {"type": "topojson", "feature": "countries"},
+    },
+    "transform": [
+        {
+            "lookup": "id",
+            "from": {
+                "data": {
+                    "values": [
+                        {"id": "840", "population": 331002651},
+                        {"id": "156", "population": 1439323776},
+                        {"id": "356", "population": 1380004385},
+                        {"id": "76", "population": 212559417},
+                        {"id": "643", "population": 145912025},
+                        {"id": "124", "population": 37742154},
+                        {"id": "250", "population": 65273511},
+                        {"id": "36", "population": 25499884},
+                        {"id": "710", "population": 59308690},
+                    ]
+                },
+                "key": "id",
+                "fields": ["population"],
+            },
+        }
+    ],
+    "mark": "geoshape",
+    "encoding": {
+        "color": {"field": "population", "type": "quantitative", "scale": {"scheme": "blues"}},
+        "tooltip": [
+            {"field": "id", "type": "nominal", "title": "Country ID"},
+            {"field": "population", "type": "quantitative", "title": "Population"},
+        ],
+    },
+}
+
+
 async def process_ws_message(message: str, db: HeavyDB) -> AsyncGenerator[WSMessage, None]:
     """Routes WebSocket messages to the appropriate handler."""
+    # if "Map " or " map " or "map " in message:
+    #     yield ChartMessage(message=chart_data_3, new=True)
     if " chart " in message:
         logger.info("WS: Generate Chart message received!")
         async for response in handle_generate_chart_message(message, db):
@@ -94,4 +206,5 @@ async def websocket_endpoint(websocket: WebSocket):
         del SESSIONS[current_session]
         if db:
             db._conn.close()
+        await websocket.close()
         print(f"Session {current_session} ended.")

@@ -187,60 +187,10 @@ Generate an appropriate Vega Lite spec based on the below user's question.
     """<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n""",
 )
 
-VEGA_ERROR_SAMPLE_INPUT = """
-{
-  "vega_spec": {
-    "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
-    "data": { "values": [...] },
-    "mark": "circle",
-    "encoding": {
-      "x": {"field": "num_flights", "type": "quantitative"},
-      "y": {"field": "carrier_name", "type": "nominal"},
-      "text": {"field": "carrier_name", "type": "nominal"},
-      "color": {"field": "num_flights", "type": "quantitative", "scale": {"scheme": "greenred"}}
-    }
-  },
-  "errors": ["'greenred' is not a valid color scheme in Vega-Lite."]
-  "warnings": ["text dropped as it is incompatible with 'circle'."]
-}
-"""
-
-VEGA_ERROR_SAMPLE_OUTPUT = """
-{
-  "vega_spec": {
-    "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
-    "width": 800,
-    "height": 800,
-    "layer": [
-      {
-        "mark": "circle",
-        "encoding": {
-          "x": {"field": "num_flights", "type": "quantitative"},
-          "y": {"field": "carrier_name", "type": "nominal"},
-          "color": {"field": "num_flights", "type": "quantitative", "scale": {"scheme": "redgreen"}}
-        }
-      },
-      {
-        "mark": {"type": "text", "dy": -10, "fontSize": 12},
-        "encoding": {
-          "x": {"field": "num_flights", "type": "quantitative"},
-          "y": {"field": "carrier_name", "type": "nominal"},
-          "text": {"field": "carrier_name", "type": "nominal"}
-        }
-      }
-    ]
-  },
-  "fixes": [
-    "Fixed 'greenred' color scheme to 'redgreen'.",
-    "Moved 'text' encoding to a separate layer to work with 'circle' marks."
-  ]
-}
-"""
 
 # vega-lite spec error correcting prompt
 DEFAULT_NL_TO_VEGA_LITE_SPEC_ERROR_CORRECTING_PROMPT = (
-    """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-You are an expert in data visualization and the Vega-Lite specification language. Your task is to debug and correct **Vega-Lite JSON specifications** that contain rendering errors or warnings.
+    """<|begin_of_text|><|start_header_id|>system<|end_header_id|>You are an expert in data visualization and the Vega-Lite specification language. Your task is to debug and correct **Vega-Lite JSON specifications** that contain rendering errors or warnings.
 
 ### **Your Responsibilities:**
 1. **Analyze the given Vega-Lite JSON specification.**
@@ -264,15 +214,19 @@ You are an expert in data visualization and the Vega-Lite specification language
 
 5. **Data Format Problems**
    - Ensure `data.values` is properly structured and that fields match encoding specifications.
+
+6. **Log Scale Issues**
+  - **Logarithmic scales (`scale.type = "log"`) cannot include zero** because `log(0)` is undefined.
+  - If a field using a log scale (e.g., `"count"`, `"value"`) contains `0`, apply one of the following fixes:
+    - **Filter out zero values** using `"filter": "datum.field > 0"`.
+    - **Manually set the domain** to exclude zero, e.g., `"domain": [1, max_value]`.
+    - **Replace zero with a small positive number (`0.1`)** using `"calculate": "datum.field === 0 ? 0.1 : datum.field"`.
+
 ---
 ### **Input Format**
 You will receive:
 1. A **Vega-Lite JSON specification**.
 2. A **list of warnings/errors** generated when attempting to render the specification.
-
-#### Example Input:
-
-{example_input}
 
 ### Expected Output:
 
@@ -280,26 +234,18 @@ You will receive:
 - Include a brief explanation of what was fixed.
 - Do not return any extra text outside of JSON.
 - Return only a valid Vega-Lite JSON specification without any extra explanation.
-- Ensure `"width": 800` and `"height": 800` are always included in the specification.
-
-#### Example Output:
-
-{example_output}
-
-<|eot_id|>
-<|start_header_id|>user<|end_header_id|>\n""",
+- Ensure the Vega spec `"width": 800` and `"height": 800` are always included in the specification.<|eot_id|><|start_header_id|>user<|end_header_id|>""",
     """You are an expert in data visualization and the Vega-Lite specification language. Your task is to debug and correct **Vega-Lite JSON specifications** that contain rendering errors or warnings.
+
+**Here is a Vega-Lite specification that failed to render:**
+
+{error_spec}
 
 ### **Errors & Warnings That Prevent Rendering**
 Here is the list of warnings/errors that stop the Vega-Lite specification from rendering:
-```json
-{error_list}
-```
 
-Here is a Vega-Lite specification that failed to render:
-```json
-{error_spec}
-```
-""",
+{error_list}
+
+Can you regenerate the Vega spec while addressing the above warning/error?""",
     """<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n""",
 )

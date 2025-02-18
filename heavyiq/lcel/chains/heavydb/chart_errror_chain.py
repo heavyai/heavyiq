@@ -39,7 +39,7 @@ def construct_prompt_variables(inputs: dict) -> dict:
 
 def output_formatter(values: str) -> dict:
     output = json.loads(values)
-    return {"corrected_vega_spec": output["vega_spec"]}
+    return {"corrected_vega_spec": output}
 
 
 format_output_rbl = RunnableLambda(output_formatter)

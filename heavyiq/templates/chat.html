@@ -308,6 +308,14 @@
       socket.onopen = function () {
         console.log("✅ WebSocket connected!");
       };
+      socket.onclose = function () {
+        document.getElementById("chat-subtitle").innerHTML = `
+                    <div class="db-info">
+                        <div>❌ <strong>Disconnected from WebSocket server</strong></div>
+                    </div>
+                `;
+        console.log("❌ Disconnected from WebSocket server");
+      };
       socket.onmessage = function (event) {
         let data = JSON.parse(event.data);
         // Remove loading spinner when response arrives
@@ -331,7 +339,8 @@
         }
       };
 
-      function keepTopNValues(vegaSpec, N = 1) {
+      function keepTopNValues(vegaSpec, N = 30) {
+        // 30 values should be passed to the prompt
         // Clone the object to avoid modifying the original
         let newSpec = JSON.parse(JSON.stringify(vegaSpec));
 
@@ -417,15 +426,16 @@
         chatBox.scrollTop = chatBox.scrollHeight;
 
         // remove data from failed spec
-        // Apply the function to get the top 5 entries
-        let updatedSpec = keepTopNValues(failedSpec, 5);
+        // let updatedSpec = keepTopNValues(failedSpec);
+
+        showLoadingSpinner();
 
         // (Optional) Send error data back to the backend
         socket.send(
           JSON.stringify({
             type: "chart_error",
             errors: errorMsg,
-            spec: updatedSpec,
+            spec: failedSpec,
           })
         );
       }
@@ -442,14 +452,16 @@
         chatBox.appendChild(warningDiv);
 
         chatBox.scrollTop = chatBox.scrollHeight;
-        let updatedSpec = keepTopNValues(failedSpec, 5);
+        // let updatedSpec = keepTopNValues(failedSpec);
+
+        showLoadingSpinner();
 
         // (Optional) Send warning data back to the backend
         socket.send(
           JSON.stringify({
             type: "chart_warning",
             warnings: warnings,
-            spec: updatedSpec,
+            spec: failedSpec,
           })
         );
       }
