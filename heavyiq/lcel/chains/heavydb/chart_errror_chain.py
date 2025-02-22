@@ -5,10 +5,12 @@ Chain for correcting the generated Vega spec.
 import json
 
 from langchain.schema.runnable import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
+from langchain_core.messages import AIMessage
 from langchain_core.pydantic_v1 import BaseModel, Field, Json
 
+from heavyiq.langchain.llms import get_groq_chat_llm
 from heavyiq.lcel.llms import llm_runnable
-from heavyiq.lcel.prompts import correct_vega_lite_prompt_runnable
+from heavyiq.lcel.prompts import correct_vega_lite_prompt_runnable, vega_error_chat_prompt
 
 
 class ChartErrorChainInputType(BaseModel):
@@ -37,17 +39,21 @@ def construct_prompt_variables(inputs: dict) -> dict:
     return {"error_spec": json.dumps(inputs), "error_list": error_list}
 
 
-def output_formatter(values: str) -> dict:
-    output = json.loads(values)
-    return {"corrected_vega_spec": output}
+def output_formatter(values: str | AIMessage) -> dict:
+    content = values.content if isinstance(values, AIMessage) else values
+    if isinstance(content, str) and "```json" in content:
+        content = content.strip("```json").strip("```")
+    return {"corrected_vega_spec": content}
 
 
 format_output_rbl = RunnableLambda(output_formatter)
 
-prompt_rbl = correct_vega_lite_prompt_runnable
-llm_rbl = llm_runnable.with_config(configurable={"llm": "default_llm", "llm_max_tokens": 1024}).bind(
-    extra_body={"guided_regex": "{.*}"}
-)
+# prompt_rbl = correct_vega_lite_prompt_runnable
+prompt_rbl = vega_error_chat_prompt
+# llm_rbl = llm_runnable.with_config(configurable={"llm": "default_llm", "llm_max_tokens": 1024}).bind(
+#     extra_body={"guided_regex": "{.*}"}
+# )
+llm_rbl = get_groq_chat_llm()
 
 chain = (
     (construct_prompt_variables | prompt_rbl | llm_rbl | format_output_rbl)

@@ -71,10 +71,11 @@ async def handle_generate_chart_message(message: str, db: HeavyDB) -> AsyncGener
     input_dict = {"session_id": session_id, "question": message, "query": query, "tables": tables}
     vega_response = await handle_generate_vega_spec_request(input_dict, db)
     vega_spec_json = vega_response["vega_lite_spec"]  # type: ignore
+    # print(vega_spec_json)
     vega_spec_dict = json.loads(vega_spec_json)
     values = fetch_values(query=query, session=session_id)
     if values:
-        vega_spec_dict["data"] = {"values": values}
+        vega_spec_dict["data"][0]["values"] = values
     yield ChartMessage(message=vega_spec_dict, new=True)
 
 
@@ -86,15 +87,18 @@ async def handle_chart_error_message(message: str, db: HeavyDB, n: int = 2) -> A
     request_body, session_id = json.loads(message), db._conn._session
     vega_spec, errors = request_body["spec"], request_body["errors"]
 
-    values_list = vega_spec["data"]["values"]
-    vega_spec["data"]["values"] = values_list[:n]
+    values_list = vega_spec["data"][0]["values"]
+    vega_spec["data"][0]["values"] = values_list[:n]
 
     input_dict = {"session_id": session_id, "vega_spec": vega_spec, "errors": errors}
-    response = await handle_vega_spec_error_correction_request(input_dict)
+    response = await handle_vega_spec_error_correction_request(input_dict, db)
 
     corrected_spec = response["corrected_vega_spec"]
-    corrected_spec["data"]["values"] = values_list
-    yield ChartMessage(message=corrected_spec, new=False)
+    corrected_spec_dict = json.loads(corrected_spec)
+    if "vega_spec" in corrected_spec_dict:
+        corrected_spec_dict = corrected_spec_dict["vega_spec"]
+    corrected_spec_dict["data"][0]["values"] = values_list
+    yield ChartMessage(message=corrected_spec_dict, new=False)
 
 
 async def handle_chart_warn_message(message: str, db: HeavyDB, n: int = 2) -> AsyncGenerator[WSMessage, None]:
@@ -106,15 +110,18 @@ async def handle_chart_warn_message(message: str, db: HeavyDB, n: int = 2) -> As
     vega_spec, warnings = request_body["spec"], request_body["warnings"]
 
     # pass only a specific data rows to error correction prompt instead of passing the whole data
-    values_list = vega_spec["data"]["values"]
-    vega_spec["data"]["values"] = values_list[:n]  # pass only two data rows
+    values_list = vega_spec["data"][0]["values"]
+    vega_spec["data"][0]["values"] = values_list[:n]  # pass only two data rows
 
     input_dict = {"session_id": session_id, "vega_spec": vega_spec, "warnings": warnings}
     response = await handle_vega_spec_error_correction_request(input_dict, db)
 
     corrected_spec = response["corrected_vega_spec"]
-    corrected_spec["data"]["values"] = values_list
-    yield ChartMessage(message=corrected_spec, new=False)
+    corrected_spec_dict = json.loads(corrected_spec)
+    if "vega_spec" in corrected_spec_dict:
+        corrected_spec_dict = corrected_spec_dict["vega_spec"]
+    corrected_spec_dict["data"][0]["values"] = values_list
+    yield ChartMessage(message=corrected_spec_dict, new=False)
 
 
 async def handle_other_message(message: str, db: HeavyDB) -> AsyncGenerator[WSMessage, None]:

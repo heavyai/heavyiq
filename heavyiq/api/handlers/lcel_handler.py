@@ -314,7 +314,9 @@ async def handle_generate_vega_spec_request(
 
 
 @with_db
-async def handle_vega_spec_error_correction_request(request_dict: dict, config: RunnableConfig | None = None):
+async def handle_vega_spec_error_correction_request(
+    request_dict: dict, config: RunnableConfig | None = None
+) -> FixVegaLiteSpecResponse | NoReturn:
     """
     Async LCEL hanlder for error correcting generated vega request.
     """

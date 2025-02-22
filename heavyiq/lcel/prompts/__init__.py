@@ -1,5 +1,8 @@
+from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate, SystemMessagePromptTemplate
 from langchain.prompts.prompt import PromptTemplate
 from langchain.schema.runnable import ConfigurableField
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.prompts.prompt import PromptTemplate
 
 from heavyiq.langchain.llms import LLMType
 from heavyiq.lcel.prompts.base import get_prompt_by_llm_type
@@ -10,6 +13,8 @@ from heavyiq.lcel.prompts.openai import (
     NL_TO_TABLES_TEMPLATE,
 )
 from heavyiq.lcel.prompts.question_prompt import TABLES_TO_NL_QUESTIONS_TEMPLATE
+
+from .vega import vega_error_human_message, vega_error_system_message, vega_human_message, vega_system_message
 
 CUSTOM_NL_TO_SQL_TEMPLATE = get_prompt_by_llm_type(LLMType.NL_TO_SQL)
 CUSTOM_NL_TO_SQL_ERROR_TEMPLATE = get_prompt_by_llm_type(LLMType.NL_TO_SQL_ERROR)
@@ -70,3 +75,17 @@ multiple_sql_judge_prompt = PromptTemplate.from_template(CUSTOM_NL_TO_MULTIPLE_S
 
 to_vega_lite_prompt_runnable = PromptTemplate.from_template(CUSTOM_NL_TO_VEGA_LITE_TEMPLATE)
 correct_vega_lite_prompt_runnable = PromptTemplate.from_template(CUSTOM_VEGA_LITE_ERROR_TEMPLATE)
+
+
+vega_chat_prompt = ChatPromptTemplate.from_messages(
+    [
+        SystemMessagePromptTemplate.from_template(vega_system_message),
+        HumanMessagePromptTemplate.from_template(vega_human_message),
+    ]
+)
+vega_error_chat_prompt = ChatPromptTemplate.from_messages(
+    [
+        SystemMessagePromptTemplate.from_template(vega_error_system_message),
+        HumanMessagePromptTemplate.from_template(vega_error_human_message),
+    ]
+)

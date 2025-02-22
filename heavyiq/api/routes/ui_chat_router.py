@@ -152,11 +152,101 @@ chart_data_3 = {
     },
 }
 
+chart_3 = {
+    "$schema": "https://vega.github.io/schema/vega/v5.json",
+    "description": "A choropleth map depicting U.S. unemployment rates by county in 2009.",
+    "width": 960,
+    "height": 500,
+    "autosize": "none",
+    "data": [
+        {
+            "name": "unemp",
+            "url": "https://raw.githubusercontent.com/vega/vega/main/docs/data/unemployment.tsv",
+            "format": {"type": "tsv", "parse": "auto"},
+        },
+        {
+            "name": "counties",
+            "url": "https://raw.githubusercontent.com/vega/vega/main/docs/data/us-10m.json",
+            "format": {"type": "topojson", "feature": "counties"},
+            "transform": [
+                {"type": "lookup", "from": "unemp", "key": "id", "fields": ["id"], "values": ["rate"]},
+                {"type": "filter", "expr": "datum.rate != null"},
+            ],
+        },
+    ],
+    "projections": [{"name": "projection", "type": "albersUsa"}],
+    "scales": [{"name": "color", "type": "quantize", "domain": [0, 0.15], "range": {"scheme": "blues", "count": 7}}],
+    "legends": [{"fill": "color", "orient": "bottom-right", "title": "Unemployment", "format": "0.1%"}],
+    "marks": [
+        {
+            "type": "shape",
+            "from": {"data": "counties"},
+            "encode": {
+                "enter": {"tooltip": {"signal": "format(datum.rate, '0.1%')"}},
+                "update": {"fill": {"scale": "color", "field": "rate"}},
+                "hover": {"fill": {"value": "red"}},
+            },
+            "transform": [{"type": "geoshape", "projection": "projection"}],
+        }
+    ],
+}
+
+bar = {
+    "$schema": "https://vega.github.io/schema/vega/v5.json",
+    "width": 800,
+    "height": 800,
+    "padding": 50,
+    "data": [
+        {
+            "name": "table",
+            "values": [
+                {"weight": 4295, "horsepower": 130},
+                {"weight": 3520, "horsepower": 110},
+                {"weight": 3425, "horsepower": 105},
+                {"weight": 3630, "horsepower": 100},
+                {"weight": 3525, "horsepower": 98},
+            ],
+        }
+    ],
+    "scales": [
+        {
+            "name": "xscale",
+            "type": "linear",
+            "domain": {"data": "table", "field": "horsepower"},
+            "range": [0, {"signal": "width"}],
+        },
+        {
+            "name": "yscale",
+            "type": "linear",
+            "domain": {"data": "table", "field": "weight"},
+            "range": [{"signal": "height"}, 0],
+        },
+    ],
+    "marks": [
+        {
+            "type": "symbol",
+            "from": {"data": "table"},
+            "encode": {
+                "enter": {
+                    "x": {"scale": "xscale", "field": "horsepower"},
+                    "y": {"scale": "yscale", "field": "weight"},
+                    "fill": {"value": "steelblue"},
+                    "size": {"value": 50},
+                }
+            },
+        }
+    ],
+    "axes": [
+        {"scale": "xscale", "orient": "bottom", "title": "Horsepower"},
+        {"scale": "yscale", "orient": "left", "title": "Weight"},
+    ],
+}
+
 
 async def process_ws_message(message: str, db: HeavyDB) -> AsyncGenerator[WSMessage, None]:
     """Routes WebSocket messages to the appropriate handler."""
     # if "Map " or " map " or "map " in message:
-    #     yield ChartMessage(message=chart_data_3, new=True)
+    #     yield ChartMessage(message=bar, new=True)
     if " chart " in message:
         logger.info("WS: Generate Chart message received!")
         async for response in handle_generate_chart_message(message, db):

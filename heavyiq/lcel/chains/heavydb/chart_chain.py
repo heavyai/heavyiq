@@ -5,13 +5,15 @@ from collections import defaultdict
 from typing import Any, Sequence, cast
 
 from langchain.schema.runnable import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
+from langchain_core.messages import AIMessage
 from langchain_core.pydantic_v1 import BaseModel, Field, Json
 
 from heavyiq.langchain.heavydb import get_db
+from heavyiq.langchain.llms import get_groq_chat_llm
 from heavyiq.langchain.utils import aget_table_info_from_cache_or_calculate
 from heavyiq.lcel.chains.heavydb.answer_chain import derive_column_metadata_from_sql
 from heavyiq.lcel.llms import llm_runnable
-from heavyiq.lcel.prompts import to_vega_lite_prompt_runnable
+from heavyiq.lcel.prompts import to_vega_lite_prompt_runnable, vega_chat_prompt
 
 
 class ChartChainInputType(BaseModel):
@@ -24,6 +26,9 @@ class ChartChainInputType(BaseModel):
     tables: list = Field(..., description="List of tables to consider.")
     query: str = Field(..., description="SQL Query")
 
+    class Config:
+        arbitrary_types_allowed = True
+
 
 class ChartChainOutputType(BaseModel):
     """
@@ -31,6 +36,9 @@ class ChartChainOutputType(BaseModel):
     """
 
     vega_lite_spec: Json = Field(..., description="Generated Vega Lite Spec")
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 def data_placeholder(_: dict) -> str:
@@ -78,7 +86,8 @@ async def derive_projected_columns(kwargs: dict) -> dict[str, list[str]]:
     # ex: {"car": ["ID", "model_name", "price"]}, here car is the table and ID, model_name, price are the projected columns
     for detail in columns_mapping.values():
         _, table, column = detail
-        projected_columns[table].append(column)
+        if column not in projected_columns[table]:
+            projected_columns[table].append(column)
     return projected_columns
 
 
@@ -121,14 +130,19 @@ async def fetch_schemas_for_tables(kwargs: dict) -> str:
     return schemas_with_projected_columns.strip()
 
 
-def output_formatter(values: str) -> dict:
-    return {"vega_lite_spec": values}
+def output_formatter(values: str | AIMessage) -> dict:
+    content = values.content if isinstance(values, AIMessage) else values
+    if isinstance(content, str) and "```json" in content:
+        content = content.strip("```json").strip("```")
+    return {"vega_lite_spec": content}
 
 
 format_output_rbl = RunnableLambda(output_formatter)
 
-prompt_rbl = to_vega_lite_prompt_runnable
-llm_rbl = llm_runnable.with_config(configurable={"llm": "default_llm"}).bind(extra_body={"guided_regex": "{.*}"})
+# prompt_rbl = to_vega_lite_prompt_runnable
+prompt_rbl = vega_chat_prompt
+# llm_rbl = llm_runnable.with_config(configurable={"llm": "default_llm"}).bind(extra_body={"guided_regex": "{.*}"})
+llm_rbl = get_groq_chat_llm()
 
 prompt_variables = RunnablePassthrough.assign(
     data_placeholder=data_placeholder,
