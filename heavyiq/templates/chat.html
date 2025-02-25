@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>HeavyIQ Chat</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
     <style>
       /* General Styles */
       body {
@@ -80,8 +84,44 @@
         padding: 10px;
         width: fit-content; /* ✅ Expands based on content */
         height: fit-content;
-        max-width: 1100px; /* Prevents excessive expansion */
-        max-height: 1100px;
+        /* max-width: 1100px; /* Prevents excessive expansion */
+        /* max-height: 1100px; */ */
+        border: 1px solid #ccc;
+        transition: all 0.3s ease-in-out;
+      }
+
+      /* Fullscreen mode */
+      .fullscreen {
+        width: 100vw !important;
+        height: 100vh !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        background: white !important;
+        z-index: 9999 !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: auto; /* Ensures scrollability if needed */
+      }
+
+      /* Fullscreen button styling */
+      .fullscreen-toggle {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        cursor: pointer;
+        font-size: 18px;
+        border-radius: 5px;
+        z-index: 10000;
+      }
+
+      .fullscreen-toggle:hover {
+        background: rgba(0, 0, 0, 0.9);
       }
 
       /* Ensure Vega Chart Fits Inside the Container */
@@ -368,6 +408,7 @@
 
         let chartDiv = document.createElement("div");
         chartDiv.className = "chart-container";
+        chartDiv.style.position = "relative";
         // Append chart outside .chat-box
         chatBox.appendChild(chartDiv);
 
@@ -375,6 +416,15 @@
         chartInnerDiv.id = chartId;
         chartInnerDiv.className = "vega-embed";
         chartDiv.appendChild(chartInnerDiv);
+
+        // Fullscreen Button
+        let fullscreenBtn = document.createElement("button");
+        fullscreenBtn.className = "fullscreen-toggle";
+        fullscreenBtn.innerHTML = '<i class="fa fa-expand"></i>'; // Fullscreen icon
+        fullscreenBtn.onclick = function () {
+          toggleFullscreen(chartDiv, fullscreenBtn);
+        };
+        chartDiv.appendChild(fullscreenBtn);
 
         // Capture warnings
         let capturedWarnings = [];
@@ -431,6 +481,17 @@
         `;
         chatBox.appendChild(errorDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
+      }
+
+      // Function to toggle fullscreen mode
+      function toggleFullscreen(chartDiv, btn) {
+        if (chartDiv.classList.contains("fullscreen")) {
+          chartDiv.classList.remove("fullscreen");
+          btn.innerHTML = '<i class="fa fa-expand"></i>'; // Switch to expand icon
+        } else {
+          chartDiv.classList.add("fullscreen");
+          btn.innerHTML = '<i class="fa fa-compress"></i>'; // Switch to minimize icon
+        }
       }
 
       function showWarningMessage(warnings) {
