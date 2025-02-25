@@ -233,6 +233,13 @@
         font-size: 12px;
       }
 
+      /* Disabled button styling */
+      #send-button:disabled {
+        background-color: #d3d3d3; /* Gray */
+        color: #666; /* Dark gray text */
+        cursor: not-allowed;
+      }
+
       /* Ensure the Chart Resizes on Smaller Screens */
       @media (max-width: 900px) {
         .chat-container {
@@ -390,6 +397,7 @@
 
             // If warnings were captured, send them back
             if (capturedWarnings.length > 0) {
+              showWarningMessage(capturedWarnings);
               if (isnew) {
                 // re-send vega spec to correct only for the newly generated vega spec
                 sendWarningMessage(chartSpec, capturedWarnings);
@@ -402,7 +410,8 @@
             console.error("⚠️ Vega-Lite Rendering Error:", error);
 
             // Remove failed chart div
-            chartDiv.remove();
+            // chartDiv.remove();
+            showErrorMessage(error.message);
             if (isnew) {
               // Send error message back to the user or backend
               sendErrorMessage(chartSpec, error.message);
@@ -412,25 +421,32 @@
         chatBox.scrollTop = chatBox.scrollHeight;
       }
 
-      function sendErrorMessage(failedSpec, errorMsg) {
+      function showErrorMessage(errorMsg) {
         let chatBox = document.getElementById("chat-box");
-
         let errorDiv = document.createElement("div");
         errorDiv.className = "message bot error-message";
         errorDiv.innerHTML = `
-        <strong>⚠️ Chart Rendering Failed!</strong><br>
-        ${errorMsg}<br>
-    `;
+            <strong>⚠️ Chart Rendering Failed!</strong><br>
+            ${errorMsg}<br>
+        `;
         chatBox.appendChild(errorDiv);
-
         chatBox.scrollTop = chatBox.scrollHeight;
+      }
 
-        // remove data from failed spec
-        // let updatedSpec = keepTopNValues(failedSpec);
+      function showWarningMessage(warnings) {
+        let chatBox = document.getElementById("chat-box");
+        let warningDiv = document.createElement("div");
+        warningDiv.className = "message bot warning-message";
+        warningDiv.innerHTML = `
+            <strong>⚠️ Chart Rendered with Warnings!</strong><br>
+            ${warnings.map((w) => `<div>➜ ${w}</div>`).join("")}
+        `;
+        chatBox.appendChild(warningDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
 
+      function sendErrorMessage(failedSpec, errorMsg) {
         showLoadingSpinner();
-
-        // (Optional) Send error data back to the backend
         socket.send(
           JSON.stringify({
             type: "chart_error",
@@ -441,22 +457,7 @@
       }
 
       function sendWarningMessage(failedSpec, warnings) {
-        let chatBox = document.getElementById("chat-box");
-
-        let warningDiv = document.createElement("div");
-        warningDiv.className = "message bot warning-message";
-        warningDiv.innerHTML = `
-        <strong>⚠️ Chart Rendered with Warnings!</strong><br>
-        ${warnings.map((w) => `<div>➜ ${w}</div>`).join("")}
-    `;
-        chatBox.appendChild(warningDiv);
-
-        chatBox.scrollTop = chatBox.scrollHeight;
-        // let updatedSpec = keepTopNValues(failedSpec);
-
         showLoadingSpinner();
-
-        // (Optional) Send warning data back to the backend
         socket.send(
           JSON.stringify({
             type: "chart_warning",
@@ -498,7 +499,17 @@
         chatBox.scrollTop = chatBox.scrollHeight;
       }
 
+      function disableSend() {
+        document.getElementById("send-button").disabled = true;
+      }
+
+      function enableSend() {
+        document.getElementById("send-button").disabled = false;
+      }
+
       function showLoadingSpinner() {
+        // disable send button
+        disableSend();
         let chatBox = document.getElementById("chat-box");
 
         let spinnerDiv = document.createElement("div");
@@ -515,15 +526,7 @@
         if (spinner) {
           spinner.remove();
         }
-      }
-
-      function resetSendButton() {
-        let sendText = document.getElementById("send-text");
-        let spinner = document.getElementById("loading-spinner");
-
-        sendText.style.display = "inline-block";
-        spinner.style.display = "none";
-        document.getElementById("send-button").disabled = false;
+        enableSend();
       }
 
       function handleKeyPress(event) {

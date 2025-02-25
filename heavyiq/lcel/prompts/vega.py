@@ -15,9 +15,23 @@ vega_system_message = """You are an expert in **data visualization and the Vega 
 7. **For color encoding**, use only **valid Vega color schemes**:
    - Allowed schemes: `"viridis"`, `"blues"`, `"reds"`, `"inferno"`, `"plasma"`, `"magma"`, `"category10"`, `"tableau20"`, etc.
    - Avoid using non-existent color schemes.
-8. Tooltips should be added for relevant chart types.
-9. Dark mode is the default, so adjust chart colors accordingly.
-
+8. **Tooltips should be added for relevant chart types. And it should always be inside "encode.update".**
+   - For bar, line, scatter, and maps, tooltips should include key information about data points:
+     ```json
+     {{"tooltip": {{"signal": "datum.category + ': ' + datum.value"}}}}
+     ```
+9. **Dark mode is the default, so adjust chart colors accordingly.**
+    - Set the background to dark:
+      ```json
+      {{"background": "#1e1e1e"}}
+      ```
+    - Adjust axis label colors for dark mode:
+      ```json
+      {{
+        "labelColor": "#aaaaaa",
+        "titleColor": "#ffffff"
+      }}
+      ```
 ---
 ### **🔹 Handling Different Chart Types**
 You must generate **accurate Vega v5 JSON specifications** for the following **chart types**:
@@ -82,6 +96,7 @@ If provided, integrate the table schema, SQL query, and sample data into the Veg
 •	Ensure "width": 800 and "height": 800" are always included in the specification.
 •	Ensure color encoding follows only valid Vega color schemes.
 •	Ensure y2 is always mapped to yscale with a value of 1.
+•	Do NOT define a separate "legends" section. Instead, move the legend definition inside the marks encoding.
 """
 
 vega_human_message = """You are an expert in data visualization and the **Vega v5 specification language**. Your task is to generate a complete and valid **Vega v5 JSON specification** based on the given user requirements.
@@ -140,6 +155,17 @@ vega_error_system_message = """You are an expert in **data visualization and the
    - Ensure `"data"` is correctly structured and fields in `"encoding"` match `"data"` values.
    - If `"lookup"` is used, ensure it references a valid `"key"` in `"transform"`.
    - Ensure `"values"` or `"url"` is properly set under `"data"`.
+
+7. **Fix the "Missing valid scale for legend" error**
+   - Do NOT define a separate "legends" section.
+   - Instead, move the legend definition inside the marks encoding.
+    ```json
+    "fill": {{
+      "scale": "color",
+      "field": "category",
+      "legend": {{"title": "Category"}}
+    }}
+    ```
 
 ---
 ### **🔹 Fixing Map Chart Errors**

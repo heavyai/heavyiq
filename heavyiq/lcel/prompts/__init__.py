@@ -15,6 +15,12 @@ from heavyiq.lcel.prompts.openai import (
 from heavyiq.lcel.prompts.question_prompt import TABLES_TO_NL_QUESTIONS_TEMPLATE
 
 from .vega import vega_error_human_message, vega_error_system_message, vega_human_message, vega_system_message
+from .vega_lite import (
+    vega_lite_error_system_message,
+    vega_lite_error_user_message,
+    vega_lite_system_message,
+    vega_lite_user_message,
+)
 
 CUSTOM_NL_TO_SQL_TEMPLATE = get_prompt_by_llm_type(LLMType.NL_TO_SQL)
 CUSTOM_NL_TO_SQL_ERROR_TEMPLATE = get_prompt_by_llm_type(LLMType.NL_TO_SQL_ERROR)
@@ -87,5 +93,19 @@ vega_error_chat_prompt = ChatPromptTemplate.from_messages(
     [
         SystemMessagePromptTemplate.from_template(vega_error_system_message),
         HumanMessagePromptTemplate.from_template(vega_error_human_message),
+    ]
+)
+
+vega_lite_chat_pormpt = ChatPromptTemplate.from_messages(
+    [
+        SystemMessagePromptTemplate.from_template(vega_lite_system_message),
+        HumanMessagePromptTemplate.from_template(vega_lite_user_message),
+    ]
+)
+
+vega_lite_error_chat_prompt = ChatPromptTemplate.from_messages(
+    [
+        SystemMessagePromptTemplate.from_template(vega_lite_error_system_message),
+        HumanMessagePromptTemplate.from_template(vega_lite_error_user_message),
     ]
 )

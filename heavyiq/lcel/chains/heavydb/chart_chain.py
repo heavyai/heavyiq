@@ -13,7 +13,7 @@ from heavyiq.langchain.llms import get_groq_chat_llm
 from heavyiq.langchain.utils import aget_table_info_from_cache_or_calculate
 from heavyiq.lcel.chains.heavydb.answer_chain import derive_column_metadata_from_sql
 from heavyiq.lcel.llms import llm_runnable
-from heavyiq.lcel.prompts import to_vega_lite_prompt_runnable, vega_chat_prompt
+from heavyiq.lcel.prompts import to_vega_lite_prompt_runnable, vega_chat_prompt, vega_lite_chat_pormpt
 
 
 class ChartChainInputType(BaseModel):
@@ -82,7 +82,7 @@ async def derive_projected_columns(kwargs: dict) -> dict[str, list[str]]:
     columns_mapping = await db.aretrieve_columns_from_query(query)
     # projected columns in the SQL query which are essential to define it in the
     # prompt along with their type
-    projected_columns = defaultdict(list)
+    projected_columns: dict = defaultdict(list)
     # ex: {"car": ["ID", "model_name", "price"]}, here car is the table and ID, model_name, price are the projected columns
     for detail in columns_mapping.values():
         _, table, column = detail
@@ -140,7 +140,8 @@ def output_formatter(values: str | AIMessage) -> dict:
 format_output_rbl = RunnableLambda(output_formatter)
 
 # prompt_rbl = to_vega_lite_prompt_runnable
-prompt_rbl = vega_chat_prompt
+# prompt_rbl = vega_chat_prompt
+prompt_rbl = vega_lite_chat_pormpt
 # llm_rbl = llm_runnable.with_config(configurable={"llm": "default_llm"}).bind(extra_body={"guided_regex": "{.*}"})
 llm_rbl = get_groq_chat_llm()
 

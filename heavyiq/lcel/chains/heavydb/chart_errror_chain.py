@@ -10,7 +10,7 @@ from langchain_core.pydantic_v1 import BaseModel, Field, Json
 
 from heavyiq.langchain.llms import get_groq_chat_llm
 from heavyiq.lcel.llms import llm_runnable
-from heavyiq.lcel.prompts import correct_vega_lite_prompt_runnable, vega_error_chat_prompt
+from heavyiq.lcel.prompts import correct_vega_lite_prompt_runnable, vega_error_chat_prompt, vega_lite_error_chat_prompt
 
 
 class ChartErrorChainInputType(BaseModel):
@@ -49,7 +49,8 @@ def output_formatter(values: str | AIMessage) -> dict:
 format_output_rbl = RunnableLambda(output_formatter)
 
 # prompt_rbl = correct_vega_lite_prompt_runnable
-prompt_rbl = vega_error_chat_prompt
+# prompt_rbl = vega_error_chat_prompt
+prompt_rbl = vega_lite_error_chat_prompt
 # llm_rbl = llm_runnable.with_config(configurable={"llm": "default_llm", "llm_max_tokens": 1024}).bind(
 #     extra_body={"guided_regex": "{.*}"}
 # )

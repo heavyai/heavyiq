@@ -56,6 +56,56 @@ def fetch_values(query: str, session: str) -> list:
     return formatted_values
 
 
+def get_values_index(data: list) -> int | None:
+    """
+    Gets the Spec data item index having values as key.
+    """
+    for idx, item in enumerate(data):
+        if "values" in item:
+            return idx
+        if "data" in item:
+            if "values" in item["data"]:
+                return idx
+    return None
+
+
+def attach_values_to_vega_spec(vega_spec_dict: dict, values: list) -> dict:
+    """
+    Attaches values data to corresponding position on vega dict.
+    """
+    if "data" in vega_spec_dict:
+        if isinstance(vega_spec_dict["data"], list):
+            # vega
+            idx = get_values_index(vega_spec_dict["data"])
+            assert idx is not None, "No values found on Vega Spec data"
+            vega_spec_dict["data"][idx]["values"] = values
+        elif isinstance(vega_spec_dict["data"], dict):
+            # vega-lite
+            vega_spec_dict["data"]["values"] = values
+    else:
+        # there might be a chances of "data" exists on the layer list
+        layers = vega_spec_dict["layer"]
+        idx = get_values_index(layers)
+        vega_spec_dict["layer"][idx]["data"]["values"] = values
+
+    return vega_spec_dict
+
+
+def get_values_from_vega_spec(vega_spec_dict: dict) -> list:
+    """
+    Get values from the vega spec dict.
+    """
+    if "data" in vega_spec_dict:
+        if isinstance(vega_spec_dict["data"], list):
+            # vega
+            idx = get_values_index(vega_spec_dict["data"])
+            return vega_spec_dict["data"][idx]["values"]
+        return vega_spec_dict["data"]["values"]
+
+    idx = get_values_index(vega_spec_dict["layer"])
+    return vega_spec_dict["layer"][idx]["data"]["values"]
+
+
 async def handle_generate_chart_message(message: str, db: HeavyDB) -> AsyncGenerator[WSMessage, None]:
     """
     Handles message which contain "chart" text.
@@ -75,7 +125,8 @@ async def handle_generate_chart_message(message: str, db: HeavyDB) -> AsyncGener
     vega_spec_dict = json.loads(vega_spec_json)
     values = fetch_values(query=query, session=session_id)
     if values:
-        vega_spec_dict["data"][0]["values"] = values
+        attach_values_to_vega_spec(vega_spec_dict, values)
+
     yield ChartMessage(message=vega_spec_dict, new=True)
 
 
@@ -87,17 +138,19 @@ async def handle_chart_error_message(message: str, db: HeavyDB, n: int = 2) -> A
     request_body, session_id = json.loads(message), db._conn._session
     vega_spec, errors = request_body["spec"], request_body["errors"]
 
-    values_list = vega_spec["data"][0]["values"]
-    vega_spec["data"][0]["values"] = values_list[:n]
+    values_list = get_values_from_vega_spec(vega_spec)
+    attach_values_to_vega_spec(vega_spec, values_list[:n])
 
     input_dict = {"session_id": session_id, "vega_spec": vega_spec, "errors": errors}
     response = await handle_vega_spec_error_correction_request(input_dict, db)
 
-    corrected_spec = response["corrected_vega_spec"]
+    corrected_spec = response["corrected_vega_spec"]  # type: ignore
     corrected_spec_dict = json.loads(corrected_spec)
     if "vega_spec" in corrected_spec_dict:
         corrected_spec_dict = corrected_spec_dict["vega_spec"]
-    corrected_spec_dict["data"][0]["values"] = values_list
+
+    attach_values_to_vega_spec(corrected_spec_dict, values_list)
+
     yield ChartMessage(message=corrected_spec_dict, new=False)
 
 
@@ -110,17 +163,18 @@ async def handle_chart_warn_message(message: str, db: HeavyDB, n: int = 2) -> As
     vega_spec, warnings = request_body["spec"], request_body["warnings"]
 
     # pass only a specific data rows to error correction prompt instead of passing the whole data
-    values_list = vega_spec["data"][0]["values"]
-    vega_spec["data"][0]["values"] = values_list[:n]  # pass only two data rows
+    values_list = get_values_from_vega_spec(vega_spec)
+    attach_values_to_vega_spec(vega_spec, values_list[:n])
 
     input_dict = {"session_id": session_id, "vega_spec": vega_spec, "warnings": warnings}
     response = await handle_vega_spec_error_correction_request(input_dict, db)
 
-    corrected_spec = response["corrected_vega_spec"]
+    corrected_spec = response["corrected_vega_spec"]  # type: ignore
     corrected_spec_dict = json.loads(corrected_spec)
     if "vega_spec" in corrected_spec_dict:
         corrected_spec_dict = corrected_spec_dict["vega_spec"]
-    corrected_spec_dict["data"][0]["values"] = values_list
+
+    attach_values_to_vega_spec(corrected_spec_dict, values_list)
     yield ChartMessage(message=corrected_spec_dict, new=False)
 
 
