@@ -1,5 +1,6 @@
 import json
 import re
+from datetime import datetime
 from typing import AsyncGenerator
 
 from heavyiq.api.handlers import (
@@ -27,7 +28,7 @@ def extract_select_columns(query: str) -> list[str]:
 
     if match:
         columns, columns_part = [], match.group(1)
-        for col in columns_part.split(","):
+        for col in re.findall(r"(?:\([^()]*\)|[^,])+", columns_part):
             if " AS " in col:
                 column = col.split(" AS ")[-1].strip()
             else:
@@ -52,6 +53,11 @@ def fetch_values(query: str, session: str) -> list:
     if not values:
         return []
     assert len(select_columns) == len(values[0])
+    # change datetime-format to string otheriwse it might endup in json decode error
+    has_datetime = any(isinstance(i, datetime) for i in values[0])
+    if has_datetime:
+        values = [[v.isoformat() if isinstance(v, datetime) else v for v in row] for row in values]
+
     formatted_values = [dict(zip(select_columns, row)) for row in values]
     return formatted_values
 
