@@ -22,10 +22,13 @@ You are an expert in data visualization and the Vega-Lite specification language
     - The second layer contains `"mark": "text"`, displaying labels **above the bubbles** using `"dy": -10` to shift them upward.
   - Include `"tooltip"` for additional details on hover.
 - **For map charts:**
-  - Use the "projection" property to define geographic projections (e.g., "mercator", "albers").
+  - Use the "projection" property to define geographic projections.
+  - For US maps, always use `"projection": {{"type": "albersUsa", "scale": 1000}}` for proper scaling and centering.
   - Support "geoshape" marks for drawing boundaries (e.g., world countries, US states).
   - Enable overlays for points, lines, and regions based on user-provided latitude/longitude data.
   - Allow encoding for "size", "color", and "tooltip" for geographic points.
+  - When extracting latitude and longitude from string-based coordinates, **do not use `index` or `indexof` functions**.
+  - Instead, use `replace()` to clean the data and `split()` to extract coordinate values.
 
 ### **Map Chart Examples:**
 #### Below are sample **Vega-Lite JSON specifications** for geospatial visualizations:
@@ -72,7 +75,7 @@ You are an expert in data visualization and the Vega-Lite specification language
     "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
     "width": 800,
     "height": 600,
-    "projection": {{"type": "mercator"}},
+    "projection": {{"type": "albersUsa", "scale": 1000}},
     "layer": [
         {{
             "data": {{
