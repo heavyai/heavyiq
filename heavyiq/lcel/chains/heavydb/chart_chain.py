@@ -139,11 +139,12 @@ def output_formatter(values: str | AIMessage) -> dict:
 
 format_output_rbl = RunnableLambda(output_formatter)
 
-# prompt_rbl = to_vega_lite_prompt_runnable
-# prompt_rbl = vega_chat_prompt
-prompt_rbl = vega_lite_chat_pormpt
-# llm_rbl = llm_runnable.with_config(configurable={"llm": "default_llm"}).bind(extra_body={"guided_regex": "{.*}"})
-llm_rbl = get_groq_chat_llm()
+# Default prompt and llm
+prompt_rbl = to_vega_lite_prompt_runnable
+llm_rbl = llm_runnable.with_config(configurable={"llm": "default_llm"}).bind(extra_body={"guided_regex": "{.*}"})
+# Groq prompt and llm
+# prompt_rbl = vega_lite_chat_pormpt
+# llm_rbl = get_groq_chat_llm()
 
 prompt_variables = RunnablePassthrough.assign(
     data_placeholder=data_placeholder,
