@@ -1,8 +1,34 @@
 {
-  "editor.formatOnSave": true,
+  // UI and Editor Theme
+  "workbench.colorTheme": "Default Dark Modern", // Light theme for better visibility
+  "workbench.preferredLightColorTheme": "Solarized Light (no bold)",
+  "workbench.preferredDarkColorTheme": "Default Dark Modern",
+  // Editor Font and Zoom
+  "editor.fontSize": 14, // Larger font size for readability
+  "editor.lineHeight": 22, // Adjust line height for better spacing
+  "window.zoomLevel": 1, // Slight zoom for overall interface
+  // Cursor Settings
+  "editor.cursorStyle": "line", // Use block-style cursor for visibility
+  "editor.cursorBlinking": "blink", // Smooth blinking for better tracking
+  // Bracket Pair Colorization
+  "editor.bracketPairColorization.enabled": true,
+  // MiniMap for Code Overview
+  "editor.minimap.enabled": false, // Disable minimap for less distraction
+  // File Explorer Font Size
+  "workbench.tree.indent": 12, // Increase indentation in file explorer
+  // Highlight Matching Brackets
+  "editor.matchBrackets": "always",
+  // Tab Appearance
+  "workbench.editor.tabSizing": "shrink", // Shrink tabs for better organization
+  // Enable Smooth Scrolling
+  "editor.smoothScrolling": true,
+  // Additional Readability Settings
+  "editor.renderWhitespace": "boundary", // Highlight spaces at boundaries
+  "editor.renderControlCharacters": true, // Show invisible characters
+  "editor.formatOnSave": true, // Automatically format code on save
   "editor.rulers": [140],
   "flake8.args": ["--config=setup.cfg"],
-  "flake8.path": ["${workspaceFolder}/venv/bin/python", "-m", "flake8"],
+  "flake8.path": ["${workspaceFolder}/nvenv/bin/python", "-m", "flake8"],
   "[python]": {
     "editor.defaultFormatter": "ms-python.black-formatter",
     "editor.formatOnSave": true,
@@ -30,6 +56,8 @@
     "**/.mypy_cache": true,
     "**/*venv": true
   },
+  "editor.tabSize": 4,
+  "editor.insertSpaces": true,
   "python.defaultInterpreterPath": "${workspaceFolder}/lvenv/bin/python",
   "autoDocstring.docstringFormat": "google-notypes"
 }
