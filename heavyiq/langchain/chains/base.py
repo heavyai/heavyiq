@@ -1,5 +1,9 @@
 from langchain.chains.base import Chain
-from langchain.callbacks.manager import CallbackManagerForChainRun, AsyncCallbackManagerForChainRun
+
+
+from langchain_core.callbacks import CallbackManagerForChainRun
+
+from langchain_core.callbacks import AsyncCallbackManagerForChainRun
 from heavyiq.logging_utils import get_heavyiq_logger
 from heavyiq.config import get_config
 

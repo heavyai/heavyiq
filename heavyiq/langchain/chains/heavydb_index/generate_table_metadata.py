@@ -6,15 +6,20 @@ from typing import Any, Optional, TYPE_CHECKING
 from pydantic import Extra
 
 from fastapi.concurrency import run_in_threadpool
-from langchain.chat_models.base import BaseChatModel
+from langchain_core.language_models import BaseChatModel
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
-from langchain.schema.language_model import BaseLanguageModel
-from langchain.callbacks.manager import (
-    AsyncCallbackManagerForChainRun,
-    CallbackManagerForChainRun,
-)
-from langchain.schema import BasePromptTemplate, LLMResult
-from langchain.prompts.prompt import PromptTemplate
+from langchain_core.language_models import BaseLanguageModel
+
+
+from langchain_core.callbacks import CallbackManagerForChainRun
+
+from langchain_core.callbacks import AsyncCallbackManagerForChainRun
+
+
+from langchain_core.outputs import LLMResult
+
+from langchain_core.prompts import BasePromptTemplate
+from langchain_core.prompts import PromptTemplate
 
 from heavyiq.langchain.exceptions import GenerateTableMetadataException
 from heavyiq.langchain.chains import BaseChain

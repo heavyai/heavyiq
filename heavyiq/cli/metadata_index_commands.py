@@ -2,7 +2,7 @@ from pathlib import Path
 
 import click
 from fastapi.concurrency import run_in_threadpool
-from langchain.vectorstores import Chroma
+from langchain_community.vectorstores import Chroma
 
 from heavyiq.utils import is_path_exists
 from heavyiq.cli.decorators import coro

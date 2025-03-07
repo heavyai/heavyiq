@@ -1,5 +1,5 @@
 # input and output types for auto_sql_chain runnable
-from langchain.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 
 from .sql_type import SqlChainOutputType
 
