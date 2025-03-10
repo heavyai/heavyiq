@@ -3,8 +3,8 @@ from enum import Enum
 
 from langchain.indexes import VectorstoreIndexCreator
 from langchain.indexes.vectorstore import VectorStoreIndexWrapper
-from langchain.schema import BaseRetriever
-from langchain.text_splitter import TextSplitter
+from langchain_core.retrievers import BaseRetriever
+from langchain_text_splitters import TextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores.chroma import Chroma
 

@@ -3,7 +3,7 @@ import re
 from typing import Any
 
 from langchain.callbacks.tracers.logging import LoggingCallbackHandler
-from langchain.callbacks.tracers.stdout import FunctionCallbackHandler
+from langchain_core.tracers.stdout import FunctionCallbackHandler
 
 from heavyiq.logging_utils import get_heavyiq_logger
 

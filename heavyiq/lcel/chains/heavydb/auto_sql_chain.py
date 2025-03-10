@@ -1,5 +1,13 @@
 # The AutoSQL Chain module contains a runnable chain designed to generate SQL queries from natural language questions by automatically detecting the necessary tables.
-from langchain.schema.runnable import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
+
+
+from langchain_core.runnables import Runnable
+
+from langchain_core.runnables import RunnableBranch
+
+from langchain_core.runnables import RunnableLambda
+
+from langchain_core.runnables import RunnablePassthrough
 
 from heavyiq.langchain.heavydb import get_config
 from heavyiq.lcel.types import AutoSQLChainInputType, AutoSQLChainOutputType

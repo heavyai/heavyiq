@@ -1,6 +1,6 @@
 from functools import partial
 
-from langchain.schema.runnable import ConfigurableField
+from langchain_core.runnables import ConfigurableField
 from langchain_core.runnables.base import RunnableSerializable
 from langchain_core.runnables.utils import AnyConfigurableField, Input, Output
 from langchain_openai import OpenAI

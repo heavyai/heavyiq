@@ -2,7 +2,13 @@ import json
 from abc import ABCMeta, abstractmethod
 from typing import Any, AsyncIterator, TypedDict
 
-from langchain.schema.runnable import Runnable, RunnableConfig, RunnableSerializable
+
+
+from langchain_core.runnables import Runnable
+
+from langchain_core.runnables import RunnableSerializable
+
+from langchain_core.runnables import RunnableConfig
 from langchain_community.llms.openai import BaseOpenAI
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.language_models.llms import LLMResult
