@@ -336,7 +336,7 @@ class ChromaController(BaseController):
         from heavyrag.ingest import delete_all_table_nodes, delete_nodes_by_ids
 
         dbname = heavydb._dbname
-        index = self.get_index_by_collection(collection_name=dbname)
+        index = self.get_or_create_index(vector_store=self.get_vectorstore(collection_name=dbname))
         if not index:
             return None
         if force:
