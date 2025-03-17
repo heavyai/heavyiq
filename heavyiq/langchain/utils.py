@@ -1,5 +1,4 @@
 import asyncio
-import json
 import os
 import re
 from datetime import datetime, timedelta
@@ -16,6 +15,7 @@ from langchain.schema.prompt import PromptValue
 from langchain_core.tracers import langchain as langchain_tracer_module
 from langchain_core.tracers.langchain import LangChainTracer
 from langchain_core.tracers.schemas import Run
+from transformers import AutoTokenizer, LlamaTokenizer
 
 from heavyiq.config import HeavyIQConfig, change_iq_config_for_free_edition, get_config
 from heavyiq.langchain import HeavyDB
@@ -126,8 +126,13 @@ def get_table_info_wrt_token_limit(
             {"include_samples": False, "include_top_k": False},
         ]
     else:
-        token_counter = custom_model_token_counter
+        tokenizer = get_tokenizer()
         token_limit = llm.context_window - 306  # type: ignore # (256 response + 50 buffer)
+
+        def token_counter(text: str) -> int:
+            """Token counter for the Llama model."""
+            return len(tokenizer.tokenize(text))
+
         table_info_options = [
             {"include_samples": False},
             {"include_samples": False, "include_top_k": False},
@@ -529,8 +534,6 @@ def get_tokenizer() -> Any:
     """
     Get tokenizer from pretrained local files.
     """
-    from tokenizers import Tokenizer
-
     from heavyiq.config import get_config
 
     config = get_config()
@@ -538,51 +541,42 @@ def get_tokenizer() -> Any:
     model_name = get_vllm_model_name(api_base=config.custom_llm_api_base).lower()
     model_local_path: str
     if "llama-3" in model_name:
+        tokenizer_cls = AutoTokenizer
         model_local_path = "./heavyiq/langchain/tokenizer_models/llama3_model"
     elif "llama" in model_name:
+        tokenizer_cls = LlamaTokenizer
         model_local_path = "./heavyiq/langchain/tokenizer_models/llama_model"
     elif "deepseek" in model_name:
+        tokenizer_cls = AutoTokenizer
         model_local_path = "./heavyiq/langchain/tokenizer_models/deepseek_model"
     elif "starcoder-2" in model_name:
+        tokenizer_cls = AutoTokenizer
         model_local_path = "./heavyiq/langchain/tokenizer_models/starcoder2_model"
     elif ("mixtral" in model_name) or ("wizard" in model_name):
+        tokenizer_cls = AutoTokenizer
         model_local_path = "./heavyiq/langchain/tokenizer_models/mixtral_model"
     elif "qwen" in model_name:
+        print("Qwen used")
+        tokenizer_cls = AutoTokenizer
         model_local_path = "./heavyiq/langchain/tokenizer_models/qwen_model"
     else:
         raise ValueError("Unsupported model found for tokenization.")
 
-    tok_json = f"{model_local_path}/tokenizer.json"
-    tokenizer = Tokenizer.from_file(tok_json)
-
-    tok_config_json = f"{model_local_path}/tokenizer_config.json"
-    tok_config = {}
-    if os.path.exists(tok_config_json):
-        with open(tok_config_json, "r") as f:
-            tok_config = json.load(f)
-
-    # Add special tokens if specified in tokenizer_config
-    if "bos_token" in tok_config:
-        tokenizer.add_special_tokens([tok_config["bos_token"]])
-
-    if "eos_token" in tok_config:
-        tokenizer.add_special_tokens([tok_config["eos_token"]])
-
-    return tokenizer
+    return tokenizer_cls.from_pretrained(model_local_path, local_files_only=True, legacy=False)
 
 
 def custom_model_token_counter(text: str) -> int:
     """
     Token counter method for custom models which helps to calculate tokens for the given text.
     """
-    return len(get_tokenizer().encode(text).tokens)
+    return len(get_tokenizer().tokenize(text))
 
 
 def custom_model_tokenizer_encode(text: str) -> list[int]:
     """
     Encode text str into list of input ids.
     """
-    return get_tokenizer().encode(text).ids
+    return get_tokenizer().encode(text)
 
 
 def custom_model_tokenizer_decode(token_ids: list[int]) -> str:
