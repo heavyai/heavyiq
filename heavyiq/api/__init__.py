@@ -274,6 +274,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         # initialize chains and RAG
         import heavyiq.lcel.chains
         from heavyiq.logging_utils import heavyiq_logger as logger
+        from heavyrag.controller import get_controller
 
         global _config_provided
 
@@ -311,6 +312,10 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         # run a background task to check license_edition got cached or not
         # if yes, and it's a free edition then enable langsmith telemetry
         asyncio.create_task(enable_telemetrics_for_free_license_daemon())
+
+        # Initialize faiss index on each worker process to avoid segmentation fault
+        if config.rag_vectordb_type == "faiss":
+            get_controller("faiss").get_vectorstore()
 
     @app.on_event("shutdown")
     async def shutdown():
