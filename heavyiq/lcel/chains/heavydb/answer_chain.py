@@ -1,8 +1,16 @@
 from collections import defaultdict
 from typing import Any, TypedDict
 
-from langchain.schema.output_parser import StrOutputParser
-from langchain.schema.runnable import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
+from langchain_core.output_parsers import StrOutputParser
+
+
+from langchain_core.runnables import Runnable
+
+from langchain_core.runnables import RunnableBranch
+
+from langchain_core.runnables import RunnableLambda
+
+from langchain_core.runnables import RunnablePassthrough
 
 from heavyiq.config import get_config
 from heavyiq.langchain.heavydb import get_db

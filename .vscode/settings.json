@@ -1,4 +1,25 @@
 {
+  "editor.fontSize": 14, // Larger font size for readability
+  "editor.lineHeight": 22, // Adjust line height for better spacing
+  "window.zoomLevel": 1, // Slight zoom for overall interface
+  // Cursor Settings
+  "editor.cursorStyle": "line", // Use block-style cursor for visibility
+  "editor.cursorBlinking": "blink", // Smooth blinking for better tracking
+  // Bracket Pair Colorization
+  "editor.bracketPairColorization.enabled": true,
+  // MiniMap for Code Overview
+  "editor.minimap.enabled": false, // Disable minimap for less distraction
+  // File Explorer Font Size
+  "workbench.tree.indent": 12, // Increase indentation in file explorer
+  // Highlight Matching Brackets
+  "editor.matchBrackets": "always",
+  // Tab Appearance
+  "workbench.editor.tabSizing": "shrink", // Shrink tabs for better organization
+  // Enable Smooth Scrolling
+  "editor.smoothScrolling": true,
+  // Additional Readability Settings
+  "editor.renderWhitespace": "boundary", // Highlight spaces at boundaries
+  "editor.renderControlCharacters": true, // Show invisible characters
   "editor.formatOnSave": true,
   "editor.rulers": [140],
   "flake8.args": ["--config=setup.cfg"],

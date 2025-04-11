@@ -251,7 +251,8 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
 
     if config.enable_debug_endpoints:
         from heavyiq.api.routes.debug_router import debug_router
-        from heavyiq.api.routes.runnable_router import runnable_router
+
+        # from heavyiq.api.routes.runnable_router import runnable_router
 
         app.include_router(
             debug_router,
@@ -264,7 +265,8 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
                 }
             },
         )
-        app.include_router(runnable_router, prefix="/runnable", tags=["runnable"])
+        # commented out since it produces error
+        # app.include_router(runnable_router, prefix="/runnable", tags=["runnable"])
 
     @app.on_event("startup")
     async def initialize():
@@ -274,6 +276,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         # initialize chains and RAG
         import heavyiq.lcel.chains
         from heavyiq.logging_utils import heavyiq_logger as logger
+        from heavyrag.controller import get_controller
 
         global _config_provided
 
@@ -311,6 +314,10 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         # run a background task to check license_edition got cached or not
         # if yes, and it's a free edition then enable langsmith telemetry
         asyncio.create_task(enable_telemetrics_for_free_license_daemon())
+
+        # Initialize faiss index on each worker process to avoid segmentation fault
+        if config.rag_vectordb_type == "faiss":
+            get_controller("faiss").get_vectorstore()
 
     @app.on_event("shutdown")
     async def shutdown():

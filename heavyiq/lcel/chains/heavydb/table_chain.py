@@ -1,6 +1,6 @@
 import re
 
-from langchain.schema import StrOutputParser
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.beta.runnables.context import Context
 from langchain_core.runnables import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
 
