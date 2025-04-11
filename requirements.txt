@@ -31,3 +31,5 @@ llama-index-vector-stores-faiss==0.3.0
 cachetools==5.5.2
 langchain-openai==0.3.7
 langchain-community==0.3.19
+llama-index-embeddings-text-embeddings-inference==0.3.2
+
