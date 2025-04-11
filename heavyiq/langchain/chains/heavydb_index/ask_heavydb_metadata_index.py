@@ -2,12 +2,16 @@ import re
 from typing import Any, Optional
 
 from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 from langchain.chains.qa_with_sources.retrieval import RetrievalQAWithSourcesChain
 from langchain.chains.combine_documents.map_reduce import MapReduceDocumentsChain
 from langchain.chains.combine_documents.stuff import StuffDocumentsChain
-from langchain.schema import BaseRetriever
-from langchain.callbacks.manager import CallbackManagerForChainRun, AsyncCallbackManagerForChainRun
+from langchain_core.retrievers import BaseRetriever
+
+
+from langchain_core.callbacks import CallbackManagerForChainRun
+
+from langchain_core.callbacks import AsyncCallbackManagerForChainRun
 from pydantic import Field
 
 from heavyiq.langchain.llms import get_llm

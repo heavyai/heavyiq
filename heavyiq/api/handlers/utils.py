@@ -1,7 +1,11 @@
 import math
 from typing import NamedTuple, final
 
-from langchain.schema.runnable import Runnable, RunnableConfig
+
+
+from langchain_core.runnables import Runnable
+
+from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.utils import Input
 
 

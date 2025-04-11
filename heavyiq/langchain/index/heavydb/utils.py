@@ -5,7 +5,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Optional, AsyncGenerator
 
-from langchain.docstore.document import Document
+from langchain_core.documents import Document
 
 from heavyiq.utils import aread_file
 from heavyiq.config import get_config
