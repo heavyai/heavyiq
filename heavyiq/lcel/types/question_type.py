@@ -1,6 +1,6 @@
 from typing import TypedDict
 
-from langchain.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field, RootModel
 
 
 class QuestionsChainInputType(BaseModel):
@@ -18,7 +18,7 @@ class QuestionsChainInputTypedDict(TypedDict):
     tables: list[str]
 
 
-class QuestionsChainOutputType(BaseModel):
+class QuestionsChainOutputType(RootModel[list[str]]):
     """Tables to Questions chain output type"""
 
-    __root__: list[str] = Field(..., description="List of generated questions.")
+    pass

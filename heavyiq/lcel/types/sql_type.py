@@ -1,15 +1,20 @@
 # contain types w.r.t sql_chain
 from typing import TypedDict
 
-from langchain.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 
 
 class SqlChainInputType(BaseModel):
     """NLtoSQL chain input type."""
 
     question: str = Field(..., description="Natural Language question.")
-    session_id: str = Field(..., description="HeavyDB session id.")
-    tables: list = Field(..., description="List of tables to consider.")
+    session_id: str = Field(..., description="HeavyDB session ID.")
+    tables: list[str] = Field(..., description="List of tables to consider.")
+
+    class Config:
+        json_schema_extra = {
+            "example": {"question": "What is the revenue?", "session_id": "12345", "tables": ["sales"]}
+        }
 
 
 class SqlChainOutputType(BaseModel):

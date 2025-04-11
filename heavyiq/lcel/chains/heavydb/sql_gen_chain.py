@@ -3,7 +3,11 @@
 import asyncio
 from collections.abc import Sequence
 
-from langchain.schema.runnable import RunnableLambda, RunnablePassthrough
+
+
+from langchain_core.runnables import RunnableLambda
+
+from langchain_core.runnables import RunnablePassthrough
 
 from heavyiq.langchain.heavydb import heavydb_var
 from heavyiq.langchain.utils import extract_error_message_from_exception

@@ -2,7 +2,7 @@ from typing import Any
 
 from langchain.chains.qa_with_sources.retrieval import RetrievalQAWithSourcesChain
 from langchain.chains.qa_with_sources.base import BaseQAWithSourcesChain
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 
 from heavyiq.langchain.index.docs import HeavyAIDocsIndex
 from heavyiq.langchain.llms import get_llm_by_type, LLMType, is_using_custom_trained_llm
