@@ -1,0 +1,173 @@
+import asyncio
+import csv
+import json
+import os
+import threading
+import time
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from typing import Any, Dict, List, TypedDict
+
+import aiocsv
+import aiofiles
+import pandas as pd
+import uvloop
+
+# CONFIG
+CSV_FILE = "data.csv"
+OUTPUT_CSV_FILE = "output.csv"
+CHUNK_SIZE = 2  # chunk size where each process is supposed to be handled
+NUM_PROCESSES = 5  # number of processes to be spawned
+QUEUE_MAXSIZE = 10  # limit memory usage
+NUMBER_OF_QUESTIONS_TO_GENERATE_PER_TABLE = 10
+
+# Use uvloop for improved performance on UNIX-based systems
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+
+
+class WriteRow(TypedDict):
+    table_name: str
+    database_name: str
+    chart_question: str
+    sql_question: str
+    query: str
+    vega_spec: str
+
+
+async def foo():
+    print("called foo")
+    await asyncio.sleep(1)
+
+
+# ========= Async per-record processing (CPU-bound simulation) =========
+async def process_record(record: Dict[str, Any]) -> list[WriteRow]:
+    from heavyiq.training.vega_lite.chart_graph import app as vega_graph
+
+    pid = os.getpid()
+    tid = threading.get_ident()
+    print(f"[Async Function] (PID={pid}, TID={tid}) Processing record ID {record.get('id')}")
+    # Simulate asynchronous work (for example, an I/O operation or async CPU work)
+    inputs = {
+        "database_name": record["database_name"],
+        "table_name": record["table_name"],
+        "n": NUMBER_OF_QUESTIONS_TO_GENERATE_PER_TABLE,
+    }
+
+    final_state = await vega_graph.ainvoke(inputs)
+    output_rows = []
+    for line in final_state["questions_with_vega"]:
+        chart_question, sql_question, query, vega_spec = line
+        if isinstance(vega_spec, dict):
+            vega_spec = json.dumps(vega_spec)
+
+        output_rows.append(
+            WriteRow(
+                database_name=record["database_name"],
+                table_name=record["table_name"],
+                chart_question=chart_question,
+                sql_question=sql_question,
+                query=query,
+                vega_spec=vega_spec,
+            )
+        )
+
+    return output_rows
+
+
+# ========= Per-process chunk processor =========
+def worker_process(chunk: List[Dict[str, Any]]) -> List[WriteRow]:
+    pid = os.getpid()
+    print(f"[Process {pid}] Received chunk with {len(chunk)} records")
+    # Create a new event loop for this process
+    asyncio.set_event_loop(asyncio.new_event_loop())
+    loop = asyncio.get_event_loop()
+
+    async def handle_chunk():
+        # Create tasks for each record using the async process_record
+        tasks = [process_record(record) for record in chunk]
+        return await asyncio.gather(*tasks)
+
+    results = loop.run_until_complete(handle_chunk())
+    print(f"[Process {pid}] Finished processing chunk")
+    loop.close()
+    flattened_results = [item for sublist in results for item in sublist]
+    return flattened_results
+
+
+# ========= Producer coroutine =========
+async def producer(queue: asyncio.Queue):
+    print("[Producer] Starting to read CSV and enqueue chunks...")
+    async with aiofiles.open(CSV_FILE, mode="r", newline="") as afp:
+        reader = aiocsv.AsyncDictReader(afp)
+        chunk = []
+        async for row in reader:
+            chunk.append(row)
+            if len(chunk) == CHUNK_SIZE:
+                print(f"[Producer] Enqueuing chunk of size {CHUNK_SIZE}")
+                await queue.put(chunk)
+                chunk = []
+        if chunk:
+            print(f"[Producer] Enqueuing final chunk of size {len(chunk)}")
+            await queue.put(chunk)
+    # Signal completion (push 'None' poison pills for each consumer)
+    for _ in range(NUM_PROCESSES):
+        await queue.put(None)
+    print("[Producer] Finished producing chunks and sent stop signals.")
+
+
+# ========= Consumer coroutine =========
+async def consumer(queue: asyncio.Queue, result_list: List, process_pool: ProcessPoolExecutor, cid: int):
+    print(f"[Consumer-{cid}] Started")
+    loop = asyncio.get_event_loop()
+    while True:
+        chunk = await queue.get()
+        if chunk is None:
+            print(f"[Consumer-{cid}] Received stop signal.")
+            queue.task_done()
+            break
+        print(f"[Consumer-{cid}] Dequeued chunk of size {len(chunk)}")
+        # Process the chunk in a separate process
+        result = await loop.run_in_executor(process_pool, worker_process, chunk)
+        result_list.extend(result)
+        queue.task_done()
+    print(f"[Consumer-{cid}] Exiting.")
+
+
+# ========= Async Main =========
+async def async_main():
+    from heavyiq.langchain.utils import init_telemetrics
+
+    print("[Main] Starting async processing pipeline...")
+    # generate_sample_csv(CSV_FILE, rows=100)
+    # Init telemetrics
+    init_telemetrics()
+    queue = asyncio.Queue(maxsize=QUEUE_MAXSIZE)
+    results = []
+    process_pool = ProcessPoolExecutor(max_workers=NUM_PROCESSES)
+
+    # Launch producer coroutine
+    producer_task = asyncio.create_task(producer(queue))
+
+    # Launch consumer coroutines (with consumer id for logging)
+    consumer_tasks = [asyncio.create_task(consumer(queue, results, process_pool, cid)) for cid in range(NUM_PROCESSES)]
+
+    await asyncio.gather(producer_task)
+    await queue.join()  # Wait until all items in the queue are processed
+
+    for c in consumer_tasks:
+        await c  # Ensure each consumer has exited
+
+    df = pd.DataFrame(results)
+    df["id"] = range(1, len(df) + 1)
+    # Define desired column order
+    column_order = ["id", "database_name", "table_name", "chart_question", "sql_question", "query", "vega_spec"]
+    df.to_csv(OUTPUT_CSV_FILE, columns=column_order, index=False)
+    print("\n[Main] Final Merged Output (First 5 Rows):")
+    print(df.head())
+    print(f"Successfully written output to {OUTPUT_CSV_FILE}")
+
+
+if __name__ == "__main__":
+    start = time.time()
+    asyncio.run(async_main())
+    end = time.time()
+    print(f"Total seconds: {end-start}")
