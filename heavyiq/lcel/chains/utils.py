@@ -1,17 +1,7 @@
 from typing import Any
 
-
-
-from langchain_core.runnables import Runnable
-
-from langchain_core.runnables import RunnableBinding
-
-from langchain_core.runnables import RunnableConfig
-
-
-from langchain_core.runnables.configurable import RunnableConfigurableFields
-
-from langchain_core.runnables.configurable import RunnableConfigurableAlternatives
+from langchain_core.runnables import Runnable, RunnableBinding, RunnableConfig
+from langchain_core.runnables.configurable import RunnableConfigurableAlternatives, RunnableConfigurableFields
 
 
 def merge_dicts(d1: dict, d2: dict) -> dict:
@@ -36,8 +26,10 @@ def get_value_from_runnable_binding(
     Passed config would be used to prepare the default runnable of RunnableConfigurableFields instance.
     """
     if isinstance(binding, RunnableConfigurableAlternatives):
-        return binding.default
-    value = binding.bound._prepare(binding.config)  # type: ignore
+        bounded = binding
+    else:
+        bounded = binding.bound
+    value = bounded._prepare(binding.config)  # type: ignore
     if value and isinstance(value, tuple):
         actual_value, attached_config = value
         if isinstance(actual_value, RunnableConfigurableFields):
