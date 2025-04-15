@@ -1,17 +1,13 @@
 import asyncio
 import operator
-from functools import partial
 from typing import Annotated, Any, Dict, Optional
 
 from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
-from langchain.schema import HumanMessage, SystemMessage
-from langchain.schema.runnable import RunnableLambda
+from langchain.schema.messages import SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
-from langgraph.types import Command, Send
+from langgraph.types import Send
 from pydantic import BaseModel, ConfigDict, Field, Json
-from typing_extensions import Literal, TypedDict
 
 from heavyiq.langchain.heavydb import HeavyDB, heavydb_context
 from heavyiq.lcel.chains.heavydb.sql_chain import chain as sql_chain
@@ -19,11 +15,9 @@ from heavyiq.lcel.chains.heavydb.sql_chain import chain as sql_chain
 # Model and prompts
 # Define model and prompts we will use
 
-chart_sql_questions_prompt = ChatPromptTemplate(
+chart_questions_prompt = ChatPromptTemplate(
     messages=[
-        SystemMessage(
-            content="You are a dataset generation assistant helping train a chart-generation and text-to-SQL model."
-        ),
+        SystemMessage(content="You are a dataset generation assistant helping train a chart-generation model."),
         HumanMessagePromptTemplate.from_template(
             """Given the following table schema:
 
@@ -41,23 +35,18 @@ Guidelines:
 - Keep questions natural but **chart-directed**.
 - Use business intelligence use cases.
 
-Step 2: For each chart-style question, generate a **corresponding SQL-style natural language question**, such as:
-- Input: "Create a bar chart showing total profit by region."
-  → Output: "What is the total profit for each region?"
-
 Output Format:
-Return a list of **tuples** in JSON format.
-Each tuple should be `(chart_question, sql_question)`.
+Return a list of **chart_question** in JSON format.
 
 ### Example Output:
 
 ```json
 [
-  ["Create a bar chart showing total profit by region.", "What is the total profit for each region?"],
-  ["Visualize the average quantity ordered per category.", "What is the average quantity ordered for each category?"]
+  "Create a bar chart showing total profit by region.",
+  "Visualize the average quantity ordered per category."
 ]
 ```
-Now generate {n} such (chart-style question, SQL-style question) pairs.
+Now generate {n} chart-style question.
 """
         ),
     ],
@@ -98,13 +87,8 @@ vega_prompt = ChatPromptTemplate(
 )  # type: ignore
 
 
-class ChartSQLQuestion(BaseModel):
-    chart_question: str
-    sql_question: str
-
-
-class ChartSQLQuestions(BaseModel):
-    questions: list[ChartSQLQuestion]
+class ChartQuestions(BaseModel):
+    questions: list[str]
 
 
 class VegaLiteSpec(BaseModel):
@@ -137,8 +121,7 @@ class OverallState(BaseModel):
 
 # QuestionState usually gets passed to generate_sql node
 class QuestionState(BaseModel):
-    chart_question: str
-    sql_question: str
+    question: str
     db: HeavyDB
     table: str
 
@@ -146,8 +129,7 @@ class QuestionState(BaseModel):
 
 
 class VegaState(BaseModel):
-    chart_question: str
-    sql_question: str
+    question: str
     query: str
     table_schema: str
 
@@ -176,14 +158,14 @@ async def generate_questions(state: OverallState):
     """
     Invoke llm to generate n question pairs.
     """
-    chain = llm.with_structured_output(ChartSQLQuestions)
-    inputs = await chart_sql_questions_prompt.aformat_messages(
+    chain = llm.with_structured_output(ChartQuestions)
+    inputs = await chart_questions_prompt.aformat_messages(
         **{
             "table_schema": state.table_schema,
             "n": state.n,
         }
     )
-    response: ChartSQLQuestions = await asyncio.to_thread(chain.invoke, inputs)  # type: ignore
+    response: ChartQuestions = await asyncio.to_thread(chain.invoke, inputs)  # type: ignore
     return {"questions": response.questions}
 
 
@@ -193,39 +175,38 @@ async def generate_sql(state: QuestionState):
     """
     async with heavydb_context(state.db):
         sql_chain_response = await sql_chain.ainvoke(
-            {"session_id": state.db._conn._session, "question": state.sql_question, "tables": [state.table]}
+            {"session_id": state.db._conn._session, "question": state.question, "tables": [state.table]}
         )
         query = sql_chain_response["query"]
-    return {"queries": [query], "questions_with_sql": [(state.chart_question, state.sql_question, query)]}
+    return {"queries": [query], "questions_with_sql": [(state.question, query)]}
 
 
 def continue_to_generate_vega(state: OverallState):
     # We will return a list of `Send` objects
     # Each `Send` object consists of the name of a node in the graph
     # as well as the state to send to that node
+    # Fan-out to generate_vega, ie. n number of generate_vega functions should be executed in parallel.
     return [
         Send(
             "generate_vega",
-            VegaState(
-                **{"chart_question": s[0], "sql_question": s[1], "query": s[2], "table_schema": state.table_schema}
-            ),
+            VegaState(**{"question": s[0], "query": s[1], "table_schema": state.table_schema}),
         )
         for s in state.questions_with_sql
     ]
 
 
-async def generate_vega(state: VegaState):
+async def generate_vega(state: VegaState) -> dict[str, list[tuple[str, str, dict | str]]]:
     chain = llm.with_structured_output(VegaLiteSpec)
     inputs = await vega_prompt.aformat_messages(
         **{
-            "question": state.chart_question,
+            "question": state.question,
             "table_schema": state.table_schema,
             "query": state.query,
         }
     )
     response: VegaLiteSpec = await asyncio.to_thread(chain.invoke, inputs)  # type: ignore
 
-    return {"questions_with_vega": [(state.chart_question, state.sql_question, state.query, response.spec)]}
+    return {"questions_with_vega": [(state.question, state.query, response.spec)]}
 
 
 def continue_to_generate_sql(state: OverallState):
@@ -237,8 +218,7 @@ def continue_to_generate_sql(state: OverallState):
             "generate_sql",
             QuestionState(
                 **{
-                    "chart_question": s.chart_question,
-                    "sql_question": s.sql_question,
+                    "question": s,
                     "db": state.db,
                     "table": state.table_name,
                 }

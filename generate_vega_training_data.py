@@ -1,10 +1,15 @@
+"""
+Script for generating training data for the model to generate Vega Lite Spec.
+$ python generate_vega_training_data.py -i data.csv -o output.csv -n 3
+"""
+
+import argparse
 import asyncio
-import csv
 import json
 import os
 import threading
 import time
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 from typing import Any, Dict, List, TypedDict
 
 import aiocsv
@@ -15,7 +20,7 @@ import uvloop
 # CONFIG
 CSV_FILE = "data.csv"
 OUTPUT_CSV_FILE = "output.csv"
-CHUNK_SIZE = 2  # chunk size where each process is supposed to be handled
+CHUNK_SIZE = 5  # chunk size where each process is supposed to be handled
 NUM_PROCESSES = 5  # number of processes to be spawned
 QUEUE_MAXSIZE = 10  # limit memory usage
 NUMBER_OF_QUESTIONS_TO_GENERATE_PER_TABLE = 10
@@ -27,8 +32,7 @@ asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 class WriteRow(TypedDict):
     table_name: str
     database_name: str
-    chart_question: str
-    sql_question: str
+    question: str
     query: str
     vega_spec: str
 
@@ -39,7 +43,7 @@ async def foo():
 
 
 # ========= Async per-record processing (CPU-bound simulation) =========
-async def process_record(record: Dict[str, Any]) -> list[WriteRow]:
+async def process_record(record: Dict[str, Any], n: int) -> list[WriteRow]:
     from heavyiq.training.vega_lite.chart_graph import app as vega_graph
 
     pid = os.getpid()
@@ -49,13 +53,13 @@ async def process_record(record: Dict[str, Any]) -> list[WriteRow]:
     inputs = {
         "database_name": record["database_name"],
         "table_name": record["table_name"],
-        "n": NUMBER_OF_QUESTIONS_TO_GENERATE_PER_TABLE,
+        "n": n,
     }
 
     final_state = await vega_graph.ainvoke(inputs)
     output_rows = []
     for line in final_state["questions_with_vega"]:
-        chart_question, sql_question, query, vega_spec = line
+        question, query, vega_spec = line
         if isinstance(vega_spec, dict):
             vega_spec = json.dumps(vega_spec)
 
@@ -63,8 +67,7 @@ async def process_record(record: Dict[str, Any]) -> list[WriteRow]:
             WriteRow(
                 database_name=record["database_name"],
                 table_name=record["table_name"],
-                chart_question=chart_question,
-                sql_question=sql_question,
+                question=question,
                 query=query,
                 vega_spec=vega_spec,
             )
@@ -74,7 +77,7 @@ async def process_record(record: Dict[str, Any]) -> list[WriteRow]:
 
 
 # ========= Per-process chunk processor =========
-def worker_process(chunk: List[Dict[str, Any]]) -> List[WriteRow]:
+def worker_process(chunk: List[Dict[str, Any]], n: int) -> List[WriteRow]:
     pid = os.getpid()
     print(f"[Process {pid}] Received chunk with {len(chunk)} records")
     # Create a new event loop for this process
@@ -83,7 +86,7 @@ def worker_process(chunk: List[Dict[str, Any]]) -> List[WriteRow]:
 
     async def handle_chunk():
         # Create tasks for each record using the async process_record
-        tasks = [process_record(record) for record in chunk]
+        tasks = [process_record(record, n) for record in chunk]
         return await asyncio.gather(*tasks)
 
     results = loop.run_until_complete(handle_chunk())
@@ -126,7 +129,9 @@ async def consumer(queue: asyncio.Queue, result_list: List, process_pool: Proces
             break
         print(f"[Consumer-{cid}] Dequeued chunk of size {len(chunk)}")
         # Process the chunk in a separate process
-        result = await loop.run_in_executor(process_pool, worker_process, chunk)
+        result = await loop.run_in_executor(
+            process_pool, worker_process, chunk, NUMBER_OF_QUESTIONS_TO_GENERATE_PER_TABLE
+        )
         result_list.extend(result)
         queue.task_done()
     print(f"[Consumer-{cid}] Exiting.")
@@ -159,15 +164,35 @@ async def async_main():
     df = pd.DataFrame(results)
     df["id"] = range(1, len(df) + 1)
     # Define desired column order
-    column_order = ["id", "database_name", "table_name", "chart_question", "sql_question", "query", "vega_spec"]
+    column_order = ["id", "database_name", "table_name", "question", "query", "vega_spec"]
     df.to_csv(OUTPUT_CSV_FILE, columns=column_order, index=False)
     print("\n[Main] Final Merged Output (First 5 Rows):")
     print(df.head())
     print(f"Successfully written output to {OUTPUT_CSV_FILE}")
 
 
+def main():
+    global CSV_FILE, OUTPUT_CSV_FILE, NUMBER_OF_QUESTIONS_TO_GENERATE_PER_TABLE
+    parser = argparse.ArgumentParser(description="Generate training data for Vega-Lite spec model.")
+    parser.add_argument("-i", "--input", help="Input csv file path", default=CSV_FILE)
+    parser.add_argument("-o", "--output", help="Output csv file path", default=OUTPUT_CSV_FILE)
+    parser.add_argument(
+        "-n",
+        "--n",
+        type=int,
+        help="Number of questions to generate per table",
+        default=NUMBER_OF_QUESTIONS_TO_GENERATE_PER_TABLE,
+    )
+
+    args = parser.parse_args()
+
+    CSV_FILE, OUTPUT_CSV_FILE, NUMBER_OF_QUESTIONS_TO_GENERATE_PER_TABLE = args.input, args.output, args.n
+
+    asyncio.run(async_main())
+
+
 if __name__ == "__main__":
     start = time.time()
-    asyncio.run(async_main())
+    main()
     end = time.time()
     print(f"Total seconds: {end-start}")
