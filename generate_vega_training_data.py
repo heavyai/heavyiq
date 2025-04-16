@@ -20,7 +20,7 @@ import uvloop
 # CONFIG
 CSV_FILE = "data.csv"
 OUTPUT_CSV_FILE = "output.csv"
-CHUNK_SIZE = 5  # chunk size where each process is supposed to be handled
+CHUNK_SIZE = 1  # chunk size where each process is supposed to be handled
 NUM_PROCESSES = 5  # number of processes to be spawned
 QUEUE_MAXSIZE = 10  # limit memory usage
 NUMBER_OF_QUESTIONS_TO_GENERATE_PER_TABLE = 10
@@ -34,12 +34,9 @@ class WriteRow(TypedDict):
     database_name: str
     question: str
     query: str
+    is_valid: bool
     vega_spec: str
-
-
-async def foo():
-    print("called foo")
-    await asyncio.sleep(1)
+    image_path: str
 
 
 # ========= Async per-record processing (CPU-bound simulation) =========
@@ -49,17 +46,20 @@ async def process_record(record: Dict[str, Any], n: int) -> list[WriteRow]:
     pid = os.getpid()
     tid = threading.get_ident()
     print(f"[Async Function] (PID={pid}, TID={tid}) Processing record ID {record.get('id')}")
+    # create images dir if not exists
+    os.makedirs("images", exist_ok=True)
     # Simulate asynchronous work (for example, an I/O operation or async CPU work)
     inputs = {
         "database_name": record["database_name"],
         "table_name": record["table_name"],
         "n": n,
+        "image_folder": "images",
     }
 
     final_state = await vega_graph.ainvoke(inputs)
     output_rows = []
-    for line in final_state["questions_with_vega"]:
-        question, query, vega_spec = line
+    for line in final_state["questions_with_vega_image"]:
+        question, query, vega_spec, image_path = line
         if isinstance(vega_spec, dict):
             vega_spec = json.dumps(vega_spec)
 
@@ -69,7 +69,22 @@ async def process_record(record: Dict[str, Any], n: int) -> list[WriteRow]:
                 table_name=record["table_name"],
                 question=question,
                 query=query,
+                is_valid=True,
                 vega_spec=vega_spec,
+                image_path=image_path,
+            )
+        )
+    for line in final_state["questions_with_error_sql"]:
+        question, query = line
+        output_rows.append(
+            WriteRow(
+                database_name=record["database_name"],
+                table_name=record["table_name"],
+                question=question,
+                query=query,
+                is_valid=False,
+                vega_spec="",
+                image_path="",
             )
         )
 
@@ -162,9 +177,10 @@ async def async_main():
         await c  # Ensure each consumer has exited
 
     df = pd.DataFrame(results)
+    df = df.sort_values(by=["database_name", "table_name"])
     df["id"] = range(1, len(df) + 1)
     # Define desired column order
-    column_order = ["id", "database_name", "table_name", "question", "query", "vega_spec"]
+    column_order = ["id", "database_name", "table_name", "question", "query", "is_valid", "image_path", "vega_spec"]
     df.to_csv(OUTPUT_CSV_FILE, columns=column_order, index=False)
     print("\n[Main] Final Merged Output (First 5 Rows):")
     print(df.head())

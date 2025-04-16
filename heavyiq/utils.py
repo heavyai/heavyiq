@@ -427,3 +427,68 @@ def get_host_and_port(url: str) -> tuple[str, int]:
     port = parsed_url.port
 
     return host, port
+
+
+def find_commas_outside_brackets(s: str) -> list[int]:
+    brackets = {"(": ")", "[": "]", "{": "}"}
+    stack = []
+    positions = []
+
+    for i, char in enumerate(s):
+        if char in brackets:
+            stack.append(brackets[char])
+        elif char in brackets.values():
+            if stack and char == stack[-1]:
+                stack.pop()
+        elif char == "," and not stack:
+            positions.append(i)
+
+    return positions
+
+
+def split_by_indexes(text: str, indexes: list[int]) -> list[str]:
+    """
+    Splits the input text using provided character indexes.
+    Assumes indexes are sorted and valid.
+    """
+    parts = []
+    prev = 0
+    for idx in indexes:
+        parts.append(text[prev:idx].strip())
+        prev = idx + 1  # skip the comma
+    parts.append(text[prev:].strip())  # final part after last comma
+    return parts
+
+
+def add_limit_clause_to_query(sql: str, limit: int) -> str:
+    # Remove any existing LIMIT clause
+    sql = re.sub(r"\s+LIMIT\s+\d+\s*;?", "", sql, flags=re.IGNORECASE)
+    sql = sql.strip().rstrip(";")
+    return f"{sql} LIMIT {limit};"
+
+
+def extract_select_columns(query: str) -> list[str]:
+    """
+    Extract column names from a SQL SELECT query.
+
+    :param query: SQL query string
+    :return: List of column names
+    """
+    # Regex pattern to extract the part between SELECT and FROM
+    pattern = r"(?<=SELECT\s)(.*?)(?=\sFROM)"
+
+    match = re.search(pattern, query, re.IGNORECASE)
+
+    if match:
+        columns, columns_part = [], match.group(1)
+        comma_indexes = find_commas_outside_brackets(columns_part)
+        cols = split_by_indexes(columns_part, comma_indexes)
+        for col in cols:
+            if " AS " in col:
+                column = col.split(" AS ")[1].strip()
+            else:
+                column = col.strip()
+            columns.append(column)
+        return columns
+    else:
+        return []

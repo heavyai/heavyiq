@@ -1,16 +1,28 @@
 import asyncio
+import copy
+import json
 import operator
+import os
+import uuid
+from datetime import datetime
 from typing import Annotated, Any, Dict, Optional
 
+import aiofiles
+import vl_convert as vlc
 from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langchain.schema.messages import SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, START, StateGraph
+from langgraph.pregel import RetryPolicy
 from langgraph.types import Send
 from pydantic import BaseModel, ConfigDict, Field, Json
 
+from heavyiq.langchain.exceptions import NLtoSQLException
 from heavyiq.langchain.heavydb import HeavyDB, heavydb_context
 from heavyiq.lcel.chains.heavydb.sql_chain import chain as sql_chain
+from heavyiq.utils import add_limit_clause_to_query, extract_select_columns
+
+from .logger_setup import FAILURE_EMOJI, START_EMOJI, SUCCESS_EMOJI, logger
 
 # Model and prompts
 # Define model and prompts we will use
@@ -95,9 +107,11 @@ class VegaLiteSpec(BaseModel):
     spec: Json[Any]
 
 
+class VegaSpecError(Exception):
+    pass
+
+
 # model = ChatOpenAI(model="o3-mini")
-
-
 llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", timeout=10, transport="rest")
 
 
@@ -105,6 +119,7 @@ llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", timeout=10, transport="re
 class OverallState(BaseModel):
     database_name: str
     table_name: str
+    image_folder: str  # folder path where vega spec images are being stored
     table_schema: Optional[str] = ""
     db: Optional[HeavyDB] = None
     n: int = Field(default=10, ge=0, description="Number of question pairs to generate.")
@@ -114,7 +129,9 @@ class OverallState(BaseModel):
     vega_lite_specs: Annotated[list, operator.add]
 
     questions_with_sql: Annotated[list, operator.add]
+    questions_with_error_sql: Annotated[list, operator.add]
     questions_with_vega: Annotated[list, operator.add]
+    questions_with_vega_image: Annotated[list, operator.add]
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -132,6 +149,16 @@ class VegaState(BaseModel):
     question: str
     query: str
     table_schema: str
+
+
+class VegaDataState(BaseModel):
+    question: str
+    query: str
+    db: HeavyDB
+    vega_spec: dict | Json
+    image_folder: str
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 async def init_db(state: OverallState) -> dict:
@@ -154,10 +181,11 @@ async def fetch_table_schema(state: OverallState) -> dict:
     return {"table_schema": table_schema}
 
 
-async def generate_questions(state: OverallState):
+async def generate_questions(state: OverallState) -> dict[str, Any]:
     """
     Invoke llm to generate n question pairs.
     """
+    logger.info(f"{START_EMOJI} Generating viz questions...")
     chain = llm.with_structured_output(ChartQuestions)
     inputs = await chart_questions_prompt.aformat_messages(
         **{
@@ -166,22 +194,32 @@ async def generate_questions(state: OverallState):
         }
     )
     response: ChartQuestions = await asyncio.to_thread(chain.invoke, inputs)  # type: ignore
+    logger.info(f"{SUCCESS_EMOJI} Generated viz questions.")
     return {"questions": response.questions}
 
 
-async def generate_sql(state: QuestionState):
+async def generate_sql(state: QuestionState) -> dict[str, Any]:
     """
     Generates SQL for the given chart and SQL question.
     """
+    logger.info(f"{START_EMOJI} Generating SQL using NL to SQL chain...")
     async with heavydb_context(state.db):
         sql_chain_response = await sql_chain.ainvoke(
             {"session_id": state.db._conn._session, "question": state.question, "tables": [state.table]}
         )
         query = sql_chain_response["query"]
+        if sql_chain_response["error"]:
+            logger.error(f"{FAILURE_EMOJI} Generated SQL query failed validation.")
+            return {"questions_with_error_sql": [(state.question, query)]}
+
+    logger.info(f"{SUCCESS_EMOJI} Generated SQL query passes validation.")
     return {"queries": [query], "questions_with_sql": [(state.question, query)]}
 
 
-def continue_to_generate_vega(state: OverallState):
+generate_sql_retry_policy = RetryPolicy(max_attempts=2)
+
+
+def continue_to_generate_vega(state: OverallState) -> list[Send]:
     # We will return a list of `Send` objects
     # Each `Send` object consists of the name of a node in the graph
     # as well as the state to send to that node
@@ -195,7 +233,23 @@ def continue_to_generate_vega(state: OverallState):
     ]
 
 
+async def validate_vega_spec(spec: dict) -> bool:
+    """
+    Helps to validate the generated Vega-lite spec.
+    """
+    try:
+        await asyncio.to_thread(vlc.vegalite_to_png, vl_spec=spec, vl_version="v5.15", scale=2)
+    except Exception:
+        return False
+    else:
+        return True
+
+
 async def generate_vega(state: VegaState) -> dict[str, list[tuple[str, str, dict | str]]]:
+    """
+    Helps to generate vega-lite spec.
+    """
+    logger.info(f"{START_EMOJI} Generating Vega-lite spec...")
     chain = llm.with_structured_output(VegaLiteSpec)
     inputs = await vega_prompt.aformat_messages(
         **{
@@ -205,11 +259,20 @@ async def generate_vega(state: VegaState) -> dict[str, list[tuple[str, str, dict
         }
     )
     response: VegaLiteSpec = await asyncio.to_thread(chain.invoke, inputs)  # type: ignore
+    is_valid = await validate_vega_spec(response.spec)
+    if not is_valid:
+        # raising error helps to retry this node which results in new spec generation
+        logger.error(f"{FAILURE_EMOJI} Invalid Vega-lite spec.")
+        raise VegaSpecError("Invalid Vega-lite spec")
 
+    logger.info(f"{SUCCESS_EMOJI} Generated valid vega-lite spec.")
     return {"questions_with_vega": [(state.question, state.query, response.spec)]}
 
 
-def continue_to_generate_sql(state: OverallState):
+generate_vega_retry_policy = RetryPolicy(max_attempts=2)
+
+
+def continue_to_generate_sql(state: OverallState) -> list[Send]:
     # We will return a list of `Send` objects
     # Each `Send` object consists of the name of a node in the graph
     # as well as the state to send to that node
@@ -228,18 +291,134 @@ def continue_to_generate_sql(state: OverallState):
     ]
 
 
+def continue_to_add_vega_data_and_generate_image(state: OverallState) -> list[Send]:
+    """
+    Return a list of Send to add vega data in parrallel.
+    """
+    return [
+        Send(
+            "add_vega_data_and_generate_image",
+            VegaDataState(question=s[0], query=s[1], vega_spec=s[2], db=state.db, image_folder=state.image_folder),
+        )
+        for s in state.questions_with_vega
+    ]
+
+
+def to_iso(value: Any):
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return value
+
+
+async def query_vega_data(query: str, db: HeavyDB, limit: int = 100) -> list[dict]:
+    """
+    Get vega data by querying the HeavyDB database.
+    """
+    query = add_limit_clause_to_query(query, limit=100)
+    values = await asyncio.to_thread(db.run, query, fetch="all", to_str=False)
+    select_columns = extract_select_columns(query=query)
+    if not values:
+        return []
+    # assert len(select_columns) == len(values[0])
+    if len(select_columns) != len(values[0]):
+        logger.error(f"{FAILURE_EMOJI} Invalid select columns!")
+        logger.info(query, len(select_columns), len(values[0]))
+        logger.info(select_columns)
+        logger.info(values[0])
+        return []
+    formatted_values = [dict(zip(select_columns, [to_iso(v) for v in row])) for row in values]
+    return formatted_values
+
+
+async def save_vega_png(spec: dict, image_folder: str) -> str:
+    """
+    Save vega spec to png.
+    """
+    filepath = os.path.join(image_folder, f"{uuid.uuid4().hex[:8]}.png")
+    try:
+        png_bytes = await asyncio.to_thread(vlc.vegalite_to_png, vl_spec=spec, vl_version="v5.15", scale=2)
+    except Exception as e:
+        logger.error(f"{FAILURE_EMOJI} Failed to save vega image, {e}")
+        return ""
+    async with aiofiles.open(filepath, "wb") as f:
+        await f.write(png_bytes)
+    return filepath
+
+
+VEGA_TO_IMAGE_WORKER_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "render_png_worker.py")
+
+
+async def save_vega_png_subprocess(spec: dict, image_folder: str, timeout: int = 10) -> str:
+    """
+    Runs vl_convert.vegalite_to_png in an isolated subprocess, so that rust errors can be easily catched and skiped.
+    """
+    filename = f"{uuid.uuid4().hex[:8]}.png"
+    filepath = os.path.join(image_folder, filename)
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "python",
+            VEGA_TO_IMAGE_WORKER_PATH,  # Path to the helper script
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        input_data = json.dumps(spec).encode("utf-8")
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(input=input_data), timeout=timeout)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+            logger.error(f"{FAILURE_EMOJI} Rendering timed out after {timeout}s")
+            return ""
+
+        if proc.returncode != 0:
+            logger.error(f"{FAILURE_EMOJI} Subprocess failed: {stderr.decode()}")
+            return ""
+
+        async with aiofiles.open(filepath, "wb") as f:
+            await f.write(stdout)
+
+        return filepath
+
+    except Exception as e:
+        logger.error(f"{FAILURE_EMOJI} Failed to save vega image: {e}")
+        return ""
+
+
+async def add_vega_data_and_generate_image(state: VegaDataState):
+    """
+    Query and add vega data and then generate image.
+    """
+    logger.info(f"{START_EMOJI} Querying vega data...")
+    values = await query_vega_data(state.query, state.db)
+    spec = copy.deepcopy(state.vega_spec)
+    spec["data"] = {"values": values}
+    image_path = await save_vega_png_subprocess(spec, state.image_folder)
+    if image_path:
+        logger.info(f"{SUCCESS_EMOJI} Chart image generated successfully.")
+    else:
+        logger.error(f"{FAILURE_EMOJI} Chart image failed to generate.")
+    return {"questions_with_vega_image": [(state.question, state.query, state.vega_spec, image_path)]}
+
+
 # Construct the graph: here we put everything together to construct our graph
 graph = StateGraph(OverallState)
 graph.add_node("init_db", init_db)
 graph.add_node("fetch_table_schema", fetch_table_schema)
 graph.add_node("generate_questions", generate_questions)
 graph.add_node("generate_sql", generate_sql)
-graph.add_node("generate_vega", generate_vega)
+graph.add_node("generate_vega", generate_vega, retry=generate_vega_retry_policy)
+graph.add_node("add_vega_data_and_generate_image", add_vega_data_and_generate_image)
 
 graph.add_edge(START, "init_db")
 graph.add_edge("init_db", "fetch_table_schema")
 graph.add_edge("fetch_table_schema", "generate_questions")
-graph.add_conditional_edges("generate_questions", continue_to_generate_sql, ["generate_sql"])
-graph.add_conditional_edges("generate_sql", continue_to_generate_vega, ["generate_vega"])
-graph.add_edge("generate_vega", END)
+graph.add_conditional_edges("generate_questions", continue_to_generate_sql, ["generate_sql"])  # type: ignore
+graph.add_conditional_edges("generate_sql", continue_to_generate_vega, ["generate_vega"])  # type: ignore
+graph.add_conditional_edges(
+    "generate_vega", continue_to_add_vega_data_and_generate_image, ["add_vega_data_and_generate_image"]  # type: ignore
+)
+graph.add_edge("add_vega_data_and_generate_image", END)
 app = graph.compile()
