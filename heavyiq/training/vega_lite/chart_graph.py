@@ -17,7 +17,6 @@ from langgraph.pregel import RetryPolicy
 from langgraph.types import Send
 from pydantic import BaseModel, ConfigDict, Field, Json
 
-from heavyiq.langchain.exceptions import NLtoSQLException
 from heavyiq.langchain.heavydb import HeavyDB, heavydb_context
 from heavyiq.lcel.chains.heavydb.sql_chain import chain as sql_chain
 from heavyiq.utils import add_limit_clause_to_query, extract_select_columns
@@ -31,7 +30,7 @@ chart_questions_prompt = ChatPromptTemplate(
     messages=[
         SystemMessage(content="You are a dataset generation assistant helping train a chart-generation model."),
         HumanMessagePromptTemplate.from_template(
-            """Given the following table schema:
+            """You are given the schemas of one or more related database tables:
 
 {table_schema}
 
@@ -39,13 +38,24 @@ chart_questions_prompt = ChatPromptTemplate(
 
 Step 1: Generate **{n} natural language questions** that clearly request a **data visualization**, such as:
 - "Create a bar chart showing total profit by region."
-- "Visualize average quantity per category."
-- "Show a line chart of sales trends over months."
+- "Visualize average quantity ordered per category."
+- "Show a line chart of monthly sales trends per customer segment."
+- "Generate a map chart showing total sales by state.
+- "Plot a choropleth map of customer count by country."
 
 Guidelines:
-- Focus on **aggregations** (e.g., sum, average, count) and **groupings** (e.g., by region, category, month).
-- Keep questions natural but **chart-directed**.
-- Use business intelligence use cases.
+- The questions should reflect realistic **business intelligence use cases**.
+- Use **one or more tables** where relevant — the model is expected to pick interconnected columns.
+- Use appropriate **aggregations** (e.g., SUM, COUNT, AVERAGE) and **groupings** (e.g., by customer, by region, by month).
+- Questions should cover a variety of **chart types**, including:
+  - Bar charts
+  - Line charts
+  - Pie charts
+  - Stacked/grouped bar charts
+  - Histogram
+  - Area charts
+  - **Map charts** (e.g., choropleths or geospatial charts using location fields like country, state, region, coordinates)
+- Keep questions **clear, chart-directed**, and **naturally phrased**.
 
 Output Format:
 Return a list of **chart_question** in JSON format.
@@ -54,11 +64,14 @@ Return a list of **chart_question** in JSON format.
 
 ```json
 [
-  "Create a bar chart showing total profit by region.",
-  "Visualize the average quantity ordered per category."
+  "Create a stacked bar chart comparing total sales by region and category.",
+  "Show a line chart of total revenue per month for the top 5 customers.",
+  "Visualize the average delivery delay by product sub-category.",
+  "Generate a choropleth map showing number of orders by US state.",
+  "Plot a map showing average order value by customer region."
 ]
 ```
-Now generate {n} chart-style question.
+Now generate {n} chart-style question using the given schemas.
 """
         ),
     ],
@@ -72,7 +85,7 @@ vega_prompt = ChatPromptTemplate(
                 "You are a data visualization assistant that generates Vega-Lite specifications.\n\n"
                 "You will be given:\n"
                 "1. A chart-related natural language question.\n"
-                "2. The schema of the table involved.\n"
+                "2. Schemas of the tables involved.\n"
                 "3. A SQL query that fulfills the question.\n\n"
                 "Your task is to generate a complete Vega-Lite JSON specification that visualizes the **result of the SQL query**. "
                 "Make sure the chart type and encoding choices are appropriate for the query.\n\n"
@@ -122,6 +135,7 @@ class OverallState(BaseModel):
     image_folder: str  # folder path where vega spec images are being stored
     table_schema: Optional[str] = ""
     db: Optional[HeavyDB] = None
+    tables: list[str] = []
     n: int = Field(default=10, ge=0, description="Number of question pairs to generate.")
 
     questions: Annotated[list, operator.add]
@@ -140,7 +154,7 @@ class OverallState(BaseModel):
 class QuestionState(BaseModel):
     question: str
     db: HeavyDB
-    table: str
+    tables: list[str]
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -163,7 +177,7 @@ class VegaDataState(BaseModel):
 
 async def init_db(state: OverallState) -> dict:
     db = await HeavyDB.create_with_persistant_connection_async(db_name=state.database_name)
-    return {"db": db}
+    return {"db": db, "tables": state.table_name.split(",")}
 
 
 # This is the function we will use to generate the subjects of the jokes
@@ -172,7 +186,7 @@ async def fetch_table_schema(state: OverallState) -> dict:
     Fetches table schema and updates the relevant state variable.
     """
     table_schema = await state.db.aget_table_info(
-        table_names=[state.table_name],
+        table_names=state.tables,
         include_samples=False,
         include_top_k=True,
         include_timestamp=True,
@@ -205,7 +219,7 @@ async def generate_sql(state: QuestionState) -> dict[str, Any]:
     logger.info(f"{START_EMOJI} Generating SQL using NL to SQL chain...")
     async with heavydb_context(state.db):
         sql_chain_response = await sql_chain.ainvoke(
-            {"session_id": state.db._conn._session, "question": state.question, "tables": [state.table]}
+            {"session_id": state.db._conn._session, "question": state.question, "tables": state.tables}
         )
         query = sql_chain_response["query"]
         if sql_chain_response["error"]:
@@ -283,7 +297,7 @@ def continue_to_generate_sql(state: OverallState) -> list[Send]:
                 **{
                     "question": s,
                     "db": state.db,
-                    "table": state.table_name,
+                    "tables": state.tables,
                 }
             ),
         )
@@ -316,7 +330,7 @@ async def query_vega_data(query: str, db: HeavyDB, limit: int = 100) -> list[dic
     """
     query = add_limit_clause_to_query(query, limit=100)
     values = await asyncio.to_thread(db.run, query, fetch="all", to_str=False)
-    select_columns = extract_select_columns(query=query)
+    select_columns = extract_select_columns(query=query, remove_table_reference=True)
     if not values:
         return []
     # assert len(select_columns) == len(values[0])

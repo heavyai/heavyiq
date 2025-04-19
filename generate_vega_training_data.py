@@ -102,11 +102,15 @@ def worker_process(chunk: List[Dict[str, Any]], n: int) -> List[WriteRow]:
     async def handle_chunk():
         # Create tasks for each record using the async process_record
         tasks = [process_record(record, n) for record in chunk]
-        return await asyncio.gather(*tasks)
+        return await asyncio.gather(*tasks, return_exceptions=True)
 
     results = loop.run_until_complete(handle_chunk())
-    print(f"[Process {pid}] Finished processing chunk")
     loop.close()
+
+    # collect all the errors and re-raise it
+    errors = [r for r in results if isinstance(r, Exception)]
+    if errors:
+        raise RuntimeError(f"{len(errors)} errors in worker process: {errors}")
     flattened_results = [item for sublist in results for item in sublist]
     return flattened_results
 
@@ -143,12 +147,17 @@ async def consumer(queue: asyncio.Queue, result_list: List, process_pool: Proces
             queue.task_done()
             break
         print(f"[Consumer-{cid}] Dequeued chunk of size {len(chunk)}")
-        # Process the chunk in a separate process
-        result = await loop.run_in_executor(
-            process_pool, worker_process, chunk, NUMBER_OF_QUESTIONS_TO_GENERATE_PER_TABLE
-        )
-        result_list.extend(result)
+        try:
+            # Process the chunk in a separate process
+            result = await loop.run_in_executor(
+                process_pool, worker_process, chunk, NUMBER_OF_QUESTIONS_TO_GENERATE_PER_TABLE
+            )
+            result_list.extend(result)
+        except Exception as e:
+            print(f"[Consumer-{cid}] ❌ Worker failed with exception: {e}")
+        # don't break the loop on exception since we have one item to process ie. None
         queue.task_done()
+    print(f"[Consumer-{cid}] Queue size: {queue.qsize()}")
     print(f"[Consumer-{cid}] Exiting.")
 
 
@@ -175,6 +184,9 @@ async def async_main():
 
     for c in consumer_tasks:
         await c  # Ensure each consumer has exited
+
+    if not results:
+        return None
 
     df = pd.DataFrame(results)
     df = df.sort_values(by=["database_name", "table_name"])

@@ -467,11 +467,12 @@ def add_limit_clause_to_query(sql: str, limit: int) -> str:
     return f"{sql} LIMIT {limit};"
 
 
-def extract_select_columns(query: str) -> list[str]:
+def extract_select_columns(query: str, remove_table_reference: bool = False) -> list[str]:
     """
     Extract column names from a SQL SELECT query.
 
     :param query: SQL query string
+    :remove_table_reference: If true, it remove table refrences in column namaes, ex: "T1.Name" turns into "Name"
     :return: List of column names
     """
     # Regex pattern to extract the part between SELECT and FROM
@@ -488,6 +489,8 @@ def extract_select_columns(query: str) -> list[str]:
                 column = col.split(" AS ")[1].strip()
             else:
                 column = col.strip()
+            if remove_table_reference:
+                column = column.split(".")[-1]
             columns.append(column)
         return columns
     else:
