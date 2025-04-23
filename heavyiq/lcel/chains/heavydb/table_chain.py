@@ -1,7 +1,7 @@
 import re
 
-from langchain_core.output_parsers import StrOutputParser
 from langchain_core.beta.runnables.context import Context
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
 
 from heavyiq.langchain.heavydb import get_config, get_db
@@ -149,7 +149,7 @@ prompt = configure_step(nl_to_tables_prompt_rbl, run_name="Format Prompt", step=
 
 # Step 4
 # Call LLM
-model = configure_step(nl_to_tables_llm_rbl, run_name="Call LLM", step="Calling LLM.")
+model = nl_to_tables_llm_rbl
 
 # Step 5
 # Parse the final output
