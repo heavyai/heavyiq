@@ -1,5 +1,8 @@
 import asyncio
+import os
+import signal
 import sys
+from contextlib import asynccontextmanager
 from typing import Any
 
 from asgi_correlation_id import CorrelationIdMiddleware
@@ -140,6 +143,94 @@ def include_rag_routers(app: FastAPI) -> None:
 _config_provided = True
 
 
+async def enable_telemetrics_for_free_license_daemon():
+    """
+    This enables langsmith telemetrics for the free license by polling a shared multiprocessing dict.
+    """
+    from heavyiq.logging_utils import heavyiq_logger as logger
+
+    shared_dict, max_retries, retry_count = SharedDictSingleton(), 20, 0
+    while retry_count < max_retries:
+        retry_count += 1
+        await asyncio.sleep(2)
+        license_edition = await shared_dict.get(SharedDictSingleton.Keys.HeavyDBLicenseEdition.name)
+        if not license_edition:
+            continue
+
+        logger.info(f"Found HeavyAI license edition, license_type: {license_edition}")
+
+        if license_edition == "free":
+            logger.info("Enabling langsmith telemetrics for free edition.")
+            done = enable_telemetrics_for_free_edition()
+            if done:
+                logger.info("Successfully changed langsmith telemetrics and HeavyIQ configs for free edition.")
+            else:
+                logger.error("Failed to change langsmith telemetrics and HeavyIQ configs for free edition.")
+        else:
+            if not _config_provided:
+                logger.error("Config must be provided when license edition is not free")
+                raise RuntimeError("Config must be provided when license edition is not free")
+
+        break
+    else:
+        logger.error(f"Failed to check HeavyAI license edition after {max_retries*2} seconds.")
+
+
+def enable_telemetrics_for_free_license_done_callback(task: asyncio.Task):
+    """
+    A callback function for the above "enable_telemetrics_for_free_license_daemon" coroutine.
+    """
+    from heavyiq.logging_utils import heavyiq_logger as logger
+
+    try:
+        task.result()  # Will raise if exception occurred
+    except RuntimeError as r:
+        logger.error(f"RuntimeError: {r}")
+        logger.info("Exiting...")
+        # causes the master process to exit
+        pid = os.getppid()
+        os.kill(pid, signal.SIGTERM)
+    except Exception as e:
+        # If any exception occurs on
+        logger.error(f"Exception occurs on enable_telemetrics done callback, {e}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    APP's lifecycle context.
+    """
+    # code executed before receiving the requests ie. startup code
+    import heavyiq.lcel.chains
+    from heavyiq.config import get_config
+    from heavyiq.logging_utils import heavyiq_logger as logger
+    from heavyrag.controller import get_controller
+
+    config = get_config()
+
+    # run a background task to check license_edition got cached or not
+    # if yes, and it's a free edition then enable langsmith telemetry
+    task = asyncio.create_task(enable_telemetrics_for_free_license_daemon())
+    task.add_done_callback(enable_telemetrics_for_free_license_done_callback)
+
+    # Initialize faiss index on each worker process to avoid segmentation fault
+    if config.rag_vectordb_type == "faiss":
+        get_controller("faiss").get_vectorstore()
+
+    yield
+    # shutdown code
+    # cancel the above task if not done
+    if not task.done():
+        task.cancel()
+
+    try:
+        await task
+    except Exception as e:
+        logger.error(f"Background task failed during shutdown: {e}")
+
+    logger.info("Shutting down FastAPI worker.")
+
+
 def create_app(config_path: str = "./config.toml") -> FastAPI:
     """
     create and return a FastAPI instance.
@@ -167,7 +258,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
     init_logs()  # initializes logs using config
     init_telemetrics()  # initializes langsmith
 
-    app = FastAPI(title="HeavyIQ")
+    app = FastAPI(title="HeavyIQ", lifespan=lifespan)
 
     app_initialize(config, config_path)
 
@@ -231,19 +322,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
             }
         },
     )
-    # @deprecated
-    # now we have endpoints for syncing table and facts/snippets index
-    # app.include_router(
-    #     bgrouter,
-    #     prefix="/bgtask",
-    #     tags=["bgtask"],
-    #     responses={
-    #         500: {
-    #             "description": "Internal Server Error",
-    #             "model": ErrorResponse,
-    #         }
-    #     },
-    # )
+
     if config.enable_rag:
         add_rag_db_exception_handlers(app)
         # RAG routers
@@ -251,8 +330,6 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
 
     if config.enable_debug_endpoints:
         from heavyiq.api.routes.debug_router import debug_router
-
-        # from heavyiq.api.routes.runnable_router import runnable_router
 
         app.include_router(
             debug_router,
@@ -265,68 +342,6 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
                 }
             },
         )
-        # commented out since it produces error
-        # app.include_router(runnable_router, prefix="/runnable", tags=["runnable"])
-
-    @app.on_event("startup")
-    async def initialize():
-        """
-        Code to be executed when application starts, ie on each worker process.
-        """
-        # initialize chains and RAG
-        import heavyiq.lcel.chains
-        from heavyiq.logging_utils import heavyiq_logger as logger
-        from heavyrag.controller import get_controller
-
-        global _config_provided
-
-        async def enable_telemetrics_for_free_license_daemon():
-            """
-            This enables langsmith telemetrics for the free license by polling a shared multiprocessing dict.
-            """
-
-            shared_dict, max_retries, retry_count = SharedDictSingleton(), 20, 0
-            while retry_count < max_retries:
-                retry_count += 1
-                await asyncio.sleep(2)
-                license_edition = await shared_dict.get(SharedDictSingleton.Keys.HeavyDBLicenseEdition.name)
-                if not license_edition:
-                    continue
-
-                logger.info(f"Found HeavyAI license edition, license_type: {license_edition}")
-
-                if license_edition == "free":
-                    logger.info("Enabling langsmith telemetrics for free edition.")
-                    done = enable_telemetrics_for_free_edition()
-                    if done:
-                        logger.info("Successfully changed langsmith telemetrics and HeavyIQ configs for free edition.")
-                    else:
-                        logger.error("Failed to change langsmith telemetrics and HeavyIQ configs for free edition.")
-                else:
-                    if not _config_provided:
-                        logger.error("Config must be provided when license edition is not free")
-                        sys.exit()
-
-                break
-            else:
-                logger.error(f"Failed to check HeavyAI license edition after {max_retries*2} seconds.")
-
-        # run a background task to check license_edition got cached or not
-        # if yes, and it's a free edition then enable langsmith telemetry
-        asyncio.create_task(enable_telemetrics_for_free_license_daemon())
-
-        # Initialize faiss index on each worker process to avoid segmentation fault
-        if config.rag_vectordb_type == "faiss":
-            get_controller("faiss").get_vectorstore()
-
-    @app.on_event("shutdown")
-    async def shutdown():
-        """
-        Code to be executed before FastAPI application ends.
-        """
-        from heavyiq.logging_utils import heavyiq_logger as logger
-
-        logger.info("Shutting down FastAPI worker.")
 
     def custom_openapi() -> dict[str, Any]:
         if app.openapi_schema:
