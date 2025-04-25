@@ -35,3 +35,7 @@ class NLtoAnswerException(HeavyIQBaseException):
 
 class NLtoTableException(HeavyIQBaseException):
     pass
+
+
+class HeavyDBTimeoutError(Exception):
+    pass
