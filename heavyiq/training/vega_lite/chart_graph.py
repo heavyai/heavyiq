@@ -329,7 +329,7 @@ async def query_vega_data(query: str, db: HeavyDB, limit: int = 100) -> list[dic
     Get vega data by querying the HeavyDB database.
     """
     query = add_limit_clause_to_query(query, limit=100)
-    values = await asyncio.to_thread(db.run, query, fetch="all", to_str=False)
+    values = await db.arun(query, fetch="all", to_str=False)
     select_columns = extract_select_columns(query=query, remove_table_reference=True)
     if not values:
         return []
