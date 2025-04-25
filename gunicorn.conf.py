@@ -192,14 +192,19 @@ def post_worker_init(worker):
 
 
 def on_exit(server):
+    from heavyiq.langchain.heavydb import HeavyDB
     from heavyiq.utils import SharedDictSingleton
 
     os.environ.pop("CHROMADB_STARTED", None)
+    print("On exit gunicorn")
 
     shared_instance = SharedDictSingleton._instance  # Removed type hint
     if shared_instance and hasattr(shared_instance, "_manager") and shared_instance._manager._state.value == 1:
-        # print("Shutting down shared instance")
+        print("Shutting down SharedDictSingleton instance manager process")
         shared_instance._manager.shutdown()
+    if HeavyDB._manager and HeavyDB._manager._state.value == 1:
+        print("Shutting down HeavyDB manager process")
+        HeavyDB._manager.shutdown()
     # print("Server exiting...")
     # exit chromadb server
     global chromadb_process
