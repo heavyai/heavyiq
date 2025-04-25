@@ -51,11 +51,14 @@ def configure_step(runnable: Runnable, run_name: str, step: str) -> Runnable:
         run_name: run name
         step: step description
     """
-    runnable_with_config = runnable.with_config(
-        config={
-            "run_name": run_name,
-            "tags": ["intermediate-step"],
-            "metadata": {"step": step},
-        }
-    )
-    return runnable_with_config
+    # double runnable.with_config results in yielding the default value
+    # so removing it for now
+    return runnable
+    # runnable_with_config = runnable.with_config(
+    #     config={
+    #         "run_name": run_name,
+    #         "tags": ["intermediate-step"],
+    #         "metadata": {"step": step},
+    #     }
+    # )
+    # return runnable_with_config

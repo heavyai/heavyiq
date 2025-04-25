@@ -102,13 +102,7 @@ query_variables = (
 )
 
 # Step 2
-query_prompt: Runnable = nl_to_sql_prompt_rbl.with_config(  # type: ignore
-    config={
-        "tags": ["intermediate-step"],
-        "run_name": "Preparing NL-SQL Prompt",
-        "metadata": {"step": "Constructing prompt with input variables."},
-    }
-)
+query_prompt: Runnable = nl_to_sql_prompt_rbl
 # Step 3
 query_llm: Runnable = nl_to_sql_llm_rbl.bind(stop=["\nSQLResult:", "\n<|sql result|>", "\n<|sql answer|>"]).with_config(  # type: ignore
     config={
