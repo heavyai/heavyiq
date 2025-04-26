@@ -131,13 +131,7 @@ retry_query_variables = (RunnablePassthrough.assign(relevant_info=relevant_info_
     }
 )
 # Step 2
-retry_query_prompt: Runnable = nl_to_sql_retry_prompt_rbl.with_config(  # type: ignore
-    config={
-        "tags": ["intermediate-step"],
-        "run_name": "Preparing NL-SQL Error Prompt",
-        "metadata": {"step": "Constructing error prompt with input variables."},
-    }
-)
+retry_query_prompt: Runnable = nl_to_sql_retry_prompt_rbl
 
 # Step 3
 retry_query_llm: Runnable = nl_to_sql_error_llm_rbl.bind(stop=["\nSQLResult:", "\n<|sql result|>", "\n<|sql error answer|>"]).with_config(  # type: ignore
