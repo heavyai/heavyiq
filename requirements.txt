@@ -1,4 +1,7 @@
 aiofiles==23.2.1
+pydantic==2.10.6
+pydantic-settings==2.8.1
+pydantic_core==2.27.2
 chromadb==0.5.17
 confz==2.0.1
 fastapi==0.115.11
