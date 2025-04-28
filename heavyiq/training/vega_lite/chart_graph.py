@@ -414,7 +414,9 @@ async def add_vega_data_and_generate_image(state: VegaDataState):
         logger.info(f"{SUCCESS_EMOJI} Chart image generated successfully.")
     else:
         logger.error(f"{FAILURE_EMOJI} Chart image failed to generate.")
-    return {"questions_with_vega_image": [(state.question, state.query, state.vega_spec, image_path)]}
+    # make sure the spec contain not more than 3 values for writing into output csv
+    spec["data"] = {"values": values[:3]}
+    return {"questions_with_vega_image": [(state.question, state.query, spec, image_path)]}
 
 
 # Construct the graph: here we put everything together to construct our graph
