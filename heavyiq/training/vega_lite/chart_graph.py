@@ -5,12 +5,14 @@ import operator
 import os
 import uuid
 from datetime import datetime
+from functools import lru_cache
 from typing import Annotated, Any, Dict, Optional
 
 import aiofiles
 import vl_convert as vlc
 from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langchain.schema.messages import SystemMessage
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, START, StateGraph
 from langgraph.pregel import RetryPolicy
@@ -124,8 +126,16 @@ class VegaSpecError(Exception):
     pass
 
 
-# model = ChatOpenAI(model="o3-mini")
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", timeout=10, transport="rest")
+@lru_cache(maxsize=10)
+def get_llm(model_choice: str) -> BaseChatModel:
+    """
+    Function to get llm instances by model name.
+    ex: gemini-2.0-flash, gemini-2.5-flash-preview-04-17
+    """
+    logger.info(f"Using {model_choice} model.")
+    if model_choice.startswith("gemini-"):
+        return ChatGoogleGenerativeAI(model=model_choice, timeout=10, transport="rest")
+    raise ValueError(f"Unknown model {model_choice}")
 
 
 # This will be the overall state of the main graph.
@@ -133,6 +143,7 @@ class OverallState(BaseModel):
     database_name: str
     table_name: str
     image_folder: str  # folder path where vega spec images are being stored
+    model_name: Optional[str] = "gemini-2.0-flash"
     table_schema: Optional[str] = ""
     db: Optional[HeavyDB] = None
     tables: list[str] = []
@@ -163,6 +174,7 @@ class VegaState(BaseModel):
     question: str
     query: str
     table_schema: str
+    model_name: str
 
 
 class VegaDataState(BaseModel):
@@ -200,6 +212,7 @@ async def generate_questions(state: OverallState) -> dict[str, Any]:
     Invoke llm to generate n question pairs.
     """
     logger.info(f"{START_EMOJI} Generating viz questions...")
+    llm = get_llm(state.model_name)
     chain = llm.with_structured_output(ChartQuestions)
     inputs = await chart_questions_prompt.aformat_messages(
         **{
@@ -241,7 +254,7 @@ def continue_to_generate_vega(state: OverallState) -> list[Send]:
     return [
         Send(
             "generate_vega",
-            VegaState(**{"question": s[0], "query": s[1], "table_schema": state.table_schema}),
+            VegaState(question=s[0], query=s[1], table_schema=state.table_schema, model_name=state.model_name),
         )
         for s in state.questions_with_sql
     ]
@@ -264,6 +277,7 @@ async def generate_vega(state: VegaState) -> dict[str, list[tuple[str, str, dict
     Helps to generate vega-lite spec.
     """
     logger.info(f"{START_EMOJI} Generating Vega-lite spec...")
+    llm = get_llm(state.model_name)
     chain = llm.with_structured_output(VegaLiteSpec)
     inputs = await vega_prompt.aformat_messages(
         **{

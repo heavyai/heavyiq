@@ -23,7 +23,7 @@ OUTPUT_CSV_FILE = "output.csv"
 CHUNK_SIZE = 1  # chunk size where each process is supposed to be handled
 NUM_PROCESSES = 5  # number of processes to be spawned
 QUEUE_MAXSIZE = 10  # limit memory usage
-NUMBER_OF_QUESTIONS_TO_GENERATE_PER_TABLE = 10
+MODEL_NAME = "gemini-2.0-flash"
 
 # Use uvloop for improved performance on UNIX-based systems
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
@@ -40,7 +40,7 @@ class WriteRow(TypedDict):
 
 
 # ========= Async per-record processing (CPU-bound simulation) =========
-async def process_record(record: Dict[str, Any], n: int) -> list[WriteRow]:
+async def process_record(record: Dict[str, Any], model_name: str) -> list[WriteRow]:
     from heavyiq.training.vega_lite.chart_graph import app as vega_graph
 
     pid = os.getpid()
@@ -52,7 +52,8 @@ async def process_record(record: Dict[str, Any], n: int) -> list[WriteRow]:
     inputs = {
         "database_name": record["database_name"],
         "table_name": record["table_name"],
-        "n": n,
+        "n": int(record["count"]),
+        "model_name": model_name,
         "image_folder": "images",
     }
 
@@ -92,7 +93,7 @@ async def process_record(record: Dict[str, Any], n: int) -> list[WriteRow]:
 
 
 # ========= Per-process chunk processor =========
-def worker_process(chunk: List[Dict[str, Any]], n: int) -> List[WriteRow]:
+def worker_process(chunk: List[Dict[str, Any]], model_name: str) -> List[WriteRow]:
     pid = os.getpid()
     print(f"[Process {pid}] Received chunk with {len(chunk)} records")
     # Create a new event loop for this process
@@ -101,7 +102,7 @@ def worker_process(chunk: List[Dict[str, Any]], n: int) -> List[WriteRow]:
 
     async def handle_chunk():
         # Create tasks for each record using the async process_record
-        tasks = [process_record(record, n) for record in chunk]
+        tasks = [process_record(record, model_name) for record in chunk]
         return await asyncio.gather(*tasks, return_exceptions=True)
 
     results = loop.run_until_complete(handle_chunk())
@@ -149,9 +150,7 @@ async def consumer(queue: asyncio.Queue, result_list: List, process_pool: Proces
         print(f"[Consumer-{cid}] Dequeued chunk of size {len(chunk)}")
         try:
             # Process the chunk in a separate process
-            result = await loop.run_in_executor(
-                process_pool, worker_process, chunk, NUMBER_OF_QUESTIONS_TO_GENERATE_PER_TABLE
-            )
+            result = await loop.run_in_executor(process_pool, worker_process, chunk, MODEL_NAME)
             result_list.extend(result)
         except Exception as e:
             print(f"[Consumer-{cid}] ❌ Worker failed with exception: {e}")
@@ -200,21 +199,15 @@ async def async_main():
 
 
 def main():
-    global CSV_FILE, OUTPUT_CSV_FILE, NUMBER_OF_QUESTIONS_TO_GENERATE_PER_TABLE
+    global CSV_FILE, OUTPUT_CSV_FILE, MODEL_NAME
     parser = argparse.ArgumentParser(description="Generate training data for Vega-Lite spec model.")
     parser.add_argument("-i", "--input", help="Input csv file path", default=CSV_FILE)
     parser.add_argument("-o", "--output", help="Output csv file path", default=OUTPUT_CSV_FILE)
-    parser.add_argument(
-        "-n",
-        "--n",
-        type=int,
-        help="Number of questions to generate per table",
-        default=NUMBER_OF_QUESTIONS_TO_GENERATE_PER_TABLE,
-    )
+    parser.add_argument("-m", "--model", help="LLM Model Name", default=MODEL_NAME)
 
     args = parser.parse_args()
 
-    CSV_FILE, OUTPUT_CSV_FILE, NUMBER_OF_QUESTIONS_TO_GENERATE_PER_TABLE = args.input, args.output, args.n
+    CSV_FILE, OUTPUT_CSV_FILE, MODEL_NAME = args.input, args.output, args.model
 
     asyncio.run(async_main())
 
