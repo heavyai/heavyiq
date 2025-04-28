@@ -486,9 +486,10 @@ def extract_select_columns(query: str, remove_table_reference: bool = False) -> 
         cols = split_by_indexes(columns_part, comma_indexes)
         for col in cols:
             if " AS " in col:
-                column = col.split(" AS ")[-1].strip()
+                column = col.split(" AS ")[-1]
             else:
-                column = col.strip()
+                column = col
+            column = column.strip().strip('"')
             if remove_table_reference:
                 column = column.split(".")[-1]
             columns.append(column)
