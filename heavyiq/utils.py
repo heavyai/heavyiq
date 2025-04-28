@@ -476,7 +476,7 @@ def extract_select_columns(query: str, remove_table_reference: bool = False) -> 
     :return: List of column names
     """
     # Regex pattern to extract the part between SELECT and FROM
-    pattern = r"(?<=SELECT\s)(.*?)(?=\sFROM)"
+    pattern = r"(?<=SELECT\s)(.*)(?=\sFROM)"
 
     match = re.search(pattern, query, re.IGNORECASE)
 
