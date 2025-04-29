@@ -49,12 +49,15 @@ async def process_record(record: Dict[str, Any], model_name: str) -> list[WriteR
     # create images dir if not exists
     os.makedirs("images", exist_ok=True)
     # Simulate asynchronous work (for example, an I/O operation or async CPU work)
+    count = int(record.get("count", 1))
     inputs = {
         "database_name": record["database_name"],
         "table_name": record["table_name"],
-        "n": int(record["count"]),
+        "n": count,
         "model_name": model_name,
         "image_folder": "images",
+        "input_viz_question": record.get("question", ""),
+        "input_sql": record.get("sql", ""),
     }
 
     final_state = await vega_graph.ainvoke(inputs)

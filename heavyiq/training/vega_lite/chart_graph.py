@@ -96,6 +96,13 @@ vega_prompt = ChatPromptTemplate(
                 '- `mark`: choose based on the question (e.g., "bar", "line", "arc", etc.)\n'
                 "- `encoding`: map X and Y axes based on group-by and aggregation logic\n"
                 "- `title`: optional, based on the question\n\n"
+                "**If the SQL result includes `latitude` and `longitude` fields:**\n"
+                "- Create a layered Vega-Lite spec with a base map using `geoshape` (US counties from `https://vega.github.io/vega-datasets/data/us-10m.json`, format type `topojson`, feature `counties`).\n"
+                "- Add a second layer with `mark: circle` to plot the points using `latitude` and `longitude` as `latitude` and `longitude` encodings.\n"
+                '- Use `projection`: { "type": "albersUsa" } for both layers.\n\n'
+                '- Ensure that circles are styled with **vibrant fill colors** (e.g., use a color scale with `"color": {"field": ..., "type": "quantitative", "scheme": "plasma"}` or a fixed color like `"#e45756"`).\n'
+                "- The base map (`geoshape`) should use `fill: '#eee'` and `stroke: 'white'`.\n"
+                "- The chart background should be white, but marks must remain clearly visible against it.\n\n"
                 "Respond only with the Vega-Lite spec in JSON format."
             )
         ),
@@ -145,9 +152,11 @@ class OverallState(BaseModel):
     image_folder: str  # folder path where vega spec images are being stored
     model_name: Optional[str] = "gemini-2.0-flash"
     table_schema: Optional[str] = ""
+    input_viz_question: Optional[str] = ""
+    input_sql: Optional[str] = ""
     db: Optional[HeavyDB] = None
     tables: list[str] = []
-    n: int = Field(default=10, ge=0, description="Number of question pairs to generate.")
+    n: int = Field(default=1, ge=0, description="Number of question pairs to generate.")
 
     questions: Annotated[list, operator.add]
     queries: Annotated[list, operator.add]
@@ -205,6 +214,13 @@ async def fetch_table_schema(state: OverallState) -> dict:
         include_comments=True,
     )
     return {"table_schema": table_schema}
+
+
+async def add_question(state: OverallState) -> dict[str, Any]:
+    """
+    Adds up the input question to the existing questions state.
+    """
+    return {"questions": [state.input_viz_question]}
 
 
 async def generate_questions(state: OverallState) -> dict[str, Any]:
@@ -298,6 +314,34 @@ async def generate_vega(state: VegaState) -> dict[str, list[tuple[str, str, dict
 
 
 generate_vega_retry_policy = RetryPolicy(max_attempts=2)
+
+
+def continue_to_generate_questions(state: OverallState) -> bool:
+    """
+    Whether continue to generate questions or not.
+    """
+    if not state.input_viz_question:
+        return True
+    return False
+
+
+def continue_to_generate_single_sql_or_generate_vega(state: OverallState) -> Send:
+    """
+    Whether continue to generate single SQL query for vega spec.
+    """
+    if state.input_sql:
+        # has input sq, so continue to generate vega
+        return Send(
+            "generate_vega",
+            VegaState(
+                question=state.input_viz_question,
+                query=state.input_sql,
+                table_schema=state.table_schema,
+                model_name=state.model_name,
+            ),
+        )
+    # ask to generate sql
+    return Send("generate_sql", QuestionState(question=state.input_viz_question, db=state.db, tables=state.tables))
 
 
 def continue_to_generate_sql(state: OverallState) -> list[Send]:
@@ -438,13 +482,20 @@ graph = StateGraph(OverallState)
 graph.add_node("init_db", init_db)
 graph.add_node("fetch_table_schema", fetch_table_schema)
 graph.add_node("generate_questions", generate_questions)
+graph.add_node("add_question", add_question)
 graph.add_node("generate_sql", generate_sql)
 graph.add_node("generate_vega", generate_vega, retry=generate_vega_retry_policy)
 graph.add_node("add_vega_data_and_generate_image", add_vega_data_and_generate_image)
 
 graph.add_edge(START, "init_db")
 graph.add_edge("init_db", "fetch_table_schema")
-graph.add_edge("fetch_table_schema", "generate_questions")
+graph.add_conditional_edges(
+    "fetch_table_schema", continue_to_generate_questions, {True: "generate_questions", False: "add_question"}
+)
+# False
+graph.add_conditional_edges("add_question", continue_to_generate_single_sql_or_generate_vega)
+
+# True
 graph.add_conditional_edges("generate_questions", continue_to_generate_sql, ["generate_sql"])  # type: ignore
 graph.add_conditional_edges("generate_sql", continue_to_generate_vega, ["generate_vega"])  # type: ignore
 graph.add_conditional_edges(
