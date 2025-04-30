@@ -11,6 +11,7 @@ import threading
 import time
 from concurrent.futures import ProcessPoolExecutor
 from typing import Any, Dict, List, TypedDict
+from uuid import uuid4
 
 import aiocsv
 import aiofiles
@@ -19,8 +20,9 @@ import uvloop
 
 # CONFIG
 CSV_FILE = "data.csv"
-OUTPUT_CSV_FILE = "output.csv"
-CHUNK_SIZE = 1  # chunk size where each process is supposed to be handled
+OUTPUT_FOLDER_PATH = "output"
+RUN_ID = None
+CHUNK_SIZE = 3  # chunk size where each process is supposed to be handled
 NUM_PROCESSES = 5  # number of processes to be spawned
 QUEUE_MAXSIZE = 10  # limit memory usage
 MODEL_NAME = "gemini-2.0-flash"
@@ -40,22 +42,23 @@ class WriteRow(TypedDict):
 
 
 # ========= Async per-record processing (CPU-bound simulation) =========
-async def process_record(record: Dict[str, Any], model_name: str) -> list[WriteRow]:
+async def process_record(record: Dict[str, Any], model_name: str, output_folder: str) -> list[WriteRow]:
     from heavyiq.training.vega_lite.chart_graph import app as vega_graph
 
     pid = os.getpid()
     tid = threading.get_ident()
     print(f"[Async Function] (PID={pid}, TID={tid}) Processing record ID {record.get('id')}")
-    # create images dir if not exists
-    os.makedirs("images", exist_ok=True)
     # Simulate asynchronous work (for example, an I/O operation or async CPU work)
     count = int(record.get("count", 1))
+    images_folder = os.path.join(output_folder, "images")
+    # create images dir if not exists
+    os.makedirs(images_folder, exist_ok=True)
     inputs = {
         "database_name": record["database_name"],
         "table_name": record["table_name"],
         "n": count,
         "model_name": model_name,
-        "image_folder": "images",
+        "image_folder": images_folder,
         "input_viz_question": record.get("question", ""),
         "input_sql": record.get("sql", ""),
     }
@@ -96,16 +99,16 @@ async def process_record(record: Dict[str, Any], model_name: str) -> list[WriteR
 
 
 # ========= Per-process chunk processor =========
-def worker_process(chunk: List[Dict[str, Any]], model_name: str) -> List[WriteRow]:
+def worker_process(chunk: List[Dict[str, Any]], model_name: str, output_folder: str) -> List[WriteRow]:
     pid = os.getpid()
     print(f"[Process {pid}] Received chunk with {len(chunk)} records")
     # Create a new event loop for this process
     asyncio.set_event_loop(asyncio.new_event_loop())
     loop = asyncio.get_event_loop()
 
-    async def handle_chunk():
+    async def handle_chunk() -> Any:
         # Create tasks for each record using the async process_record
-        tasks = [process_record(record, model_name) for record in chunk]
+        tasks = [process_record(record, model_name, output_folder) for record in chunk]
         return await asyncio.gather(*tasks, return_exceptions=True)
 
     results = loop.run_until_complete(handle_chunk())
@@ -141,7 +144,9 @@ async def producer(queue: asyncio.Queue):
 
 
 # ========= Consumer coroutine =========
-async def consumer(queue: asyncio.Queue, result_list: List, process_pool: ProcessPoolExecutor, cid: int):
+async def consumer(
+    queue: asyncio.Queue, result_list: List, process_pool: ProcessPoolExecutor, cid: int, output_folder: str
+):
     print(f"[Consumer-{cid}] Started")
     loop = asyncio.get_event_loop()
     while True:
@@ -153,7 +158,7 @@ async def consumer(queue: asyncio.Queue, result_list: List, process_pool: Proces
         print(f"[Consumer-{cid}] Dequeued chunk of size {len(chunk)}")
         try:
             # Process the chunk in a separate process
-            result = await loop.run_in_executor(process_pool, worker_process, chunk, MODEL_NAME)
+            result = await loop.run_in_executor(process_pool, worker_process, chunk, MODEL_NAME, output_folder)
             result_list.extend(result)
         except Exception as e:
             print(f"[Consumer-{cid}] ❌ Worker failed with exception: {e}")
@@ -178,8 +183,13 @@ async def async_main():
     # Launch producer coroutine
     producer_task = asyncio.create_task(producer(queue))
 
+    output_folder = os.path.join(OUTPUT_FOLDER_PATH, RUN_ID)
+    os.makedirs(output_folder, exist_ok=True)
+
     # Launch consumer coroutines (with consumer id for logging)
-    consumer_tasks = [asyncio.create_task(consumer(queue, results, process_pool, cid)) for cid in range(NUM_PROCESSES)]
+    consumer_tasks = [
+        asyncio.create_task(consumer(queue, results, process_pool, cid, output_folder)) for cid in range(NUM_PROCESSES)
+    ]
 
     await asyncio.gather(producer_task)
     await queue.join()  # Wait until all items in the queue are processed
@@ -195,22 +205,23 @@ async def async_main():
     df["id"] = range(1, len(df) + 1)
     # Define desired column order
     column_order = ["id", "database_name", "table_name", "question", "query", "is_valid", "image_path", "vega_spec"]
-    df.to_csv(OUTPUT_CSV_FILE, columns=column_order, index=False)
+    output_csv = os.path.join(output_folder, "output.csv")
+    df.to_csv(output_csv, columns=column_order, index=False)
     print("\n[Main] Final Merged Output (First 5 Rows):")
     print(df.head())
-    print(f"Successfully written output to {OUTPUT_CSV_FILE}")
+    print(f"Successfully written output to {output_csv}")
 
 
 def main():
-    global CSV_FILE, OUTPUT_CSV_FILE, MODEL_NAME
+    global CSV_FILE, OUTPUT_FOLDER_PATH, MODEL_NAME, RUN_ID
     parser = argparse.ArgumentParser(description="Generate training data for Vega-Lite spec model.")
     parser.add_argument("-i", "--input", help="Input csv file path", default=CSV_FILE)
-    parser.add_argument("-o", "--output", help="Output csv file path", default=OUTPUT_CSV_FILE)
+    parser.add_argument("-o", "--output", help="Output folder path", default=OUTPUT_FOLDER_PATH)
     parser.add_argument("-m", "--model", help="LLM Model Name", default=MODEL_NAME)
 
     args = parser.parse_args()
 
-    CSV_FILE, OUTPUT_CSV_FILE, MODEL_NAME = args.input, args.output, args.model
+    CSV_FILE, OUTPUT_FOLDER_PATH, MODEL_NAME, RUN_ID = args.input, args.output, args.model, uuid4().hex[:7]
 
     asyncio.run(async_main())
 

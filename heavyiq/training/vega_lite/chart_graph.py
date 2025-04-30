@@ -459,6 +459,23 @@ async def save_vega_png_subprocess(spec: dict, image_folder: str, timeout: int =
         return ""
 
 
+def replace_data_url_with_values(obj: dict | list, values: list):
+    if isinstance(obj, dict):
+        # If this dict has a "data" key with the exact pattern, replace it
+        if "data" in obj and obj["data"] == {"url": "data.csv"}:
+            obj["data"] = {"values": values}
+
+        # Recursively process all keys
+        for key, value in obj.items():
+            obj[key] = replace_data_url_with_values(value, values)
+
+    elif isinstance(obj, list):
+        # Recursively process all list items
+        obj = [replace_data_url_with_values(item, values) for item in obj]
+
+    return obj
+
+
 async def add_vega_data_and_generate_image(state: VegaDataState):
     """
     Query and add vega data and then generate image.
@@ -466,14 +483,15 @@ async def add_vega_data_and_generate_image(state: VegaDataState):
     logger.info(f"{START_EMOJI} Querying vega data...")
     values = await query_vega_data(state.query, state.db)
     spec = copy.deepcopy(state.vega_spec)
-    spec["data"] = {"values": values}
+    spec = replace_data_url_with_values(spec, values)
     image_path = await save_vega_png_subprocess(spec, state.image_folder)
     if image_path:
         logger.info(f"{SUCCESS_EMOJI} Chart image generated successfully.")
     else:
         logger.error(f"{FAILURE_EMOJI} Chart image failed to generate.")
     # make sure the spec contain not more than 3 values for writing into output csv
-    spec["data"] = {"values": values[:3]}
+    spec = copy.deepcopy(state.vega_spec)
+    spec = replace_data_url_with_values(spec, values[:3])
     return {"questions_with_vega_image": [(state.question, state.query, spec, image_path)]}
 
 
