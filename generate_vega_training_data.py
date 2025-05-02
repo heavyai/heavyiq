@@ -32,6 +32,7 @@ asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 
 class WriteRow(TypedDict):
+    id: int
     table_name: str
     database_name: str
     question: str
@@ -72,6 +73,7 @@ async def process_record(record: Dict[str, Any], model_name: str, output_folder:
 
         output_rows.append(
             WriteRow(
+                id=int(record["id"]),
                 database_name=record["database_name"],
                 table_name=record["table_name"],
                 question=question,
@@ -85,6 +87,7 @@ async def process_record(record: Dict[str, Any], model_name: str, output_folder:
         question, query = line
         output_rows.append(
             WriteRow(
+                id=int(record["id"]),
                 database_name=record["database_name"],
                 table_name=record["table_name"],
                 question=question,
@@ -98,6 +101,14 @@ async def process_record(record: Dict[str, Any], model_name: str, output_folder:
     return output_rows
 
 
+async def safe_process_record(record: dict, model_name: str, output_folder: str):
+    try:
+        result = await process_record(record, model_name, output_folder)
+        return (record["id"], result)
+    except Exception as e:
+        return (record["id"], e)
+
+
 # ========= Per-process chunk processor =========
 def worker_process(chunk: List[Dict[str, Any]], model_name: str, output_folder: str) -> List[WriteRow]:
     pid = os.getpid()
@@ -108,16 +119,17 @@ def worker_process(chunk: List[Dict[str, Any]], model_name: str, output_folder: 
 
     async def handle_chunk() -> Any:
         # Create tasks for each record using the async process_record
-        tasks = [process_record(record, model_name, output_folder) for record in chunk]
-        return await asyncio.gather(*tasks, return_exceptions=True)
+        tasks = [safe_process_record(record, model_name, output_folder) for record in chunk]
+        return await asyncio.gather(*tasks)
 
     results = loop.run_until_complete(handle_chunk())
     loop.close()
 
     # collect all the errors and re-raise it
-    errors = [r for r in results if isinstance(r, Exception)]
+    errors = [(record_id, err) for record_id, err in results if isinstance(err, Exception)]
     if errors:
         raise RuntimeError(f"{len(errors)} errors in worker process: {errors}")
+    results = [i[-1] for i in results]
     flattened_results = [item for sublist in results for item in sublist]
     return flattened_results
 
@@ -162,6 +174,9 @@ async def consumer(
             result_list.extend(result)
         except Exception as e:
             print(f"[Consumer-{cid}] ❌ Worker failed with exception: {e}")
+            import traceback
+
+            traceback.print_exc()
         # don't break the loop on exception since we have one item to process ie. None
         queue.task_done()
     print(f"[Consumer-{cid}] Queue size: {queue.qsize()}")
@@ -201,8 +216,8 @@ async def async_main():
         return None
 
     df = pd.DataFrame(results)
-    df = df.sort_values(by=["database_name", "table_name"])
-    df["id"] = range(1, len(df) + 1)
+    df = df.sort_values(by=["id", "database_name", "table_name"])
+    # df["id"] = range(1, len(df) + 1)
     # Define desired column order
     column_order = ["id", "database_name", "table_name", "question", "query", "is_valid", "image_path", "vega_spec"]
     output_csv = os.path.join(output_folder, "output.csv")
