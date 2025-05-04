@@ -52,6 +52,7 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
     App initialization code which get excuted before gunicorn process fork upon using `--preload` option.
     """
     from heavyiq.langchain.heavydb import HeavyDB
+    from heavyiq.langchain.utils import initialize_tokenizer
 
     logger = get_heavyiq_logger()
     logger.info("Allocating Shared Dict....")
@@ -64,6 +65,7 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
     # if we let it to happen on each worker process at the time of http request then
     # we might endup in request pending issue.
     HeavyDB.initialize()
+    initialize_tokenizer()
 
     # LLM Cache
     if config.enable_llm_cache:

@@ -25,6 +25,7 @@ from heavyiq.logging_utils import get_heavyiq_logger
 from heavyiq.utils import TABLES_CACHE, SharedDictSingleton
 
 is_langsmith_active = False
+TOKENIZER = None
 
 
 def init_telemetrics() -> None:
@@ -524,7 +525,7 @@ async def apopulate_table_info_wrt_token_limit(
     return prompt.format_prompt(table_info=table_info)
 
 
-@cached(cache=LRUCache(maxsize=3))  # Cache the tokenizer
+@cached(cache=LRUCache(maxsize=1))  # Cache the tokenizer
 def get_tokenizer() -> Any:
     """
     Get tokenizer from pretrained local files.
@@ -547,6 +548,8 @@ def get_tokenizer() -> Any:
         model_local_path = "./heavyiq/langchain/tokenizer_models/starcoder2_model"
     elif ("mixtral" in model_name) or ("wizard" in model_name):
         model_local_path = "./heavyiq/langchain/tokenizer_models/mixtral_model"
+    elif "qwen-3" in model_name:
+        model_local_path = "./heavyiq/langchain/tokenizer_models/qwen3_model"
     elif "qwen" in model_name:
         model_local_path = "./heavyiq/langchain/tokenizer_models/qwen_model"
     else:
@@ -562,27 +565,46 @@ def get_tokenizer() -> Any:
             tok_config = json.load(f)
 
     # Add special tokens if specified in tokenizer_config
-    if "bos_token" in tok_config:
-        tokenizer.add_special_tokens([tok_config["bos_token"]])
+    # Add additional_special_tokens
+    special_tokens = []
 
-    if "eos_token" in tok_config:
-        tokenizer.add_special_tokens([tok_config["eos_token"]])
+    # Add additional_special_tokens
+    for token in tok_config.get("additional_special_tokens", []):
+        special_tokens.append(token)
+
+    # Add pad/eos/bos tokens only if defined
+    for key in ("pad_token", "eos_token", "bos_token"):
+        val = tok_config.get(key)
+        if val:
+            special_tokens.append(val)
+
+    # De-duplicate and add as special tokens
+    special_tokens = list(set(special_tokens))
+    tokenizer.add_special_tokens(special_tokens)
 
     return tokenizer
+
+
+def initialize_tokenizer():
+    """
+    Initialize tokenizer before process fork.
+    """
+    global TOKENIZER
+    TOKENIZER = get_tokenizer()
 
 
 def custom_model_token_counter(text: str) -> int:
     """
     Token counter method for custom models which helps to calculate tokens for the given text.
     """
-    return len(get_tokenizer().encode(text).tokens)
+    return len(custom_model_tokenizer_encode(text))
 
 
 def custom_model_tokenizer_encode(text: str) -> list[int]:
     """
     Encode text str into list of input ids.
     """
-    return get_tokenizer().encode(text).ids
+    return TOKENIZER.encode(text).ids
 
 
 def custom_model_tokenizer_decode(token_ids: list[int]) -> str:
@@ -590,7 +612,7 @@ def custom_model_tokenizer_decode(token_ids: list[int]) -> str:
     Decode list of input ids back to the original text.
     """
     # skip_special_tokens=True, else <｜begin▁of▁sentence｜> gets prepended
-    return get_tokenizer().decode(token_ids, skip_special_tokens=True)
+    return TOKENIZER.decode(token_ids, skip_special_tokens=True)
 
 
 @alru_cache(ttl=60)
