@@ -593,6 +593,12 @@ def initialize_tokenizer():
     TOKENIZER = get_tokenizer()
 
 
+def tokenizer():
+    if TOKENIZER:
+        return TOKENIZER
+    return get_tokenizer()
+
+
 def custom_model_token_counter(text: str) -> int:
     """
     Token counter method for custom models which helps to calculate tokens for the given text.
@@ -604,7 +610,7 @@ def custom_model_tokenizer_encode(text: str) -> list[int]:
     """
     Encode text str into list of input ids.
     """
-    return TOKENIZER.encode(text).ids
+    return tokenizer().encode(text).ids
 
 
 def custom_model_tokenizer_decode(token_ids: list[int]) -> str:
@@ -612,7 +618,7 @@ def custom_model_tokenizer_decode(token_ids: list[int]) -> str:
     Decode list of input ids back to the original text.
     """
     # skip_special_tokens=True, else <｜begin▁of▁sentence｜> gets prepended
-    return TOKENIZER.decode(token_ids, skip_special_tokens=True)
+    return tokenizer().decode(token_ids, skip_special_tokens=True)
 
 
 @alru_cache(ttl=60)
