@@ -29,7 +29,14 @@ from heavyiq.langchain.heavydb_base import (
     StringLiteralOp,
 )
 from heavyiq.langchain.heavydb_utils import DB_KEYWORDS
-from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
+from heavyiq.utils import (
+    LRUCache,
+    calc_query_stats,
+    is_destructive_sql,
+    rate_sql_complexity,
+    semaphore_gather,
+    strip_sql_comments,
+)
 
 config = get_config()
 
@@ -181,8 +188,8 @@ class HeavyDB(HeavyDBCreateBase, HeavyDBCacheBase, HeavyDBState):
             if not timestamp_columns:
                 return []  # type: ignore
             self.logger.info(f"Calculating timestamp values for table {table_name}")
-            timestamp_values = await asyncio.gather(
-                *[self.aget_column_timestamp(table_name, col) for col in timestamp_columns]
+            timestamp_values = await semaphore_gather(
+                5, [self.aget_column_timestamp(table_name, col) for col in timestamp_columns]
             )  # type: ignore
             self.timestamp_cache.put(cache_key, timestamp_values)
 
@@ -464,6 +471,15 @@ class HeavyDB(HeavyDBCreateBase, HeavyDBCacheBase, HeavyDBState):
         ]
         return CustomTableDetails(name=table, columns=custom_columns, comment=table_comment)
 
+    async def aget_columns_top_k(self, table: str, cols: Sequence[str]) -> list[tuple[Optional[list[str]], bool]]:
+        """
+        Finds top-k for list of columns.
+        """
+        # if the col count exceeds the default db connection pool limit 20, it might endup with deadlock condition
+        # so we always protect the tasks by semaphore so that it can process only limited number of tasks at a given time.
+        columns_top_k = await semaphore_gather(5, [self.aget_column_top_k(table, col) for col in cols])
+        return columns_top_k
+
     async def _aget_raw_table_schema_from_thrift(
         self,
         table: str,
@@ -496,9 +512,7 @@ class HeavyDB(HeavyDBCreateBase, HeavyDBCacheBase, HeavyDBState):
             if use_cache:
                 zip_colname_topk = await self._aget_top_k(table_name=table, text_columns=text_columns)
             else:
-                columns_top_k = await asyncio.gather(
-                    *[self.aget_column_top_k(table_details.name, col) for col in text_columns]
-                )
+                columns_top_k = await self.aget_columns_top_k(table_details.name, text_columns)
                 zip_colname_topk = zip(text_columns, columns_top_k)
 
             for colstr, (top_k_res, is_high_cardinality) in zip_colname_topk:
@@ -511,8 +525,8 @@ class HeavyDB(HeavyDBCreateBase, HeavyDBCacheBase, HeavyDBState):
             if use_cache:
                 zip_column_timestamp = await self._aget_timestamp(table_name=table, timestamp_columns=timestamp_columns)
             else:
-                timestamp_values = await asyncio.gather(
-                    *[self.aget_column_timestamp(table_details.name, col) for col in timestamp_columns]
+                timestamp_values = await semaphore_gather(
+                    5, [self.aget_column_timestamp(table_details.name, col) for col in timestamp_columns]
                 )
                 zip_column_timestamp = zip(timestamp_columns, timestamp_values)
 
@@ -665,7 +679,7 @@ class HeavyDB(HeavyDBCreateBase, HeavyDBCacheBase, HeavyDBState):
             if not text_columns:
                 return []  # type: ignore
             self.logger.info(f"Calculating top k values for table {table_name}")
-            columns_top_k = await asyncio.gather(*[self.aget_column_top_k(table_name, col) for col in text_columns])  # type: ignore
+            columns_top_k = await self.aget_columns_top_k(table_name, text_columns)  # type: ignore
             self.top_k_cache.put(cache_key, columns_top_k)
 
         return zip(text_columns, columns_top_k)
@@ -764,7 +778,7 @@ class HeavyDB(HeavyDBCreateBase, HeavyDBCacheBase, HeavyDBState):
 
         if len(all_table_names) > 1 and config.sort_prompt_tables_desc:
             # sort tables in desc order based on total row count
-            table_row_count = await asyncio.gather(*[self.aget_total_row_count(table) for table in all_table_names])
+            table_row_count = await semaphore_gather(5, [self.aget_total_row_count(table) for table in all_table_names])
             sorted_tables = [
                 k[0] for k in sorted(zip(all_table_names, table_row_count), key=lambda x: x[1], reverse=True)
             ]
