@@ -1,34 +1,52 @@
 # import chromadb
 # from chromadb.api import ClientAPI
 # from chromadb.config import Settings as ChromaDBSettings
+from concurrent.futures import ThreadPoolExecutor
+
 from llama_index.embeddings.openai import OpenAIEmbedding
 
 from heavyiq.config import get_config
 from heavyrag.logger import logger
 
-CONFIG, EMBED_MODEL = get_config(), None
+CONFIG, EMBED_MODEL, EMBED_MODEL_MAX_LEN = get_config(), None, None
+
+
+def get_embed_model_info() -> tuple[str, int]:
+    """
+    Get info regrading the embedding model.
+    """
+    from heavyiq.langchain.llms import get_vllm_max_model_len, get_vllm_model_name
+
+    with ThreadPoolExecutor() as executor:
+        future_name = executor.submit(get_vllm_model_name, CONFIG.rag_embed_server_base)
+        future_max_len = executor.submit(get_vllm_max_model_len, CONFIG.rag_embed_server_base)
+
+        model_name = future_name.result()
+        max_model_len = future_max_len.result()
+
+    return model_name, max_model_len
 
 
 def set_embed_model():
     """
     Supposed to set the embed model
     """
-    from heavyiq.langchain.llms import get_vllm_model_name
 
-    global EMBED_MODEL
+    global EMBED_MODEL, EMBED_MODEL_MAX_LEN
     if not CONFIG.enable_rag:
         msg = "Failed to initialize the embedding model. The enable_rag setting is being turned off."
         logger.error(msg)
         raise ValueError(msg)
 
     if CONFIG.rag_embed_server_base and CONFIG.rag_embed_server_base.endswith("/v1"):
-        model_name = get_vllm_model_name(CONFIG.rag_embed_server_base)
+        model_name, model_max_len = get_embed_model_info()
         EMBED_MODEL = OpenAIEmbedding(
             api_key="nothing",
             api_base=CONFIG.rag_embed_server_base,
             model_name=model_name,
             embed_batch_size=100,
         )
+        EMBED_MODEL_MAX_LEN = model_max_len
         logger.info(
             "Initialized embed model using OpenAIEmbedding client with the following parameters: "
             f"timeout=60 seconds, embed_batch_size=100, model_name={model_name}, base_url={CONFIG.rag_embed_server_base}"
