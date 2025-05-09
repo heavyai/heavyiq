@@ -8,7 +8,6 @@
 #       - insert
 #       - list
 #       - delete
-
 import threading
 from abc import ABC, abstractmethod
 
@@ -243,6 +242,8 @@ class ChromaController(BaseController):
     Controller which helps to interact with chroma vectorstore.
     """
 
+    MAX_BATCH_SIZE = 166
+
     @property
     def persist_dir(self) -> str:
         return CONFIG.rag_chromadb_persist_dir
@@ -323,6 +324,14 @@ class ChromaController(BaseController):
         nodes_with_score = await get_nodes(index=index, filters=get_table_filter_matches(heavydb_name=dbname))  # type: ignore
         return nodes_with_score
 
+    def insert_nodes_in_batches(self, index: VectorStoreIndex, nodes: list[BaseNode], show_progress: bool = True):
+        """
+        Batch Insertion in chormadb should not exceed a certain limit. ie. not more than 166 nodes.
+        """
+        for i in range(0, len(nodes), self.MAX_BATCH_SIZE):
+            batch = nodes[i : i + self.MAX_BATCH_SIZE]
+            index.insert_nodes(nodes=batch, show_progress=show_progress)
+
     async def sync_table_nodes(self, heavydb: HeavyDB, force: bool = False) -> None:
         """
         Synchronize nodes (documents or text content) with a table in the database.
@@ -344,7 +353,7 @@ class ChromaController(BaseController):
             await delete_all_table_nodes(index=index, dbname=dbname)  # type: ignore
             docs = await self._load_tables(heavydb)
             nodes = await self._docs_to_nodes(docs)
-            index.insert_nodes(nodes=nodes, show_progress=True)
+            self.insert_nodes_in_batches(index, nodes, show_progress=True)
             return None
 
         all_tables = heavydb.get_usable_table_names()
@@ -365,7 +374,7 @@ class ChromaController(BaseController):
         if tables_to_insert:
             docs = await aload_specific_tables(heavydb=heavydb, tables=tables_to_insert)
             nodes = await self._docs_to_nodes(docs)
-            index.insert_nodes(nodes=nodes, show_progress=True)
+            self.insert_nodes_in_batches(index, nodes, show_progress=True)
         return None
 
 
