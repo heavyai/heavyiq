@@ -164,7 +164,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     rag_document_pdf_parser_url: str = ""
     rag_embed_dimension: int = 1024
     rag_embed_model_name: str = "BAAI/bge-large-en-v1.5"
-    rag_embed_server_base: str = "https://embeddings.heavy.ai"
+    rag_embed_server_base: str = "https://embeddings.heavy.ai/v1"
     rag_rerank_server_base: Optional[str] = None
     rag_rerank_llm_start_token: str = "<|prompt|>\n"
     rag_rerank_llm_end_token: str = "\n<|answer|>\n"
