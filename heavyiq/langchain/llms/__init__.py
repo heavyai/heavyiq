@@ -109,6 +109,8 @@ def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str
         model_kwargs["logprobs"] = config.custom_llm_logprobs_limit
         kwargs["n"] = 1
         kwargs["max_tokens"] = config.custom_llm_api_vllm_max_tokens
+    if model_type == LLMType.INSTRUCT:
+        kwargs["seed"] = 42
     return kwargs, {"extra_body": model_kwargs} if model_kwargs else {}
 
 
@@ -203,14 +205,14 @@ def _get_custom_api_vllm_llm(model_type: LLMType, api_base: str, context_window:
     # unhashable type list (ie. mutable) when passing a mutable object.
     vllm_kwargs, model_kwargs = get_vllm_model_kwargs(model_type)
     model_name = get_vllm_model_name(api_base)
+    combined_kwargs = {**vllm_kwargs, **kwargs}
     return OverrideVLLMOpenAI(
         openai_api_key="nothing",
         openai_api_base=api_base,
         model=model_name,
         model_kwargs=model_kwargs,
         context_window=context_window,
-        **kwargs,
-        **vllm_kwargs,
+        **combined_kwargs,
     )
 
 
