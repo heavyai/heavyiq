@@ -111,7 +111,8 @@ def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str
         kwargs["max_tokens"] = config.custom_llm_api_vllm_max_tokens
     if model_type == LLMType.INSTRUCT:
         kwargs["seed"] = 42
-    return kwargs, {"extra_body": model_kwargs} if model_kwargs else {}
+        model_kwargs["use_beam_search"] = False
+    return kwargs, model_kwargs
 
 
 @cached(
@@ -203,14 +204,14 @@ def _get_custom_api_vllm_llm(model_type: LLMType, api_base: str, context_window:
     """
     # always pass immutable kwargs to the function decorated by lru_cache or otherwise you'll end up in
     # unhashable type list (ie. mutable) when passing a mutable object.
-    vllm_kwargs, model_kwargs = get_vllm_model_kwargs(model_type)
+    vllm_kwargs, extra_body = get_vllm_model_kwargs(model_type)
     model_name = get_vllm_model_name(api_base)
     combined_kwargs = {**vllm_kwargs, **kwargs}
     return OverrideVLLMOpenAI(
         openai_api_key="nothing",
         openai_api_base=api_base,
         model=model_name,
-        model_kwargs=model_kwargs,
+        model_kwargs={"extra_body": extra_body},
         context_window=context_window,
         **combined_kwargs,
     )
