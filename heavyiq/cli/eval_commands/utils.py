@@ -303,6 +303,8 @@ def summarize_eval_results(eval_str: str) -> None:
     # Count occurrences of each status value
     status_counts = Counter(df["status"])
     total_count = len(df)
+    if total_count == 0:
+        raise ValueError(f"No eval result data found for {eval_str}, {results_path}")
 
     # Compute success metrics
     success_count = df["success"].sum()  # Summing boolean column gives count of True values

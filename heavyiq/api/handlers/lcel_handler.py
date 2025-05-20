@@ -1,6 +1,8 @@
 from typing import NoReturn, cast
 
+from fastapi import HTTPException
 from langchain_core.runnables.config import RunnableConfig
+from langsmith import Client
 
 from heavyiq.api.handlers.decorators import with_db, with_feedback_id
 from heavyiq.api.handlers.utils import ainvoke_logprobs, compute_total_probability
@@ -9,6 +11,8 @@ from heavyiq.api.models import (
     AutoQueryResponse,
     AutoQuestionResponse,
     COTQueryResponse,
+    FeedbackRequest,
+    FeedbackResponse,
     FixVegaLiteSpecResponse,
     GenerateVegaLiteResponse,
     QueryResponse,
@@ -326,3 +330,25 @@ async def handle_vega_spec_error_correction_request(
 
     response = await chain.ainvoke(request_dict, config=config)
     return cast(FixVegaLiteSpecResponse, response)
+
+
+# Define the feedback submission handler
+async def handle_submit_feedback(request: FeedbackRequest) -> FeedbackResponse:
+    """
+    Handle feedback submission.
+    """
+    from heavyiq.langchain.utils import is_langsmith_active
+
+    if not is_langsmith_active:
+        raise HTTPException(status_code=500, detail="Langsmith is not enabled in the config.")
+    try:
+        client = Client()
+        client.create_feedback(
+            request.feedback_id,
+            key="feedback-key",
+            score=request.score,
+            comment=request.comment,
+        )
+        return FeedbackResponse(success=True)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to submit feedback: {str(e)}")

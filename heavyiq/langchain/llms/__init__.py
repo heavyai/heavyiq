@@ -2,6 +2,7 @@ import time
 from enum import Enum
 from typing import Any
 
+import httpx
 import requests
 from cachetools import LRUCache, TTLCache, cached
 from langchain.chat_models.base import BaseChatModel
@@ -52,6 +53,31 @@ def get_vllm_model_name(api_base: str) -> str:
     model_name = response.json()["data"][0]["id"]
 
     return model_name
+
+
+def get_vllm_max_model_len(api_base: str) -> int:
+    """
+    Fetch the max_model_len from the embedding model listed by the vLLM server.
+
+    Args:
+        api_base (str): Base URL of the vLLM server (e.g., "http://localhost:8000/v1")
+
+    Returns:
+        int: max_model_len of the first model
+    """
+    with httpx.Client(timeout=10.0) as client:
+        resp = client.get(f"{api_base}/models")
+        resp.raise_for_status()
+        data = resp.json()
+
+        if not data.get("data"):
+            raise ValueError("No models found in /v1/models response")
+
+        first_model = data["data"][0]
+        if "max_model_len" in first_model:
+            return first_model["max_model_len"]
+
+        raise ValueError("max_model_len not found in model metadata")
 
 
 @cached(cache=LRUCache(maxsize=10))

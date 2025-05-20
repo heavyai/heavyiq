@@ -1,4 +1,4 @@
-from typing import AsyncIterator
+from typing import AsyncIterator, Generator
 from unittest.mock import patch
 
 import pytest
@@ -44,7 +44,7 @@ async def aclient(config_file_path: str) -> AsyncIterator[AsyncClient]:
 
 
 @pytest.fixture(scope="module")
-def client(config_file_path: str):
+def client(config_file_path: str) -> Generator[TestClient, None, None]:
     # Initialize the TestClient with the provided base URL
     with patch("heavyiq.api.init_telemetrics", return_value=None):
         app = create_app(config_file_path)
@@ -54,11 +54,12 @@ def client(config_file_path: str):
     app.dependency_overrides[valid_tables_db_session] = override_valid_tables_db_session
     app.dependency_overrides[valid_auto_query_db_session] = override_valid_auto_query_db_session
     app.dependency_overrides[valid_auto_question_db_session] = override_valid_auto_question_db_session
-    return TestClient(app)
+    with TestClient(app) as client:
+        yield client
 
 
-@pytest.fixture(scope="module")
-def session_id(heavyiq_config: HeavyIQConfig):
+@pytest.fixture(scope="function")
+def session_id(heavyiq_config: HeavyIQConfig) -> Generator[str, None, None]:
     try:
         # Use patch to mock the get_config function
         with patch("heavyiq.langchain.heavydb.get_config", return_value=heavyiq_config):

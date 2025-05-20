@@ -12,6 +12,7 @@ from langchain.globals import set_llm_cache
 from starlette.exceptions import HTTPException
 
 from heavyiq.api.handlers import exception_handler as exh
+from heavyiq.api.handlers import handle_submit_feedback
 from heavyiq.api.middlewares import AsyncLoggingMiddleware
 from heavyiq.api.models.error import ErrorResponse
 from heavyiq.api.routes import bgrouter, defaultrouter, lcelrouter, llmrouter, streamrouter
@@ -52,6 +53,7 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
     App initialization code which get excuted before gunicorn process fork upon using `--preload` option.
     """
     from heavyiq.langchain.heavydb import HeavyDB
+    from heavyiq.langchain.utils import initialize_tokenizer
 
     logger = get_heavyiq_logger()
     logger.info("Allocating Shared Dict....")
@@ -64,6 +66,7 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
     # if we let it to happen on each worker process at the time of http request then
     # we might endup in request pending issue.
     HeavyDB.initialize()
+    initialize_tokenizer()
 
     # LLM Cache
     if config.enable_llm_cache:
@@ -230,6 +233,12 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
                 "model": ErrorResponse,
             }
         },
+    )
+    app.add_api_route(
+        path="/api/v1/submit-feedback",
+        endpoint=handle_submit_feedback,
+        methods=["POST"],
+        include_in_schema=True,
     )
     # @deprecated
     # now we have endpoints for syncing table and facts/snippets index
