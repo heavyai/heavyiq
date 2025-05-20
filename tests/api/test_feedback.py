@@ -1,9 +1,11 @@
 from typing import Any
 from unittest.mock import patch
 
+from fastapi.testclient import TestClient
+
 
 @patch("heavyiq.langchain.utils.is_langsmith_active", False)
-def test_should_fail_upon_submitting_feedback(client):
+def test_should_fail_upon_submitting_feedback(client: TestClient):
     """
     Test /submit-feedback endpoint.
     """
@@ -14,12 +16,12 @@ def test_should_fail_upon_submitting_feedback(client):
     }
     response = client.post("/api/v1/submit-feedback", json=payload)
     assert response.status_code == 500
-    assert response.json() == {"error": "HTTP Exception: Feedback is not enabled in the config."}
+    assert response.json() == {"error": "HTTP Exception: Langsmith is not enabled in the config."}
 
 
 @patch("heavyiq.langchain.utils.is_langsmith_active", True)
-@patch("heavyiq.api.handlers.iq_handler.Client")
-def test_should_pass_upon_submitting_feedback(MockClient: Any, client):
+@patch("heavyiq.api.handlers.lcel_handler.Client")
+def test_should_pass_upon_submitting_feedback(MockClient: Any, client: TestClient):
     """
     Test /submit-feedback endpoint.
     """

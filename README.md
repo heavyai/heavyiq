@@ -88,6 +88,12 @@ Use `pytest`
 $ pytest tests/fastapi --disable-warnings
 ```
 
+Always run the testcases in sequential order by explicitly specifying the `-n=0` option, or otherwise we might endup with errors.
+
+```bash
+pytest tests/api/test_lcel.py  -rs --config-path config.test.toml -n 0 --maxfail=1 --disable-warnings
+```
+
 ## Deployment
 
 ### Create Obfuscated Build

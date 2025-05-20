@@ -35,3 +35,4 @@ pyheavydb*.whl
 rag_storage/
 eval/
 table_documents/
+**/.vscode

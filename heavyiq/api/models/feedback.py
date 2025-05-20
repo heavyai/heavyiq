@@ -31,3 +31,5 @@ class FeedbackResponse(BaseModel):
     """
     /submit-feedback endpoint's response schema class.
     """
+
+    success: bool

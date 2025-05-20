@@ -1,5 +1,8 @@
 from typing import NoReturn
 
+from fastapi import HTTPException
+from langsmith import Client
+
 from heavyiq.api.handlers.decorators import with_db, with_feedback_id
 from heavyiq.api.handlers.utils import ainvoke_logprobs, compute_total_probability
 from heavyiq.api.models import (
@@ -7,6 +10,8 @@ from heavyiq.api.models import (
     AutoQueryResponse,
     AutoQuestionResponse,
     COTQueryResponse,
+    FeedbackRequest,
+    FeedbackResponse,
     QueryResponse,
     QuestionResponse,
     TablesResponse,
@@ -294,3 +299,25 @@ async def handle_lcel_cot_query_request(request_dict: dict, config: dict | None 
         logprobs=logprobs,
         total_score=total_score,
     )
+
+
+# Define the feedback submission handler
+async def handle_submit_feedback(request: FeedbackRequest) -> FeedbackResponse:
+    """
+    Handle feedback submission.
+    """
+    from heavyiq.langchain.utils import is_langsmith_active
+
+    if not is_langsmith_active:
+        raise HTTPException(status_code=500, detail="Langsmith is not enabled in the config.")
+    try:
+        client = Client()
+        client.create_feedback(
+            request.feedback_id,
+            key="feedback-key",
+            score=request.score,
+            comment=request.comment,
+        )
+        return FeedbackResponse(success=True)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to submit feedback: {str(e)}")

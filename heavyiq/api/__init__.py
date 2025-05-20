@@ -12,6 +12,7 @@ from langchain.globals import set_llm_cache
 from starlette.exceptions import HTTPException
 
 from heavyiq.api.handlers import exception_handler as exh
+from heavyiq.api.handlers import handle_submit_feedback
 from heavyiq.api.middlewares import AsyncLoggingMiddleware
 from heavyiq.api.models.error import ErrorResponse
 from heavyiq.api.routes import bgrouter, defaultrouter, lcelrouter, llmrouter, streamrouter
@@ -232,6 +233,12 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
                 "model": ErrorResponse,
             }
         },
+    )
+    app.add_api_route(
+        path="/api/v1/submit-feedback",
+        endpoint=handle_submit_feedback,
+        methods=["POST"],
+        include_in_schema=True,
     )
     # @deprecated
     # now we have endpoints for syncing table and facts/snippets index

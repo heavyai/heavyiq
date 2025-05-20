@@ -12,7 +12,8 @@ from contextvars import ContextVar
 from copy import deepcopy
 from multiprocessing.managers import SyncManager
 from threading import Lock
-from typing import Any, Callable, Iterator, NamedTuple, Optional, Sequence, TypedDict
+from typing import (Any, Callable, Iterator, NamedTuple, Optional, Sequence,
+                    TypedDict)
 
 import anyio
 from async_lru import alru_cache
@@ -23,7 +24,8 @@ from starlette.concurrency import run_in_threadpool
 
 from heavyiq.config import get_config
 from heavyiq.langchain.heavydb_utils import DB_KEYWORDS
-from heavyiq.utils import LRUCache, calc_query_stats, is_destructive_sql, rate_sql_complexity, strip_sql_comments
+from heavyiq.utils import (LRUCache, calc_query_stats, is_destructive_sql,
+                           rate_sql_complexity, strip_sql_comments)
 
 
 class CustomColumnDetails(NamedTuple):
@@ -336,8 +338,13 @@ class HeavyDB:
         return cls(conn, **kwargs)
 
     @classmethod
-    async def from_session_async(cls: type[HeavyDB], session_id: str, **kwargs: Any) -> HeavyDB:
-        """Create a database connection from session."""
+    @alru_cache(maxsize=128, ttl=60 * 5)
+    async def _from_session_async_cached(cls: type[HeavyDB], session_id: str, **kwargs: Any) -> HeavyDB:
+        """
+        Creates a current class instance (which further establishes heavydb connection)
+        from the passed session_id only if the relevant instance for the passed session_id
+        does not exists in the cache else it returns the cached instance.
+        """
         config = get_config()
 
         async def aconnect_func() -> Connection:
@@ -351,7 +358,28 @@ class HeavyDB:
             return await anyio.to_thread.run_sync(func, cancellable=True)  # type: ignore
 
         conn = await cls._aconnect_with_timeout(aconnect_func(), kwargs.pop("timeout", 10))
-        return await run_in_threadpool(cls, conn, **kwargs)
+        instance = await run_in_threadpool(cls, conn, **kwargs)
+        return weakref.proxy(instance)  # Cache a weak reference (helps to avoid memory leaks)
+
+    @classmethod
+    async def from_session_async(cls: type[HeavyDB], session_id: str, **kwargs: Any) -> HeavyDB:
+        """
+        Always use this corountine function for instance creation since it implements caching.
+        Create a database connection from session.
+        Falls back to the original function if the weak reference is invalid.
+        """
+        try:
+            # Try to get the cached instance
+            instance = await cls._from_session_async_cached(session_id, **kwargs)
+            # try to access it's attributes in-order to check whether the original instance gets deleted or not, if yes then it should raise ReferenceError
+            _ = instance._conn
+            return instance
+        except ReferenceError:
+            # If weak reference is invalid, recreate the instance and update the cache
+            print(f"Recreating HeavyDB instance for session_id: {session_id} due to ReferenceError")
+            cls._from_session_async_cached.cache_clear()  # Clear the invalid entry from the cache
+            instance = await cls._from_session_async_cached(session_id, **kwargs)
+            return instance
 
     @classmethod
     def from_creds(
