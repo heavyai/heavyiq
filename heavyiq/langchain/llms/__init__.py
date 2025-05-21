@@ -86,10 +86,9 @@ def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str
     # by default n was set to 1, so no need for passing n as llm kwargs otherwise if we need to
     kwargs: dict[str, Any] = {}
     model_kwargs: dict[str, Any] = {}
-    # set seed for NLtoSQL model type
+    # set seed for all model type
     seed_value = 42
-    if model_type == LLMType.NL_TO_SQL:
-        kwargs["seed"] = seed_value
+    kwargs["seed"] = seed_value
     if config.enable_logprobs and model_type in [LLMType.NL_TO_SQL, LLMType.NL_TO_SQL_ERROR]:
         model_kwargs["logprobs"] = config.custom_llm_logprobs_limit
     if config.custom_llm_api_vllm_beam_width >= 2 and model_type in [LLMType.NL_TO_SQL, LLMType.NL_TO_SQL_ERROR]:
@@ -114,7 +113,6 @@ def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str
         kwargs["n"] = 1
         kwargs["max_tokens"] = config.custom_llm_api_vllm_max_tokens
     if model_type == LLMType.INSTRUCT:
-        kwargs["seed"] = seed_value
         model_kwargs["use_beam_search"] = False
     return kwargs, model_kwargs
 
