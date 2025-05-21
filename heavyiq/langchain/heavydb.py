@@ -98,8 +98,8 @@ class HeavyDB:
     def __init__(
         self,
         conn: Connection,
-        ignore_tables: Optional[list[str]] = None,
-        include_tables: Optional[list[str]] = None,
+        ignore_tables: Optional[list[str] | set[str]] = None,
+        include_tables: Optional[list[str] | set[str]] = None,
         sample_rows_in_table_info: int = 2,
         custom_table_info: Optional[dict[str, str]] = None,
     ):
@@ -368,9 +368,16 @@ class HeavyDB:
         Create a database connection from session.
         Falls back to the original function if the weak reference is invalid.
         """
+        copied_kwargs = kwargs.copy()
+        new_kwargs = {}
+        for key, value in copied_kwargs.items():
+            if isinstance(value, list):
+                new_kwargs[key] = set(value)
+            else:
+                new_kwargs[key] = value
         try:
             # Try to get the cached instance
-            instance = await cls._from_session_async_cached(session_id, **kwargs)
+            instance = await cls._from_session_async_cached(session_id, **new_kwargs)
             # try to access it's attributes in-order to check whether the original instance gets deleted or not, if yes then it should raise ReferenceError
             _ = instance._conn
             return instance
@@ -378,7 +385,7 @@ class HeavyDB:
             # If weak reference is invalid, recreate the instance and update the cache
             print(f"Recreating HeavyDB instance for session_id: {session_id} due to ReferenceError")
             cls._from_session_async_cached.cache_clear()  # Clear the invalid entry from the cache
-            instance = await cls._from_session_async_cached(session_id, **kwargs)
+            instance = await cls._from_session_async_cached(session_id, **new_kwargs)
             return instance
 
     @classmethod
