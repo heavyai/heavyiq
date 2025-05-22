@@ -98,8 +98,8 @@ class HeavyDB:
     def __init__(
         self,
         conn: Connection,
-        ignore_tables: Optional[list[str] | set[str]] = None,
-        include_tables: Optional[list[str] | set[str]] = None,
+        ignore_tables: Optional[list[str] | tuple[str]] = None,
+        include_tables: Optional[list[str] | tuple[str]] = None,
         sample_rows_in_table_info: int = 2,
         custom_table_info: Optional[dict[str, str]] = None,
     ):
@@ -372,7 +372,7 @@ class HeavyDB:
         new_kwargs = {}
         for key, value in copied_kwargs.items():
             if isinstance(value, list):
-                new_kwargs[key] = set(value)
+                new_kwargs[key] = tuple(value)
             else:
                 new_kwargs[key] = value
         try:
