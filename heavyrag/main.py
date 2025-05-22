@@ -300,7 +300,7 @@ async def determine_table_names(question: str, heavydb: HeavyDB, force_sync: boo
     logger.debug("Started determining table names, syncing table index...")
     from heavyrag.controller import rag_controller
 
-    await rag_controller.sync_table_nodes(heavydb=heavydb)
+    await rag_controller.sync_table_nodes(heavydb=heavydb, force=force_sync)
     logger.debug("Finished syncing table index.")
     nodes_with_score = await rag_controller.search_table_nodes(dbname=heavydb._dbname, question=question, top_k=2)
     tables = []
@@ -309,6 +309,6 @@ async def determine_table_names(question: str, heavydb: HeavyDB, force_sync: boo
         if table_name not in tables:
             tables.append(table_name)
 
-    logger.debug("Retrieved tables: {tables}")
+    logger.debug(f"Retrieved tables: {tables}")
 
     return tables
