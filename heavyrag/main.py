@@ -302,12 +302,7 @@ async def determine_table_names(question: str, heavydb: HeavyDB, force_sync: boo
 
     await rag_controller.sync_table_nodes(heavydb=heavydb)
     logger.debug("Finished syncing table index.")
-    index = rag_controller.index(heavydb._dbname)
-    engine = index.as_retriever(
-        filters=table_filters,
-        similarity_top_k=2,
-    )
-    nodes_with_score = await engine.aretrieve(question)
+    nodes_with_score = await rag_controller.search_table_nodes(dbname=heavydb._dbname, question=question, top_k=2)
     tables = []
     for n in nodes_with_score:
         table_name = n.metadata["name"]
