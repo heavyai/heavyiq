@@ -33,3 +33,4 @@ sqlparse==0.5.0
 faiss-cpu==1.8.0.post1
 llama-index-vector-stores-faiss==0.1.2
 cachetools==5.3.3
+llama-index-embeddings-text-embeddings-inference==0.1.4
