@@ -306,9 +306,12 @@ async def determine_table_names(question: str, heavydb: HeavyDB, force_sync: boo
     tables = []
     for n in nodes_with_score:
         table_name = n.metadata["name"]
+        dbname = n.metadata["dbname"]
+        if dbname != heavydb._dbname:
+            continue
         if table_name not in tables:
             tables.append(table_name)
 
-    logger.debug("Retrieved tables: {tables}")
+    logger.debug(f"Retrieved tables: {tables}")
 
     return tables

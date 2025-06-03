@@ -1,0 +1,38 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "HeavyIQ Debug",
+      "type": "python",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["app:app", "--reload"],
+      "justMyCode": false
+    },
+    {
+      "name": "Run Gunicorn",
+      "type": "debugpy",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "program": "${workspaceFolder}/venv/bin/gunicorn",
+      "args": [
+        "heavyiq.api:create_app(config_path=\"./config.toml\")",
+        "--preload",
+        "--capture-output",
+        "-t",
+        "0",
+        "-w",
+        "1",
+        "-k",
+        "uvicorn.workers.UvicornWorker",
+        "-c",
+        "gunicorn.conf.py"
+      ],
+      "justMyCode": false,
+      "env": {
+        "OBJC_DISABLE_INITIALIZE_FORK_SAFETY": "YES"
+      }
+    }
+  ]
+}

@@ -1,6 +1,7 @@
-from typing import NoReturn
+from typing import NoReturn, cast
 
 from fastapi import HTTPException
+from langchain_core.runnables.config import RunnableConfig
 from langsmith import Client
 
 from heavyiq.api.handlers.decorators import with_db, with_feedback_id
@@ -12,6 +13,8 @@ from heavyiq.api.models import (
     COTQueryResponse,
     FeedbackRequest,
     FeedbackResponse,
+    FixVegaLiteSpecResponse,
+    GenerateVegaLiteResponse,
     QueryResponse,
     QuestionResponse,
     TablesResponse,
@@ -299,6 +302,34 @@ async def handle_lcel_cot_query_request(request_dict: dict, config: dict | None 
         logprobs=logprobs,
         total_score=total_score,
     )
+
+
+@with_db
+async def handle_generate_vega_spec_request(
+    request_dict: dict, config: RunnableConfig | None = None
+) -> GenerateVegaLiteResponse | NoReturn:
+    """
+    Async LCEL handler for generate_vega request.
+    """
+    from heavyiq.lcel.chains.heavydb.chart_chain import chain
+
+    response = await chain.ainvoke(request_dict, config=config)
+    return cast(GenerateVegaLiteResponse, response)
+
+
+@with_db
+async def handle_vega_spec_error_correction_request(
+    request_dict: dict, config: RunnableConfig | None = None
+) -> FixVegaLiteSpecResponse | NoReturn:
+    """
+    Async LCEL hanlder for error correcting generated vega request.
+    """
+    from heavyiq.lcel.chains.heavydb.chart_errror_chain import chain
+
+    request_dict.pop("session_id", None)
+
+    response = await chain.ainvoke(request_dict, config=config)
+    return cast(FixVegaLiteSpecResponse, response)
 
 
 # Define the feedback submission handler

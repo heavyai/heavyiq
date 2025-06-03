@@ -25,7 +25,8 @@ def with_db(coro: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
         logger = get_heavyiq_logger()
         async with heavydb_context(db):  # type: ignore
             try:
-                response = await coro(request.dict(), config={"callbacks": [LogFileCallbackHandler(logger=logger)]})
+                request_dict = request if isinstance(request, dict) else request.dict()
+                response = await coro(request_dict, config={"callbacks": [LogFileCallbackHandler(logger=logger)]})
             except Exception as e:
                 raise e
             else:

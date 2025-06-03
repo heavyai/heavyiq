@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HeavyIQ Chat</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
+    <style>
+      /* General Styles */
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #121212;
+        color: #fff;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        justify-content: center;
+        align-items: center;
+      }
+
+      /* Chat Container */
+      .chat-container {
+        width: 95%;
+        max-width: 90%;
+        height: 95vh;
+        display: flex;
+        flex-direction: column;
+        border-radius: 12px;
+        overflow: hidden;
+        background-color: #222;
+        box-shadow: 0px 4px 10px rgba(255, 255, 255, 0.1);
+      }
+
+      /* Chat Header */
+      .chat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px;
+        background: #1e1e1e;
+        font-size: 20px;
+        font-weight: bold;
+        border-bottom: 1px solid #333;
+        flex-direction: row;
+      }
+
+      /* Subtitle (Align to the Right) */
+      .chat-subtitle {
+        text-align: right;
+        font-size: 12px;
+        color: #ccc;
+        font-weight: normal;
+        line-height: 1.4;
+        margin-right: 10px;
+        padding: 3px 0;
+      }
+
+      /* Add spacing between database and session */
+      .db-info {
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Chat Messages */
+      .chat-box {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        scroll-behavior: smooth;
+      }
+
+      /* Ensure charts fit properly */
+      .chart-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 10px;
+        width: fit-content; /* ✅ Expands based on content */
+        height: fit-content;
+        /* max-width: 1100px; /* Prevents excessive expansion */
+        /* max-height: 1100px; */ */
+        border: 1px solid #ccc;
+        transition: all 0.3s ease-in-out;
+      }
+
+      /* Fullscreen mode */
+      .fullscreen {
+        width: 100vw !important;
+        height: 100vh !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        background: white !important;
+        z-index: 9999 !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: auto; /* Ensures scrollability if needed */
+      }
+
+      /* Fullscreen button styling */
+      .fullscreen-toggle {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        cursor: pointer;
+        font-size: 18px;
+        border-radius: 5px;
+        z-index: 10000;
+      }
+
+      .fullscreen-toggle:hover {
+        background: rgba(0, 0, 0, 0.9);
+      }
+
+      /* Ensure Vega Chart Fits Inside the Container */
+      .chart-container > div {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: auto; /* ✅ Ensures the div size is based on chart */
+        height: auto;
+      }
+
+      /* Ensure Vega Canvas Does Not Overflow */
+      .vega-embed canvas {
+        max-width: 100% !important;
+        max-height: 100% !important;
+        width: auto !important;
+        height: auto !important;
+      }
+
+      /* Message Styles */
+      .message {
+        padding: 10px;
+        border-radius: 6px;
+        max-width: 75%;
+        word-wrap: break-word;
+        line-height: 1.4;
+        font-size: 14px;
+        font-family: "Arial", sans-serif; /* Clearer font */
+      }
+
+      .sql-message {
+        background-color: #2a2a2a;
+        color: #0f0; /* Green SQL text */
+        font-family: "Courier New", monospace;
+        font-size: 14px;
+        padding: 10px;
+        border-left: 4px solid #0f0; /* Left green border for SQL */
+        white-space: pre-wrap; /* Keeps formatting */
+      }
+
+      .user {
+        background-color: #007aff;
+        align-self: flex-end;
+        text-align: right;
+      }
+
+      .bot {
+        background-color: #444;
+        align-self: flex-start;
+      }
+
+      /* Input Area */
+      .input-container {
+        display: flex;
+        padding: 12px;
+        background-color: #1e1e1e;
+        border-top: 1px solid #333;
+      }
+
+      input {
+        flex: 1;
+        padding: 12px;
+        border: none;
+        border-radius: 5px;
+        font-size: 16px;
+        outline: none;
+        background-color: #333;
+        color: white;
+      }
+
+      button {
+        background-color: #007aff;
+        border: none;
+        color: white;
+        padding: 12px 15px;
+        margin-left: 10px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+
+      button:hover {
+        background-color: #005ecb;
+      }
+
+      /* Spinner Container */
+      .spinner-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 10px;
+      }
+
+      /* Animated Spinner */
+      .spinner {
+        width: 25px;
+        height: 25px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #007aff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      /* Keyframes for Spinner Animation */
+      @keyframes spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .error-message {
+        background-color: #ffebee;
+        color: #d32f2f;
+        font-family: "Arial", sans-serif;
+        border-left: 4px solid #d32f2f;
+        padding: 10px;
+        margin-top: 10px;
+        max-width: 80%;
+        word-wrap: break-word;
+      }
+
+      .error-message pre {
+        background-color: #f8f9fa;
+        padding: 5px;
+        border-radius: 4px;
+        overflow-x: auto;
+        font-size: 12px;
+      }
+
+      .warning-message {
+        background-color: #fff3cd;
+        color: #856404;
+        font-family: "Arial", sans-serif;
+        border-left: 4px solid #856404;
+        padding: 10px;
+        margin-top: 10px;
+        max-width: 80%;
+        word-wrap: break-word;
+      }
+
+      .warning-message pre {
+        background-color: #f8f9fa;
+        padding: 5px;
+        border-radius: 4px;
+        overflow-x: auto;
+        font-size: 12px;
+      }
+
+      /* Disabled button styling */
+      #send-button:disabled {
+        background-color: #d3d3d3; /* Gray */
+        color: #666; /* Dark gray text */
+        cursor: not-allowed;
+      }
+
+      /* Ensure the Chart Resizes on Smaller Screens */
+      @media (max-width: 900px) {
+        .chat-container {
+          width: 95%;
+        }
+
+        .chart-container {
+          max-width: 100%;
+          max-height: 600px; /* Limit height on mobile */
+        }
+      }
+
+      /* Responsive Design */
+      @media (max-width: 600px) {
+        .chat-container {
+          width: 95%;
+          height: 90vh;
+        }
+
+        input {
+          font-size: 14px;
+        }
+
+        button {
+          padding: 10px 14px;
+        }
+        .chart-container {
+          max-width: 100%;
+          max-height: 500px;
+        }
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+  </head>
+  <body>
+    <div class="chat-container">
+      <!-- Chat Header -->
+      <div class="chat-header">
+        <span>HeavyIQ Chat</span>
+        <div class="chat-subtitle" id="chat-subtitle">
+          <div class="db-info">Connecting...</div>
+        </div>
+      </div>
+
+      <!-- Chat Messages -->
+      <div class="chat-box" id="chat-box"></div>
+
+      <!-- Input Box -->
+      <div class="input-container">
+        <input
+          type="text"
+          id="message"
+          placeholder="Type your message..."
+          onkeypress="handleKeyPress(event)"
+        />
+        <button id="send-button" onclick="sendMessage()">
+          <span id="send-text">Send</span>
+          <span id="loading-spinner" style="display: none">⏳</span>
+        </button>
+      </div>
+    </div>
+
+    <script>
+      // Dynamically construct WebSocket URL
+      let wsProtocol =
+        window.location.protocol === "https:" ? "wss://" : "ws://";
+      let wsHost = window.location.host; // Gets host + port (e.g., 127.0.0.1:8000)
+      let socket = new WebSocket(`${wsProtocol}${wsHost}/chat/ws`);
+      let sessionId = null;
+
+      socket.onopen = function () {
+        console.log("✅ WebSocket connected!");
+      };
+      socket.onclose = function () {
+        document.getElementById("chat-subtitle").innerHTML = `
+                    <div class="db-info">
+                        <div>❌ <strong>Disconnected from WebSocket server</strong></div>
+                    </div>
+                `;
+        console.log("❌ Disconnected from WebSocket server");
+      };
+      socket.onmessage = function (event) {
+        let data = JSON.parse(event.data);
+        // Remove loading spinner when response arrives
+        removeLoadingSpinner();
+        if (data.type === "processing") {
+          showLoadingSpinner();
+        } else if (data.type === "session") {
+          sessionId = data.session;
+          document.getElementById("chat-subtitle").innerHTML = `
+                    <div class="db-info">
+                        <div>🔗 <strong>Database:</strong> ${data.database}</div>
+                        <div>🆔 <strong>Session:</strong> ${data.session}</div>
+                    </div>
+                `;
+        } else if (data.type === "chart") {
+          embedChart(data.message, data.new);
+        } else if (data.type === "sql") {
+          appendSQLMessage(data.message);
+        } else {
+          appendMessage(data.message, "bot");
+        }
+      };
+
+      function keepTopNValues(vegaSpec, N = 30) {
+        // 30 values should be passed to the prompt
+        // Clone the object to avoid modifying the original
+        let newSpec = JSON.parse(JSON.stringify(vegaSpec));
+
+        // Keep only the first N values
+        if (newSpec.data && Array.isArray(newSpec.data.values)) {
+          newSpec.data.values = newSpec.data.values.slice(0, N);
+        }
+
+        return newSpec;
+      }
+
+      function embedChart(chartSpec, isnew) {
+        console.log(JSON.stringify(chartSpec));
+        let chatBox = document.querySelector(".chat-box");
+
+        // Create a unique container for each chart
+        let chartId = `chart-container-${Date.now()}`;
+
+        let chartDiv = document.createElement("div");
+        chartDiv.className = "chart-container";
+        chartDiv.style.position = "relative";
+        // Append chart outside .chat-box
+        chatBox.appendChild(chartDiv);
+
+        let chartInnerDiv = document.createElement("div");
+        chartInnerDiv.id = chartId;
+        chartInnerDiv.className = "vega-embed";
+        chartDiv.appendChild(chartInnerDiv);
+
+        // Fullscreen Button
+        let fullscreenBtn = document.createElement("button");
+        fullscreenBtn.className = "fullscreen-toggle";
+        fullscreenBtn.innerHTML = '<i class="fa fa-expand"></i>'; // Fullscreen icon
+        fullscreenBtn.onclick = function () {
+          toggleFullscreen(chartDiv, fullscreenBtn);
+        };
+        chartDiv.appendChild(fullscreenBtn);
+
+        // Capture warnings
+        let capturedWarnings = [];
+        let originalWarn = console.warn;
+        console.warn = function (...args) {
+          capturedWarnings.push(args.join(" "));
+          originalWarn.apply(console, args);
+        };
+
+        // Embed Vega-Lite chart
+        vegaEmbed(`#${chartId}`, chartSpec, { actions: false })
+          .then(() => {
+            let chartElement = document.querySelector(`#${chartId} canvas`);
+            if (chartElement) {
+              chartDiv.style.width = `${chartElement.width}px`;
+              chartDiv.style.height = `${chartElement.height}px`;
+            }
+            // Restore console.warn
+            console.warn = originalWarn;
+
+            // If warnings were captured, send them back
+            if (capturedWarnings.length > 0) {
+              showWarningMessage(capturedWarnings);
+              if (isnew) {
+                // re-send vega spec to correct only for the newly generated vega spec
+                sendWarningMessage(chartSpec, capturedWarnings);
+              }
+            } else {
+              console.log("✅ Chart rendered successfully!");
+            }
+          })
+          .catch((error) => {
+            console.error("⚠️ Vega-Lite Rendering Error:", error);
+
+            // Remove failed chart div
+            // chartDiv.remove();
+            showErrorMessage(error.message);
+            if (isnew) {
+              // Send error message back to the user or backend
+              sendErrorMessage(chartSpec, error.message);
+            }
+          });
+        // Auto-scroll to latest message
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+
+      function showErrorMessage(errorMsg) {
+        let chatBox = document.getElementById("chat-box");
+        let errorDiv = document.createElement("div");
+        errorDiv.className = "message bot error-message";
+        errorDiv.innerHTML = `
+            <strong>⚠️ Chart Rendering Failed!</strong><br>
+            ${errorMsg}<br>
+        `;
+        chatBox.appendChild(errorDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+
+      // Function to toggle fullscreen mode
+      function toggleFullscreen(chartDiv, btn) {
+        if (chartDiv.classList.contains("fullscreen")) {
+          chartDiv.classList.remove("fullscreen");
+          btn.innerHTML = '<i class="fa fa-expand"></i>'; // Switch to expand icon
+        } else {
+          chartDiv.classList.add("fullscreen");
+          btn.innerHTML = '<i class="fa fa-compress"></i>'; // Switch to minimize icon
+        }
+      }
+
+      function showWarningMessage(warnings) {
+        let chatBox = document.getElementById("chat-box");
+        let warningDiv = document.createElement("div");
+        warningDiv.className = "message bot warning-message";
+        warningDiv.innerHTML = `
+            <strong>⚠️ Chart Rendered with Warnings!</strong><br>
+            ${warnings.map((w) => `<div>➜ ${w}</div>`).join("")}
+        `;
+        chatBox.appendChild(warningDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+
+      function sendErrorMessage(failedSpec, errorMsg) {
+        showLoadingSpinner();
+        socket.send(
+          JSON.stringify({
+            type: "chart_error",
+            errors: errorMsg,
+            spec: failedSpec,
+          })
+        );
+      }
+
+      function sendWarningMessage(failedSpec, warnings) {
+        showLoadingSpinner();
+        socket.send(
+          JSON.stringify({
+            type: "chart_warning",
+            warnings: warnings,
+            spec: failedSpec,
+          })
+        );
+      }
+
+      function sendMessage() {
+        let input = document.getElementById("message");
+        if (!input.value.trim()) return;
+
+        appendMessage(input.value, "user");
+
+        // Show loading state
+        showLoadingSpinner();
+        socket.send(input.value);
+        input.value = "";
+      }
+
+      function appendMessage(text, sender) {
+        let chatBox = document.getElementById("chat-box");
+        let message = document.createElement("div");
+        message.className = `message ${sender}`;
+        message.innerText = text;
+        chatBox.appendChild(message);
+
+        // Auto-scroll to the latest message
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+
+      function appendSQLMessage(text) {
+        let chatBox = document.getElementById("chat-box");
+        let message = document.createElement("div");
+        message.className = `message bot sql-message`;
+        message.innerText = text;
+        chatBox.appendChild(message);
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+
+      function disableSend() {
+        document.getElementById("send-button").disabled = true;
+      }
+
+      function enableSend() {
+        document.getElementById("send-button").disabled = false;
+      }
+
+      function showLoadingSpinner() {
+        // disable send button
+        disableSend();
+        let chatBox = document.getElementById("chat-box");
+
+        let spinnerDiv = document.createElement("div");
+        spinnerDiv.className = "message bot spinner-container";
+        spinnerDiv.innerHTML = `<div class="spinner"></div>`;
+        spinnerDiv.id = "loading-spinner"; // Set an ID to remove it later
+
+        chatBox.appendChild(spinnerDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+
+      function removeLoadingSpinner() {
+        let spinner = document.getElementById("loading-spinner");
+        if (spinner) {
+          spinner.remove();
+        }
+        enableSend();
+      }
+
+      function handleKeyPress(event) {
+        if (event.key === "Enter") {
+          sendMessage();
+        }
+      }
+    </script>
+  </body>
+</html>

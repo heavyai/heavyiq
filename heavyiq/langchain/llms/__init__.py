@@ -7,8 +7,6 @@ import requests
 from cachetools import LRUCache, TTLCache, cached
 from langchain.chat_models.base import BaseChatModel
 from langchain.llms.base import BaseLLM
-from langchain_openai.chat_models import AzureChatOpenAI, ChatOpenAI
-from langchain_openai.llms import AzureOpenAI
 
 from heavyiq.config import get_config
 from heavyiq.logging_utils import get_heavyiq_logger
@@ -26,6 +24,8 @@ class LLMType(Enum):
     NL_TO_SQL_GEN = "nl_to_sql_gen"  # nl to sql gen model used to multiple sql queries
     NL_TO_SQL_ERROR = "nl_to_sql_error"
     NL_TO_SQL_COT_ERROR = "nl_to_sql_cot_error"
+    NL_TO_VEGA_LITE = "nl_to_vega_lite"
+    NL_TO_VEGA_LITE_ERROR = "nl_to_vega_lite_error"
     SQL_TO_ANSWER = "sql_to_answer"
     NL_TO_TABLES = "nl_to_tables"
     TABLES_TO_QUESTIONS = "tables_to_questions"
@@ -233,6 +233,8 @@ def get_openai_llm_by_model_name(model: str, **kwargs) -> BaseLLM | BaseChatMode
 
 
 def _get_openai_llm(model: str, **kwargs) -> BaseLLM:
+    from langchain_openai.llms import AzureOpenAI
+
     config = get_config()
     if config.custom_llm_type == "AZURE":
         return AzureOpenAI(
@@ -248,6 +250,8 @@ def _get_openai_llm(model: str, **kwargs) -> BaseLLM:
 
 
 def _get_openai_chat_llm(model: str, **kwargs) -> BaseChatModel:
+    from langchain_openai.chat_models import AzureChatOpenAI, ChatOpenAI
+
     config = get_config()
     if config.custom_llm_type == "AZURE":
         return AzureChatOpenAI(
@@ -274,6 +278,8 @@ def azure_model_to_openai(model: str) -> str:
 
 
 def get_chat_llm(model: str, **kwargs) -> BaseChatModel:
+    from langchain_openai.chat_models import AzureChatOpenAI, ChatOpenAI
+
     config = get_config()
     if config.custom_llm_type is not None:
         if config.custom_llm_type == "AZURE":
@@ -289,3 +295,18 @@ def get_chat_llm(model: str, **kwargs) -> BaseChatModel:
         else:
             raise NotImplementedError("Custom LLMs are not supported for chat models yet.")
     return ChatOpenAI(model=model, openai_api_key=config.openai_api_key, **kwargs)
+
+
+def get_groq_chat_llm(temperature: int = 0, max_tokens: int | None = None) -> BaseChatModel:
+    from langchain_groq import ChatGroq
+
+    config = get_config()
+
+    return ChatGroq(
+        api_key=config.groq_api_key,  # type: ignore
+        model=config.groq_model_name,
+        temperature=temperature,
+        timeout=None,
+        max_retries=2,
+        max_tokens=max_tokens,
+    )

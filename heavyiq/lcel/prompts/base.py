@@ -12,6 +12,8 @@ from heavyiq.lcel.prompts.default import (
     DEFAULT_NL_TO_SQL_ERROR_PROMPT,
     DEFAULT_NL_TO_SQL_PROMPT,
     DEFAULT_NL_TO_TABLES_PROMPT,
+    DEFAULT_NL_TO_VEGA_LITE_SPEC_ERROR_CORRECTING_PROMPT,
+    DEFAULT_NL_TO_VEGA_LITE_SPEC_PROMPT,
     DEFAULT_SQL_TO_ANSWER_PROMPT,
     DEFAULT_TABLES_TO_QUESTIONS_PROMPT,
 )
@@ -254,6 +256,34 @@ class NLtoSQLwithCOTErrorPromptBuilder(BasePromptBuilder):
         return DEFAULT_NL_TO_SQL_COT_ERROR_PROMPT
 
 
+class NLtoVegaLitePromptBuilder(BasePromptBuilder):
+    """
+    Builds NL to Vega Lite prompt template.
+    """
+
+    @property
+    def llm_type(self) -> LLMType:
+        return LLMType.NL_TO_VEGA_LITE
+
+    @property
+    def default_prompt(self) -> tuple[str, str, str]:
+        return DEFAULT_NL_TO_VEGA_LITE_SPEC_PROMPT
+
+
+class NLtoVegaLiteErrorPromptBuilder(BasePromptBuilder):
+    """
+    Builds Vega Lite prompt template for cofrrecting the rendering the errors.
+    """
+
+    @property
+    def llm_type(self) -> LLMType:
+        return LLMType.NL_TO_VEGA_LITE_ERROR
+
+    @property
+    def default_prompt(self) -> tuple[str, str, str]:
+        return DEFAULT_NL_TO_VEGA_LITE_SPEC_ERROR_CORRECTING_PROMPT
+
+
 LLMTypeBuilderMapping: dict[LLMType, BasePromptBuilder] = {
     LLMType.NL_TO_SQL: NLtoSQLPromptBuilder(),
     LLMType.NL_TO_SQL_ERROR: NLtoSQLErrorPromptBuilder(),
@@ -264,6 +294,8 @@ LLMTypeBuilderMapping: dict[LLMType, BasePromptBuilder] = {
     LLMType.NL_TO_SQL_COT: NLtoSQLwithCOTPromptBuilder(),
     LLMType.NL_TO_SQL_COT_ERROR: NLtoSQLwithCOTErrorPromptBuilder(),
     LLMType.NL_TO_MULTIPLE_SQL_JUDGE: NLtoMultipleSQLJudgePromptBuider(),
+    LLMType.NL_TO_VEGA_LITE: NLtoVegaLitePromptBuilder(),
+    LLMType.NL_TO_VEGA_LITE_ERROR: NLtoVegaLiteErrorPromptBuilder(),
 }
 
 
