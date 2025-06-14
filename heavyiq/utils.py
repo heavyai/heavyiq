@@ -1,6 +1,7 @@
 import asyncio
 import re
 import threading
+import weakref
 from collections.abc import Awaitable
 from datetime import datetime
 from enum import Enum
@@ -116,7 +117,17 @@ class SharedDictSingleton(Generic[KT, VT]):
             manager = Manager()
             cls._instance._manager = manager  # type: ignore[attr-defined]
             cls._instance._shared_dict = manager.dict()  # type: ignore[attr-defined]
+            # Register finalizer to clean up manager on GC
+            weakref.finalize(cls._instance, cls._shutdown_manager, manager)
         return cls._instance
+
+    @staticmethod
+    def _shutdown_manager(manager: SyncManager):
+        try:
+            manager.shutdown()
+            print("Manager shut down cleanly.")
+        except Exception as e:
+            print(f"Error shutting down manager: {e}")
 
     @classmethod
     def is_instantiated(cls: type["SharedDictSingleton"]) -> bool:
