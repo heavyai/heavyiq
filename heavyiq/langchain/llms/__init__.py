@@ -86,6 +86,9 @@ def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str
     # by default n was set to 1, so no need for passing n as llm kwargs otherwise if we need to
     kwargs: dict[str, Any] = {}
     model_kwargs: dict[str, Any] = {}
+    # set seed for all model type
+    seed_value = 42
+    kwargs["seed"] = seed_value
     if config.enable_logprobs and model_type in [LLMType.NL_TO_SQL, LLMType.NL_TO_SQL_ERROR]:
         model_kwargs["logprobs"] = config.custom_llm_logprobs_limit
     if config.custom_llm_api_vllm_beam_width >= 2 and model_type in [LLMType.NL_TO_SQL, LLMType.NL_TO_SQL_ERROR]:
@@ -109,7 +112,9 @@ def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str
         model_kwargs["logprobs"] = config.custom_llm_logprobs_limit
         kwargs["n"] = 1
         kwargs["max_tokens"] = config.custom_llm_api_vllm_max_tokens
-    return kwargs, {"extra_body": model_kwargs} if model_kwargs else {}
+    if model_type == LLMType.INSTRUCT:
+        model_kwargs["use_beam_search"] = False
+    return kwargs, model_kwargs
 
 
 @cached(
@@ -201,16 +206,16 @@ def _get_custom_api_vllm_llm(model_type: LLMType, api_base: str, context_window:
     """
     # always pass immutable kwargs to the function decorated by lru_cache or otherwise you'll end up in
     # unhashable type list (ie. mutable) when passing a mutable object.
-    vllm_kwargs, model_kwargs = get_vllm_model_kwargs(model_type)
+    vllm_kwargs, extra_body = get_vllm_model_kwargs(model_type)
     model_name = get_vllm_model_name(api_base)
+    combined_kwargs = {**vllm_kwargs, **kwargs}
     return OverrideVLLMOpenAI(
         openai_api_key="nothing",
         openai_api_base=api_base,
         model=model_name,
-        model_kwargs=model_kwargs,
+        model_kwargs={"extra_body": extra_body},
         context_window=context_window,
-        **kwargs,
-        **vllm_kwargs,
+        **combined_kwargs,
     )
 
 
