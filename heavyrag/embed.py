@@ -17,12 +17,8 @@ def get_embed_model_info() -> tuple[str, int]:
     """
     from heavyiq.langchain.llms import get_vllm_max_model_len, get_vllm_model_name
 
-    with ThreadPoolExecutor() as executor:
-        future_name = executor.submit(get_vllm_model_name, CONFIG.rag_embed_server_base)
-        future_max_len = executor.submit(get_vllm_max_model_len, CONFIG.rag_embed_server_base)
-
-        model_name = future_name.result()
-        max_model_len = future_max_len.result()
+    model_name = get_vllm_model_name(CONFIG.rag_embed_server_base)
+    max_model_len = get_vllm_max_model_len(CONFIG.rag_embed_server_base)
 
     return model_name, max_model_len
 

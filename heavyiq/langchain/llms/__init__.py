@@ -41,16 +41,26 @@ def is_using_custom_trained_llm() -> bool:
 @cached(
     cache=TTLCache(maxsize=3, ttl=60 * 10)
 )  # a max of 3 unique calls can be cached at a time and each can live for 10 minutes
+def get_vllm_model_info(api_base: str) -> dict:
+    """
+    Gets the vllm model info.
+    """
+    logger, config = get_heavyiq_logger(), get_config()
+    headers = {"Authorization": f"Bearer {config.heavylm_api_key}"} if config.heavylm_api_key else None
+    logger.debug(f"Getting VLLM model info for {api_base}.")
+    response = requests.get(f"{api_base}/models", headers=headers, timeout=30)
+    response.raise_for_status()
+    model_info = response.json()["data"][0]
+    logger.debug(f"vLLM Model Info on {api_base}, {model_info}")
+    return model_info
+
+
 def get_vllm_model_name(api_base: str) -> str:
     """
     Get VLLM model name either from cache or from remote endpoint.
     """
-    logger, config = get_heavyiq_logger(), get_config()
-    headers = {"Authorization": f"Bearer {config.heavylm_api_key}"} if config.heavylm_api_key else None
-    logger.debug("Getting VLLM model name.")
-    response = requests.get(f"{api_base}/models", headers=headers, timeout=10)
-    response.raise_for_status()
-    model_name = response.json()["data"][0]["id"]
+    model_info = get_vllm_model_info(api_base)
+    model_name = model_info["id"]
 
     return model_name
 
@@ -65,19 +75,9 @@ def get_vllm_max_model_len(api_base: str) -> int:
     Returns:
         int: max_model_len of the first model
     """
-    with httpx.Client(timeout=10.0) as client:
-        resp = client.get(f"{api_base}/models")
-        resp.raise_for_status()
-        data = resp.json()
-
-        if not data.get("data"):
-            raise ValueError("No models found in /v1/models response")
-
-        first_model = data["data"][0]
-        if "max_model_len" in first_model:
-            return first_model["max_model_len"]
-
-        raise ValueError("max_model_len not found in model metadata")
+    model_info = get_vllm_model_info(api_base)
+    max_model_len = model_info.get("max_model_len")
+    return max_model_len
 
 
 @cached(cache=LRUCache(maxsize=10))

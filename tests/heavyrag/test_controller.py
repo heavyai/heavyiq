@@ -1,12 +1,10 @@
 # Test RAG controller module (unittests)
-from collections.abc import Generator
 from typing import TYPE_CHECKING
-from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
 
-from heavyiq.config import HeavyIQConfig
+from heavyiq.langchain.heavydb import HeavyDB
 
 if TYPE_CHECKING:
     from heavyrag.controller import BaseController
@@ -32,62 +30,6 @@ def facts_data() -> list:
             "Octopuses has two of the hearts pump blood to the gills, while the third pumps it to the rest of the body.",
         ),
     ]
-
-
-def delete_all_collections():
-    from heavyrag.vector_stores.chroma import get_chroma_client
-
-    client = get_chroma_client()
-
-    # List all collections
-    collections = client.list_collections()
-
-    # Loop through all collections and delete them
-    for collection in collections:
-        collection_name = collection.name
-        print(f"Deleting collection: {collection_name}")
-        client.delete_collection(collection_name)
-
-    print("All collections deleted.")
-
-
-@pytest.fixture(scope="function")
-def chroma_controller_patch(heavyiq_config: HeavyIQConfig) -> Generator["BaseController", None, None]:
-    """
-    Overrided config w.r.t chroma vectorstore
-    """
-    chroma_temp_dir = "/tmp/chroma"
-    with patch.object(heavyiq_config, "rag_vectordb_type", "chroma"), patch.object(
-        heavyiq_config, "rag_chromadb_persist_dir", chroma_temp_dir
-    ):
-        with patch("heavyrag.controller.CONFIG", heavyiq_config):
-            from heavyrag.controller import get_controller
-
-            controller = get_controller(heavyiq_config.rag_vectordb_type)
-            assert controller.persist_dir == heavyiq_config.rag_chromadb_persist_dir
-            yield controller
-    # reset collections
-    delete_all_collections()
-
-
-@pytest.fixture(scope="function")
-def faiss_controller_patch(heavyiq_config: HeavyIQConfig) -> Generator["BaseController", None, None]:
-    """
-    Overrided config w.r.t faiss vectorstore
-    """
-    faiss_temp_dir = "/tmp/faiss"
-    with patch.object(heavyiq_config, "rag_vectordb_type", "faiss"), patch.object(
-        heavyiq_config, "rag_faiss_persist_dir", faiss_temp_dir
-    ):
-        with patch("heavyrag.controller.CONFIG", heavyiq_config):
-            from heavyrag.controller import get_controller
-
-            controller = get_controller(heavyiq_config.rag_vectordb_type)
-            assert controller.persist_dir == heavyiq_config.rag_faiss_persist_dir
-            yield controller
-    # resets all index data
-    vs = controller.get_vectorstore()
-    vs.reset()
 
 
 @pytest.mark.anyio
@@ -187,3 +129,43 @@ async def test_faiss_vectorstore_passes_facts_delete(faiss_controller_patch: "Ba
     await faiss_controller_patch.delete_fact_nodes(dbname=second_dbname)
     second_nodes = await faiss_controller_patch.list_fact_nodes(second_dbname)
     assert not (second_nodes)
+
+
+@pytest.mark.anyio
+async def test_chroma_vectorstore_passes_tables_sync_and_retrieve(chroma_controller_patch: "BaseController"):
+    """
+    Test insert tables (fetching table schema, split it into chunks, create embeddings,
+    store it inside vectordb with metadata for each node) on chroma vectorstore.
+    """
+    overture_db_name, cars_db_name = "overture_wa", "cars"
+    overture_db = await HeavyDB.from_env_async(db_name=overture_db_name)
+    cars_db = await HeavyDB.from_env_async(db_name=cars_db_name)
+
+    await chroma_controller_patch.sync_table_nodes(overture_db, force=True)
+    await chroma_controller_patch.sync_table_nodes(cars_db, force=True)
+
+    overture_nodes = await chroma_controller_patch.list_table_nodes(overture_db_name)
+    car_nodes = await chroma_controller_patch.list_table_nodes(cars_db_name)
+
+    assert all(n.metadata["type"] == "table" and n.metadata["dbname"] == overture_db_name for n in overture_nodes)
+    assert all(n.metadata["type"] == "table" and n.metadata["dbname"] == cars_db_name for n in car_nodes)
+
+
+@pytest.mark.anyio
+async def test_faiss_vectorstore_passes_tables_sync_and_retrieve(faiss_controller_patch: "BaseController"):
+    """
+    Test insert tables (fetching table schema, split it into chunks, create embeddings,
+    store it inside vectordb with metadata for each node) on chroma vectorstore.
+    """
+    overture_db_name, cars_db_name = "overture_wa", "cars"
+    overture_db = await HeavyDB.from_env_async(db_name=overture_db_name)
+    cars_db = await HeavyDB.from_env_async(db_name=cars_db_name)
+
+    await faiss_controller_patch.sync_table_nodes(overture_db, force=True)
+    await faiss_controller_patch.sync_table_nodes(cars_db, force=True)
+
+    overture_nodes = await faiss_controller_patch.list_table_nodes(overture_db_name)
+    car_nodes = await faiss_controller_patch.list_table_nodes(cars_db_name)
+
+    assert all(n.metadata["type"] == "table" and n.metadata["dbname"] == overture_db_name for n in overture_nodes)
+    assert all(n.metadata["type"] == "table" and n.metadata["dbname"] == cars_db_name for n in car_nodes)
