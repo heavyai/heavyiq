@@ -3,7 +3,7 @@
 
 export INTERNALLY_RELEASED_PYHEAVYDB=false
 export INCLUDE_ALL_DEPS=false
-export HTTP_PYTHON_DEPS="https://dependencies.mapd.com/python-deps"
+export HTTP_PYTHON_DEPS="https://dependencies.heavy.ai/python-deps"
 export PKG_PATH=""
 export PYHEAVYDB_ARCHIVE=""
 
