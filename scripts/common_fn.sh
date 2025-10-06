@@ -4,6 +4,7 @@
 export INTERNALLY_RELEASED_PYHEAVYDB=false
 export INCLUDE_ALL_DEPS=false
 export HTTP_PYTHON_DEPS="https://dependencies.heavy.ai/python-deps"
+export NFS_PATH="/theHoard/export/home/www/dependencies.mapd.com"
 export PKG_PATH=""
 export PYHEAVYDB_ARCHIVE=""
 
@@ -28,6 +29,13 @@ function get_pyheavydb_for_local_install() {
   wget --continue ${HTTP_PYTHON_DEPS}/pyheavydb.whl.version
   PYHEAVYDB_ARCHIVE=$(head -n 1 pyheavydb.whl.version)
   wget --continue ${HTTP_PYTHON_DEPS}/${PYHEAVYDB_ARCHIVE}
+}
+
+function get_pyheavydb_for_NFS_install() {
+  pwd
+  cp ${NFS_PATH}/pyheavydb.whl.version .
+  PYHEAVYDB_ARCHIVE=$(head -n 1 pyheavydb.whl.version)
+  cp ${NFS_PATH}/${PYHEAVYDB_ARCHIVE} .
 }
 
 function test_for_include_all_deps() {
