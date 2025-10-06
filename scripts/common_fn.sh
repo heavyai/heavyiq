@@ -113,7 +113,8 @@ function test_for_internally_release_pyheavydb() {
     return
   fi
   # get_pyheavydb_for_local_install sets PYHEAVYDB_ARCHIVE
-  get_pyheavydb_for_local_install
+  ##get_pyheavydb_for_local_install
+  get_pyheavydb_for_NFS_install
   mkdir -p ./packages
   mv ${PYHEAVYDB_ARCHIVE} ./packages
   PKG_PATH=./packages/${PYHEAVYDB_ARCHIVE}
@@ -122,7 +123,8 @@ function test_for_internally_release_pyheavydb() {
 
 function test_and_install_local_pyheavydb() {
   # get_pyheavydb_for_local_install sets PYHEAVYDB_ARCHIVE
-  get_pyheavydb_for_local_install
+  ##get_pyheavydb_for_local_install
+  get_pyheavydb_for_NFS_install
   if [[ $INTERNALLY_RELEASED_PYHEAVYDB == "false" ]];then
     return
   fi
