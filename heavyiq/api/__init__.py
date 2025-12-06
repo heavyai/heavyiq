@@ -8,7 +8,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from heavydb.exceptions import Error as HeavyDBError  # type: ignore
-from langchain.globals import set_llm_cache
+from langchain_core.globals import set_llm_cache
 from starlette.exceptions import HTTPException
 
 from heavyiq.api.handlers import exception_handler as exh

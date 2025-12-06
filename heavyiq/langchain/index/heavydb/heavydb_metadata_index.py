@@ -2,7 +2,8 @@ from typing import Optional
 
 from chromadb.api.types import Where
 from fastapi.concurrency import run_in_threadpool
-from langchain.schema import BaseRetriever, Document
+from langchain_core.retrievers import BaseRetriever
+from langchain_core.documents import Document
 
 from heavyiq.langchain.chains import AskHeavyDBMetadataIndexChain, SQLMetadataQuestionTransformerChain
 from heavyiq.langchain.heavydb import HeavyDB

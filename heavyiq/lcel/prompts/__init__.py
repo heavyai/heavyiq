@@ -1,5 +1,5 @@
-from langchain.prompts.prompt import PromptTemplate
-from langchain.schema.runnable import ConfigurableField
+from langchain_core.prompts import PromptTemplate
+from langchain_core.runnables import ConfigurableField
 
 from heavyiq.langchain.llms import LLMType
 from heavyiq.lcel.prompts.base import get_prompt_by_llm_type

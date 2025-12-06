@@ -1,7 +1,7 @@
 # Get tables list by passing db_id/db_name and question
 
-from langchain.pydantic_v1 import BaseModel, Field
-from langchain.schema.runnable import Runnable, RunnableLambda, RunnablePassthrough
+from pydantic import BaseModel, Field
+from langchain_core.runnables import Runnable, RunnableLambda, RunnablePassthrough
 
 from heavyiq.langchain.heavydb import HeavyDB
 

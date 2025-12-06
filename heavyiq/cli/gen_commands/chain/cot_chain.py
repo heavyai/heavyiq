@@ -1,10 +1,10 @@
 # Gen command chain to generate Chain of Thoughts for the given question and gold query
 import re
 
-from langchain.chat_models.openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate, PromptTemplate
-from langchain.schema.output_parser import StrOutputParser
-from langchain.schema.runnable import ConfigurableField, RunnableLambda, RunnableParallel, RunnablePassthrough
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import ConfigurableField, RunnableLambda, RunnableParallel, RunnablePassthrough
 from langchain_core.output_parsers import JsonOutputParser
 from typing_extensions import Any
 

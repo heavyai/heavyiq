@@ -9,10 +9,10 @@ from async_lru import alru_cache
 from cachetools import LRUCache, TTLCache, cached
 from fastapi.concurrency import run_in_threadpool
 from heavydb.exceptions import TDBException
-from langchain.base_language import BaseLanguageModel
-from langchain.prompts import BaseChatPromptTemplate, BasePromptTemplate
-from langchain.schema.cache import RETURN_VAL_TYPE, BaseCache
-from langchain.schema.prompt import PromptValue
+from langchain_core.language_models import BaseLanguageModel
+from langchain_core.prompts import BaseChatPromptTemplate, BasePromptTemplate
+from langchain_core.caches import RETURN_VAL_TYPE, BaseCache
+from langchain_core.prompt_values import PromptValue
 from langchain_core.tracers import langchain as langchain_tracer_module
 from langchain_core.tracers.langchain import LangChainTracer
 from langchain_core.tracers.schemas import Run

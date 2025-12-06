@@ -2,9 +2,9 @@ import logging
 import re
 from typing import Any
 
-from langchain.callbacks.tracers.logging import LoggingCallbackHandler
-from langchain.callbacks.tracers.stdout import FunctionCallbackHandler
-
+from langchain_classic.callbacks.tracers.logging import LoggingCallbackHandler
+from langchain_classic.callbacks.tracers.stdout import FunctionCallbackHandler
+from langchain_core.callbacks import BaseCallbackHandler
 from heavyiq.logging_utils import get_heavyiq_logger
 
 

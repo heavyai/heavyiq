@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from langchain.vectorstores import Chroma
-from langchain.vectorstores.base import VectorStore
+from langchain_community.vectorstores import Chroma
+from langchain_core.vectorstores import VectorStore
 
 from heavyiq.config import get_config
 

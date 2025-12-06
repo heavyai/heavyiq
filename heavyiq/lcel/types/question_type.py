@@ -1,6 +1,6 @@
 from typing import TypedDict
 
-from langchain.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 
 
 class QuestionsChainInputType(BaseModel):

@@ -9,7 +9,9 @@ import pandas as pd
 from aiocsv.readers import AsyncReader
 from aiocsv.writers import AsyncWriter
 from fastapi.concurrency import run_in_threadpool
-from langchain.schema.runnable import Runnable, RunnableConfig
+from langchain_core.runnables import Runnable, RunnableConfig
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.language_models.llms import BaseLLM
 from typing_extensions import AsyncGenerator, Sequence
 
 from heavyiq.langchain import HeavyDB

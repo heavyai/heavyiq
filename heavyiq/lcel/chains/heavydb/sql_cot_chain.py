@@ -1,6 +1,6 @@
 from typing import Any
 
-from langchain.schema.runnable import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
+from langchain_core.runnables import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.pydantic_v1 import BaseModel, Field
 
