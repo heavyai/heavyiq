@@ -1,2 +1,2 @@
 # Only used in build_prod.sh, build_prod_rhel.sh
-pyarmor==8.3.5
+pyarmor==9.2.1
