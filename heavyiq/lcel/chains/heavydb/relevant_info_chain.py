@@ -1,9 +1,21 @@
 from langchain_core.runnables import Runnable, RunnableLambda
 
 from heavyiq.langchain.heavydb import get_config, get_db
-from heavyrag.chains.retrieve_facts_chain import chain as snippets_chain
 
 CONFIG = get_config()
+
+
+def _get_snippets_chain():
+    """Lazy load snippets_chain to avoid ChromaDB initialization during module import."""
+    from heavyrag.chains.retrieve_facts_chain import chain as snippets_chain
+    return snippets_chain
+
+
+async def _run_snippets(inputs: dict) -> dict:
+    """Async runner to ensure coroutine chains are awaited properly."""
+    chain = _get_snippets_chain()
+    # Prefer async invocation to avoid TypeError when chain is coroutine-based
+    return await chain.ainvoke(inputs)  # type: ignore
 
 
 async def get_collection_name(inputs: dict) -> str:
@@ -37,7 +49,7 @@ chain: Runnable = (
         "reranker_top_k": lambda x: CONFIG.rag_facts_reranker_top_k,
         "reranker_cutoff": lambda x: CONFIG.rag_facts_reranker_cutoff_score,
     }
-    | snippets_chain
+    | RunnableLambda(_run_snippets)  # type: ignore
     | form_relevant_info
 )
 # Sample Chain Output

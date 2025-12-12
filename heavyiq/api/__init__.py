@@ -26,6 +26,7 @@ from heavyiq.langchain.exceptions import (
 from heavyiq.langchain.utils import InMemoryLLMCache, enable_telemetrics_for_free_edition, init_telemetrics
 from heavyiq.logging_utils import get_heavyiq_logger, init_logs
 from heavyiq.utils import SharedDictSingleton
+from heavyiq import shared_state
 
 
 def stripped_down_api() -> FastAPI:
@@ -50,21 +51,44 @@ def rag_initialize():
 
 def app_initialize(config: HeavyIQConfig, config_path: str):
     """
-    App initialization code which get excuted before gunicorn process fork upon using `--preload` option.
+    App initialization code which gets executed before gunicorn process fork upon using `--preload` option.
+    
+    With --preload, this runs BEFORE Gunicorn's on_starting hook, so we start the
+    shared state manager here to ensure it's available before storing any data.
     """
+    import os
     from heavyiq.langchain.heavydb import HeavyDB
     from heavyiq.langchain.utils import initialize_tokenizer
 
     logger = get_heavyiq_logger()
-    logger.info("Allocating Shared Dict....")
-    # shared manager
-    instance = SharedDictSingleton()
-    instance.sput(SharedDictSingleton.Keys.ConfFilePath.name, config_path)
-    logger.info(f"Shared Manager PID: {instance._manager._process.pid}")
+    
+    # Start shared state manager FIRST, before storing any data.
+    # This must happen before any shared_state.put() calls.
+    # In standalone mode (uvicorn), this will be a no-op and auto-init will use local dict.
+    try:
+        shared_state.start_manager()
+        logger.info(f"Started shared state manager at {shared_state.get_manager_info()['manager_address']}")
+    except Exception as e:
+        logger.warning(f"Could not start shared state manager: {e}. Using standalone mode.")
+        shared_state.init_standalone()
+    
+    # Store config path in shared state
+    logger.info("Storing config path in shared state...")
+    shared_state.put(shared_state.SharedStateKeys.ConfFilePath.name, config_path)
+    
+    # Also store in environment as backup
+    os.environ["HEAVYIQ_CONFIG_PATH"] = config_path
+    
+    manager_info = shared_state.get_manager_info()
+    if manager_info["is_standalone"]:
+        logger.info("Running in standalone mode (no shared manager)")
+    else:
+        logger.info(f"Using shared manager at {manager_info['manager_address']}")
 
-    # always create a HeavyDB's multiprocessing.Manager instance (which was being used for shared cache) before gunicorn process fork
-    # if we let it to happen on each worker process at the time of http request then
-    # we might endup in request pending issue.
+    # Initialize all caches before Gunicorn fork.
+    # These use shared_state internally for cross-process sharing.
+    from heavyiq.utils import TablesCache
+    TablesCache.initialize()
     HeavyDB.initialize()
     initialize_tokenizer()
 
@@ -76,7 +100,9 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
         # not in the worker process  otherise we might endup in worker process reload.
         if config.rag_vectordb_type == "faiss":
             import faiss
-        rag_initialize()
+        # Note: RAG initialization (ChromaDB) is now done in post_fork hook in gunicorn.conf.py
+        # to avoid SIGSEGV issues when using --preload flag
+        # rag_initialize() will be called after fork in each worker process
 
 
 def add_rag_db_exception_handlers(app: FastAPI) -> None:
@@ -280,7 +306,8 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
         """
         Code to be executed when application starts, ie on each worker process.
         """
-        # initialize chains and RAG
+        # Note: Chains import moved to be lazy-loaded when first needed
+        # Importing chains at startup causes SIGSEGV with --preload
         import heavyiq.lcel.chains
         from heavyiq.logging_utils import heavyiq_logger as logger
 
@@ -290,32 +317,41 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
             """
             This enables langsmith telemetrics for the free license by polling a shared multiprocessing dict.
             """
+            try:
+                max_retries, retry_count = 20, 0
+                while retry_count < max_retries:
+                    retry_count += 1
+                    await asyncio.sleep(2)
+                    try:
+                        license_edition = shared_state.get(shared_state.SharedStateKeys.HeavyDBLicenseEdition.name)
+                    except (EOFError, OSError, ConnectionError) as e:
+                        # Manager connection lost (common with --preload), skip telemetry check
+                        logger.debug(f"Shared dict unavailable: {e}")
+                        return
+                    
+                    if not license_edition:
+                        continue
 
-            shared_dict, max_retries, retry_count = SharedDictSingleton(), 20, 0
-            while retry_count < max_retries:
-                retry_count += 1
-                await asyncio.sleep(2)
-                license_edition = await shared_dict.get(SharedDictSingleton.Keys.HeavyDBLicenseEdition.name)
-                if not license_edition:
-                    continue
+                    logger.info(f"Found HeavyAI license edition, license_type: {license_edition}")
 
-                logger.info(f"Found HeavyAI license edition, license_type: {license_edition}")
-
-                if license_edition == "free":
-                    logger.info("Enabling langsmith telemetrics for free edition.")
-                    done = enable_telemetrics_for_free_edition()
-                    if done:
-                        logger.info("Successfully changed langsmith telemetrics and HeavyIQ configs for free edition.")
-                    else:
-                        logger.error("Failed to change langsmith telemetrics and HeavyIQ configs for free edition.")
-                else:
+                    if license_edition == "free":
+                        logger.info("Enabling langsmith telemetrics for free edition.")
+                        done = enable_telemetrics_for_free_edition()
+                        if done:
+                            logger.info("Successfully changed langsmith telemetrics and HeavyIQ configs for free edition.")
+                        else:
+                            logger.error("Failed to change langsmith telemetrics and HeavyIQ configs for free edition.")
+                    
                     if not _config_provided:
-                        logger.error("Config must be provided when license edition is not free")
-                        sys.exit()
-
-                break
-            else:
-                logger.error(f"Failed to check HeavyAI license edition after {max_retries*2} seconds.")
+                        if license_edition != "free":
+                            logger.error("Config must be provided when license edition is not free")
+                            sys.exit()
+                    
+                    break
+                else:
+                    logger.error(f"Failed to check HeavyAI license edition after {max_retries*2} seconds.")
+            except Exception as e:
+                logger.warning(f"Telemetry daemon error (non-fatal): {e}")
 
         # run a background task to check license_edition got cached or not
         # if yes, and it's a free edition then enable langsmith telemetry

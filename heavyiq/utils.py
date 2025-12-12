@@ -1,12 +1,9 @@
 import asyncio
 import re
 import threading
-import weakref
 from collections.abc import Awaitable
 from datetime import datetime
 from enum import Enum
-from multiprocessing import Manager
-from multiprocessing.managers import SyncManager
 from pathlib import Path
 from typing import Any, Generic, Optional, TypeVar
 from urllib.parse import urlparse
@@ -103,9 +100,21 @@ VT = TypeVar("VT")  # Value type
 
 
 class SharedDictSingleton(Generic[KT, VT]):
+    """
+    Facade over the shared_state module for backward compatibility.
+    
+    This class delegates to heavyiq.shared_state which manages the actual
+    shared state. When running under Gunicorn, shared_state uses a 
+    multiprocessing Manager started by the master process. When running
+    standalone, it uses a simple dict.
+    
+    Concurrency:
+        - Individual get/put/delete operations are atomic (serialized by manager)
+        - For compound operations (read-modify-write), use shared_state.lock()
+    
+    New code should use heavyiq.shared_state directly.
+    """
     _instance: "SharedDictSingleton[KT, VT]" = None
-    _lock: asyncio.Lock = asyncio.Lock()
-    _sync_lock: threading.Lock = threading.Lock()
 
     class Keys(Enum):
         HeavyDBLicenseEdition = "heavydb_license_edition"
@@ -114,54 +123,47 @@ class SharedDictSingleton(Generic[KT, VT]):
     def __new__(cls) -> "SharedDictSingleton":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            manager = Manager()
-            cls._instance._manager = manager  # type: ignore[attr-defined]
-            cls._instance._shared_dict = manager.dict()  # type: ignore[attr-defined]
-            # Register finalizer to clean up manager on GC
-            weakref.finalize(cls._instance, cls._shutdown_manager, manager)
         return cls._instance
 
-    @staticmethod
-    def _shutdown_manager(manager: SyncManager):
-        try:
-            manager.shutdown()
-            print("Manager shut down cleanly.")
-        except Exception as e:
-            print(f"Error shutting down manager: {e}")
+    @property
+    def _shared_dict(self) -> dict:
+        """Get the underlying shared dict from shared_state module."""
+        from heavyiq import shared_state
+        return shared_state.get_shared_dict()
 
     @classmethod
     def is_instantiated(cls: type["SharedDictSingleton"]) -> bool:
         return cls._instance is not None
 
     async def get(self, key: KT) -> Any:
-        async with self._lock:
-            return self._shared_dict.get(key)  # type: ignore
+        """Async get - individual operation is atomic."""
+        return self._shared_dict.get(key)  # type: ignore
 
     async def put(self, key: KT, value: VT) -> None:
-        async with self._lock:
-            self._shared_dict[key] = value  # type: ignore
+        """Async put - individual operation is atomic."""
+        self._shared_dict[key] = value  # type: ignore
 
     async def delete(self, key: KT) -> None:
-        async with self._lock:
-            try:
-                del self._shared_dict[key]  # type: ignore
-            except KeyError:
-                pass
+        """Async delete - individual operation is atomic."""
+        try:
+            del self._shared_dict[key]  # type: ignore
+        except KeyError:
+            pass
 
-    def sget(self, key: KT) -> Any:  # sync get where manager.Dict().get and put are atomic, thus avoids race-conditions
-        with self._sync_lock:
-            return self._shared_dict.get(key)  # type: ignore
+    def sget(self, key: KT) -> Any:
+        """Sync get - individual operation is atomic."""
+        return self._shared_dict.get(key)  # type: ignore
 
     def sput(self, key: KT, value: VT) -> None:
-        with self._sync_lock:
-            self._shared_dict[key] = value  # type: ignore
+        """Sync put - individual operation is atomic."""
+        self._shared_dict[key] = value  # type: ignore
 
     def sdelete(self, key: KT) -> None:
-        with self._sync_lock:
-            try:
-                del self._shared_dict[key]  # type: ignore
-            except KeyError:
-                pass
+        """Sync delete - individual operation is atomic."""
+        try:
+            del self._shared_dict[key]  # type: ignore
+        except KeyError:
+            pass
 
     def get_last_schema_modification_check_time(self, table: str) -> float | None:
         """
@@ -178,22 +180,36 @@ class SharedDictSingleton(Generic[KT, VT]):
 
 class LRUCache(Generic[KT, VT]):
     """
-    Implements Singleton/shared caching ie. shared cache which can be
-    accessed by any process.
+    Implements shared LRU caching that can be accessed by any process.
+    
+    Uses shared_state module for cross-process sharing when running under Gunicorn,
+    or simple Python containers when running standalone.
     """
 
-    def __init__(self, capacity: int = 100, manager: SyncManager | None = None) -> None:
+    def __init__(
+        self, 
+        capacity: int = 100, 
+        cache: dict | None = None,
+        order: list | None = None,
+    ) -> None:
+        """
+        Initialize LRU cache.
+        
+        Args:
+            capacity: Maximum number of items in cache.
+            cache: Optional pre-created dict (from shared_state.create_dict()).
+                   If None, creates using shared_state.
+            order: Optional pre-created list (from shared_state.create_list()).
+                   If None, creates using shared_state.
+        """
+        from heavyiq import shared_state
+        
         self.capacity: int = capacity
         self._lock: threading.Lock = threading.Lock()
-        if manager:
-            # this should create seperate manager processes if manager isn't passed
-            # thread safe/process-safe shared dict which holds the key, value pair
-            self.cache = manager.dict()
-            # shared list which holds the key order, ie. recently used key should be removed and appended to the last
-            self.order = manager.list()
-        else:
-            self.cache = {}  # type: ignore
-            self.order = []  # type: ignore
+        
+        # Use provided containers or create new ones from shared_state
+        self.cache = cache if cache is not None else shared_state.create_dict()
+        self.order = order if order is not None else shared_state.create_list()
 
     def get(self, key: KT) -> Optional[VT]:
         """
@@ -306,26 +322,44 @@ class LRUCache(Generic[KT, VT]):
 class TablesCache(Generic[KT, VT]):
     """
     Helps to store schema related to multiple tables in LRUCache.
+    
+    Uses lazy initialization - the cache is created on first access,
+    using shared_state for cross-process sharing.
     """
 
-    _instance: "TablesCache[KT, VT]" = None
-    _lock: threading.Lock = threading.Lock()
+    _instance: "TablesCache[KT, VT] | None" = None
+    _cache: "LRUCache[KT, VT] | None" = None
+    _init_lock: threading.Lock = threading.Lock()
+    _op_lock: threading.Lock = threading.Lock()
+    key_prefix: str = "tables_cache"
 
     def __new__(cls: type["TablesCache"]) -> "TablesCache":
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._cache = LRUCache[KT, VT](capacity=200, manager=Manager())  # type: ignore[attr-defined]
+            with cls._init_lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self) -> None:
-        # Ensure the constructor does not reinitialize the instance
-        if not hasattr(self, "_cache"):
-            self._cache: LRUCache[KT, VT]  # Define the type of cache
-        self.key_prefix = "tables_cache"
+    @classmethod
+    def _get_cache(cls) -> "LRUCache[KT, VT]":
+        """Lazy initialization of the cache."""
+        if cls._cache is None:
+            with cls._init_lock:
+                if cls._cache is None:
+                    cls._cache = LRUCache[KT, VT](capacity=200)
+        return cls._cache
 
     @property
-    def cache(self) -> LRUCache:
-        return self._instance._cache
+    def cache(self) -> "LRUCache[KT, VT]":
+        return self._get_cache()
+
+    @classmethod
+    def initialize(cls) -> None:
+        """
+        Explicitly initialize the cache.
+        Call this in app_initialize() before Gunicorn forks workers.
+        """
+        cls._get_cache()
 
     def create_cache_key_for_single_table(
         self,
@@ -357,20 +391,20 @@ class TablesCache(Generic[KT, VT]):
         """
         Helps to delete a particular cache.
         """
-        with self._lock:
+        with self._op_lock:
             self.cache.delete(key)
 
     def get(self, key: KT) -> VT | None:
-        with self._lock:
+        with self._op_lock:
             return self.cache.get(key)
 
     def put(self, key: KT, value: VT) -> None:
-        with self._lock:
+        with self._op_lock:
             return self.cache.put(key, value)
 
     def get_table_keys(self, database: str, table: str) -> list[str]:
         """
-        Get all keys releated to a table.
+        Get all keys related to a table.
         """
         return self.cache.get_key_starts_with(f"{self.key_prefix}:{database}:{table}:")
 
@@ -383,7 +417,29 @@ class TablesCache(Generic[KT, VT]):
             self.delete(key)  # type: ignore
 
 
-TABLES_CACHE = TablesCache[str, str]()
+def get_tables_cache() -> TablesCache[str, str]:
+    """
+    Get the global TablesCache instance (lazy initialization).
+    
+    This is the preferred way to access the tables cache.
+    """
+    # TablesCache is already a singleton via __new__
+    return TablesCache[str, str]()
+
+
+class _TablesCacheProxy:
+    """
+    Proxy class for backward compatibility with TABLES_CACHE module constant.
+    
+    Delegates all attribute access to the actual TablesCache singleton,
+    which is lazily initialized on first access.
+    """
+    def __getattr__(self, name: str) -> Any:
+        return getattr(get_tables_cache(), name)
+
+
+# For backward compatibility - existing code uses TABLES_CACHE.get(), TABLES_CACHE.put(), etc.
+TABLES_CACHE: TablesCache[str, str] = _TablesCacheProxy()  # type: ignore
 
 
 async def is_path_exists(path: str) -> bool:

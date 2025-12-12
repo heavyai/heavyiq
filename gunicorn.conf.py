@@ -24,19 +24,29 @@ def start_chromadb_server_process():
 
     if "CHROMADB_STARTED" not in os.environ:
         assert DB_PATH and PORT and HOST and LOG_PATH
-        # Open log file
-        log_file = open(LOG_PATH, "a")
-        # Start the ChromaDB server and redirect stdout and stderr to the log file
-        chromadb_process = subprocess.Popen(
-            ["chroma", "run", "--path", DB_PATH, "--host", HOST, "--port", str(PORT)], stdout=log_file, stderr=log_file
-        )
-        os.environ["CHROMADB_STARTED"] = "1"
-        print(
-            "Started chromadb server...\nArgs:\n--path {}\n--host {}\n--port {}\nSee logs at {}".format(
-                DB_PATH, HOST, PORT, log_file.name
+        try:
+            # Open log file
+            log_file = open(LOG_PATH, "a")
+            # Start the ChromaDB server and redirect stdout and stderr to the log file
+            chromadb_process = subprocess.Popen(
+                ["chroma", "run", "--path", DB_PATH, "--host", HOST, "--port", str(PORT)], stdout=log_file, stderr=log_file
             )
-        )
-        return True
+            os.environ["CHROMADB_STARTED"] = "1"
+            print(
+                "Started chromadb server...\nArgs:\n--path {}\n--host {}\n--port {}\nSee logs at {}".format(
+                    DB_PATH, HOST, PORT, log_file.name
+                )
+            )
+            return True
+        except FileNotFoundError as e:
+            print(f"Warning: ChromaDB 'chroma' command not found. Skipping ChromaDB server startup. Error: {e}")
+            print("You can either install ChromaDB CLI or connect to an existing ChromaDB server.")
+            os.environ["CHROMADB_STARTED"] = "1"  # Set to prevent retry
+            return False
+        except Exception as e:
+            print(f"Warning: Failed to start ChromaDB server: {e}")
+            os.environ["CHROMADB_STARTED"] = "1"  # Set to prevent retry
+            return False
 
     return False
 
@@ -103,9 +113,7 @@ def cache_license_edition_background_task(conf_file_path):
     Find and set license edition on the shared cache dict.
     """
     from heavyiq.config import get_config, get_heavydb_license_claims
-    from heavyiq.utils import SharedDictSingleton
-
-    instance = SharedDictSingleton()  # Removed type hint
+    from heavyiq import shared_state
 
     if conf_file_path:
         config = get_config(conf_file_path)
@@ -130,7 +138,7 @@ def cache_license_edition_background_task(conf_file_path):
 
     # print("Setting license edition in the shared cache, license_edition: %s" % license_edition)
 
-    instance.sput(SharedDictSingleton.Keys.HeavyDBLicenseEdition.name, license_edition)
+    shared_state.put(shared_state.SharedStateKeys.HeavyDBLicenseEdition.name, license_edition)
 
     # print("Background task cache_license_edition completed.")
 
@@ -171,9 +179,11 @@ def on_starting(server):
     What it does actually?
 
     1. Print Server Args
-    2. Checks for the license edition in background and enables langsmith tracing only for the free edition.
+    2. Start ChromaDB server if enabled
+    3. Checks for the license edition in background and enables langsmith tracing only for the free edition.
+    
+    Note: With --preload, the shared state manager is already started in app_initialize().
     """
-
     gunicorn_args = server.cfg.settings
     # print_gunicorn_args(gunicorn_args)
 
@@ -184,6 +194,20 @@ def on_starting(server):
     run_background_task_in_thread(conf_file_path)
 
 
+def post_fork(server, worker):
+    """
+    Called after a worker has been forked.
+    Reconnect to shared manager. ChromaDB/RAG will initialize lazily on first use.
+    """
+    from heavyiq import shared_state
+    
+    # Reconnect to the shared state manager created in master process
+    shared_state.connect_to_manager()
+    
+    # Note: RAG initialization (ChromaDB) is NOT done here due to SIGSEGV issues.
+    # It will be initialized lazily when first accessed in each worker.
+
+
 def post_worker_init(worker):
     import atexit
     from multiprocessing.util import _exit_function
@@ -192,16 +216,14 @@ def post_worker_init(worker):
 
 
 def on_exit(server):
-    from heavyiq.utils import SharedDictSingleton
+    from heavyiq import shared_state
 
     os.environ.pop("CHROMADB_STARTED", None)
 
-    shared_instance = SharedDictSingleton._instance  # Removed type hint
-    if shared_instance and hasattr(shared_instance, "_manager") and shared_instance._manager._state.value == 1:
-        # print("Shutting down shared instance")
-        shared_instance._manager.shutdown()
-    # print("Server exiting...")
-    # exit chromadb server
+    # Shutdown shared state manager
+    shared_state.shutdown_manager()
+    
+    # Exit chromadb server
     global chromadb_process
     if chromadb_process:
         chromadb_process.terminate()
@@ -213,5 +235,6 @@ workers_per_core = 2
 workers = 2 * cores  # overridden by passing CLI arg -w <num_workers>
 worker_class = "uvicorn.workers.UvicornWorker"
 bind = "127.0.0.1:8000"
+# preload_app enabled with lazy chain loading to avoid fork issues
 preload_app = True
 accesslog = "-"

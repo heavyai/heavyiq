@@ -1,5 +1,26 @@
 from threading import Thread
 from typing import Any, Generator
+import sys
+from types import ModuleType
+
+# Compatibility shim for langchain module reorganization
+# llama-index-llms-langchain still expects old module paths
+if "langchain.base_language" not in sys.modules:
+    import langchain_core.language_models as lc_models
+    import langchain_core.messages as lc_messages
+    
+    # Create fake modules with the classes the old package expects
+    base_language_module = ModuleType("langchain.base_language")
+    base_language_module.BaseLanguageModel = lc_models.BaseLanguageModel
+    sys.modules["langchain.base_language"] = base_language_module
+    
+    schema_module = ModuleType("langchain.schema")
+    schema_module.AIMessage = lc_messages.AIMessage
+    schema_module.HumanMessage = lc_messages.HumanMessage
+    schema_module.SystemMessage = lc_messages.SystemMessage
+    schema_module.ChatMessage = lc_messages.ChatMessage
+    schema_module.FunctionMessage = lc_messages.FunctionMessage
+    sys.modules["langchain.schema"] = schema_module
 
 from llama_index.core.base.llms.types import CompletionResponse, CompletionResponseGen
 from llama_index.core.llms.callbacks import llm_completion_callback

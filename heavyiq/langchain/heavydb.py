@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import functools
-import multiprocessing
 import re
 import weakref
 from collections.abc import AsyncGenerator, Awaitable
@@ -10,7 +9,6 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from copy import deepcopy
-from multiprocessing.managers import SyncManager
 from threading import Lock
 from typing import (Any, Callable, Iterator, NamedTuple, Optional, Sequence,
                     TypedDict)
@@ -87,13 +85,15 @@ class StringLiteralOp(TypedDict):
 class HeavyDB:
     """A heavydb database connection."""
 
-    _manager: Optional[SyncManager] = None
+    # Class-level caches shared across all instances
+    # These use shared_state internally for cross-process sharing
     _top_k_cache: Optional[LRUCache[str, str]] = None
     _sample_rows_cache: Optional[LRUCache[str, str]] = None
     _table_schema_cache: Optional[LRUCache[str, str]] = None
     _table_text_columns_count_cache: Optional[LRUCache[str, int]] = None
     _table_total_row_count_cache: Optional[LRUCache[str, int]] = None
     _timestamp_cache: Optional[LRUCache[str, str]] = None
+    _init_lock: Lock = Lock()
 
     def __init__(
         self,
@@ -171,15 +171,12 @@ class HeavyDB:
             print(f"Error on HeavyDB cleanup: {e}")
 
     @classmethod
-    def get_manager(cls: type[HeavyDB]) -> SyncManager:
-        if cls._manager is None:
-            cls._manager = multiprocessing.Manager()
-        return cls._manager
-
-    @classmethod
     def initialize(cls: type[HeavyDB]) -> None:
         """
         Initializes all the inter-process caches.
+        
+        Call this in app_initialize() before Gunicorn forks workers.
+        The caches use shared_state internally for cross-process sharing.
         """
         cls.get_top_k_cache()
         cls.get_sample_rows_cache()
@@ -191,37 +188,49 @@ class HeavyDB:
     @classmethod
     def get_top_k_cache(cls: type[HeavyDB]) -> LRUCache[str, str]:
         if cls._top_k_cache is None:
-            cls._top_k_cache = LRUCache[str, str](manager=cls.get_manager())
+            with cls._init_lock:
+                if cls._top_k_cache is None:
+                    cls._top_k_cache = LRUCache[str, str]()
         return cls._top_k_cache
 
     @classmethod
     def get_sample_rows_cache(cls: type[HeavyDB]) -> LRUCache[str, str]:
         if cls._sample_rows_cache is None:
-            cls._sample_rows_cache = LRUCache[str, str](manager=cls.get_manager())
+            with cls._init_lock:
+                if cls._sample_rows_cache is None:
+                    cls._sample_rows_cache = LRUCache[str, str]()
         return cls._sample_rows_cache
 
     @classmethod
     def get_table_schema_cache(cls: type[HeavyDB]) -> LRUCache[str, str]:
         if cls._table_schema_cache is None:
-            cls._table_schema_cache = LRUCache[str, str](manager=cls.get_manager())
+            with cls._init_lock:
+                if cls._table_schema_cache is None:
+                    cls._table_schema_cache = LRUCache[str, str]()
         return cls._table_schema_cache
 
     @classmethod
     def get_table_text_columns_count_cache(cls: type[HeavyDB]) -> LRUCache[str, int]:
         if cls._table_text_columns_count_cache is None:
-            cls._table_text_columns_count_cache = LRUCache[str, int](manager=cls.get_manager())
+            with cls._init_lock:
+                if cls._table_text_columns_count_cache is None:
+                    cls._table_text_columns_count_cache = LRUCache[str, int]()
         return cls._table_text_columns_count_cache
 
     @classmethod
     def get_table_total_row_count_cache(cls: type[HeavyDB]) -> LRUCache[str, int]:
         if cls._table_total_row_count_cache is None:
-            cls._table_total_row_count_cache = LRUCache[str, int](manager=cls.get_manager())
+            with cls._init_lock:
+                if cls._table_total_row_count_cache is None:
+                    cls._table_total_row_count_cache = LRUCache[str, int]()
         return cls._table_total_row_count_cache
 
     @classmethod
     def get_timestamp_cache(cls: type[HeavyDB]) -> LRUCache[str, str]:
         if cls._timestamp_cache is None:
-            cls._timestamp_cache = LRUCache[str, str](manager=cls.get_manager())
+            with cls._init_lock:
+                if cls._timestamp_cache is None:
+                    cls._timestamp_cache = LRUCache[str, str]()
         return cls._timestamp_cache
 
     @property

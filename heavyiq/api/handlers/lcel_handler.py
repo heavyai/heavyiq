@@ -263,7 +263,7 @@ async def handle_lcel_tables_to_questions_request(
 @with_feedback_id
 async def handle_lcel_cot_query_request(request_dict: dict, config: dict | None = None) -> COTQueryResponse | NoReturn:
     """
-    Async LCEL handler for /query request.
+    Async LCEL handler for /query/cot request.
     """
     from heavyiq.lcel.chains import sql_cot_chain
 

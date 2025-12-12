@@ -85,10 +85,10 @@ def get_vllm_model_kwargs(model_type: LLMType) -> tuple[dict[str, Any], dict[str
     config = get_config()
     # by default n was set to 1, so no need for passing n as llm kwargs otherwise if we need to
     kwargs: dict[str, Any] = {}
-    model_kwargs: dict[str, Any] = {}
     # set seed for all model type
     seed_value = 42
-    kwargs["seed"] = seed_value
+    model_kwargs: dict[str, Any] = {"seed": seed_value}
+    # set seed for all model type
     if config.enable_logprobs and model_type in [LLMType.NL_TO_SQL, LLMType.NL_TO_SQL_ERROR]:
         model_kwargs["logprobs"] = config.custom_llm_logprobs_limit
     if config.custom_llm_api_vllm_beam_width >= 2 and model_type in [LLMType.NL_TO_SQL, LLMType.NL_TO_SQL_ERROR]:
@@ -191,13 +191,18 @@ def _get_custom_api_llm(model_type: LLMType, api_base: str, context_window: int,
     """
     Return the corresponding LLM class for the custom llm type API.(ie. llama2)
     """
-    return OverrideOpenAI(
+    llm = OverrideOpenAI(
         openai_api_key="nothing",
         openai_api_base=api_base,
         model=f"CUSTOM_LLM_{model_type.value}",
-        context_window=context_window,
         **kwargs,
     )
+    # Assign context_window post-init to avoid constructor validation errors
+    try:
+        setattr(llm, "context_window", context_window)
+    except Exception:
+        pass
+    return llm
 
 
 def _get_custom_api_vllm_llm(model_type: LLMType, api_base: str, context_window: int, **kwargs):

@@ -1,7 +1,6 @@
 import re
 
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.beta.runnables.context import Context
 from langchain_core.runnables import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
 
 from heavyiq.langchain.heavydb import get_config, get_db
@@ -158,29 +157,29 @@ parse_output_lambda = configure_step(
 )
 
 chain: Runnable = (
-    (
-        RunnablePassthrough.assign(relevant_info_table_dict=relevant_info_lambda)
-        | RunnablePassthrough.assign(
-            snippet_ids=lambda x: x["relevant_info_table_dict"]["snippet_ids"],
-            relevant_info=lambda x: x["relevant_info_table_dict"]["relevant_info"],
-        )
-        | Context.setter("context")
-        | RunnablePassthrough.assign(table_info=get_and_retrieve_table_info_lambda, input=lambda x: x["question"])
-        | prompt
-        | model
-        | StrOutputParser()  # needed for chat models to efficiently convert chat message instance to str
-        | parse_output_lambda
-        | {"result": RunnablePassthrough(), "context": Context.getter("context")}
-        | RunnableLambda(
-            lambda x: {
-                "tables": x["result"],  # pick only the tables which got a match
-                "snippet_ids": x["context"]["snippet_ids"],
-                "relevant_info": x["context"]["relevant_info"],
-            }
+    RunnablePassthrough.assign(relevant_info_table_dict=relevant_info_lambda)
+    | RunnablePassthrough.assign(
+        snippet_ids=lambda x: x["relevant_info_table_dict"]["snippet_ids"],
+        relevant_info=lambda x: x["relevant_info_table_dict"]["relevant_info"],
+    )
+    | RunnablePassthrough.assign(
+        _parsed_tables=(
+            RunnablePassthrough.assign(table_info=get_and_retrieve_table_info_lambda, input=lambda x: x["question"])
+            | prompt
+            | model
+            | StrOutputParser()  # needed for chat models to efficiently convert chat message instance to str
+            | parse_output_lambda
         )
     )
-    .with_config(config={"tags": ["NLtoTablesChainRunnable"], "run_name": "NL to Tables Chain Runnable"})
-    .with_types(input_type=TableChainInputType, output_type=TableChainOutputType)  # type: ignore
+    | RunnableLambda(
+        lambda x: {
+            "tables": x["_parsed_tables"],  # pick only the tables which got a match
+            "snippet_ids": x["snippet_ids"],
+            "relevant_info": x["relevant_info"],
+        }
+    )
+).with_config(config={"tags": ["NLtoTablesChainRunnable"], "run_name": "NL to Tables Chain Runnable"}).with_types(
+    input_type=TableChainInputType, output_type=TableChainOutputType
 )
 tables_dict_chain = chain | RunnableLambda(lambda x: {**x, "tables": [k for k, v in x["tables"].items() if v == 1]})
 # chain which returns found tables as a list

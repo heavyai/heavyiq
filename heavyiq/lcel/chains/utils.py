@@ -26,8 +26,12 @@ def get_value_from_runnable_binding(
     Passed config would be used to prepare the default runnable of RunnableConfigurableFields instance.
     """
     if isinstance(binding, RunnableConfigurableAlternatives):
-        return binding.default
-    value = binding.bound._prepare(binding.config)  # type: ignore
+        bind_config = binding.config
+        if not bind_config:
+            return binding.default
+        value = binding._prepare(binding.config)
+    else:
+        value = binding.bound._prepare(binding.config)  # type: ignore
     if value and isinstance(value, tuple):
         actual_value, attached_config = value
         if isinstance(actual_value, RunnableConfigurableFields):
