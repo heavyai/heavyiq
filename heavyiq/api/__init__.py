@@ -1,6 +1,11 @@
+# Import faiss FIRST to avoid static TLS exhaustion error
+# See: https://github.com/facebookresearch/faiss/issues/2595
+import faiss  # noqa: F401
+
 import asyncio
 import sys
-from typing import Any
+from contextlib import asynccontextmanager
+from typing import Any, AsyncGenerator
 
 from asgi_correlation_id import CorrelationIdMiddleware
 from fastapi import FastAPI
@@ -35,17 +40,20 @@ def stripped_down_api() -> FastAPI:
     return app
 
 
+def rag_create_tables():
+    """
+    Create RAG database tables. Safe to call before fork (SQLite create_all is idempotent).
+    """
+    from heavyrag.database import ragdb
+    ragdb.create_tables()
+
+
 def rag_initialize():
     """
-    Intialize heavyrag.
+    Initialize heavyrag models and clients.
     """
     from heavyrag import initialize_rag
-    from heavyrag.database import ragdb
-
-    # initialize RAG DB
-    ragdb.create_tables()
-    # set embed model on master process in-order to avoid avoid multiprocessing.fork error
-    # initializes embedding model and chroma client
+    # initializes embedding model and vector store client
     initialize_rag()
 
 
@@ -96,13 +104,15 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
     if config.enable_llm_cache:
         set_llm_cache(InMemoryLLMCache())
     if config.enable_rag:
-        # Note: If you going to use faiss package then it should be imported in the gunicorn's master process
-        # not in the worker process  otherise we might endup in worker process reload.
-        if config.rag_vectordb_type == "faiss":
-            import faiss
-        # Note: RAG initialization (ChromaDB) is now done in post_fork hook in gunicorn.conf.py
-        # to avoid SIGSEGV issues when using --preload flag
-        # rag_initialize() will be called after fork in each worker process
+        # Always create RAG database tables before fork (idempotent, safe for SQLite)
+        logger.info("Creating RAG database tables...")
+        rag_create_tables()
+        
+        # Both FAISS and ChromaDB are initialized after fork for consistency
+        # - Gunicorn: post_fork hook initializes RAG
+        # - Uvicorn standalone: FastAPI startup event initializes RAG
+        # Note: `import faiss` is still at module level to get TLS slots first
+        logger.info(f"RAG with {config.rag_vectordb_type} will be initialized after fork/startup")
 
 
 def add_rag_db_exception_handlers(app: FastAPI) -> None:
@@ -169,6 +179,96 @@ def include_rag_routers(app: FastAPI) -> None:
 _config_provided = True
 
 
+def create_lifespan(config: HeavyIQConfig) -> Any:
+    """
+    Create a lifespan context manager for FastAPI.
+    
+    This replaces the deprecated @app.on_event("startup") and @app.on_event("shutdown") decorators.
+    """
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+        """
+        Lifespan context manager for FastAPI application.
+        
+        Startup: Initializes RAG, chains, and background tasks.
+        Shutdown: Cleans up resources.
+        """
+        # === STARTUP ===
+        import heavyiq.lcel.chains
+        from heavyiq.logging_utils import heavyiq_logger as logger
+        
+        # Initialize RAG (FAISS or ChromaDB) if not already done
+        # - Gunicorn: post_fork may have already initialized, so we check _initialized flag
+        # - Uvicorn standalone: post_fork is not called, so we initialize here
+        if config.enable_rag:
+            try:
+                from heavyrag.controller import rag_controller
+                from heavyiq.api import rag_initialize
+                
+                if not hasattr(rag_controller, '_initialized') or not rag_controller._initialized:
+                    logger.info(f"Initializing RAG with {config.rag_vectordb_type} (FastAPI lifespan startup)")
+                    rag_initialize()
+                    rag_controller._initialized = True
+                else:
+                    logger.info("RAG already initialized (skipping in FastAPI lifespan)")
+            except Exception as e:
+                logger.warning(f"RAG initialization in lifespan startup: {e}")
+        
+        async def enable_telemetrics_for_free_license_daemon():
+            """
+            This enables langsmith telemetrics for the free license by polling a shared multiprocessing dict.
+            """
+            try:
+                max_retries, retry_count = 20, 0
+                while retry_count < max_retries:
+                    retry_count += 1
+                    await asyncio.sleep(2)
+                    try:
+                        license_edition = shared_state.get(shared_state.SharedStateKeys.HeavyDBLicenseEdition.name)
+                    except (EOFError, OSError, ConnectionError) as e:
+                        logger.debug(f"Shared dict unavailable: {e}")
+                        return
+                    
+                    if not license_edition:
+                        continue
+
+                    logger.info(f"Found HeavyAI license edition, license_type: {license_edition}")
+
+                    if license_edition == "free":
+                        logger.info("Enabling langsmith telemetrics for free edition.")
+                        done = enable_telemetrics_for_free_edition()
+                        if done:
+                            logger.info("Successfully changed langsmith telemetrics and HeavyIQ configs for free edition.")
+                        else:
+                            logger.error("Failed to change langsmith telemetrics and HeavyIQ configs for free edition.")
+                    
+                    break
+                else:
+                    logger.error(f"Failed to check HeavyAI license edition after {max_retries*2} seconds.")
+            except Exception as e:
+                logger.warning(f"Telemetry daemon error (non-fatal): {e}")
+        
+        # Start background task for license edition check
+        background_task = asyncio.create_task(enable_telemetrics_for_free_license_daemon())
+        
+        logger.info("FastAPI application started")
+        
+        yield  # Application runs here
+        
+        # === SHUTDOWN ===
+        logger.info("Shutting down FastAPI worker")
+        
+        # Cancel background task to prevent cleanup errors
+        if not background_task.done():
+            background_task.cancel()
+            try:
+                await background_task
+            except asyncio.CancelledError:
+                pass  # Expected when cancelling
+    
+    return lifespan
+
+
 def create_app(config_path: str = "./config.toml") -> FastAPI:
     """
     create and return a FastAPI instance.
@@ -196,9 +296,11 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
     init_logs()  # initializes logs using config
     init_telemetrics()  # initializes langsmith
 
-    app = FastAPI(title="HeavyIQ")
-
     app_initialize(config, config_path)
+    
+    # Create lifespan context manager for startup/shutdown
+    lifespan = create_lifespan(config)
+    app = FastAPI(title="HeavyIQ", lifespan=lifespan)
 
     cors_origins = ["http://localhost"]
 
@@ -300,71 +402,6 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
             },
         )
         app.include_router(runnable_router, prefix="/runnable", tags=["runnable"])
-
-    @app.on_event("startup")
-    async def initialize():
-        """
-        Code to be executed when application starts, ie on each worker process.
-        """
-        # Note: Chains import moved to be lazy-loaded when first needed
-        # Importing chains at startup causes SIGSEGV with --preload
-        import heavyiq.lcel.chains
-        from heavyiq.logging_utils import heavyiq_logger as logger
-
-        global _config_provided
-
-        async def enable_telemetrics_for_free_license_daemon():
-            """
-            This enables langsmith telemetrics for the free license by polling a shared multiprocessing dict.
-            """
-            try:
-                max_retries, retry_count = 20, 0
-                while retry_count < max_retries:
-                    retry_count += 1
-                    await asyncio.sleep(2)
-                    try:
-                        license_edition = shared_state.get(shared_state.SharedStateKeys.HeavyDBLicenseEdition.name)
-                    except (EOFError, OSError, ConnectionError) as e:
-                        # Manager connection lost (common with --preload), skip telemetry check
-                        logger.debug(f"Shared dict unavailable: {e}")
-                        return
-                    
-                    if not license_edition:
-                        continue
-
-                    logger.info(f"Found HeavyAI license edition, license_type: {license_edition}")
-
-                    if license_edition == "free":
-                        logger.info("Enabling langsmith telemetrics for free edition.")
-                        done = enable_telemetrics_for_free_edition()
-                        if done:
-                            logger.info("Successfully changed langsmith telemetrics and HeavyIQ configs for free edition.")
-                        else:
-                            logger.error("Failed to change langsmith telemetrics and HeavyIQ configs for free edition.")
-                    
-                    if not _config_provided:
-                        if license_edition != "free":
-                            logger.error("Config must be provided when license edition is not free")
-                            sys.exit()
-                    
-                    break
-                else:
-                    logger.error(f"Failed to check HeavyAI license edition after {max_retries*2} seconds.")
-            except Exception as e:
-                logger.warning(f"Telemetry daemon error (non-fatal): {e}")
-
-        # run a background task to check license_edition got cached or not
-        # if yes, and it's a free edition then enable langsmith telemetry
-        asyncio.create_task(enable_telemetrics_for_free_license_daemon())
-
-    @app.on_event("shutdown")
-    async def shutdown():
-        """
-        Code to be executed before FastAPI application ends.
-        """
-        from heavyiq.logging_utils import heavyiq_logger as logger
-
-        logger.info("Shutting down FastAPI worker.")
 
     def custom_openapi() -> dict[str, Any]:
         if app.openapi_schema:

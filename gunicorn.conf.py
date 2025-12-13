@@ -194,18 +194,50 @@ def on_starting(server):
     run_background_task_in_thread(conf_file_path)
 
 
+def pre_fork(server, worker):
+    """
+    Called just before a worker is forked.
+    
+    Disable garbage collection to prevent importlib_metadata FreezableDefaultDict errors
+    that occur when GC runs during fork with --preload.
+    """
+    import gc
+    gc.disable()
+
+
 def post_fork(server, worker):
     """
     Called after a worker has been forked.
-    Reconnect to shared manager. ChromaDB/RAG will initialize lazily on first use.
+    Reconnect to shared manager and initialize RAG.
     """
+    import gc
+    
     from heavyiq import shared_state
+    from heavyiq.config import get_config
     
     # Reconnect to the shared state manager created in master process
     shared_state.connect_to_manager()
     
-    # Note: RAG initialization (ChromaDB) is NOT done here due to SIGSEGV issues.
-    # It will be initialized lazily when first accessed in each worker.
+    # Initialize RAG (FAISS or ChromaDB) after fork
+    # Both vector stores are now initialized after fork for consistency
+    # Note: RAG database tables are already created in master process
+    try:
+        config = get_config()
+        if config.enable_rag:
+            from heavyiq.api import rag_initialize
+            from heavyrag.controller import rag_controller
+            
+            # Mark as initialized to prevent duplicate init in FastAPI startup event
+            if not hasattr(rag_controller, '_initialized') or not rag_controller._initialized:
+                print(f"Worker {worker.pid}: Initializing RAG with {config.rag_vectordb_type} (post-fork)")
+                rag_initialize()
+                rag_controller._initialized = True
+    except Exception as e:
+        print(f"Worker {worker.pid}: Failed to initialize RAG: {e}")
+    finally:
+        # Re-enable garbage collection after fork initialization is complete
+        # (was disabled in pre_fork to prevent importlib_metadata errors)
+        gc.enable()
 
 
 def post_worker_init(worker):
@@ -213,6 +245,16 @@ def post_worker_init(worker):
     from multiprocessing.util import _exit_function
 
     atexit.unregister(_exit_function)
+
+
+def worker_exit(server, worker):
+    """
+    Called when a worker exits.
+    Clean up worker-specific resources like ChromaDB clients.
+    """
+    # ChromaDB clients are cleaned up automatically when the worker process exits
+    # SQLAlchemy engines are also cleaned up automatically
+    print(f"Worker {worker.pid}: Exiting cleanly")
 
 
 def on_exit(server):

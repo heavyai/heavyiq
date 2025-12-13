@@ -13,7 +13,6 @@ from llama_index.core.postprocessor import LLMRerank, SimilarityPostprocessor
 from llama_index.core.postprocessor.types import BaseNodePostprocessor
 from llama_index.core.prompts import BasePromptTemplate
 from llama_index.core.schema import BaseNode, MetadataMode, NodeWithScore, QueryBundle
-from llama_index.core.service_context import ServiceContext
 
 from heavyiq.config import get_config
 
@@ -265,7 +264,6 @@ class OverridedLLMRerank(LLMRerank):
         choice_batch_size: int = 10,
         format_node_batch_fn: Optional[Callable] = None,
         parse_choice_select_answer_fn: Optional[Callable] = None,
-        service_context: Optional[ServiceContext] = None,
         top_n: int = 10,
     ) -> None:
         choice_select_prompt = choice_select_prompt or RAG_RERANK_CHOICE_SELECT_PROMPT
@@ -281,7 +279,6 @@ class OverridedLLMRerank(LLMRerank):
             choice_batch_size=choice_batch_size,
             format_node_batch_fn=format_node_batch_fn,
             parse_choice_select_answer_fn=parse_choice_select_answer_fn,
-            service_context=service_context,
             top_n=top_n,
         )
 
