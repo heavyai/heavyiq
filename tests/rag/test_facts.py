@@ -3,8 +3,7 @@ from collections.abc import Generator
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
-# import faiss on test module is must or otherwise we should endup in segmentation fault error upon running tcs
-import faiss
+# Note: faiss is imported in tests/conftest.py to avoid TLS exhaustion
 import pytest
 from fastapi.exceptions import HTTPException
 from fastapi.testclient import TestClient

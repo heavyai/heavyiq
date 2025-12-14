@@ -81,19 +81,21 @@ class FaissIQVectorStore(FaissVectorStore):
             index_file: The file path for storing/loading the FAISS index.
             metadata_file: The file path for storing/loading the metadata.
         """
-        # self.dimension = dimension
-        self._persis_dir = persist_dir
-        self._metadata_store: dict = {}
-
-        self._index_file = os.path.join(persist_dir, index_file)
-        self._metadata_file = os.path.join(persist_dir, metadata_file)
-
         os.makedirs(persist_dir, exist_ok=True)  # create the persist folder
 
         index = get_faiss_index(persist_dir, dimension=dimension)
-        self.load_metadata()
 
+        # Call super().__init__ first, then set private attributes
+        # (Pydantic v2 resets __pydantic_private__ during __init__)
         super().__init__(faiss_index=index)
+
+        # Now set private attributes after super().__init__
+        self._persis_dir = persist_dir
+        self._metadata_store = {}
+        self._index_file = os.path.join(persist_dir, index_file)
+        self._metadata_file = os.path.join(persist_dir, metadata_file)
+
+        self.load_metadata()
 
     def load_metadata(self):
         """

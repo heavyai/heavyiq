@@ -20,7 +20,13 @@ async def get_nodes(
         filters=retriever._filters,
     )
     query_result = await retriever._vector_store.aquery(query, **retriever._kwargs)
-    nodes = retriever._build_node_list_from_query_result(query_result)
+    
+    # Build NodeWithScore list from query result
+    nodes: list[NodeWithScore] = []
+    if query_result.nodes:
+        similarities = query_result.similarities or [1.0] * len(query_result.nodes)
+        for node, score in zip(query_result.nodes, similarities):
+            nodes.append(NodeWithScore(node=node, score=score))
     return nodes
 
 

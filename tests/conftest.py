@@ -1,3 +1,11 @@
+# Import faiss FIRST to avoid static TLS exhaustion error
+# This must be the first import before any other heavy libraries (numpy, torch, etc.)
+# See: https://github.com/facebookresearch/faiss/issues/2595
+try:
+    import faiss  # noqa: F401
+except ImportError:
+    pass  # FAISS not installed, skip
+
 import asyncio
 import os
 import time

@@ -8,6 +8,8 @@
 #       - insert
 #       - list
 #       - delete
+from __future__ import annotations
+
 import threading
 from abc import ABC, abstractmethod
 
@@ -17,9 +19,13 @@ from llama_index.core.schema import BaseNode, Document, NodeWithScore, TextNode
 from llama_index.core.storage.docstore import SimpleDocumentStore
 from llama_index.core.vector_stores.types import BasePydanticVectorStore
 
+from typing import TYPE_CHECKING
+
 from heavyiq.config import get_config
-from heavyiq.langchain.heavydb import HeavyDB
 from heavyrag.database import FactsModel
+
+if TYPE_CHECKING:
+    from heavyiq.langchain.heavydb import HeavyDB
 from heavyrag.database.database import Database as RAGDatabase
 from heavyrag.embed import get_embed_model
 from heavyrag.filters import get_facts_filter_matches, get_table_filter_matches
@@ -44,7 +50,7 @@ class TableAbstract(ABC):
         pass
 
     @abstractmethod
-    def sync_table_nodes(self, heavydb: HeavyDB, force: bool = False):
+    def sync_table_nodes(self, heavydb: "HeavyDB", force: bool = False):
         pass
 
     async def _docs_to_nodes(self, docs: list[Document]) -> list[BaseNode]:
