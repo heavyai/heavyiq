@@ -5,10 +5,7 @@ from fastapi.concurrency import run_in_threadpool
 from langchain_core.retrievers import BaseRetriever
 from langchain_core.documents import Document
 
-from heavyiq.langchain.chains import AskHeavyDBMetadataIndexChain, SQLMetadataQuestionTransformerChain
 from heavyiq.langchain.heavydb import HeavyDB
-from heavyiq.langchain.llms import get_llm
-from heavyiq.langchain.logging import log_chain_call
 
 from ..utils import HeavyIQIndexWrapper, SearchType
 from .generate_table_documents import agenerate_table_document
@@ -65,61 +62,6 @@ class HeavyDBMetadataIndex(HeavyIQIndexWrapper):
         """
         docs = await self.asimple_search_for_table_docs(search_string, allowable_tables, **kwargs)
         return list(set([doc.metadata["source"] for doc in docs]))
-
-    def ask_about_database(
-        self,
-        question: str,
-        allowable_tables: Optional[list[str]] = None,
-        **kwargs,
-    ) -> dict[str, str]:
-        """Ask a question akin to: "Which table(s) are about [topic]?", "Which column of the [table_name] table is used for [thing]?"
-
-        Args:
-            question: Text to look up documents similar to. The table_name will be taken from the metadata of the documents.
-            allowable_tables: List of table names to search. If None, all tables will be searched.
-
-        Returns:
-            List of dict containing:
-              - answer: natural language answer
-              - tables: list[str]
-        """
-        retriever = self.as_retriever(allowable_tables=allowable_tables, **kwargs)
-        chain = AskHeavyDBMetadataIndexChain.create(retriever=retriever)
-        res: dict[str, str] = log_chain_call(chain, question, "", chain_name="ask_heavydb_metadata_index")
-        if res[chain.answer_key] == chain.no_results_answer:
-            # consider a fallback to a simple search
-            raise Exception("No relevant tables found for query: " + question)
-        return {
-            "answer": res[chain.answer_key],
-            "tables": res[chain.tables_answer_key],
-        }
-
-    def rephrase_question(self, question: str) -> str:
-        """Rephrase a question to be more like a question that this index can answer.
-
-        Args:
-            question: Question to rephrase.
-
-        Returns:
-            Rephrased question.
-        """
-        llm = get_llm(temperature=0)
-        chain = SQLMetadataQuestionTransformerChain(llm=llm)
-        return log_chain_call(chain, {chain.input_key: question}, "")[chain.output_key]
-
-    def ask_using_rephrased_question(self, question: str, **kwargs) -> dict[str, str]:
-        """Ask a question by first rephrasing the input question and then using the rephrased question to query the database.
-
-        Args:
-            question: Original question to ask the database.
-
-        Returns:
-            Dictionary containing:
-            - answer: A natural language answer to the question.
-            - tables: A list of table names relevant to the answer.
-        """
-        rephrased_question = self.rephrase_question(question)
-        return self.ask_about_database(rephrased_question, **kwargs)
 
     def reindex_table_document(self, table_name: str) -> None:
         docs = list(read_table_documents(include=[table_name]))

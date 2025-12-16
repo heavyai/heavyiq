@@ -48,16 +48,25 @@ def configure_step(runnable: Runnable, run_name: str, step: str) -> Runnable:
     Configure a runnable to act as an intermediate step.
     This function adds run_name, metadata to the runnable.
 
+    Note: We use config_factories to merge with any existing configurable settings
+    rather than replacing them (which would break LLM alternatives).
+
     Args:
         runnable: Runnable Instance
         run_name: run name
         step: step description
     """
-    runnable_with_config = runnable.with_config(
-        config={
-            "run_name": run_name,
-            "tags": ["intermediate-step"],
-            "metadata": {"step": step},
-        }
-    )
+    # Get existing config from the runnable if it has one
+    existing_config = getattr(runnable, 'config', {}) or {}
+    existing_configurable = existing_config.get('configurable', {})
+    
+    # Merge the new config with existing configurable settings
+    new_config = {
+        "run_name": run_name,
+        "tags": ["intermediate-step"],
+        "metadata": {"step": step},
+        "configurable": existing_configurable,  # Preserve existing configurable settings
+    }
+    
+    runnable_with_config = runnable.with_config(config=new_config)
     return runnable_with_config

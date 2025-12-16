@@ -1,44 +1,47 @@
-import os
 from enum import Enum
 
-from langchain_classic.indexes import VectorstoreIndexCreator
-from langchain_classic.indexes.vectorstore import VectorStoreIndexWrapper
+from langchain.indexes import VectorstoreIndexCreator
+from langchain.indexes.vectorstore import VectorStoreIndexWrapper
 from langchain_core.retrievers import BaseRetriever
 from langchain_text_splitters import TextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores.chroma import Chroma
 
 from heavyiq.config import get_config
 
-hf_model = None
+_embed_model = None
 
 
-def get_or_download_hf_model() -> HuggingFaceEmbeddings:
+def get_embed_model() -> OpenAIEmbeddings:
     """
-    Get or download hugging face embedding model.
+    Get embedding model using the custom embedding server from config.
+    Uses the same embedding server as the RAG system (rag_embed_server_base).
     """
     from heavyiq.logging_utils import get_heavyiq_logger
 
-    global hf_model
-    if hf_model:
-        return hf_model
+    global _embed_model
+    if _embed_model:
+        return _embed_model
 
     config, logger = get_config(), get_heavyiq_logger()
-    if os.path.exists(config.huggingface_model_cache_folder):
-        logger.debug("Initializing HF model embeddings from cache...")
-    else:
-        logger.debug("Downloading HF model embeddings...")
-    model_kwargs = {"device": "cpu"}
-    encode_kwargs = {"normalize_embeddings": False}
-    hf_model = HuggingFaceEmbeddings(
-        model_name=config.huggingface_embed_model,
-        cache_folder=config.huggingface_model_cache_folder,
-        multi_process=config.huggingface_embed_documents_parallel,
-        model_kwargs=model_kwargs,
-        encode_kwargs=encode_kwargs,
+    
+    if not config.rag_embed_server_base:
+        raise ValueError(
+            "rag_embed_server_base is not configured. "
+            "Please set it in your config file to use the metadata index."
+        )
+    
+    # Use the same embedding server as the RAG system
+    logger.debug(f"Initializing embeddings from {config.rag_embed_server_base}...")
+    
+    _embed_model = OpenAIEmbeddings(
+        openai_api_key="nothing",  # Custom server doesn't need real API key
+        openai_api_base=config.rag_embed_server_base,
+        model=config.rag_embed_model_name or "text-embedding",
     )
-    logger.debug("Initialized HuggingFace embeddings!")
-    return hf_model
+    
+    logger.debug("Initialized embeddings from custom server!")
+    return _embed_model
 
 
 def get_vectorstore_index_creator(persist_directory: str) -> VectorstoreIndexCreator:
@@ -49,7 +52,7 @@ def get_vectorstore_index_creator(persist_directory: str) -> VectorstoreIndexCre
     """
     return VectorstoreIndexCreator(
         vectorstore_kwargs={"persist_directory": persist_directory},
-        embedding=get_or_download_hf_model(),
+        embedding=get_embed_model(),
     )
 
 

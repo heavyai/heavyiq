@@ -7,6 +7,14 @@ import pytest
 
 from heavyiq.config import HeavyIQConfig
 
+# Re-export fixtures for test_retrieve_facts_chain.py
+from tests.fixtures.rag_fixtures import (  # noqa: F401
+    faiss_rag_controller,
+    pre_clean_table,
+    ragdb,
+    require_chromadb_server,
+)
+
 if TYPE_CHECKING:
     from heavyrag.controller import BaseController
 

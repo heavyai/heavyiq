@@ -1,27 +1,6 @@
-from threading import Thread
 from typing import Any, Generator
-import sys
-from types import ModuleType
 
-# Compatibility shim for langchain module reorganization
-# llama-index-llms-langchain still expects old module paths
-if "langchain.base_language" not in sys.modules:
-    import langchain_core.language_models as lc_models
-    import langchain_core.messages as lc_messages
-    
-    # Create fake modules with the classes the old package expects
-    base_language_module = ModuleType("langchain.base_language")
-    base_language_module.BaseLanguageModel = lc_models.BaseLanguageModel
-    sys.modules["langchain.base_language"] = base_language_module
-    
-    schema_module = ModuleType("langchain.schema")
-    schema_module.AIMessage = lc_messages.AIMessage
-    schema_module.HumanMessage = lc_messages.HumanMessage
-    schema_module.SystemMessage = lc_messages.SystemMessage
-    schema_module.ChatMessage = lc_messages.ChatMessage
-    schema_module.FunctionMessage = lc_messages.FunctionMessage
-    sys.modules["langchain.schema"] = schema_module
-
+from langchain_core.language_models.chat_models import BaseChatModel
 from llama_index.core.base.llms.types import CompletionResponse, CompletionResponseGen
 from llama_index.core.llms.callbacks import llm_completion_callback
 from llama_index.core.llms.llm import dispatcher, stream_chat_response_to_tokens, stream_completion_response_to_tokens
@@ -89,7 +68,11 @@ class OverridedLangChainLLM(LangChainLLM):
         """
         self._log_template_data(prompt, **prompt_args)
 
-        if self.metadata.is_chat_model:
+        # Check if underlying LLM is a chat model directly to avoid triggering
+        # llama_index.llms.langchain.utils import which has langchain 1.x incompatibility
+        is_chat = isinstance(self._llm, BaseChatModel)
+        
+        if is_chat:
             messages = self._get_messages(prompt, **prompt_args)
             chat_response = self.stream_chat(messages)
             stream_tokens = stream_chat_response_to_tokens(chat_response)

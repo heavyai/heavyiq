@@ -3,8 +3,8 @@ from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime
 from typing import Any, Optional
 
-from langchain_classic.agents import AgentExecutor
-from langchain_classic.chains.base import Chain
+from langchain.agents import AgentExecutor
+from langchain.chains.base import Chain
 from langchain_core.runnables import Runnable, RunnableConfig, RunnableSerializable
 from langchain_community.callbacks import OpenAICallbackHandler, get_openai_callback
 from langchain_core.tracers.context import collect_runs

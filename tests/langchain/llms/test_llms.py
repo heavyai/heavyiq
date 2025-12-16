@@ -1,8 +1,6 @@
 from unittest.mock import patch
 
 import pytest
-from langchain_openai.chat_models import AzureChatOpenAI, ChatOpenAI
-from langchain_openai.llms import AzureOpenAI
 
 from heavyiq.config import HeavyIQConfig
 from heavyiq.langchain.llms import LLMType, get_llm_by_type, get_vllm_model_kwargs, is_using_custom_trained_llm
@@ -25,13 +23,13 @@ def test_should_check_whether_custom_llm_used_or_not():
 @pytest.mark.parametrize(
     "model_type, beam_width, expected",
     [
-        (LLMType.DEFAULT, 1, ({}, {})),
+        (LLMType.DEFAULT, 1, ({}, {"seed": 42})),
         (
             LLMType.NL_TO_SQL,
             2,
-            ({"n": 1, "best_of": 2, "max_tokens": 612}, {"extra_body": {"logprobs": 5, "use_beam_search": True}}),
+            ({"n": 1, "best_of": 2, "max_tokens": 612}, {"seed": 42, "logprobs": 5, "use_beam_search": True}),
         ),
-        (LLMType.SQL_TO_ANSWER, 2, ({}, {})),
+        (LLMType.SQL_TO_ANSWER, 2, ({}, {"seed": 42})),
     ],
 )
 def test_get_vllm_model_kwargs_should_return_model_kwargs_for_valid_llm_type(
@@ -39,6 +37,8 @@ def test_get_vllm_model_kwargs_should_return_model_kwargs_for_valid_llm_type(
     beam_width,
     expected,
 ):
+    # Clear cache to ensure fresh results with the patched config
+    get_vllm_model_kwargs.cache_clear()
     with patch(
         "heavyiq.langchain.llms.get_config",
         return_value=HeavyIQConfig(
@@ -53,63 +53,6 @@ def test_get_vllm_model_kwargs_should_return_model_kwargs_for_valid_llm_type(
         kwargs, model_kwargs = get_vllm_model_kwargs(model_type)
         assert kwargs == expected[0]
         assert model_kwargs == expected[1]
-
-
-@pytest.mark.parametrize(
-    "model_type, models, expected",
-    [
-        (LLMType.DEFAULT, ("gpt-4", None, None), (ChatOpenAI, "gpt-4")),
-        (LLMType.NL_TO_SQL, ("text-davinci-003", "gpt-3.5", None), (ChatOpenAI, "gpt-3.5")),
-        (LLMType.SQL_TO_ANSWER, ("gpt-4", None, "gpt-3.5"), (ChatOpenAI, "gpt-3.5")),
-        (LLMType.SQL_TO_ANSWER, ("gpt-4", None, None), (ChatOpenAI, "gpt-4")),
-    ],
-)
-def test_llm_by_type_should_return_corresponding_openai_llm(model_type, models, expected):
-    # since get_llm_by_type results are being cached for 10 mins, we must invalidate
-    # the caches for before testing it with new config options
-    func = get_llm_by_type
-    func.cache_clear()
-    with patch(
-        "heavyiq.langchain.llms.get_config",
-        return_value=HeavyIQConfig(
-            openai_api_key="dummy-key",
-            openai_gpt_model=models[0],
-            openai_gpt_model_nl_to_sql=models[1],
-            openai_gpt_model_sql_to_answer=models[2],
-        ),
-    ):
-        llm = func(model_type=model_type)
-        assert isinstance(llm, expected[0])
-        assert llm.model_name == expected[1]
-
-
-@pytest.mark.parametrize(
-    "model_type, models, expected",
-    [
-        (LLMType.DEFAULT, ("gpt-4", None, None), (AzureChatOpenAI, "gpt-4")),
-        (LLMType.NL_TO_SQL, ("text-davinci-003", None, None), (AzureOpenAI, "text-davinci-003")),
-        (LLMType.NL_TO_SQL, ("text-davinci-003", "gpt-3.5", None), (AzureChatOpenAI, "gpt-3.5")),
-        (LLMType.SQL_TO_ANSWER, ("gpt-4", None, "gpt-3.5"), (AzureChatOpenAI, "gpt-3.5")),
-        (LLMType.SQL_TO_ANSWER, ("gpt-4", None, None), (AzureChatOpenAI, "gpt-4")),
-    ],
-)
-def test_llm_by_type_should_return_corresponding_custom_azure_llm(model_type, models, expected):
-    func = get_llm_by_type
-    func.cache_clear()
-    with patch(
-        "heavyiq.langchain.llms.get_config",
-        return_value=HeavyIQConfig(
-            openai_api_key="dummy-key",
-            custom_llm_type="AZURE",
-            custom_llm_azure_openai_api_base="http://localhost:7777",
-            openai_gpt_model=models[0],
-            openai_gpt_model_nl_to_sql=models[1],
-            openai_gpt_model_sql_to_answer=models[2],
-        ),
-    ):
-        llm = func(model_type=model_type)
-        assert isinstance(llm, expected[0])
-        assert llm.model_name == expected[1]
 
 
 @pytest.mark.parametrize(

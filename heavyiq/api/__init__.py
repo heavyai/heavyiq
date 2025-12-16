@@ -388,7 +388,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
 
     if config.enable_debug_endpoints:
         from heavyiq.api.routes.debug_router import debug_router
-        from heavyiq.api.routes.runnable_router import runnable_router
+        from heavyiq.api.routes.runnable_router import get_runnable_router
 
         app.include_router(
             debug_router,
@@ -401,7 +401,7 @@ def create_app(config_path: str = "./config.toml") -> FastAPI:
                 }
             },
         )
-        app.include_router(runnable_router, prefix="/runnable", tags=["runnable"])
+        app.include_router(get_runnable_router(), prefix="/runnable", tags=["runnable"])
 
     def custom_openapi() -> dict[str, Any]:
         if app.openapi_schema:

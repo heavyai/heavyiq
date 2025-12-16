@@ -1,5 +1,4 @@
 # Import faiss FIRST to avoid static TLS exhaustion error
-# This must be the first import before any other heavy libraries (numpy, torch, etc.)
 # See: https://github.com/facebookresearch/faiss/issues/2595
 try:
     import faiss  # noqa: F401
@@ -7,6 +6,9 @@ except ImportError:
     pass  # FAISS not installed, skip
 
 import asyncio
+
+# Register fixture modules
+pytest_plugins = ["tests.fixtures.rag_fixtures"]
 import os
 import time
 from unittest.mock import patch
@@ -19,6 +21,8 @@ from heavyiq.config import get_config
 
 def pytest_addoption(parser):
     parser.addoption("--config-path", action="store")
+    parser.addoption("--skip-faiss-preload", action="store_true",
+                     help="Skip early FAISS import (for tests that conflict with llama-index)")
 
 
 # Global variable to store the config file path

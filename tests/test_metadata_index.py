@@ -1,11 +1,32 @@
 import unittest
 from collections.abc import AsyncIterator
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 
 import pytest
+from langchain_core.documents import Document
 
 from heavyiq.langchain.index import HeavyDBMetadataIndex, aget_heavydb_index
+
+# Mark entire module as integration test (requires working embedding server)
+pytestmark = pytest.mark.integration
+
+
+async def mock_aread_table_documents(include=None):
+    """Mock table documents for testing."""
+    docs = [
+        Document(
+            page_content="usa_states table contains information about US states including population, area, and capital cities.",
+            metadata={"source": "usa_states"}
+        ),
+        Document(
+            page_content="flights_2008 table contains flight data from 2008 including delays, cancellations, and routes.",
+            metadata={"source": "flights_2008"}
+        ),
+    ]
+    for doc in docs:
+        if include is None or doc.metadata["source"] in include:
+            yield doc
 
 
 @pytest.fixture(scope="module")
@@ -13,13 +34,12 @@ async def metadata_index() -> AsyncIterator[HeavyDBMetadataIndex]:
     """
     Async metadata index fixture.
     """
-    # this should generate missing documents (only when table_documents been emptied) and then
-    # populates the index with those documents
-    # if the index already exists then the documents related to "usa_states", "flights_2008" tables
-    # gets updated
     with patch(
         "heavyiq.langchain.index.heavydb.create_index.agenerate_table_documents",
         return_value=["usa_states", "flights_2008"],
+    ), patch(
+        "heavyiq.langchain.index.heavydb.create_index.aread_table_documents",
+        side_effect=mock_aread_table_documents,
     ):
         result = await aget_heavydb_index()
         yield result

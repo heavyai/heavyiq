@@ -43,7 +43,7 @@ async def test_determine_relevant_table_names(faiss_controller_patch: "BaseContr
             question="Show me all the counties in the United States",
             heavydb=heavydb,
             force_sync=False  # Already synced above
-        )
+    )
         assert isinstance(county_names, list)
         assert "heavyai_us_counties" in county_names
 

@@ -1,0 +1,75 @@
+# HeavyIQ Server - Ubuntu 22.04 Base with Python 3.11
+#
+# Build with internal image (default):
+#   docker build -f docker/Dockerfile.ubuntu -t heavyiq:ubuntu .
+#
+# Build with fallback to public Ubuntu 22.04:
+#   docker build -f docker/Dockerfile.ubuntu --build-arg BASE_IMAGE=ubuntu:22.04 -t heavyiq:ubuntu .
+#
+# Run:
+#   docker run -p 6279:6279 -v $(pwd):/code heavyiq:ubuntu
+
+ARG BASE_IMAGE=docker-internal.mapd.com/mapd/core-build-ubuntu22.04-static-cuda12.2-x86_64-jenkins-ssh
+
+FROM ${BASE_IMAGE}
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install Python 3.11 and build dependencies
+# The internal image may already have some of these, but this ensures they exist
+RUN apt-get update && apt-get install -y \
+    software-properties-common \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y \
+    python3.11 \
+    python3.11-venv \
+    python3.11-dev \
+    python3.11-distutils \
+    python3-pip \
+    gcc \
+    g++ \
+    make \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Python 3.11 as default
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
+    update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
+
+# Install pip for Python 3.11
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
+
+# Verify Python version
+RUN python --version && python -c "import sys; assert sys.version_info[:2] == (3, 11), f'Python 3.11 required, got {sys.version}'"
+
+# Set working directory
+WORKDIR /code
+
+# Set PYTHONPATH so Python can find heavyiq and heavyrag modules
+ENV PYTHONPATH=/code
+
+# Copy requirements first for better caching
+COPY requirements.txt ./
+COPY requirements-dev.txt ./
+
+# Install Python dependencies (including test deps)
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r requirements-dev.txt
+
+# Copy entire project into /code
+COPY . /code/
+
+# Create storage directories
+RUN mkdir -p /code/storage/rag_storage/chromadb \
+    /code/storage/rag_storage/faiss \
+    /code/storage/ragdb
+
+# Expose the API port
+EXPOSE 6279
+
+# Default command - run HeavyIQ server with gunicorn
+CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:6279", "--preload", "heavyiq.api:create_app('config.toml')"]
+

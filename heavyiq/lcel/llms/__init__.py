@@ -52,34 +52,55 @@ llm_configurable_fields = {
     ),
 }
 
-llm_runnable = (
-    OpenAI(temperature=0, openai_api_key="nothing")  # type: ignore
-    .configurable_alternatives(
-        ConfigurableField(id="llm"),
-        default_key="openai",
-        nl_to_sql=partial(make_llm_configurable, LLMType.NL_TO_SQL, default_temperature=0.0, **llm_configurable_fields),  # type: ignore
-        nl_to_sql_error=partial(make_llm_configurable, LLMType.NL_TO_SQL_ERROR, default_temperature=0.0, **llm_configurable_fields),  # type: ignore
-        sql_to_answer=partial(make_llm_configurable, LLMType.SQL_TO_ANSWER, default_temperature=0.0, **llm_configurable_fields),  # type: ignore
-        nl_to_tables=partial(make_llm_configurable, LLMType.NL_TO_TABLES, default_temperature=0.0, **llm_configurable_fields),  # type: ignore
-        nl_to_multiple_sql=partial(
-            make_llm_configurable, LLMType.NL_TO_MULTIPLE_SQL, default_temperature=0.0, **llm_configurable_fields
-        ),
-        nl_to_multiple_sql_judge=partial(
-            make_llm_configurable, LLMType.NL_TO_MULTIPLE_SQL_JUDGE, default_temperature=0.0, **llm_configurable_fields
-        ),
-        tables_to_questions=partial(
-            make_llm_configurable, LLMType.TABLES_TO_QUESTIONS, default_temperature=0.0, **llm_configurable_fields
-        ),  # type: ignore
-        nl_to_sql_gen=partial(
-            make_llm_configurable, LLMType.NL_TO_SQL_GEN, default_temperature=0.0, **llm_configurable_fields
-        ),
-        default_llm=partial(make_llm_configurable, LLMType.DEFAULT, default_temperature=0.0, **llm_configurable_fields),  # type: ignore
-    )
-    .configurable_fields(
-        temperature=ConfigurableField(
-            id="llm_temperature",
-            name="LLM Temperature",
-            description="The temperature of the LLM",
+# Lazy initialization cache
+_llm_runnable = None
+
+
+def _create_llm_runnable():
+    """Create the LLM runnable with configurable alternatives."""
+    return (
+        OpenAI(temperature=0, openai_api_key="nothing")  # type: ignore
+        .configurable_alternatives(
+            ConfigurableField(id="llm"),
+            default_key="openai",
+            nl_to_sql=partial(make_llm_configurable, LLMType.NL_TO_SQL, default_temperature=0.0, **llm_configurable_fields),  # type: ignore
+            nl_to_sql_error=partial(make_llm_configurable, LLMType.NL_TO_SQL_ERROR, default_temperature=0.0, **llm_configurable_fields),  # type: ignore
+            sql_to_answer=partial(make_llm_configurable, LLMType.SQL_TO_ANSWER, default_temperature=0.0, **llm_configurable_fields),  # type: ignore
+            nl_to_tables=partial(make_llm_configurable, LLMType.NL_TO_TABLES, default_temperature=0.0, **llm_configurable_fields),  # type: ignore
+            nl_to_multiple_sql=partial(
+                make_llm_configurable, LLMType.NL_TO_MULTIPLE_SQL, default_temperature=0.0, **llm_configurable_fields
+            ),
+            nl_to_multiple_sql_judge=partial(
+                make_llm_configurable, LLMType.NL_TO_MULTIPLE_SQL_JUDGE, default_temperature=0.0, **llm_configurable_fields
+            ),
+            tables_to_questions=partial(
+                make_llm_configurable, LLMType.TABLES_TO_QUESTIONS, default_temperature=0.0, **llm_configurable_fields
+            ),  # type: ignore
+            nl_to_sql_gen=partial(
+                make_llm_configurable, LLMType.NL_TO_SQL_GEN, default_temperature=0.0, **llm_configurable_fields
+            ),
+            default_llm=partial(make_llm_configurable, LLMType.DEFAULT, default_temperature=0.0, **llm_configurable_fields),  # type: ignore
+        )
+        .configurable_fields(
+            temperature=ConfigurableField(
+                id="llm_temperature",
+                name="LLM Temperature",
+                description="The temperature of the LLM",
+            )
         )
     )
-)
+
+
+def __getattr__(name: str):
+    """Lazy loading of llm_runnable to ensure config is loaded before LLM creation."""
+    global _llm_runnable
+    if name == "llm_runnable":
+        if _llm_runnable is None:
+            _llm_runnable = _create_llm_runnable()
+        return _llm_runnable
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    """Include llm_runnable in dir() output."""
+    return list(globals().keys()) + ["llm_runnable"]

@@ -3,7 +3,7 @@ from pathlib import Path
 
 from chromadb.api import Where
 from fastapi.concurrency import run_in_threadpool
-from langchain_classic.indexes import VectorstoreIndexCreator
+from langchain.indexes import VectorstoreIndexCreator
 from langchain_core.vectorstores import VectorStore
 from langchain_community.vectorstores import Chroma
 

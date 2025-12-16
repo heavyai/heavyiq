@@ -1,26 +1,24 @@
-import os
-from collections.abc import Generator
+"""
+Integration tests for RAG retrieve facts chain.
+
+These tests require the embedding server to be running.
+
+Run with:
+    pytest tests/heavyrag/chains/test_retrieve_facts_chain.py -v -m integration --config-path config.toml
+"""
 from typing import TYPE_CHECKING
-from unittest.mock import patch
-from uuid import uuid4
 
-# Note: faiss is imported in tests/conftest.py to avoid TLS exhaustion
 import pytest
-from fastapi.exceptions import HTTPException
-from fastapi.testclient import TestClient
 
-from heavyiq.config import HeavyIQConfig
-from heavyrag.chains.retrieve_facts_chain import chain
 from tests import aoverride_config
-from tests.api.conftest import client
-from tests.fixtures.app_fixtures import session_id
-from tests.fixtures.rag_fixtures import pre_clean_table, ragdb
 
 if TYPE_CHECKING:
+    from fastapi.testclient import TestClient
+    from heavyiq.config import HeavyIQConfig
     from heavyrag.database.base import Database
 
 
-def populate_vectordb(client: TestClient, session_id: str):
+def populate_vectordb(client: "TestClient", session_id: str):
     snippets = [
         "Python is a versatile programming language used widely for web development, data analysis, and machine learning.",
         "Django is a popular Python framework for building secure and scalable web applications.",
@@ -38,14 +36,18 @@ def populate_vectordb(client: TestClient, session_id: str):
     assert res.status_code == 200
 
 
+@pytest.mark.integration
 @pytest.mark.anyio
 @aoverride_config
 async def test_rag_retrieve_snippets_chain_success(
-    heavyiq_config: HeavyIQConfig, client: TestClient, session_id: str, ragdb: "Database", pre_clean_table
+    heavyiq_config: "HeavyIQConfig", client: "TestClient", session_id: str, ragdb: "Database", pre_clean_table
 ):
     """
     Test heavyrag retrieval of nodes without any re-ranker.
+    Requires: embedding server
     """
+    from heavyrag.chains.retrieve_facts_chain import chain
+
     populate_vectordb(client=client, session_id=session_id)
     question = "Which Python libraries are used for numerical computation and data manipulation?"
     expected_answer = (
@@ -66,14 +68,18 @@ async def test_rag_retrieve_snippets_chain_success(
     assert expected_answer in [i[1] for i in retrieved_snippets]
 
 
+@pytest.mark.integration
 @pytest.mark.anyio
 @aoverride_config
 async def test_rag_retrieve_and_rerank_snippets(
-    heavyiq_config: HeavyIQConfig, client: TestClient, session_id: str, ragdb: "Database", pre_clean_table
+    heavyiq_config: "HeavyIQConfig", client: "TestClient", session_id: str, ragdb: "Database", pre_clean_table
 ):
     """
-    Test heavyrag retrieval of nodes without any re-ranker.
+    Test heavyrag retrieval of nodes with re-ranker.
+    Requires: embedding server, reranker server
     """
+    from heavyrag.chains.retrieve_facts_chain import chain
+
     populate_vectordb(client=client, session_id=session_id)
     question = "Which Python libraries are used for numerical computation and data manipulation?"
     expected_answer = (

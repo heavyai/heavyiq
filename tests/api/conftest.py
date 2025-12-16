@@ -14,7 +14,6 @@ from heavyiq.api.dependencies import (
     valid_tables_db_session,
     validate_db_session_for_table_metadata,
 )
-from heavyiq.config import HeavyIQConfig
 from heavyiq.langchain import HeavyDB
 
 from .dependencies import (
@@ -59,22 +58,32 @@ def client(config_file_path: str) -> Generator[TestClient, None, None]:
 
 
 @pytest.fixture(scope="function")
-def session_id(heavyiq_config: HeavyIQConfig) -> Generator[str, None, None]:
+def session_id(config_file_path: str) -> Generator[str, None, None]:
+    """
+    Create a real HeavyDB session for e2e tests.
+    Uses the actual config without patching.
+    """
     try:
-        # Use patch to mock the get_config function
-        with patch("heavyiq.langchain.heavydb.get_config", return_value=heavyiq_config):
-            yield HeavyDB.create_session_id()
+        # Load config to ensure HeavyDB connection uses correct host
+        from heavyiq.config import get_config
+        get_config(config_file_path)
+        yield HeavyDB.create_session_id()
     except Exception as e:
-        print(f"An error occurred during mock heavydb creation: {e}")
+        print(f"An error occurred during heavydb session creation: {e}")
         yield None
 
 
 @pytest.fixture(scope="function")
-async def asession_id(heavyiq_config: HeavyIQConfig):
+async def asession_id(config_file_path: str):
+    """
+    Create a real HeavyDB session asynchronously for e2e tests.
+    Uses the actual config without patching.
+    """
     try:
-        # Use patch to mock the get_config function
-        with patch("heavyiq.langchain.heavydb.get_config", return_value=heavyiq_config):
-            yield await HeavyDB.create_session_id_async()
+        # Load config to ensure HeavyDB connection uses correct host
+        from heavyiq.config import get_config
+        get_config(config_file_path)
+        yield await HeavyDB.create_session_id_async()
     except Exception as e:
-        print(f"An error occurred during mock heavydb creation: {e}")
+        print(f"An error occurred during heavydb session creation: {e}")
         yield None

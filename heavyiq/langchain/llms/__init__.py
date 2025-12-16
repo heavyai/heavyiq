@@ -127,7 +127,7 @@ def get_llm_by_type(model_type: LLMType, **kwargs) -> BaseLLM | BaseChatModel:
     since it makes a network call to identify vllm.model_name.
     """
     config = get_config()
-    if config.custom_llm_type is None or config.custom_llm_type == "AZURE":
+    if not config.custom_llm_type or config.custom_llm_type == "AZURE":
         openai_llm_mapping: dict[LLMType, str | None] = {
             LLMType.DEFAULT: config.openai_gpt_model,
             LLMType.NL_TO_SQL: config.openai_gpt_model_nl_to_sql,
@@ -209,13 +209,16 @@ def _get_custom_api_vllm_llm(model_type: LLMType, api_base: str, context_window:
     """
     Return the corresponding LLM class for the custom llm type API_VLLM.(ie. VLLM)
     """
+    config = get_config()
     # always pass immutable kwargs to the function decorated by lru_cache or otherwise you'll end up in
     # unhashable type list (ie. mutable) when passing a mutable object.
     vllm_kwargs, extra_body = get_vllm_model_kwargs(model_type)
     model_name = get_vllm_model_name(api_base)
     combined_kwargs = {**vllm_kwargs, **kwargs}
+    # Use heavylm_api_key if set, otherwise use "nothing" (for self-hosted VLLM without auth)
+    api_key = config.heavylm_api_key if config.heavylm_api_key else "nothing"
     return OverrideVLLMOpenAI(
-        openai_api_key="nothing",
+        openai_api_key=api_key,
         openai_api_base=api_base,
         model=model_name,
         model_kwargs={"extra_body": extra_body},

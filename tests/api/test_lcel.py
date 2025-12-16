@@ -1,15 +1,16 @@
-# Test LCEL query endpoints (integration tests)
+# Test LCEL query endpoints (e2e tests - require full app stack)
+# These tests run against the actual server without config patching
 
 import pytest
 from fastapi.testclient import TestClient
 
-from heavyiq.config import HeavyIQConfig
-from tests import aoverride_config, override_config
+
+# Mark all tests in this module as e2e (end-to-end API tests)
+pytestmark = pytest.mark.e2e
 
 
 @pytest.mark.anyio
-@aoverride_config
-async def test_should_pass_lcel_query_endpoint(heavyiq_config: HeavyIQConfig, client: TestClient, session_id: str):
+async def test_should_pass_lcel_query_endpoint(client: TestClient, session_id: str):
     """
     Test LCEL query endpoint.
     """
@@ -27,8 +28,7 @@ async def test_should_pass_lcel_query_endpoint(heavyiq_config: HeavyIQConfig, cl
 
 
 @pytest.mark.anyio
-@aoverride_config
-async def test_should_pass_lcel_question_endpoint(heavyiq_config: HeavyIQConfig, client: TestClient, session_id: str):
+async def test_should_pass_lcel_question_endpoint(client: TestClient, session_id: str):
     """
     Test LCEL question endpoint.
     """
@@ -48,8 +48,7 @@ async def test_should_pass_lcel_question_endpoint(heavyiq_config: HeavyIQConfig,
 
 
 @pytest.mark.anyio
-@aoverride_config
-async def test_should_pass_lcel_tables_endpoint(heavyiq_config: HeavyIQConfig, client: TestClient, session_id: str):
+async def test_should_pass_lcel_tables_endpoint(client: TestClient, session_id: str):
     """
     Test LCEL tables endpoint.
     """
@@ -67,8 +66,7 @@ async def test_should_pass_lcel_tables_endpoint(heavyiq_config: HeavyIQConfig, c
 
 
 @pytest.mark.anyio
-@aoverride_config
-async def test_should_pass_lcel_auto_query_endpoint(heavyiq_config: HeavyIQConfig, client: TestClient, session_id: str):
+async def test_should_pass_lcel_auto_query_endpoint(client: TestClient, session_id: str):
     """
     Test LCEL auto table query endpoint.
     """
@@ -85,10 +83,7 @@ async def test_should_pass_lcel_auto_query_endpoint(heavyiq_config: HeavyIQConfi
 
 
 @pytest.mark.anyio
-@aoverride_config
-async def test_should_pass_lcel_auto_question_endpoint(
-    heavyiq_config: HeavyIQConfig, client: TestClient, session_id: str
-):
+async def test_should_pass_lcel_auto_question_endpoint(client: TestClient, session_id: str):
     """
     Test LCEL auto table question endpoint.
     """
@@ -108,15 +103,14 @@ async def test_should_pass_lcel_auto_question_endpoint(
 
 
 @pytest.mark.anyio
-@override_config
-async def test_should_pass_lcel_answer_endpoint(heavyiq_config: HeavyIQConfig, client: TestClient, session_id: str):
+async def test_should_pass_lcel_answer_endpoint(client: TestClient, session_id: str):
     """
     Test LCEL answer endpoint.
     """
 
     payload = {
         "session_id": session_id,
-        "query": "SELECT COUNT(DISTINCT STATE_NAME) AS count_states, STATE_NAME FROM heavyai_us_states WHERE STATE_NAME LIKE 'A%' GROUP BY STATE_NAME;",
+        "query": "SELECT COUNT(DISTINCT name) AS count_states, name FROM heavyai_us_states WHERE name LIKE 'A%' GROUP BY name;",
         "question": "How many states begin with the letter A? What are they?",
         "tables": ["heavyai_us_states"],
     }
@@ -130,8 +124,7 @@ async def test_should_pass_lcel_answer_endpoint(heavyiq_config: HeavyIQConfig, c
 
 
 @pytest.mark.anyio
-@override_config
-async def test_should_pass_call_llm_endpoint(heavyiq_config: HeavyIQConfig, client: TestClient):
+async def test_should_pass_call_llm_endpoint(client: TestClient):
     """
     Test LCEL answer endpoint.
     """

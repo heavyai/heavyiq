@@ -1,7 +1,7 @@
 from typing import Any
 
-from langchain_classic.chains.qa_with_sources.retrieval import RetrievalQAWithSourcesChain
-from langchain_classic.chains.qa_with_sources.base import BaseQAWithSourcesChain
+from langchain.chains import RetrievalQAWithSourcesChain
+from langchain.chains.qa_with_sources.base import BaseQAWithSourcesChain
 from langchain_core.prompts import PromptTemplate
 
 from heavyiq.langchain.index.docs import HeavyAIDocsIndex

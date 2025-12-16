@@ -4,7 +4,7 @@ from heavyiq.api.models import QueryRequest, QuestionRequest
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.heavydb import heavydb_context
 from heavyiq.lcel.callbacks.file_callback import LogFileCallbackHandler
-from heavyiq.lcel.chains import answer_chain, sql_chain, sql_cot_chain
+# Lazy import chains inside functions to ensure config is loaded first
 from heavyiq.lcel.runnables import StreamLLMRunnableWrapper, StreamStepsRunnableWrapper
 from heavyiq.lcel.types import StepDict
 
@@ -21,6 +21,8 @@ async def streaming_query(request: QueryRequest, db: HeavyDB) -> AsyncIterator[S
     Yields:
         AsyncIterable[StepDict]: A stream of StepDict representing the query results.
     """
+    from heavyiq.lcel.chains import sql_chain
+    
     async with heavydb_context(db):
         stream_chain = StreamStepsRunnableWrapper(sql_chain)
         async for step in stream_chain.start(request.dict(), config={"callbacks": [LogFileCallbackHandler()]}):
@@ -28,6 +30,8 @@ async def streaming_query(request: QueryRequest, db: HeavyDB) -> AsyncIterator[S
 
 
 async def streaming_query_with_cot(request, db) -> AsyncIterator[StepDict]:
+    from heavyiq.lcel.chains import sql_cot_chain
+    
     async with heavydb_context(db):
         stream_chain = StreamLLMRunnableWrapper(sql_cot_chain)
         async for step in stream_chain.start(request.dict(), config={"callbacks": [LogFileCallbackHandler()]}):
@@ -38,6 +42,8 @@ async def streaming_question(request: QuestionRequest, db: HeavyDB) -> AsyncIter
     """
     Asynchronously streams a question(ie. nl to answer chain) based on the provided message.
     """
+    from heavyiq.lcel.chains import answer_chain
+    
     async with heavydb_context(db):
         stream_chain = StreamStepsRunnableWrapper(answer_chain)
         async for step in stream_chain.start(request.dict(), config={"callbacks": [LogFileCallbackHandler()]}):

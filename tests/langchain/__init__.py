@@ -3,9 +3,11 @@ from typing import Any, Optional
 from unittest.mock import patch
 
 import pytest
-from langchain.callbacks.base import Callbacks
-from langchain.callbacks.manager import CallbackManagerForLLMRun
-from langchain.schema import AIMessage, BaseMessage, ChatGeneration, ChatResult, Generation, LLMResult, PromptValue
+from langchain_core.callbacks.base import Callbacks
+from langchain_core.callbacks.manager import CallbackManagerForLLMRun
+from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.outputs import ChatGeneration, ChatResult, Generation, LLMResult
+from langchain_core.prompt_values import PromptValue
 from langchain_openai.chat_models import ChatOpenAI
 
 from heavyiq.langchain.llms.overrides import OverrideOpenAI
@@ -18,8 +20,8 @@ class FakeChatOpenAI(ChatOpenAI):
     Uses: Mainly used to test NLtoSQL chain.
     """
 
-    generation_info = {"finish_reason": "stop"}
-    content = "SELECT SUM(POPULATION) AS total_population\nFROM usa_states"
+    generation_info: dict = {"finish_reason": "stop"}
+    content: str = "SELECT SUM(POPULATION) AS total_population\nFROM usa_states"
 
     @property
     def _llm_type(self) -> str:
@@ -60,8 +62,8 @@ class FakeOpenAI(OverrideOpenAI):
     Mainly used to test NLtoAnswer chain.
     """
 
-    generation_info = {"finish_reason": "stop"}
-    content = "Total population in the USA according to the data in the usa_states table is 327514334"
+    generation_info: dict = {"finish_reason": "stop"}
+    content: str = "Total population in the USA according to the data in the usa_states table is 327514334"
 
     @property
     def _llm_type(self) -> str:

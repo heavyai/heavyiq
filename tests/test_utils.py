@@ -83,7 +83,7 @@ class TestLRUCache(unittest.TestCase):
         Always wait for all the child processes to complete before exiting the main process.
         """
         manager = multiprocessing.Manager()
-        cache = LRUCache(capacity=3, manager=manager)
+        cache = LRUCache(capacity=3, cache=manager.dict(), order=manager.list())
 
         # Create two processes
         process1 = multiprocessing.Process(target=self.process_one, args=(cache,))
@@ -130,7 +130,7 @@ class TestLRUCache(unittest.TestCase):
         In this case, we don't need to explicitly put the lock, manager.Dict (ProxyDict) automatically handles it.
         """
         manager = multiprocessing.Manager()
-        cache = LRUCache(capacity=3, manager=manager)
+        cache = LRUCache(capacity=3, cache=manager.dict(), order=manager.list())
 
         # Create two processes
         processx = multiprocessing.Process(target=self.process_x, args=(cache,))
@@ -152,9 +152,9 @@ class TestLRUCache(unittest.TestCase):
 
         class TestDB:
             # a single manager process being shared with all the caches
-            cache_top_k = LRUCache[str, str](capacity=2, manager=manager)
-            cache_table_schema = LRUCache[str, str](capacity=2, manager=manager)
-            cache_sample_rows = LRUCache[str, str](capacity=2, manager=manager)
+            cache_top_k = LRUCache[str, str](capacity=2, cache=manager.dict(), order=manager.list())
+            cache_table_schema = LRUCache[str, str](capacity=2, cache=manager.dict(), order=manager.list())
+            cache_sample_rows = LRUCache[str, str](capacity=2, cache=manager.dict(), order=manager.list())
 
             def set_top_k(self, table_name, top_k):
                 self.cache_top_k.put(table_name, top_k)

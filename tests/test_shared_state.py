@@ -428,7 +428,6 @@ class TestSharedStateManager:
         # All 500 increments should be counted
         assert shared_state.get("counter") == 500
 
-    @pytest.mark.skip(reason="Multiprocessing tests cause SIGSEGV when FAISS is loaded. Run this test in isolation: pytest tests/test_shared_state.py::TestSharedStateManager::test_concurrent_access_with_manager_multiprocess -v --config-path config.toml")
     def test_concurrent_access_with_manager_multiprocess(self):
         """
         Test concurrent access with manager mode using multiprocessing.Process.

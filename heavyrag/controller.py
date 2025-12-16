@@ -300,7 +300,9 @@ class ChromaController(BaseController):
         """
         from heavyrag.ingest import adelete_database_facts, adelete_facts_by_ids
 
-        index = self.get_index_by_collection(collection_name=dbname)
+        # Use get_or_create_index to handle case where docstore doesn't exist yet
+        vector_store = self.get_vectorstore(collection_name=dbname)
+        index = self.get_or_create_index(vector_store=vector_store)
         if not index:
             return None
         if fact_ids:

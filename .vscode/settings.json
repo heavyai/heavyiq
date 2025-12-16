@@ -1,10 +1,29 @@
 {
   "editor.formatOnSave": true,
-  "editor.rulers": [140],
-  "flake8.args": ["--config=setup.cfg"],
+  "editor.rulers": [
+    140
+  ],
+  "flake8.args": [
+    "--config=setup.cfg"
+  ],
   "workbench.preferredDarkColorTheme": "Catppuccin Macchiato",
+  "workbench.preferredLightColorTheme": "Catppuccin Latte",
   "window.zoomLevel": 0.7,
-  "flake8.path": ["${workspaceFolder}/venv/bin/python", "-m", "flake8"],
+  "flake8.path": [
+    "${workspaceFolder}/venv/bin/python",
+    "-m",
+    "flake8"
+  ],
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "terminal.integrated.profiles.linux": {
+    "bash": {
+      "path": "/bin/bash",
+      "args": [
+        "-l"
+      ],
+      "icon": "terminal-bash"
+    }
+  },
   "[python]": {
     "editor.defaultFormatter": "ms-python.black-formatter",
     "editor.formatOnSave": true,
@@ -12,14 +31,19 @@
       "source.organizeImports": "explicit"
     }
   },
-  "black-formatter.args": ["--line-length", "120"],
-  "mypy-type-checker.args": ["--config-file=setup.cfg"],
+  "black-formatter.args": [
+    "--line-length",
+    "120"
+  ],
+  "mypy-type-checker.args": [
+    "--config-file=setup.cfg"
+  ],
   "mypy-type-checker.path": [
     "${workspaceFolder}/venv/bin/python",
     "-m",
     "mypy"
   ],
-  "python.languageServer": "Pylance",
+  "python.languageServer": "None",
   "files.exclude": {
     "**/.git": true,
     "**/.svn": true,
@@ -33,6 +57,9 @@
     "**/*venv": true
   },
   "python.defaultInterpreterPath": "${workspaceFolder}/venv/bin/python",
-  "autoDocstring.docstringFormat": "google-notypes",
+  "python.condaPath": "/usr/local/mambaforge/bin/conda",
+  "python.terminal.activateEnvironment": true,
+  "python.terminal.activateEnvInCurrentTerminal": true,
+  // "python.defaultInterpreterPath": "${workspaceFolder}/venv/bin/python",
   "workbench.colorTheme": "Catppuccin Macchiato"
 }

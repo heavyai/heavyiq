@@ -263,9 +263,11 @@ class TestChromaClient:
         mock_config = MagicMock()
         mock_config.rag_chromadb_server_base = "http://localhost:8000"
 
-        with patch("heavyrag.vector_stores.chroma.CONFIG", mock_config), patch(
-            "chromadb.HttpClient"
-        ) as mock_http_client:
+        with patch("heavyrag.vector_stores.chroma.CONFIG", mock_config), \
+             patch("heavyrag.vector_stores.chroma.CHROMA_CLIENT", None), \
+             patch("heavyrag.vector_stores.chroma.get_embed_model") as mock_embed, \
+             patch("chromadb.HttpClient") as mock_http_client:
+            mock_embed.return_value = MagicMock()
             mock_client = MagicMock()
             mock_http_client.return_value = mock_client
 

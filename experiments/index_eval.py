@@ -76,12 +76,13 @@ def test_stuff(question_dicts: list[dict[str, Any]]) -> tuple[str, dict]:
         if question_dict["is_multi_table"]:
             table_set.add(question_dict["secondary_table"])
         question = question_dict["question"]
+        # NOTE: ask_about_database method has been removed (legacy chain)
+        # Use simple_search_for_table_names instead
         try:
             simple_start = datetime.now()
-            simple_res = get_heavydb_index().ask_about_database(question)
+            simple_guessed_tables = set(get_heavydb_index().simple_search_for_table_names(question))
             simple_end = datetime.now()
             simple["time_spent"] += (simple_end - simple_start).total_seconds()
-            simple_guessed_tables = set(simple_res["tables"])
             if simple_guessed_tables == table_set:
                 simple["total_exactly_correct"] += 1
             elif simple_guessed_tables.intersection(table_set) == table_set:
