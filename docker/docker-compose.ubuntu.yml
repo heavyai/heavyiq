@@ -35,8 +35,12 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
-      - OMP_NUM_THREADS=1
-      - MKL_NUM_THREADS=1
+      # FAISS threading control - set to 1 to avoid conflicts with multiprocessing/gunicorn workers
+      # These prevent over-subscription and SIGSEGV issues when using FAISS with multiple processes
+      - OMP_NUM_THREADS=1 # OpenMP threads (used by FAISS)
+      - MKL_NUM_THREADS=1 # Intel MKL threads (if MKL-backed FAISS)
+      - OPENBLAS_NUM_THREADS=1 # OpenBLAS threads (if OpenBLAS-backed FAISS)
+      - NUMEXPR_MAX_THREADS=1 # NumExpr threads
     extra_hosts:
       # Access host machine services (like heavyaiserver on port 16274)
       - "host.docker.internal:host-gateway"

@@ -1,3 +1,13 @@
+import os
+
+# Set FAISS threading environment variables BEFORE importing faiss or numpy
+# This prevents thread over-subscription and SIGSEGV issues when using
+# FAISS with multiple gunicorn workers or multiprocessing
+os.environ.setdefault("OMP_NUM_THREADS", "1")        # OpenMP threads (used by FAISS)
+os.environ.setdefault("MKL_NUM_THREADS", "1")        # Intel MKL threads (if MKL-backed FAISS)
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # OpenBLAS threads (if OpenBLAS-backed FAISS)
+os.environ.setdefault("NUMEXPR_MAX_THREADS", "1")    # NumExpr threads
+
 import faiss  # noqa: F401
 
 import asyncio
