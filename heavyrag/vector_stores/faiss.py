@@ -1,9 +1,11 @@
-import multiprocessing
+import fcntl
 import os
 import pickle
 import sys
 import threading
+import time
 from collections.abc import Sequence
+from contextlib import contextmanager
 from typing import Any, Union, cast
 
 import faiss
@@ -23,48 +25,138 @@ from llama_index.vector_stores.faiss import FaissVectorStore
 from heavyrag.logger import logger
 from heavyrag.utils import uuid4_hex_to_int64
 
-# Create a multiprocessing lock (for processes)
-process_lock = multiprocessing.Lock()
-
-# Uncomment this line only on mac, for ubuntu/prod we can leave as it is
-# this line should fix gunciorn worker reloading issue upon doing RAG search on FAISS index (MAC M1 only)
+# On macOS, limit FAISS threads to prevent gunicorn worker crashes
 if sys.platform == "darwin":
-    faiss.omp_set_num_threads(1)  # important so that gunicorn worker process won't get terminated
+    faiss.omp_set_num_threads(1)
 
-# Create a threading lock (for threads within the same process)
-thread_lock = threading.Lock()
+# Track last update time for reload optimization
 last_update_time = 0
 
+# Global cached index (per-process)
 faiss_index = None
+
+
+class FaissFileLock:
+    """
+    File-based lock for FAISS index operations.
+    Works across separate processes (e.g., gunicorn workers).
+    Supports both shared (read) and exclusive (write) locks.
+    """
+
+    def __init__(self, lock_file: str, timeout: float = 30.0):
+        """
+        Initialize the file lock.
+        
+        Args:
+            lock_file: Path to the lock file (will be created if doesn't exist)
+            timeout: Maximum time to wait for lock acquisition (seconds)
+        """
+        self.lock_file = lock_file
+        self.timeout = timeout
+        self._fd = None
+        
+    def _ensure_lock_file(self):
+        """Ensure the lock file exists."""
+        lock_dir = os.path.dirname(self.lock_file)
+        if lock_dir and not os.path.exists(lock_dir):
+            os.makedirs(lock_dir, exist_ok=True)
+        # Create lock file if it doesn't exist
+        if not os.path.exists(self.lock_file):
+            open(self.lock_file, 'a').close()
+
+    @contextmanager
+    def read_lock(self):
+        """
+        Acquire a shared (read) lock. Multiple readers can hold the lock simultaneously.
+        """
+        self._ensure_lock_file()
+        fd = open(self.lock_file, 'r')
+        try:
+            start_time = time.time()
+            while True:
+                try:
+                    fcntl.flock(fd.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.time() - start_time > self.timeout:
+                        raise TimeoutError(f"Could not acquire read lock on {self.lock_file} within {self.timeout}s")
+                    time.sleep(0.01)
+            yield
+        finally:
+            fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
+            fd.close()
+
+    @contextmanager
+    def write_lock(self):
+        """
+        Acquire an exclusive (write) lock. Only one writer can hold the lock.
+        Blocks all readers and other writers.
+        """
+        self._ensure_lock_file()
+        fd = open(self.lock_file, 'r+')
+        try:
+            start_time = time.time()
+            while True:
+                try:
+                    fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.time() - start_time > self.timeout:
+                        raise TimeoutError(f"Could not acquire write lock on {self.lock_file} within {self.timeout}s")
+                    time.sleep(0.01)
+            yield
+        finally:
+            fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
+            fd.close()
+
+
+# Global file lock instance (will be initialized per persist_dir)
+_file_locks: dict[str, FaissFileLock] = {}
+_file_locks_lock = threading.Lock()
+
+
+def get_file_lock(persist_dir: str) -> FaissFileLock:
+    """Get or create a file lock for the given persist directory."""
+    with _file_locks_lock:
+        if persist_dir not in _file_locks:
+            lock_file = os.path.join(persist_dir, ".faiss.lock")
+            _file_locks[persist_dir] = FaissFileLock(lock_file)
+        return _file_locks[persist_dir]
 
 
 def get_faiss_index(persist_dir: str | None = None, dimension: int = 1024):
     """
-    Set and get faiss index.
+    Get or create the FAISS index. Uses file lock for thread-safe initialization.
     """
     global faiss_index
     if faiss_index:
         return faiss_index
-    with process_lock:
-        with thread_lock:
-            logger.info("Reading faiss index from disk")
-            _index_file = os.path.join(persist_dir, "faiss_index.bin")
-            if os.path.exists(_index_file):
-                faiss_index = faiss.read_index(_index_file, faiss.IO_FLAG_MMAP)
-            else:
-                faiss_index = faiss.IndexIDMap(faiss.IndexFlatL2(dimension))
+    
+    # Use file lock for initialization to prevent race conditions
+    file_lock = get_file_lock(persist_dir)
+    with file_lock.read_lock():
+        # Double-check after acquiring lock
+        if faiss_index:
             return faiss_index
+        logger.info("Reading faiss index from disk")
+        _index_file = os.path.join(persist_dir, "faiss_index.bin")
+        if os.path.exists(_index_file):
+            faiss_index = faiss.read_index(_index_file, faiss.IO_FLAG_MMAP)
+        else:
+            faiss_index = faiss.IndexIDMap(faiss.IndexFlatL2(dimension))
+        return faiss_index
 
 
 class FaissIQVectorStore(FaissVectorStore):
     """
-    Faiss vector store wrapper class.
+    Faiss vector store wrapper class with file-based locking for concurrent access.
     """
 
     _persis_dir: str = PrivateAttr()
     _metadata_store: dict = PrivateAttr()
     _index_file: str = PrivateAttr()
     _metadata_file: str = PrivateAttr()
+    _file_lock: FaissFileLock = PrivateAttr()
 
     def __init__(
         self,
@@ -94,81 +186,98 @@ class FaissIQVectorStore(FaissVectorStore):
         self._metadata_store = {}
         self._index_file = os.path.join(persist_dir, index_file)
         self._metadata_file = os.path.join(persist_dir, metadata_file)
+        self._file_lock = get_file_lock(persist_dir)
 
         self.load_metadata()
 
-    def load_metadata(self):
+    def load_metadata(self, use_file_lock: bool = False):
         """
         Load the metadata from the metadata file.
+        
+        Args:
+            use_file_lock: Whether to acquire file lock (False when called from within locked context)
         """
-        if os.path.exists(self._metadata_file):
-            logger.info(f"Loading metadata from {self._metadata_file}")
-            with open(self._metadata_file, "rb") as f:
-                self._metadata_store = pickle.load(f)
+        def _load():
+            if os.path.exists(self._metadata_file):
+                logger.info(f"Loading metadata from {self._metadata_file}")
+                with open(self._metadata_file, "rb") as f:
+                    self._metadata_store = pickle.load(f)
+            else:
+                logger.info("No metadata file found, initializing empty metadata store.")
+                self._metadata_store = {}
+        
+        if use_file_lock:
+            with self._file_lock.read_lock():
+                _load()
         else:
-            logger.info("No metadata file found, initializing empty metadata store.")
-            self._metadata_store = {}
+            _load()
 
-    def reload(self):
+    def _reload_internal(self):
         """
-        Helps to reload faiss index and metadata.
+        Internal reload - caller must hold appropriate file lock.
         """
         global last_update_time
         logger.debug("Started reloading faiss index and metadata.")
-        # Process lock to ensure only one process reloads the index at a time
-        with process_lock:
-            try:
-                # Thread lock to ensure only one thread reloads within the same process
-                with thread_lock:
-                    # Check if the FAISS index file has been updated
-                    if os.path.exists(self._index_file):
-                        file_mod_time = os.path.getmtime(self._index_file)
-                        # Reload the index only if it has been modified since the last reload
-                        if file_mod_time > last_update_time:
-                            self._faiss_index = faiss.read_index(self._index_file)
-                            self.load_metadata()
-                            last_update_time = file_mod_time
-                            logger.debug(f"FAISS index reloaded by process {os.getpid()} at {file_mod_time}")
-                        else:
-                            logger.debug("No need to reload FAISS index; no changes detected.")
-                    else:
-                        logger.debug(f"FAISS index file not found at {self._index_file}")
-            except Exception as e:
-                print(f"Error reloading FAISS index: {e}")
+        
+        try:
+            if os.path.exists(self._index_file):
+                file_mod_time = os.path.getmtime(self._index_file)
+                # Reload the index only if it has been modified since the last reload
+                if file_mod_time > last_update_time:
+                    self._faiss_index = faiss.read_index(self._index_file)
+                    self.load_metadata(use_file_lock=False)
+                    last_update_time = file_mod_time
+                    logger.debug(f"FAISS index reloaded by process {os.getpid()} at {file_mod_time}")
+                else:
+                    logger.debug("No need to reload FAISS index; no changes detected.")
+            else:
+                logger.debug(f"FAISS index file not found at {self._index_file}")
+        except Exception as e:
+            logger.error(f"Error reloading FAISS index: {e}")
+
+    def reload(self):
+        """
+        Reload faiss index and metadata from disk with proper file locking.
+        Uses file-based locking to coordinate across separate processes.
+        """
+        with self._file_lock.read_lock():
+            self._reload_internal()
 
     def remove(self, ids: list[int] | None = None, node_ids: list[str] | None = None) -> None:
         """
         Remove vectors from the FAISS index as well as from metadata dump using their IDs.
         Supports both node_ids(str) as well as the vector store index ids (int).
+        Uses write lock for the entire operation to ensure atomicity.
         """
-        self.reload()
-        with process_lock:
-            with thread_lock:
-                if ids:
-                    ids_to_remove = np.array(ids, dtype=np.int64)
-                elif node_ids:
-                    ids_to_remove = np.array([uuid4_hex_to_int64(id_) for id_ in node_ids], dtype=np.int64)
-                else:
-                    raise ValueError("ids or node_ids need to be passed!")
-                # Remove the vectors based on their IDs
-                self._faiss_index.remove_ids(ids_to_remove)
+        with self._file_lock.write_lock():
+            self._reload_internal()
+            
+            if ids:
+                ids_to_remove = np.array(ids, dtype=np.int64)
+            elif node_ids:
+                ids_to_remove = np.array([uuid4_hex_to_int64(id_) for id_ in node_ids], dtype=np.int64)
+            else:
+                raise ValueError("ids or node_ids need to be passed!")
+            
+            # Remove the vectors based on their IDs
+            self._faiss_index.remove_ids(ids_to_remove)
 
-                # Remove the corresponding metadata from the metadata store
-                for id_ in ids_to_remove:
-                    if id_ in self._metadata_store:
-                        del self._metadata_store[id_]
+            # Remove the corresponding metadata from the metadata store
+            for id_ in ids_to_remove:
+                if id_ in self._metadata_store:
+                    del self._metadata_store[id_]
 
-                self.persist()
+            self._persist_internal()
 
     def reset(self):
         """
-        Deletes all the index data as well as the metdata.
+        Deletes all the index data as well as the metadata.
+        Uses write lock for the entire operation.
         """
-        with process_lock:
-            with thread_lock:
-                self._faiss_index.reset()
-                self._metadata_store = {}
-                self.persist()
+        with self._file_lock.write_lock():
+            self._faiss_index.reset()
+            self._metadata_store = {}
+            self._persist_internal()
 
     def get_ids(self) -> list:
         """
@@ -184,27 +293,27 @@ class FaissIQVectorStore(FaissVectorStore):
         """Add nodes to index.
 
         NOTE: in the Faiss vector store, we do not store text in Faiss.
+        Uses write lock for the entire operation to ensure atomicity across processes.
 
         Args:
             nodes: List[BaseNode]: list of nodes with embeddings
 
         """
-        self.reload()
-        with process_lock:
-            with thread_lock:
-                new_ids = []
-                for node in nodes:
-                    text_embedding = node.get_embedding()
-                    text_embedding_np = np.array(text_embedding, dtype="float32").reshape(1, -1)
-                    new_id = uuid4_hex_to_int64(node.node_id)
-                    self._faiss_index.add_with_ids(text_embedding_np, np.array([new_id], dtype=np.int64))
-                    # self._faiss_index.add(text_embedding_np)
-                    new_ids.append(new_id)
-                    metadata = {**node.metadata, "id": node.node_id}
-                    self._metadata_store[new_id] = {"text": node.get_content(), "metadata": metadata}
-                    # add metadata to the metadatastore with the corresponding doc_id as key
-                self.persist()  # do persist to disk after node's addition
-                return new_ids
+        with self._file_lock.write_lock():
+            self._reload_internal()
+            
+            new_ids = []
+            for node in nodes:
+                text_embedding = node.get_embedding()
+                text_embedding_np = np.array(text_embedding, dtype="float32").reshape(1, -1)
+                new_id = uuid4_hex_to_int64(node.node_id)
+                self._faiss_index.add_with_ids(text_embedding_np, np.array([new_id], dtype=np.int64))
+                new_ids.append(new_id)
+                metadata = {**node.metadata, "id": node.node_id}
+                self._metadata_store[new_id] = {"text": node.get_content(), "metadata": metadata}
+            
+            self._persist_internal()
+            return new_ids
 
     def apply_filter(self, metadata: dict, filter: Union[MetadataFilter, ExactMatchFilter, MetadataFilters]) -> bool:
         """
@@ -264,25 +373,20 @@ class FaissIQVectorStore(FaissVectorStore):
         node = TextNode(text=metadata.get("text", ""), metadata=node_metadata, id_=node_metadata["id"])  # type: ignore
         return node
 
-    # Function to perform FAISS search with proper locking
     def load_and_search(self, query_vector: np.array, top_k: int, filtered_ids: list[int] | None = None):
-        # Acquire process-level lock
-        with process_lock:
-            # Acquire thread-level lock
-            with thread_lock:
-                # Create FAISS search parameters (if necessary)
-                if filtered_ids:
-                    id_selector = faiss.IDSelectorBatch(np.array(filtered_ids, dtype=np.int64))
-                    search_params = faiss.SearchParameters()
-                    search_params.selector = id_selector  # Apply ID filtering
+        """
+        Perform FAISS search with file-based read lock for cross-process safety.
+        """
+        with self._file_lock.read_lock():
+            if filtered_ids:
+                id_selector = faiss.IDSelectorBatch(np.array(filtered_ids, dtype=np.int64))
+                search_params = faiss.SearchParameters()
+                search_params.selector = id_selector
+                distances, indices = self._faiss_index.search(query_vector, top_k, params=search_params)
+            else:
+                distances, indices = self._faiss_index.search(query_vector, top_k)
 
-                # Perform FAISS search (with or without search parameters)
-                if filtered_ids:
-                    distances, indices = self._faiss_index.search(query_vector, top_k, params=search_params)
-                else:
-                    distances, indices = self._faiss_index.search(query_vector, top_k)
-
-                return distances, indices
+            return distances, indices
 
     def query(self, query: VectorStoreQuery, **kwargs: Any) -> VectorStoreQueryResult:
         """
@@ -360,16 +464,32 @@ class FaissIQVectorStore(FaissVectorStore):
 
         return VectorStoreQueryResult(nodes=nodes, similarities=similarities, ids=ids)
 
-    def persist(self, *args, **kwargs):
+    def _persist_internal(self):
         """
-        Persist the FAISS index and metadata to disk.
+        Internal persist without file lock - caller must hold write lock.
+        Uses atomic write (write to temp file, then rename) to prevent corruption.
         """
         logger.info(f"Saving FAISS index to {self._index_file}")
-        faiss.write_index(self._faiss_index, self._index_file)
+        
+        # Atomic write for FAISS index: write to temp file, then rename
+        temp_index_file = self._index_file + ".tmp"
+        faiss.write_index(self._faiss_index, temp_index_file)
+        os.replace(temp_index_file, self._index_file)
 
         logger.info(f"Saving metadata to {self._metadata_file}")
-        with open(self._metadata_file, "wb") as f:
+        # Atomic write for metadata: write to temp file, then rename
+        temp_metadata_file = self._metadata_file + ".tmp"
+        with open(temp_metadata_file, "wb") as f:
             pickle.dump(self._metadata_store, f)
+        os.replace(temp_metadata_file, self._metadata_file)
+
+    def persist(self, *args, **kwargs):
+        """
+        Persist the FAISS index and metadata to disk with file-based locking.
+        Uses atomic write (write to temp file, then rename) to prevent corruption.
+        """
+        with self._file_lock.write_lock():
+            self._persist_internal()
 
     @classmethod
     def class_name(cls: type["FaissIQVectorStore"]) -> str:

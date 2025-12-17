@@ -81,8 +81,13 @@ while [[ $# -gt 0 ]]; do
             echo "  $0 tests/api/test_rag_router.py       # Run specific test file"
             exit 0
             ;;
+        -k|-m|--deselect|--ignore|--tb|--maxfail|-x|-p)
+            # Flags that require a value
+            EXTRA_ARGS="$EXTRA_ARGS $1 $2"
+            shift 2
+            ;;
         -*)
-            # Pass other flags to pytest
+            # Pass other flags to pytest (standalone flags like -v, -s, etc.)
             EXTRA_ARGS="$EXTRA_ARGS $1"
             shift
             ;;
