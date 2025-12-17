@@ -1,0 +1,13 @@
+# Docker Compose override for VS Code devcontainer
+# This extends docker-compose.ubuntu.yml for development mode
+version: '3.8'
+
+services:
+  heavyiq:
+    # Keep container running without starting gunicorn
+    command: sleep infinity
+    # Use stdin_open and tty for interactive development
+    stdin_open: true
+    tty: true
+    # Don't auto-restart during development
+    restart: "no"

@@ -1,5 +1,3 @@
-# Import faiss FIRST to avoid static TLS exhaustion error
-# See: https://github.com/facebookresearch/faiss/issues/2595
 import faiss  # noqa: F401
 
 import asyncio

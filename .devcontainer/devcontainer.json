@@ -1,9 +1,14 @@
 {
   "name": "HeavyIQ Development",
-  // Use docker-compose
-  "dockerComposeFile": "../docker/docker-compose.ubuntu.yml",
+  // Use docker-compose with devcontainer override
+  "dockerComposeFile": [
+    "../docker/docker-compose.ubuntu.yml",
+    "docker-compose.devcontainer.yml"
+  ],
   "service": "heavyiq",
   "workspaceFolder": "/code",
+  // Ensure docker group access before building
+  "initializeCommand": "sg docker -c 'docker info > /dev/null 2>&1' || echo 'Docker access may require: newgrp docker'",
   // Features to add to the dev container
   "features": {
     "ghcr.io/devcontainers/features/git:1": {}
@@ -29,15 +34,14 @@
       }
     }
   },
-  // Ports to forward
+  // Ports to forward (6279 is the HeavyIQ API port inside the container)
   "forwardPorts": [
-    6275,
-    8000
+    6279
   ],
   // Run commands after container is created
   "postCreateCommand": "pip install -r requirements.txt && pip install -r requirements-dev.txt || true",
   // Run commands after container starts
-  "postStartCommand": "echo 'Dev container ready! Run: gunicorn -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:6275 --preload \"heavyiq.api:create_app('config.toml')\"'"
+  "postStartCommand": "echo 'Dev container ready! Start server with: gunicorn -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:6279 --preload heavyiq.api:create_app'"
   // User to run as (optional - comment out to run as root)
   // "remoteUser": "vscode"
 }

@@ -7,6 +7,9 @@
 #   ./scripts/start-heavyiq.sh
 #   ./scripts/stop-heavyiq.sh
 #
+# If you can't access the internal image, set BASE_IMAGE before running:
+#   BASE_IMAGE=ubuntu:22.04 docker-compose -f docker/docker-compose.ubuntu.yml up --build
+#
 # ChromaDB is started internally by gunicorn, no separate service needed.
 #
 version: '3.8'
@@ -18,7 +21,7 @@ services:
       dockerfile: docker/Dockerfile.ubuntu
       args:
         # Use internal image by default; override with BASE_IMAGE=ubuntu:22.04 if not available
-        BASE_IMAGE: docker-internal.mapd.com/mapd/core-build-ubuntu22.04-static-cuda12.2-x86_64-jenkins-ssh
+        BASE_IMAGE: ${BASE_IMAGE:-docker-internal.mapd.com/mapd/core-build-ubuntu22.04-static-cuda12.2.2-x86_64-jenkins-ssh:latest}
     container_name: heavyiq-ubuntu
     ports:
       - "16279:6279"
