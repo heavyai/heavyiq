@@ -47,22 +47,6 @@ def init_telemetrics() -> None:
     langchain_tracer_module.logger = get_heavyiq_logger()  # type: ignore
 
 
-def enable_telemetrics_for_free_edition() -> bool:
-    """
-    Enables telemetrics for free edition.
-    """
-    if not change_iq_config_for_free_edition():
-        return False
-
-    global is_langsmith_active
-    os.environ["LANGCHAIN_TRACING_V2"] = "true"
-    os.environ["LANGCHAIN_API_KEY"] = "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"
-    os.environ["LANGCHAIN_PROJECT"] = "heavyai-free"
-    is_langsmith_active = True
-
-    return True
-
-
 @cached(cache=TTLCache(maxsize=30, ttl=60 * 10))
 def get_token_limit(model_name: str, response_tokens: int = 256) -> int:
     """

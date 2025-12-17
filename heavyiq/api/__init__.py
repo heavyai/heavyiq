@@ -36,7 +36,7 @@ from heavyiq.langchain.exceptions import (
     NLtoSQLException,
     NLtoTableException,
 )
-from heavyiq.langchain.utils import InMemoryLLMCache, enable_telemetrics_for_free_edition, init_telemetrics
+from heavyiq.langchain.utils import InMemoryLLMCache, init_telemetrics
 from heavyiq.logging_utils import get_heavyiq_logger, init_logs
 from heavyiq.utils import SharedDictSingleton
 from heavyiq import shared_state
@@ -222,43 +222,6 @@ def create_lifespan(config: HeavyIQConfig) -> Any:
             except Exception as e:
                 logger.warning(f"RAG initialization in lifespan startup: {e}")
         
-        async def enable_telemetrics_for_free_license_daemon():
-            """
-            This enables langsmith telemetrics for the free license by polling a shared multiprocessing dict.
-            """
-            try:
-                max_retries, retry_count = 20, 0
-                while retry_count < max_retries:
-                    retry_count += 1
-                    await asyncio.sleep(2)
-                    try:
-                        license_edition = shared_state.get(shared_state.SharedStateKeys.HeavyDBLicenseEdition.name)
-                    except (EOFError, OSError, ConnectionError) as e:
-                        logger.debug(f"Shared dict unavailable: {e}")
-                        return
-                    
-                    if not license_edition:
-                        continue
-
-                    logger.info(f"Found HeavyAI license edition, license_type: {license_edition}")
-
-                    if license_edition == "free":
-                        logger.info("Enabling langsmith telemetrics for free edition.")
-                        done = enable_telemetrics_for_free_edition()
-                        if done:
-                            logger.info("Successfully changed langsmith telemetrics and HeavyIQ configs for free edition.")
-                        else:
-                            logger.error("Failed to change langsmith telemetrics and HeavyIQ configs for free edition.")
-                    
-                    break
-                else:
-                    logger.error(f"Failed to check HeavyAI license edition after {max_retries*2} seconds.")
-            except Exception as e:
-                logger.warning(f"Telemetry daemon error (non-fatal): {e}")
-        
-        # Start background task for license edition check
-        background_task = asyncio.create_task(enable_telemetrics_for_free_license_daemon())
-        
         logger.info("FastAPI application started")
         
         yield  # Application runs here
@@ -266,13 +229,7 @@ def create_lifespan(config: HeavyIQConfig) -> Any:
         # === SHUTDOWN ===
         logger.info("Shutting down FastAPI worker")
         
-        # Cancel background task to prevent cleanup errors
-        if not background_task.done():
-            background_task.cancel()
-            try:
-                await background_task
-            except asyncio.CancelledError:
-                pass  # Expected when cancelling
+        logger.info("FastAPI application shutdown complete")
     
     return lifespan
 
