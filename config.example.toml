@@ -1,41 +1,107 @@
+# HeavyIQ Configuration
+# Copy this file to config.toml and customize for your environment
+#
+# All options under [iq] section
+
 [iq]
+
+# =============================================================================
+# HeavyDB Connection (Required)
+# =============================================================================
 heavydb_host = "localhost"
 heavydb_port = 6274
-heavydb_protocol = "binary"
-heavydb_dbname = "heavyai"
+heavydb_protocol = "binary"          # binary or http
+heavydb_dbname = "heavydb"
 heavydb_username = "admin"
-heavydb_password = "HyperInteractive"
-openai_api_key = "sk-xxxxxxxxetc"
-huggingface_embed_model = "sentence-transformers/all-mpnet-base-v2"
-metadata_index_dir = "db"
-table_documents_dir = "table_documents"
-openai_gpt_model = "gpt-3.5-turbo-16k"
-max_fields_limit_sql_to_answer = 20
+heavydb_password = "pass"
 
-# optional, don't copy to your config if you don't have these
+# =============================================================================
+# HeavyIQ Server
+# =============================================================================
+port = 6279                          # HeavyIQ API port
+data = "./storage"                   # Storage directory for logs, RAG data
+
+# =============================================================================
+# LLM Configuration (Choose ONE option)
+# =============================================================================
+
+# --- Option 1: Heavy.ai LLM API (Recommended) ---
+custom_llm_type = "API_VLLM"
+custom_llm_api_base = "https://api.heavy.ai/v1"
+heavylm_api_key = "your-heavy-ai-api-key"
+custom_llm_api_context_window = 8192
+custom_llm_api_vllm_beam_width = 2   # Beam search (disabled if <2)
+
+# --- Option 2: OpenAI ---
+# openai_api_key = "sk-..."
+# openai_gpt_model = "gpt-4"
+
+# --- Option 3: Azure OpenAI ---
+# custom_llm_type = "AZURE"
+# custom_llm_azure_openai_api_base = "https://your-resource.openai.azure.com"
+# custom_llm_azure_deployment_name = "your-deployment"
+# custom_llm_azure_openai_api_version = "2023-05-15"
+
+# =============================================================================
+# RAG (Retrieval Augmented Generation)
+# =============================================================================
+enable_rag = true
+
+# Vector store backend: "faiss" (fast, in-memory) or "chroma" (persistent, requires server)
+rag_vectordb_type = "faiss"
+
+# Embedding server for vector generation
+rag_embed_server_base = "https://embeddings.heavy.ai/v1"
+rag_embed_dimension = 1024
+
+# FAISS storage directory (when using faiss)
+rag_faiss_persist_dir = "./storage/rag_storage/faiss"
+
+# ChromaDB server (when using chroma)
+rag_chromadb_server_base = "http://localhost:6271"
+rag_chromadb_collection_name = "heavyiq"
+
+# RAG retrieval settings
+rag_facts_reranker_top_k = 5
+rag_facts_reranker_cutoff_score = 0.1
+
+# SQLite database for RAG metadata
+rag_database_uri = "sqlite:///./storage/ragdb/ragdb.sqlite"
+
+# =============================================================================
+# Metadata Index
+# =============================================================================
+metadata_index_dir = "db"            # Directory for metadata index
+table_documents_dir = "table_documents"
+
+# =============================================================================
+# SQL to Answer Configuration
+# =============================================================================
+max_fields_limit_sql_to_answer = 20  # Max columns for auto-answer generation
+
+# =============================================================================
+# Logging
+# =============================================================================
+access_log_level = "INFO"
+heavyiq_log_level = "INFO"           # DEBUG for development
+log_to_stdout = false                # true for development
+
+# =============================================================================
+# LangSmith Tracing (Optional)
+# =============================================================================
 langsmith_project = ""
 langsmith_api_key = ""
 
-# Logging, these are defaults no need to copy to your config if not overriding
-access_log_level = "INFO"
-heavyiq_log_level = "INFO" # DEBUG is recommended for development
-log_to_stdout = false      # true is recommended for development
+# =============================================================================
+# Advanced Options
+# =============================================================================
+enable_logprobs = false              # Show token probabilities
+custom_llm_logprobs_limit = 1        # Max token probabilities
 
-# Custom LLM (optional, don't copy to your config if you aren't using a custom LLM solution)
-custom_llm_type = "API" # API or API_VLLM or AZURE
-# Custom LLM API/API_VLLM
-custom_llm_api_base = ""             # base url of API
-custom_llm_api_context_window = 8192 # context window limit
-# Custom LLM API_VLLM
-custom_llm_api_vllm_beam_width = 2 # beam search disabled if <2
-# Custom LLM AZURE
-custom_llm_azure_openai_api_version = "2023-05-15" # API specification version
-custom_llm_azure_openai_api_base = ""              # base url of API
-custom_llm_azure_deployment_name = ""              # name of deployment
+# Debug endpoints (disable in production)
+enable_debug_endpoints = false
 
-# SQL TO ANSWER
-max_fields_limit_sql_to_answer = 20  # generate answer only when the fields of the resultset has not more than this flag's limit
-
-# logprobs
-enable_logprobs = false # show/hide logprobs on nl-to-sql response
-custom_llm_logprobs_limit = 1  # max probabilities of token to be generated next.
+# Custom prompts (override defaults)
+# custom_prompt_nl_to_sql = "..."
+# custom_prompt_nl_to_tables = "..."
+# custom_prompt_sql_to_answer = "..."
