@@ -116,11 +116,11 @@ def app_initialize(config: HeavyIQConfig, config_path: str):
         logger.info("Creating RAG database tables...")
         rag_create_tables()
         
-        # Both FAISS and ChromaDB are initialized after fork for consistency
-        # - Gunicorn: post_fork hook initializes RAG
-        # - Uvicorn standalone: FastAPI startup event initializes RAG
-        # Note: `import faiss` is still at module level to get TLS slots first
-        logger.info(f"RAG with {config.rag_vectordb_type} will be initialized after fork/startup")
+        # Initialize RAG (embedding model) in master process before fork.
+        # This sets EMBED_MODEL_MAX_LEN which is used by transform.py at import time.
+        # Note: `import faiss` is at module level to get TLS slots first.
+        logger.info(f"Initializing RAG with {config.rag_vectordb_type} (master process, before fork)")
+        rag_initialize()
 
 
 def add_rag_db_exception_handlers(app: FastAPI) -> None:
@@ -205,20 +205,24 @@ def create_lifespan(config: HeavyIQConfig) -> Any:
         import heavyiq.lcel.chains
         from heavyiq.logging_utils import heavyiq_logger as logger
         
-        # Initialize RAG (FAISS or ChromaDB) if not already done
-        # - Gunicorn: post_fork may have already initialized, so we check _initialized flag
-        # - Uvicorn standalone: post_fork is not called, so we initialize here
+        # Initialize RAG if not already done
+        # - Gunicorn with --preload: Already initialized in master process (app_initialize)
+        # - Uvicorn standalone: Not initialized yet, so we initialize here
         if config.enable_rag:
             try:
-                from heavyrag.controller import rag_controller
                 from heavyiq.api import rag_initialize
+                from heavyrag.embed import EMBED_MODEL
                 
-                if not hasattr(rag_controller, '_initialized') or not rag_controller._initialized:
+                # Check if already initialized (master process set EMBED_MODEL)
+                if EMBED_MODEL is None:
+                    # Uvicorn standalone mode - initialize RAG here
                     logger.info(f"Initializing RAG with {config.rag_vectordb_type} (FastAPI lifespan startup)")
                     rag_initialize()
-                    rag_controller._initialized = True
                 else:
-                    logger.info("RAG already initialized (skipping in FastAPI lifespan)")
+                    logger.info("RAG already initialized in master process")
+                
+                from heavyrag.controller import rag_controller
+                rag_controller._initialized = True
             except Exception as e:
                 logger.warning(f"RAG initialization in lifespan startup: {e}")
         

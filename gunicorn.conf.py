@@ -218,22 +218,17 @@ def post_fork(server, worker):
     # Reconnect to the shared state manager created in master process
     shared_state.connect_to_manager()
     
-    # Initialize RAG (FAISS or ChromaDB) after fork
-    # Both vector stores are now initialized after fork for consistency
-    # Note: RAG database tables are already created in master process
+    # RAG is already initialized in master process (app_initialize with --preload).
+    # Embed model and EMBED_MODEL_MAX_LEN are inherited by workers via fork.
+    # Just mark as initialized to prevent duplicate init in FastAPI startup event.
     try:
         config = get_config()
         if config.enable_rag:
-            from heavyiq.api import rag_initialize
             from heavyrag.controller import rag_controller
-            
-            # Mark as initialized to prevent duplicate init in FastAPI startup event
-            if not hasattr(rag_controller, '_initialized') or not rag_controller._initialized:
-                print(f"Worker {worker.pid}: Initializing RAG with {config.rag_vectordb_type} (post-fork)")
-                rag_initialize()
-                rag_controller._initialized = True
+            rag_controller._initialized = True
+            print(f"Worker {worker.pid}: RAG inherited from master process")
     except Exception as e:
-        print(f"Worker {worker.pid}: Failed to initialize RAG: {e}")
+        print(f"Worker {worker.pid}: RAG setup: {e}")
     finally:
         # Re-enable garbage collection after fork initialization is complete
         # (was disabled in pre_fork to prevent importlib_metadata errors)

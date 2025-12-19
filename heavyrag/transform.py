@@ -8,14 +8,19 @@ from heavyiq.langchain.utils import custom_model_tokenizer_encode
 from heavyrag.embed import EMBED_MODEL_MAX_LEN
 
 # EMBED_MODEL_MAX_LEN variable being set on master process and then made available to all worker processes via --preload option
-# this option copies all the global varibales to the forked process
+# this option copies all the global variables to the forked process
+#
+# Buffer of 50 tokens is needed because LlamaIndex adds metadata (extra_info, metadata)
+# when building the final chunk string, and this contributes to the total token count.
+METADATA_BUFFER = 50
+
 if EMBED_MODEL_MAX_LEN:
-    chunk_size = EMBED_MODEL_MAX_LEN - 50  # 50 as a buffer token
-    # Because LlamaIndex adds metadata (extra_info, metadata) when building the final chunk string,
-    # and this contributes to the total token count.
-    token_splitter = TokenTextSplitter(chunk_size=chunk_size, chunk_overlap=20, tokenizer=custom_model_tokenizer_encode)
+    chunk_size = EMBED_MODEL_MAX_LEN - METADATA_BUFFER
 else:
-    token_splitter = TokenTextSplitter(chunk_size=512, chunk_overlap=20, tokenizer=custom_model_tokenizer_encode)
+    # Fallback for edge cases - use conservative default (512 - buffer)
+    chunk_size = 512 - METADATA_BUFFER
+
+token_splitter = TokenTextSplitter(chunk_size=chunk_size, chunk_overlap=20, tokenizer=custom_model_tokenizer_encode)
 
 DEFAULT_PIPELINE = IngestionPipeline(
     transformations=[token_splitter]  # no need for SentenceSplitter if token chunking suffices
