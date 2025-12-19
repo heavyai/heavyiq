@@ -34,16 +34,9 @@ pip freeze -l > ./dist/requirements.txt
 # for pyheavydb.  We need a relative path
 update_pyheavydb_reference ./dist/requirements.txt
 
-pip install -r ./requirements-build-prod.txt
-
-# Create Obfuscated Build
-pyarmor reg pyarmor-regfile-5130.zip
-
-# Note the pyarmor step can create the
-# ./dist dir if it doesn't already exist.
-pyarmor gen ./heavyiq
-pyarmor gen ./heavyrag
-cp -r heavyiq/langchain/tokenizer_models/ ./dist/heavyiq/langchain/tokenizer_models/
+# Copy source files to dist (no obfuscation)
+cp -r heavyiq ./dist/heavyiq
+cp -r heavyrag ./dist/heavyrag
 cp gunicorn.conf.py ./dist/gunicorn.conf.py
 
 # Create version.txt
