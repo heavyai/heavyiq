@@ -1,0 +1,186 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_candidate:
+        description: 'Branch or SHA to build'
+        type: string
+        default: 'master'
+      pyheavydb_release_tag:
+        description: 'GitHub Release tag from heavyai/pyheavydb (e.g. pyheavydb-abc1234); leave blank to use PyPI version'
+        type: string
+        default: ''
+      include_all_deps:
+        description: 'Bundle all Python dependencies offline (--include_all_deps)'
+        type: boolean
+        default: false
+      build_rhel:
+        description: 'Also build Rocky Linux (RHEL) variant'
+        type: boolean
+        default: false
+      make_release:
+        description: 'Create a GitHub Release with the built artifacts'
+        type: boolean
+        default: true
+
+jobs:
+  build-ubuntu:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_candidate }}
+
+      - name: Download pyheavydb wheel from GitHub Release
+        if: ${{ inputs.pyheavydb_release_tag != '' }}
+        run: |
+          mkdir -p /tmp/pyheavydb-nfs
+          gh release download "${{ inputs.pyheavydb_release_tag }}" \
+            --repo heavyai/pyheavydb \
+            --pattern "*.whl" \
+            --dir /tmp/pyheavydb-nfs
+          WHL_NAME=$(ls /tmp/pyheavydb-nfs/*.whl | xargs basename)
+          echo "$WHL_NAME" > /tmp/pyheavydb-nfs/pyheavydb.whl.version
+          # Redirect NFS_PATH to local dir so get_pyheavydb_for_NFS_install() works without NFS
+          sed -i 's|NFS_PATH=.*|NFS_PATH=/tmp/pyheavydb-nfs|' scripts/common_fn.sh
+
+      - name: Build (Ubuntu)
+        run: |
+          SCRIPT_OPTION=""
+          if [ -n "${{ inputs.pyheavydb_release_tag }}" ]; then
+            SCRIPT_OPTION="--internally-built-pyheavydb"
+          fi
+          if [ "${{ inputs.include_all_deps }}" = "true" ]; then
+            SCRIPT_OPTION="$SCRIPT_OPTION --include_all_deps"
+          fi
+          bash ./scripts/build_prod.sh $SCRIPT_OPTION
+
+      - name: Generate env.sh
+        run: |
+          source /etc/os-release
+          PYVER=$(python3 -V | awk '{print $2}')
+          echo "ARCH=$(uname -p)" > env.sh
+          echo "c_date=$(date +%Y%m%d)" >> env.sh
+          echo "git_hash=${GITHUB_SHA::8}" >> env.sh
+          echo "pyver=p${PYVER}" >> env.sh
+          echo "os=${ID}${VERSION_ID}" >> env.sh
+
+      - name: Upload Ubuntu artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: heavyiq-ubuntu
+          path: |
+            dist.tgz
+            env.sh
+
+  build-rocky:
+    if: ${{ inputs.build_rhel }}
+    runs-on: ubuntu-latest
+    container:
+      image: rockylinux/rockylinux:8
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Install git and gh CLI
+        run: |
+          dnf install -y git
+          dnf install -y 'dnf-command(config-manager)'
+          dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+          dnf install -y gh
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_candidate }}
+
+      - name: Download pyheavydb wheel from GitHub Release
+        if: ${{ inputs.pyheavydb_release_tag != '' }}
+        run: |
+          mkdir -p /tmp/pyheavydb-nfs
+          gh release download "${{ inputs.pyheavydb_release_tag }}" \
+            --repo heavyai/pyheavydb \
+            --pattern "*.whl" \
+            --dir /tmp/pyheavydb-nfs
+          WHL_NAME=$(ls /tmp/pyheavydb-nfs/*.whl | xargs basename)
+          echo "$WHL_NAME" > /tmp/pyheavydb-nfs/pyheavydb.whl.version
+          sed -i 's|NFS_PATH=.*|NFS_PATH=/tmp/pyheavydb-nfs|' scripts/common_fn.sh
+
+      - name: Build (Rocky Linux)
+        run: |
+          SCRIPT_OPTION=""
+          if [ -n "${{ inputs.pyheavydb_release_tag }}" ]; then
+            SCRIPT_OPTION="--internally-built-pyheavydb"
+          fi
+          if [ "${{ inputs.include_all_deps }}" = "true" ]; then
+            SCRIPT_OPTION="$SCRIPT_OPTION --include_all_deps"
+          fi
+          bash ./scripts/build_prod_rhel.sh $SCRIPT_OPTION
+
+      - name: Generate env.sh
+        run: |
+          source /etc/os-release
+          PYVER=$(python3 -V | awk '{print $2}')
+          echo "ARCH=$(uname -p)" > env.sh
+          echo "c_date=$(date +%Y%m%d)" >> env.sh
+          echo "git_hash=${GITHUB_SHA::8}" >> env.sh
+          echo "pyver=p${PYVER}" >> env.sh
+          echo "os=${ID}${VERSION_ID}" >> env.sh
+
+      - name: Upload Rocky artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: heavyiq-rocky
+          path: |
+            dist.tgz
+            env.sh
+
+  release:
+    needs: [build-ubuntu, build-rocky]
+    if: |
+      always() &&
+      inputs.make_release == true &&
+      needs.build-ubuntu.result == 'success' &&
+      (needs.build-rocky.result == 'success' || needs.build-rocky.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Ubuntu artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: heavyiq-ubuntu
+          path: artifacts/ubuntu
+
+      - name: Download Rocky artifact
+        if: ${{ inputs.build_rhel }}
+        uses: actions/download-artifact@v4
+        with:
+          name: heavyiq-rocky
+          path: artifacts/rocky
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          cp artifacts/ubuntu/dist.tgz release-assets/dist.tgz
+          if [ -d artifacts/rocky ]; then
+            cp artifacts/rocky/dist.tgz release-assets/dist-rocky.tgz
+          fi
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SHA="${{ github.sha }}"
+          TAG="heavyiq-${SHA::8}"
+          gh release create "$TAG" release-assets/* \
+            --repo "${{ github.repository }}" \
+            --title "heavyiq ${TAG}" \
+            --notes "Built from \`${{ inputs.release_candidate }}\` (${SHA}) — run [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
