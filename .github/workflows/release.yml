@@ -1,6 +1,9 @@
 name: Release
 
 on:
+  push:
+    branches:
+      - misiug/gh-actions-release
   workflow_dispatch:
     inputs:
       release_candidate:
