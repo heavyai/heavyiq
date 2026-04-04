@@ -70,6 +70,7 @@ jobs:
           if [ "${{ inputs.include_all_deps }}" = "true" ]; then
             SCRIPT_OPTION="$SCRIPT_OPTION --include_all_deps"
           fi
+          mkdir -p packages
           bash ./scripts/build_prod.sh $SCRIPT_OPTION
 
       - name: Upload Ubuntu x86_64 artifact
@@ -117,6 +118,7 @@ jobs:
           if [ "${{ inputs.include_all_deps }}" = "true" ]; then
             SCRIPT_OPTION="$SCRIPT_OPTION --include_all_deps"
           fi
+          mkdir -p packages
           bash ./scripts/build_prod.sh $SCRIPT_OPTION
 
       - name: Upload Ubuntu ARM64 artifact
@@ -168,6 +170,7 @@ jobs:
           if [ "${{ inputs.include_all_deps }}" = "true" ]; then
             SCRIPT_OPTION="$SCRIPT_OPTION --include_all_deps"
           fi
+          mkdir -p packages
           bash ./scripts/build_prod_rhel.sh $SCRIPT_OPTION
 
       - name: Upload Rocky x86_64 artifact
