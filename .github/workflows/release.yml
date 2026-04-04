@@ -33,7 +33,7 @@ on:
 
 jobs:
   build-ubuntu:
-    runs-on: nv-cpu-general
+    runs-on: linux-amd64-cpu16
     permissions:
       contents: read
     env:
@@ -127,7 +127,7 @@ jobs:
 
   build-rocky:
     if: ${{ inputs.build_rhel }}
-    runs-on: nv-cpu-general
+    runs-on: linux-amd64-cpu16
     container:
       image: rockylinux/rockylinux:8
     permissions:
@@ -184,7 +184,7 @@ jobs:
       needs.build-ubuntu.result == 'success' &&
       (needs.build-ubuntu-arm64.result == 'success' || needs.build-ubuntu-arm64.result == 'skipped') &&
       (needs.build-rocky.result == 'success' || needs.build-rocky.result == 'skipped')
-    runs-on: nv-cpu-general
+    runs-on: linux-amd64-cpu16
     permissions:
       contents: write
     steps:
