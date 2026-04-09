@@ -81,7 +81,7 @@ jobs:
 
   build-ubuntu-arm64:
     if: ${{ inputs.build_arm64 }}
-    runs-on: nv-gpu-arm64-l4-1gpu
+    runs-on: linux-arm64-cpu16
     permissions:
       contents: read
     env:
