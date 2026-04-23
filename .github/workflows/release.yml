@@ -163,7 +163,7 @@ jobs:
             --repo heavyai/pyheavydb \
             --pattern "*.whl" \
             --dir /tmp/pyheavydb-nfs
-          WHL_NAME=$(ls /tmp/pyheavydb-nfs/*.whl | xargs basename)
+          WHL_NAME=$(basename /tmp/pyheavydb-nfs/*.whl)
           echo "$WHL_NAME" > /tmp/pyheavydb-nfs/pyheavydb.whl.version
           sed -i 's|NFS_PATH=.*|NFS_PATH=/tmp/pyheavydb-nfs|' scripts/common_fn.sh
 
