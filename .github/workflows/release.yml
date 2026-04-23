@@ -51,6 +51,8 @@ jobs:
 
       - name: Download pyheavydb wheel from GitHub Release
         if: ${{ inputs.pyheavydb_release_tag != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.PRIVATE_PACKAGES_TOKEN }}
         run: |
           mkdir -p /tmp/pyheavydb-nfs
           gh release download "${{ inputs.pyheavydb_release_tag }}" \
@@ -99,6 +101,8 @@ jobs:
 
       - name: Download pyheavydb wheel from GitHub Release
         if: ${{ inputs.pyheavydb_release_tag != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.PRIVATE_PACKAGES_TOKEN }}
         run: |
           mkdir -p /tmp/pyheavydb-nfs
           gh release download "${{ inputs.pyheavydb_release_tag }}" \
@@ -151,6 +155,8 @@ jobs:
 
       - name: Download pyheavydb wheel from GitHub Release
         if: ${{ inputs.pyheavydb_release_tag != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.PRIVATE_PACKAGES_TOKEN }}
         run: |
           mkdir -p /tmp/pyheavydb-nfs
           gh release download "${{ inputs.pyheavydb_release_tag }}" \
@@ -233,3 +239,4 @@ jobs:
             --repo "${{ github.repository }}" \
             --title "heavyiq ${TAG}" \
             --notes "Built from \`${{ inputs.release_candidate || github.ref_name }}\` (${SHA}) — run [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+
