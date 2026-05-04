@@ -7,6 +7,8 @@ from llama_index.core.schema import TextNode
 
 from heavyiq.langchain.heavydb import HeavyDB
 
+pytestmark = pytest.mark.heavydb
+
 
 @pytest.mark.anyio
 async def test_determine_relevant_table_names():

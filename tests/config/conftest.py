@@ -32,11 +32,13 @@ def conf_file(tmp_path: Path, request: FixtureRequest):
     openai_config = """
     [iq]
     openai_api_key = "some-dummy-key"
+    custom_llm_type = ""
     """
     openai_config_with_data_dir = """
     data = "test-data-dir"
     [iq]
     openai_api_key = "some-dummy-key"
+    custom_llm_type = ""
     """
     custom_api_config_without_base = """
     [iq]

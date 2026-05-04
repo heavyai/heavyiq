@@ -6,6 +6,8 @@ import pytest
 
 from heavyiq.langchain.heavydb import HeavyDB
 
+pytestmark = pytest.mark.heavydb
+
 if TYPE_CHECKING:
     from heavyrag.controller import BaseController
 

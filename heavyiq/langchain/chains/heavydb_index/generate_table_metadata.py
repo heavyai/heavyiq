@@ -17,7 +17,7 @@ from langchain_core.prompts import BasePromptTemplate, PromptTemplate
 from langchain_core.outputs import LLMResult
 
 from heavyiq.langchain.exceptions import GenerateTableMetadataException
-from heavyiq.langchain.chains import BaseChain
+from heavyiq.langchain.chains.base import BaseChain
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.utils import populate_table_info_wrt_token_limit
 

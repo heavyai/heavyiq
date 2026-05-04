@@ -17,6 +17,8 @@ from tests.api.conftest import client
 from tests.fixtures.app_fixtures import session_id
 from tests.fixtures.rag_fixtures import pre_clean_table, ragdb
 
+pytestmark = pytest.mark.heavydb
+
 if TYPE_CHECKING:
     from heavyrag.database.base import Database
 

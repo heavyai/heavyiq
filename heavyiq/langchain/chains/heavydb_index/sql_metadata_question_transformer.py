@@ -10,7 +10,7 @@ from langchain_community.vectorstores.chroma import Chroma
 from pydantic import Extra
 
 from heavyiq.config import get_config
-from heavyiq.langchain.chains import BaseChain
+from heavyiq.langchain.chains.base import BaseChain
 
 rephrase_question_examples = [
     {

@@ -7,6 +7,8 @@ import pytest
 
 from heavyiq.langchain.index import HeavyDBMetadataIndex, aget_heavydb_index
 
+pytestmark = pytest.mark.heavydb
+
 
 @pytest.fixture(scope="module")
 async def metadata_index() -> AsyncIterator[HeavyDBMetadataIndex]:

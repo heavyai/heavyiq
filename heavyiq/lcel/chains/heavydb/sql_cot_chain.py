@@ -2,7 +2,6 @@ from typing import Any
 
 from langchain_core.runnables import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.pydantic_v1 import BaseModel, Field
 
 from heavyiq.langchain.heavydb import get_config
 from heavyiq.langchain.llms import is_using_custom_trained_llm

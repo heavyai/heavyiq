@@ -47,7 +47,7 @@ def test_get_config_should_pass_on_openai_llm_type_if_relevant_config_is_set(con
 def test_get_config_should_create_default_data_dir_if_not_exists(conf_file: str, openai_mock):
     openai_mock.models.list.return_value = []
     config: HeavyIQConfig = get_config(conf_file)
-    assert config.data == "./storage"
+    assert config.data == "storage"
     assert os.path.exists(config.data)
 
 

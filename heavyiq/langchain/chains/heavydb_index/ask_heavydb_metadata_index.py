@@ -1,5 +1,5 @@
 import re
-from typing import Any, Optional
+from typing import Any, ClassVar, Optional
 
 from langchain_classic.chains import LLMChain
 from langchain_core.prompts import PromptTemplate
@@ -11,7 +11,7 @@ from langchain_core.callbacks import CallbackManagerForChainRun, AsyncCallbackMa
 from pydantic import Field
 
 from heavyiq.langchain.llms import get_llm
-from heavyiq.langchain.chains import FileCallbackHandlerForChainMixin
+from heavyiq.langchain.chains.base import FileCallbackHandlerForChainMixin
 
 question_prompt_template = """Use the following description of a SQL table.
 If relevant to the question, return the text verbatim.
@@ -89,7 +89,7 @@ class AskHeavyDBMetadataIndexChain(FileCallbackHandlerForChainMixin, RetrievalQA
     If you need to restrict the tables that can be searched,
     """
 
-    no_results_answer = SQLSchemaQuestionChainNoResultsAnswer
+    no_results_answer: ClassVar[str] = SQLSchemaQuestionChainNoResultsAnswer
 
     retriever: BaseRetriever = Field(exclude=True)
     """Index to connect to. Ensure the retriever provided is filtered to the tables you want to search.
