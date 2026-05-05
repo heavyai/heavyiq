@@ -37,3 +37,9 @@ rag_storage/
 eval/
 table_documents/
 **/.vscode
+
+# PyArmor commercial license artifacts — never commit (treat as credentials).
+pyarmor-regfile-*.zip
+.pyarmor_capsule.zip
+license.lic
+.pyarmor/
