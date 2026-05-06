@@ -1,4 +1,4 @@
-from langchain.schema.runnable import Runnable, RunnableLambda, RunnablePassthrough
+from langchain_core.runnables import Runnable, RunnableLambda, RunnablePassthrough
 
 from heavyiq.config import get_config
 from heavyiq.langchain.llms import LLMType, is_using_custom_trained_llm

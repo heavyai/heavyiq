@@ -2,9 +2,9 @@ from typing import Optional
 
 from chromadb.api.types import Where
 from fastapi.concurrency import run_in_threadpool
-from langchain.schema import BaseRetriever, Document
+from langchain_core.retrievers import BaseRetriever
+from langchain_core.documents import Document
 
-from heavyiq.langchain.chains import AskHeavyDBMetadataIndexChain, SQLMetadataQuestionTransformerChain
 from heavyiq.langchain.heavydb import HeavyDB
 from heavyiq.langchain.llms import get_llm
 from heavyiq.langchain.logging import log_chain_call
@@ -82,6 +82,8 @@ class HeavyDBMetadataIndex(HeavyIQIndexWrapper):
               - answer: natural language answer
               - tables: list[str]
         """
+        from heavyiq.langchain.chains.heavydb_index.ask_heavydb_metadata_index import AskHeavyDBMetadataIndexChain
+
         retriever = self.as_retriever(allowable_tables=allowable_tables, **kwargs)
         chain = AskHeavyDBMetadataIndexChain.create(retriever=retriever)
         res: dict[str, str] = log_chain_call(chain, question, "", chain_name="ask_heavydb_metadata_index")
@@ -102,6 +104,10 @@ class HeavyDBMetadataIndex(HeavyIQIndexWrapper):
         Returns:
             Rephrased question.
         """
+        from heavyiq.langchain.chains.heavydb_index.sql_metadata_question_transformer import (
+            SQLMetadataQuestionTransformerChain,
+        )
+
         llm = get_llm(temperature=0)
         chain = SQLMetadataQuestionTransformerChain(llm=llm)
         return log_chain_call(chain, {chain.input_key: question}, "")[chain.output_key]

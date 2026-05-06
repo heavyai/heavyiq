@@ -2,7 +2,7 @@ import functools
 from typing import Awaitable, Callable, TypeVar
 from uuid import UUID
 
-from langchain import callbacks
+from langchain_core.tracers.context import collect_runs
 from langchain_core.tracers.langchain import wait_for_all_tracers
 from pydantic import BaseModel
 
@@ -46,7 +46,7 @@ def with_feedback_id(coro: Callable[..., Awaitable[T]]) -> Callable[..., Awaitab
 
         run_id: UUID | str = ""
         if is_langsmith_active:
-            with callbacks.collect_runs() as cb:
+            with collect_runs() as cb:
                 out = await coro(*args, **kwargs)
                 run_id = str(cb.traced_runs[0].id)
         else:

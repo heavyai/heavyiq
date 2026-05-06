@@ -1,4 +1,4 @@
-from langchain.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field, RootModel
 
 
 class TableChainInputType(BaseModel):
@@ -12,7 +12,5 @@ class TableChainInputType(BaseModel):
     )
 
 
-class TableChainOutputType(BaseModel):
-    """NLtoTable chain output type"""
-
-    __root__: dict[str, int] = Field(..., description="A dictionary with table names and presence as integer values.")
+class TableChainOutputType(RootModel[dict[str, int]]):
+    """NLtoTable chain output type — table names mapped to presence (0/1)."""

@@ -1,7 +1,7 @@
 from typing import Any, Optional
 
-from langchain.llms.openai import OpenAI
-from langchain.llms.vllm import VLLMOpenAI
+from langchain_openai import OpenAI
+from langchain_community.llms.vllm import VLLMOpenAI
 
 from heavyiq.config import get_config
 

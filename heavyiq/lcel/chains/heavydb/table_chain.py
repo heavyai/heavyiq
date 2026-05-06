@@ -1,7 +1,6 @@
 import re
 
-from langchain.schema import StrOutputParser
-from langchain_core.beta.runnables.context import Context
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import Runnable, RunnableBranch, RunnableLambda, RunnablePassthrough
 
 from heavyiq.langchain.heavydb import get_config, get_db
@@ -164,18 +163,20 @@ chain: Runnable = (
             snippet_ids=lambda x: x["relevant_info_table_dict"]["snippet_ids"],
             relevant_info=lambda x: x["relevant_info_table_dict"]["relevant_info"],
         )
-        | Context.setter("context")
-        | RunnablePassthrough.assign(table_info=get_and_retrieve_table_info_lambda, input=lambda x: x["question"])
-        | prompt
-        | model
-        | StrOutputParser()  # needed for chat models to efficiently convert chat message instance to str
-        | parse_output_lambda
-        | {"result": RunnablePassthrough(), "context": Context.getter("context")}
+        | RunnablePassthrough.assign(
+            parsed_tables=(
+                RunnablePassthrough.assign(table_info=get_and_retrieve_table_info_lambda, input=lambda x: x["question"])
+                | prompt
+                | model
+                | StrOutputParser()  # needed for chat models to efficiently convert chat message instance to str
+                | parse_output_lambda
+            )
+        )
         | RunnableLambda(
             lambda x: {
-                "tables": x["result"],  # pick only the tables which got a match
-                "snippet_ids": x["context"]["snippet_ids"],
-                "relevant_info": x["context"]["relevant_info"],
+                "tables": x["parsed_tables"],  # pick only the tables which got a match
+                "snippet_ids": x["snippet_ids"],
+                "relevant_info": x["relevant_info"],
             }
         )
     )

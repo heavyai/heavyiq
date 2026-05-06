@@ -1,7 +1,7 @@
 from typing import Any
 
-from langchain.schema.runnable import Runnable, RunnableBinding, RunnableConfig
-from langchain.schema.runnable.configurable import RunnableConfigurableAlternatives, RunnableConfigurableFields
+from langchain_core.runnables import Runnable, RunnableBinding, RunnableConfig
+from langchain_core.runnables.configurable import RunnableConfigurableAlternatives, RunnableConfigurableFields
 
 
 def merge_dicts(d1: dict, d2: dict) -> dict:

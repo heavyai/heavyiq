@@ -2,8 +2,8 @@ import asyncio
 from typing import Coroutine
 
 from fastapi.concurrency import run_in_threadpool
-from langchain.pydantic_v1 import BaseModel, Field
-from langchain.schema.runnable import Runnable, RunnableLambda, RunnablePassthrough
+from pydantic import BaseModel, Field
+from langchain_core.runnables import Runnable, RunnableLambda, RunnablePassthrough
 
 from heavyiq.langchain.heavydb import HeavyDB, get_db
 

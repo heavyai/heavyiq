@@ -58,10 +58,9 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     log_to_stdout: bool = False
     enable_debug_endpoints: bool = False
     enable_llm_cache: bool = False
-    # CUSTOM LLM
-    custom_llm_type: str = "API_VLLM"
-
-    """ 'API' or 'API_VLLM' or 'AZURE' """
+    # CUSTOM LLM (None = use native OpenAI models from openai_gpt_model* fields)
+    custom_llm_type: Optional[str] = "API_VLLM"
+    """ 'API' or 'API_VLLM' or 'AZURE' or None """
     custom_llm_api_base: str = "https://api.heavy.ai/v1"  # LLMType.DEFAULT
     custom_llm_api_context_window: int = 15552  # LLMType.DEFAULT
     custom_llm_api_nl_to_sql_base: Optional[str] = None  # LLMType.NL_TO_SQL

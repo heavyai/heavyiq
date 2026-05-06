@@ -6,6 +6,8 @@ from fastapi.testclient import TestClient
 from heavyiq.config import HeavyIQConfig
 from tests import aoverride_config, override_config
 
+pytestmark = pytest.mark.heavydb
+
 
 @pytest.mark.anyio
 @aoverride_config

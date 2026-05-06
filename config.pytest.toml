@@ -1,0 +1,31 @@
+# Default config for pytest when --config-path is not passed.
+# Does not require a reachable custom LLM or embeddings server (see tests/conftest.py).
+
+[iq]
+openai_api_key = "sk-test-offline-not-used"
+custom_llm_type = "API_VLLM"
+custom_llm_api_base = "http://127.0.0.1:1/v1"
+
+heavydb_host = "127.0.0.1"
+heavydb_port = 6274
+heavydb_protocol = "binary"
+heavydb_dbname = "heavyai"
+heavydb_username = "admin"
+heavydb_password = "HyperInteractive"
+
+metadata_index_dir = "testdb"
+langsmith_project = ""
+langsmith_api_key = ""
+log_to_stdout = true
+
+access_log_level = "INFO"
+heavyiq_log_level = "INFO"
+heavyrag_log_level = "INFO"
+
+data = "test_storage"
+enable_rag = true
+# Empty: tests use LlamaIndex MockEmbedding (tests/conftest.py) instead of a remote server.
+rag_embed_server_base = ""
+rag_embed_dimension = 1024
+rag_database_uri = "sqlite:///test_ragdb.sqlite"
+rag_vectordb_type = "faiss"

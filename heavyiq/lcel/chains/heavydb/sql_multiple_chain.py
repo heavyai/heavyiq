@@ -4,7 +4,7 @@
 import math
 from typing import Any
 
-from langchain.schema.runnable import Runnable, RunnableLambda, RunnablePassthrough
+from langchain_core.runnables import Runnable, RunnableLambda, RunnablePassthrough
 
 from heavyiq.langchain.heavydb import get_config, get_db
 from heavyiq.langchain.llms import LLMType, get_llm_by_type

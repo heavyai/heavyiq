@@ -37,6 +37,10 @@ def validate_config(iq: HeavyIQConfig) -> AppConfig:
     Validates app config after it's creation.
     This involves basic validation of configs and creation of directory mentioned if not exists.
     """
+    # Empty string opts back into the native-OpenAI flow (TOML can't express null).
+    if isinstance(iq.custom_llm_type, str) and iq.custom_llm_type.strip() == "":
+        iq.custom_llm_type = None
+
     if iq.custom_llm_type is None or iq.custom_llm_type == "AZURE":
         if iq.custom_llm_type == "AZURE" and (
             iq.custom_llm_azure_deployment_name.strip() == ""

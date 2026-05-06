@@ -1,4 +1,4 @@
-from langchain.pydantic_v1 import Field
+from pydantic import Field
 
 from .answer_type import AnswerChainOutputType
 from .auto_sql_type import AutoSQLChainInputType

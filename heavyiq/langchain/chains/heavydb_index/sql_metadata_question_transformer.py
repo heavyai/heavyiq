@@ -1,16 +1,16 @@
 from typing import Any, Optional
 
-from langchain.base_language import BaseLanguageModel
-from langchain.callbacks.manager import AsyncCallbackManagerForChainRun, CallbackManagerForChainRun
-from langchain.chains import LLMChain
-from langchain.prompts import FewShotPromptTemplate, PromptTemplate
-from langchain.prompts.example_selector import MaxMarginalRelevanceExampleSelector
+from langchain_core.language_models import BaseLanguageModel
+from langchain_core.callbacks import AsyncCallbackManagerForChainRun, CallbackManagerForChainRun
+from langchain_classic.chains import LLMChain
+from langchain_core.prompts import FewShotPromptTemplate, PromptTemplate
+from langchain_core.example_selectors import MaxMarginalRelevanceExampleSelector
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores.chroma import Chroma
 from pydantic import Extra
 
 from heavyiq.config import get_config
-from heavyiq.langchain.chains import BaseChain
+from heavyiq.langchain.chains.base import BaseChain
 
 rephrase_question_examples = [
     {

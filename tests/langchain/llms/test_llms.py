@@ -25,13 +25,13 @@ def test_should_check_whether_custom_llm_used_or_not():
 @pytest.mark.parametrize(
     "model_type, beam_width, expected",
     [
-        (LLMType.DEFAULT, 1, ({}, {})),
+        (LLMType.DEFAULT, 1, ({"seed": 42}, {})),
         (
             LLMType.NL_TO_SQL,
             2,
-            ({"n": 1, "best_of": 2, "max_tokens": 612}, {"extra_body": {"logprobs": 5, "use_beam_search": True}}),
+            ({"seed": 42, "n": 1, "best_of": 2, "max_tokens": 612}, {"logprobs": 5, "use_beam_search": True}),
         ),
-        (LLMType.SQL_TO_ANSWER, 2, ({}, {})),
+        (LLMType.SQL_TO_ANSWER, 2, ({"seed": 42}, {})),
     ],
 )
 def test_get_vllm_model_kwargs_should_return_model_kwargs_for_valid_llm_type(
@@ -73,6 +73,7 @@ def test_llm_by_type_should_return_corresponding_openai_llm(model_type, models, 
         "heavyiq.langchain.llms.get_config",
         return_value=HeavyIQConfig(
             openai_api_key="dummy-key",
+            custom_llm_type=None,
             openai_gpt_model=models[0],
             openai_gpt_model_nl_to_sql=models[1],
             openai_gpt_model_sql_to_answer=models[2],

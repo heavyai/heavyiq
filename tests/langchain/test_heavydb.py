@@ -7,15 +7,19 @@ import pytest
 from heavyiq.config import HeavyIQConfig
 from heavyiq.langchain import HeavyDB
 
+pytestmark = pytest.mark.heavydb
+
 # always apply nest_asyncio when the module contain more than one async test cases
 nest_asyncio.apply()
 
 
 @pytest.mark.asyncio
 async def test_aget_single_table_info_should_pass_for_inline_column_metadata(
-    mock_heavy_db: HeavyDB,
+    mock_heavy_db: HeavyDB | None,
     heavyiq_config: HeavyIQConfig,
 ):
+    if mock_heavy_db is None:
+        pytest.skip("HeavyDB not reachable at configured host; run with live DB for this integration test.")
     tablename = "usa_states"
     heavyiq_config.inline_column_metadata_on_table_info_prompt = True
     with patch("heavyiq.langchain.heavydb.get_config", return_value=heavyiq_config):
@@ -30,9 +34,11 @@ async def test_aget_single_table_info_should_pass_for_inline_column_metadata(
 
 @pytest.mark.asyncio
 async def test_aget_single_table_info_should_pass_for_not_inline_column_metadata(
-    mock_heavy_db: HeavyDB,
+    mock_heavy_db: HeavyDB | None,
     heavyiq_config: HeavyIQConfig,
 ):
+    if mock_heavy_db is None:
+        pytest.skip("HeavyDB not reachable at configured host; run with live DB for this integration test.")
     tablename = "usa_states"
     heavyiq_config.inline_column_metadata_on_table_info_prompt = False
     with patch("heavyiq.langchain.heavydb.get_config", return_value=heavyiq_config):
