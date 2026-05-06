@@ -1,9 +1,7 @@
 name: Release
+run-name: ${{ inputs.description != '' && format('heavyiq — {0}', inputs.description) || 'heavyiq Release' }}
 
 on:
-  push:
-    branches:
-      - misiug/gh-actions-release
   workflow_dispatch:
     inputs:
       release_candidate:
@@ -30,6 +28,10 @@ on:
         description: 'Create a GitHub Release with the built artifacts'
         type: boolean
         default: true
+      description:
+        description: 'Build description label'
+        type: string
+        default: ''
 
 jobs:
   build-ubuntu:
@@ -235,8 +237,11 @@ jobs:
         run: |
           SHA="${{ github.sha }}"
           TAG="heavyiq-${SHA::8}"
+          TITLE="heavyiq ${TAG}"
+          if [ -n "${{ inputs.description }}" ]; then
+            TITLE="$TITLE — ${{ inputs.description }}"
+          fi
           gh release create "$TAG" release-assets/* \
             --repo "${{ github.repository }}" \
-            --title "heavyiq ${TAG}" \
+            --title "$TITLE" \
             --notes "Built from \`${{ inputs.release_candidate || github.ref_name }}\` (${SHA}) — run [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-
