@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # Module for ingesting/inserting or deleting data into vectorDB specifically for chromadb
 # Import this module only if the vector_db_type is set to chroma
 import asyncio

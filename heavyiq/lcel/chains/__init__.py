@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from .heavydb.answer_chain import chain as answer_chain
 from .heavydb.auto_answer_chain import chain as auto_answer_chain
 from .heavydb.auto_sql_chain import chain as auto_sql_chain

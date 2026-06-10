@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 DEFAULT_NL_TO_SQL_PROMPT = (
     "<|sql prompt|>\n",
     """You are an expert data analyst adept at writing SQL queries to answer user questions.

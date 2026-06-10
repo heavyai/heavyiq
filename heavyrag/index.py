@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # Module for creating various indexes
 from llama_index.core import StorageContext, VectorStoreIndex, load_index_from_storage
 from llama_index.core.indices.base import BaseIndex

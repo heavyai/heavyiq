@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # This module contains prompts for generating Natural Language questions
 
 TABLES_TO_NL_QUESTIONS_TEMPLATE = """

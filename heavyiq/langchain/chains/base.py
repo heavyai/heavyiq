@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from langchain_classic.chains.base import Chain
 from langchain_core.callbacks import CallbackManagerForChainRun, AsyncCallbackManagerForChainRun
 from heavyiq.logging_utils import get_heavyiq_logger

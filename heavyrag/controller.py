@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # Controller class which helps to make CRUD operations on the vectorstore irrespective of it's type.
 # CRUD Operations ->
 #     - Snippets/facts

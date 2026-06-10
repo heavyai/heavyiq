@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from langchain_core.runnables import Runnable, RunnableLambda
 
 from heavyiq.langchain.heavydb import get_config, get_db

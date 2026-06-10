@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # contain chain endpoints implemented using Langchain Expression Language (LCEL)
 from fastapi import APIRouter, Depends
 

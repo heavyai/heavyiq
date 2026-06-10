@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # This router contain endpoints that serve as triggering points for tasks running in the background.
 
 from fastapi import APIRouter, BackgroundTasks, Request

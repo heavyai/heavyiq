@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # Module contain different filters used for node retrieval
 
 from llama_index.core.vector_stores import FilterCondition, FilterOperator, MetadataFilter, MetadataFilters

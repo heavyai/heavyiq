@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from llama_index.core.evaluation.relevancy import DEFAULT_EVAL_TEMPLATE as DEFAULT_REL_EVAL_TEMPLATE
 from llama_index.core.evaluation.relevancy import DEFAULT_REFINE_TEMPLATE as DEFAULT_REL_REFINE_TEMPLATE
 from llama_index.core.prompts.base import PromptTemplate

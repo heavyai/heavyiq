@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # This module should be loaded on gunicorn worker process
 # Moule helps to transform list of documents into list of nodes
 from llama_index.core.ingestion import IngestionPipeline

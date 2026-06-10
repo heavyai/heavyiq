@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # Module helps to query the underlying vectorstore
 from llama_index.core import VectorStoreIndex
 from llama_index.core.vector_stores import MetadataFilters

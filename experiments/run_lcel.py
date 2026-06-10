@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # Script which helps to run LCEL runnable chains
 # You can play with any defined functions by passing heavydb_session id to each
 # python run_lcel.py <heavydb_session_id>

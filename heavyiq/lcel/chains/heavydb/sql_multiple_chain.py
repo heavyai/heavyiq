@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # Generate multiple SQL queries
 # Pass them to judge llm which is supposed to produce 1 and 0 for valid sql queries
 # Pick the right one having the highest probability
