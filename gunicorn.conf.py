@@ -14,6 +14,8 @@ except ImportError:
     pass
 
 chromadb_process, DB_PATH, PORT, HOST, LOG_PATH = None, None, None, None, None
+# ChromaDB is started as a local sidecar; bind to localhost only (CVE-2026-45829 mitigation).
+CHROMA_SERVER_BIND_HOST = "127.0.0.1"
 
 
 def start_chromadb_server_process():
@@ -27,13 +29,30 @@ def start_chromadb_server_process():
         # Open log file
         log_file = open(LOG_PATH, "a")
         # Start the ChromaDB server and redirect stdout and stderr to the log file
+        if HOST not in ("127.0.0.1", "localhost", "::1"):
+            print(
+                "Overriding ChromaDB bind host {!r} with {!r} for local sidecar deployment.".format(
+                    HOST, CHROMA_SERVER_BIND_HOST
+                )
+            )
         chromadb_process = subprocess.Popen(
-            ["chroma", "run", "--path", DB_PATH, "--host", HOST, "--port", str(PORT)], stdout=log_file, stderr=log_file
+            [
+                "chroma",
+                "run",
+                "--path",
+                DB_PATH,
+                "--host",
+                CHROMA_SERVER_BIND_HOST,
+                "--port",
+                str(PORT),
+            ],
+            stdout=log_file,
+            stderr=log_file,
         )
         os.environ["CHROMADB_STARTED"] = "1"
         print(
             "Started chromadb server...\nArgs:\n--path {}\n--host {}\n--port {}\nSee logs at {}".format(
-                DB_PATH, HOST, PORT, log_file.name
+                DB_PATH, CHROMA_SERVER_BIND_HOST, PORT, log_file.name
             )
         )
         return True
