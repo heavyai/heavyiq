@@ -96,11 +96,10 @@ pytest tests/api/test_lcel.py  -rs --config-path config.test.toml -n 0 --maxfail
 
 ## Deployment
 
-### Create Obfuscated Build
+### Create Production Build
 
 ```bash
-pyarmor gen ./modules
-cp app.py ./dist/app.py
+bash scripts/build_prod.sh
 ```
 
 ### Run Production Server Process
@@ -110,4 +109,3 @@ $ gunicorn -w 4 -k uvicorn.workers.UvicornWorker 'heavyiq.api:create_app("./path
 ```
 
 Port can be specified in above command with command line flag `-b :8080`
-

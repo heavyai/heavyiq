@@ -80,6 +80,18 @@ function test_for_include_all_deps() {
   find ./packages -type f > ./dist/requirements.packages.txt
 }
 
+function copy_source_to_dist() {
+  if [[ ! -d ./dist ]] ; then
+    echo "Error. dist directory must exist before copying source"
+    return 1
+  fi
+
+  rm -rf ./dist/heavyiq ./dist/heavyrag
+  cp -r ./heavyiq ./dist/heavyiq
+  cp -r ./heavyrag ./dist/heavyrag
+  cp gunicorn.conf.py ./dist/gunicorn.conf.py
+}
+
 function update_pyheavydb_reference() {
   if [[ $INTERNALLY_RELEASED_PYHEAVYDB == "false" ]]; then
     return
