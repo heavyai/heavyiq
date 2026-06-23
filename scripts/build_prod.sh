@@ -13,6 +13,7 @@ python3.10 -m venv venv
 
 
 # Install Requirements
+rm -rf ./dist
 mkdir -p ./dist
 cp requirements.txt ./dist/requirements.txt
 
@@ -37,17 +38,8 @@ pip freeze -l > ./dist/requirements.txt
 # for pyheavydb.  We need a relative path
 update_pyheavydb_reference ./dist/requirements.txt
 
-pip install -r ./requirements-build-prod.txt
-
-# Create Obfuscated Build
-pyarmor reg pyarmor-regfile-5130.zip
-
-# Note the pyarmor step can create the
-# ./dist dir if it doesn't already exist.
-pyarmor gen ./heavyiq
-pyarmor gen ./heavyrag
-cp -r heavyiq/langchain/tokenizer_models/ ./dist/heavyiq/langchain/tokenizer_models/
-cp gunicorn.conf.py ./dist/gunicorn.conf.py
+# Create production source build
+copy_source_to_dist
 
 # Create version.txt
 mkdir -p dist/public

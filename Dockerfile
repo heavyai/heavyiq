@@ -1,26 +1,13 @@
-FROM python:3.10 AS obfuscator
+FROM python:3.10
 
 WORKDIR /usr/src/app
 
 COPY config.toml ./
-COPY pyarmor-regfile-5130.zip ./
 COPY requirements.txt ./
-COPY requirements-dev.txt ./
 COPY gunicorn.conf.py ./
 COPY heavyiq/ ./heavyiq/
+COPY heavyrag/ ./heavyrag/
 
-RUN pip install --no-cache-dir pyarmor
-RUN pyarmor reg pyarmor-regfile-5130.zip
-RUN pyarmor gen ./heavyiq
-
-FROM python:3.10 AS runner
-
-WORKDIR /usr/src/app
-
-COPY --from=obfuscator /usr/src/app/dist/ ./
-COPY --from=obfuscator /usr/src/app/requirements.txt ./requirements.txt
-COPY --from=obfuscator /usr/src/app/config.toml ./config.toml
-COPY --from=obfuscator /usr/src/app/heavyiq/langchain/tokenizer_models/ ./heavyiq/langchain/tokenizer_models/
 RUN pip install --no-cache-dir --upgrade -r ./requirements.txt
 
 EXPOSE 8000

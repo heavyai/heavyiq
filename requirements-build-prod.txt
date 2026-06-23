@@ -1,2 +1,2 @@
-# Only used in build_prod.sh, build_prod_rhel.sh
-pyarmor==9.2.1
+# Reserved for production build-time dependencies.
+# Source packaging currently does not require any.
