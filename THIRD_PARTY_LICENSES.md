@@ -29,7 +29,7 @@ Total runtime packages: **177**. Full license texts are under [`LICENSES/`](LICE
 | cachetools | 6.2.2 | [MIT](LICENSES/MIT.txt) | [pypi.org/cachetools](https://pypi.org/project/cachetools/6.2.2/) | [source](https://github.com/tkem/cachetools/) |
 | certifi | 2025.11.12 | [MPL-2.0](LICENSES/MPL-2.0.txt) | [pypi.org/certifi](https://pypi.org/project/certifi/2025.11.12/) | [source](https://github.com/certifi/python-certifi) |
 | charset-normalizer | 3.4.4 | [MIT](LICENSES/MIT.txt) | [pypi.org/charset-normalizer](https://pypi.org/project/charset-normalizer/3.4.4/) | [source](https://pypi.org/project/charset-normalizer/) |
-| chromadb | 1.3.5 | [Apache-2.0](LICENSES/Apache-2.0.txt) | [pypi.org/chromadb](https://pypi.org/project/chromadb/1.3.5/) | [source](https://github.com/chroma-core/chroma) |
+| chromadb | 1.5.9 | [Apache-2.0](LICENSES/Apache-2.0.txt) | [pypi.org/chromadb](https://pypi.org/project/chromadb/1.5.9/) | [source](https://github.com/chroma-core/chroma) |
 | click | 8.3.1 | [BSD-3-Clause](LICENSES/BSD-3-Clause.txt) | [pypi.org/click](https://pypi.org/project/click/8.3.1/) | [source](https://github.com/pallets/click/) |
 | colorama | 0.4.6 | [BSD-3-Clause](LICENSES/BSD-3-Clause.txt) | [pypi.org/colorama](https://pypi.org/project/colorama/0.4.6/) | [source](https://github.com/tartley/colorama) |
 | coloredlogs | 15.0.1 | [MIT](LICENSES/MIT.txt) | [pypi.org/coloredlogs](https://pypi.org/project/coloredlogs/15.0.1/) | [source](https://coloredlogs.readthedocs.io) |
@@ -1582,10 +1582,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### chromadb 1.3.5
+### chromadb 1.5.9
 
 *License: Apache-2.0 — SPDX text: [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html)*  
-*Verify (PyPI): https://pypi.org/project/chromadb/1.3.5/*  
+*Verify (PyPI): https://pypi.org/project/chromadb/1.5.9/*  
 *Source: https://github.com/chroma-core/chroma*
 
 ```

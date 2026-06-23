@@ -66,8 +66,9 @@ function test_for_include_all_deps() {
 
   ## For the "rhel" case, copy RHEL-specific files directly
   if [[ $requirements_file_rhel == "rhel" ]]; then
-    # Replace the downloaded chromadb-0.5.3-py3-none-any.whl with the one in scripts/assets
-    cp scripts/assets/chromadb-0.5.3-py3-none-any.whl ./packages/
+    # Replace the downloaded chromadb wheel with the one in scripts/assets
+    rm -f ./packages/chromadb-*.whl
+    cp scripts/assets/chromadb-1.5.9-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl ./packages/
     cp scripts/assets/pysqlite3_binary-0.5.3-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl ./packages/
 
     # Replace PyPika with a binary version found in scripts/assets
