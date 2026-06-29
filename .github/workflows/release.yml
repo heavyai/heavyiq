@@ -28,6 +28,10 @@ on:
         description: 'Create a GitHub Release with the built artifacts'
         type: boolean
         default: true
+      mark_as_latest:
+        description: 'Promote this release to the repo latest (enables RC builder auto-pull)'
+        type: boolean
+        default: false
       description:
         description: 'Build description label'
         type: string
@@ -245,3 +249,6 @@ jobs:
             --repo "${{ github.repository }}" \
             --title "$TITLE" \
             --notes "Built from \`${{ inputs.release_candidate || github.ref_name }}\` (${SHA}) — run [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          if [ "${{ inputs.mark_as_latest }}" = "true" ]; then
+            gh release edit "$TAG" --repo "${{ github.repository }}" --latest
+          fi
