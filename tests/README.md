@@ -63,13 +63,9 @@ pytest tests --disable-warnings -rs -n 0 --maxfail=1 -m "not heavydb"
 
 Either form leaves config / langchain LLM / RAG-snippet-vectorstore unit tests running and skips the ones that would otherwise call `HeavyDB.from_env()` / `HeavyDB.from_env_async()`.
 
-Before running the testcases for heavyrag, make sure to run the chromadb server beforehand like below,
+HeavyRAG tests use an embedded ChromaDB `PersistentClient` fixture (see `tests/heavyrag/conftest.py`), so a separate `chroma run` server is not required.
 
-```bash
-chroma run --port 6271
-```
-
-And then run the integration tests,
+Run the integration tests with:
 
 ```bash
 pytest tests/heavyrag/test_controller.py -rs --config-path config.test.toml -n 0 --maxfail=1
