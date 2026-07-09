@@ -160,7 +160,7 @@ class HeavyIQConfig(OverrideBaseConfig):  # type: ignore
     rag_vectordb_type: Literal["chroma", "faiss"] = "chroma"  # type of vectordb used for embeddings storage and search
     rag_storage_persist_dir: str = "rag_storage"
     rag_documents_source_dir: str = "rag_sources"
-    rag_chromadb_persist_dir: str = rag_storage_persist_dir + "/chromadb"  # persistant client
+    rag_chromadb_persist_dir: str = rag_storage_persist_dir + "/chromadb"  # ChromaDB sidecar persistence path
     rag_chromadb_server_base: str = "http://127.0.0.1:6271"
     rag_faiss_persist_dir: str = rag_storage_persist_dir + "/faiss"  # persistant client
     rag_document_pdf_parser_url: str = ""

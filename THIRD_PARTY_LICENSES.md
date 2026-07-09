@@ -72,17 +72,17 @@ Total runtime packages: **177**. Full license texts are under [`LICENSES/`](LICE
 | jsonschema | 4.25.1 | [MIT](LICENSES/MIT.txt) | [pypi.org/jsonschema](https://pypi.org/project/jsonschema/4.25.1/) | [source](https://github.com/python-jsonschema/jsonschema) |
 | jsonschema-specifications | 2025.9.1 | [MIT](LICENSES/MIT.txt) | [pypi.org/jsonschema-specifications](https://pypi.org/project/jsonschema-specifications/2025.9.1/) | [source](https://github.com/python-jsonschema/jsonschema-specifications) |
 | kubernetes | 34.1.0 | [Apache-2.0](LICENSES/Apache-2.0.txt) | [pypi.org/kubernetes](https://pypi.org/project/kubernetes/34.1.0/) | [source](https://github.com/kubernetes-client/python) |
-| langchain | 1.1.2 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain](https://pypi.org/project/langchain/1.1.2/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/langchain) |
-| langchain-classic | 1.0.0 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-classic](https://pypi.org/project/langchain-classic/1.0.0/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/langchain) |
-| langchain-community | 0.4.1 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-community](https://pypi.org/project/langchain-community/0.4.1/) | [source](https://github.com/langchain-ai/langchain-community) |
-| langchain-core | 1.1.1 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-core](https://pypi.org/project/langchain-core/1.1.1/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/core) |
-| langchain-openai | 1.1.0 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-openai](https://pypi.org/project/langchain-openai/1.1.0/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/partners/openai) |
-| langchain-text-splitters | 1.0.0 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-text-splitters](https://pypi.org/project/langchain-text-splitters/1.0.0/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/text-splitters) |
-| langgraph | 1.0.4 | [MIT](LICENSES/MIT.txt) | [pypi.org/langgraph](https://pypi.org/project/langgraph/1.0.4/) | [source](https://github.com/langchain-ai/langgraph/tree/main/libs/langgraph) |
+| langchain | 1.3.12 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain](https://pypi.org/project/langchain/1.3.12/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/langchain) |
+| langchain-classic | 1.0.8 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-classic](https://pypi.org/project/langchain-classic/1.0.8/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/langchain) |
+| langchain-community | 0.4.2 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-community](https://pypi.org/project/langchain-community/0.4.2/) | [source](https://github.com/langchain-ai/langchain-community) |
+| langchain-core | 1.4.9 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-core](https://pypi.org/project/langchain-core/1.4.9/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/core) |
+| langchain-openai | 1.3.0 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-openai](https://pypi.org/project/langchain-openai/1.3.0/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/partners/openai) |
+| langchain-text-splitters | 1.1.2 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-text-splitters](https://pypi.org/project/langchain-text-splitters/1.1.2/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/text-splitters) |
+| langgraph | 1.2.5 | [MIT](LICENSES/MIT.txt) | [pypi.org/langgraph](https://pypi.org/project/langgraph/1.2.5/) | [source](https://github.com/langchain-ai/langgraph/tree/main/libs/langgraph) |
 | langgraph-checkpoint | 3.0.1 | [MIT](LICENSES/MIT.txt) | [pypi.org/langgraph-checkpoint](https://pypi.org/project/langgraph-checkpoint/3.0.1/) | [source](https://www.github.com/langchain-ai/langgraph) |
 | langgraph-prebuilt | 1.0.5 | [MIT](LICENSES/MIT.txt) | [pypi.org/langgraph-prebuilt](https://pypi.org/project/langgraph-prebuilt/1.0.5/) | [source](https://github.com/langchain-ai/langgraph/tree/main/libs/prebuilt) |
 | langgraph-sdk | 0.2.15 | [MIT](LICENSES/MIT.txt) | [pypi.org/langgraph-sdk](https://pypi.org/project/langgraph-sdk/0.2.15/) | [source](https://github.com/langchain-ai/langgraph/tree/main/libs/sdk-py) |
-| langsmith | 0.4.56 | [MIT](LICENSES/MIT.txt) | [pypi.org/langsmith](https://pypi.org/project/langsmith/0.4.56/) | [source](https://github.com/langchain-ai/langsmith-sdk) |
+| langsmith | 0.8.15 | [MIT](LICENSES/MIT.txt) | [pypi.org/langsmith](https://pypi.org/project/langsmith/0.8.15/) | [source](https://github.com/langchain-ai/langsmith-sdk) |
 | llama-index-core | 0.14.10 | [MIT](LICENSES/MIT.txt) | [pypi.org/llama-index-core](https://pypi.org/project/llama-index-core/0.14.10/) | [source](https://github.com/run-llama/llama_index) |
 | llama-index-embeddings-openai | 0.5.1 | [MIT](LICENSES/MIT.txt) | [pypi.org/llama-index-embeddings-openai](https://pypi.org/project/llama-index-embeddings-openai/0.5.1/) | [source](https://pypi.org/project/llama-index-embeddings-openai/) |
 | llama-index-embeddings-text-embeddings-inference | 0.4.2 | [MIT](LICENSES/MIT.txt) | [pypi.org/llama-index-embeddings-text-embeddings-inference](https://pypi.org/project/llama-index-embeddings-text-embeddings-inference/0.4.2/) | [source](https://pypi.org/project/llama-index-embeddings-text-embeddings-inference/) |
@@ -5731,10 +5731,10 @@ Apache License
    limitations under the License.
 ```
 
-### langchain 1.1.2
+### langchain 1.3.12
 
 *License: MIT — SPDX text: [MIT](https://spdx.org/licenses/MIT.html)*  
-*Verify (PyPI): https://pypi.org/project/langchain/1.1.2/*  
+*Verify (PyPI): https://pypi.org/project/langchain/1.3.12/*  
 *Source: https://github.com/langchain-ai/langchain/tree/master/libs/langchain*
 
 ```
@@ -5761,10 +5761,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### langchain-classic 1.0.0
+### langchain-classic 1.0.8
 
 *License: MIT — SPDX text: [MIT](https://spdx.org/licenses/MIT.html)*  
-*Verify (PyPI): https://pypi.org/project/langchain-classic/1.0.0/*  
+*Verify (PyPI): https://pypi.org/project/langchain-classic/1.0.8/*  
 *Source: https://github.com/langchain-ai/langchain/tree/master/libs/langchain*
 
 ```
@@ -5791,26 +5791,26 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### langchain-community 0.4.1
+### langchain-community 0.4.2
 
 *License: MIT — SPDX text: [MIT](https://spdx.org/licenses/MIT.html)*  
-*Verify (PyPI): https://pypi.org/project/langchain-community/0.4.1/*  
+*Verify (PyPI): https://pypi.org/project/langchain-community/0.4.2/*  
 *Source: https://github.com/langchain-ai/langchain-community*
 
 _No license file bundled in the wheel; see the license type text in [`LICENSES/MIT.txt`](LICENSES/MIT.txt) and the project page above._
 
-### langchain-core 1.1.1
+### langchain-core 1.4.9
 
 *License: MIT — SPDX text: [MIT](https://spdx.org/licenses/MIT.html)*  
-*Verify (PyPI): https://pypi.org/project/langchain-core/1.1.1/*  
+*Verify (PyPI): https://pypi.org/project/langchain-core/1.4.9/*  
 *Source: https://github.com/langchain-ai/langchain/tree/master/libs/core*
 
 _No license file bundled in the wheel; see the license type text in [`LICENSES/MIT.txt`](LICENSES/MIT.txt) and the project page above._
 
-### langchain-openai 1.1.0
+### langchain-openai 1.3.0
 
 *License: MIT — SPDX text: [MIT](https://spdx.org/licenses/MIT.html)*  
-*Verify (PyPI): https://pypi.org/project/langchain-openai/1.1.0/*  
+*Verify (PyPI): https://pypi.org/project/langchain-openai/1.3.0/*  
 *Source: https://github.com/langchain-ai/langchain/tree/master/libs/partners/openai*
 
 ```
@@ -5837,18 +5837,18 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### langchain-text-splitters 1.0.0
+### langchain-text-splitters 1.1.2
 
 *License: MIT — SPDX text: [MIT](https://spdx.org/licenses/MIT.html)*  
-*Verify (PyPI): https://pypi.org/project/langchain-text-splitters/1.0.0/*  
+*Verify (PyPI): https://pypi.org/project/langchain-text-splitters/1.1.2/*  
 *Source: https://github.com/langchain-ai/langchain/tree/master/libs/text-splitters*
 
 _No license file bundled in the wheel; see the license type text in [`LICENSES/MIT.txt`](LICENSES/MIT.txt) and the project page above._
 
-### langgraph 1.0.4
+### langgraph 1.2.5
 
 *License: MIT — SPDX text: [MIT](https://spdx.org/licenses/MIT.html)*  
-*Verify (PyPI): https://pypi.org/project/langgraph/1.0.4/*  
+*Verify (PyPI): https://pypi.org/project/langgraph/1.2.5/*  
 *Source: https://github.com/langchain-ai/langgraph/tree/main/libs/langgraph*
 
 ```
@@ -5965,10 +5965,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### langsmith 0.4.56
+### langsmith 0.8.15
 
 *License: MIT — SPDX text: [MIT](https://spdx.org/licenses/MIT.html)*  
-*Verify (PyPI): https://pypi.org/project/langsmith/0.4.56/*  
+*Verify (PyPI): https://pypi.org/project/langsmith/0.8.15/*  
 *Source: https://github.com/langchain-ai/langsmith-sdk*
 
 _No license file bundled in the wheel; see the license type text in [`LICENSES/MIT.txt`](LICENSES/MIT.txt) and the project page above._
