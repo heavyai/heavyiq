@@ -71,7 +71,7 @@ function test_for_include_all_deps() {
   if [[ $requirements_file_rhel == "rhel" ]]; then
     # Replace the downloaded chromadb wheel with the one in scripts/assets
     rm -f ./packages/chromadb-*.whl
-    cp scripts/assets/chromadb-1.5.9-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl ./packages/
+    cp scripts/assets/chromadb-1.5.10.dev197-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl ./packages/
     cp scripts/assets/pysqlite3_binary-0.5.3-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl ./packages/
 
     # Replace PyPika with a binary version found in scripts/assets
