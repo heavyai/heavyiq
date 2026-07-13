@@ -72,17 +72,17 @@ Total runtime packages: **177**. Full license texts are under [`LICENSES/`](LICE
 | jsonschema | 4.25.1 | [MIT](LICENSES/MIT.txt) | [pypi.org/jsonschema](https://pypi.org/project/jsonschema/4.25.1/) | [source](https://github.com/python-jsonschema/jsonschema) |
 | jsonschema-specifications | 2025.9.1 | [MIT](LICENSES/MIT.txt) | [pypi.org/jsonschema-specifications](https://pypi.org/project/jsonschema-specifications/2025.9.1/) | [source](https://github.com/python-jsonschema/jsonschema-specifications) |
 | kubernetes | 34.1.0 | [Apache-2.0](LICENSES/Apache-2.0.txt) | [pypi.org/kubernetes](https://pypi.org/project/kubernetes/34.1.0/) | [source](https://github.com/kubernetes-client/python) |
-| langchain | 1.3.12 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain](https://pypi.org/project/langchain/1.3.12/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/langchain) |
+| langchain | 1.3.13 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain](https://pypi.org/project/langchain/1.3.13/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/langchain) |
 | langchain-classic | 1.0.8 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-classic](https://pypi.org/project/langchain-classic/1.0.8/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/langchain) |
 | langchain-community | 0.4.2 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-community](https://pypi.org/project/langchain-community/0.4.2/) | [source](https://github.com/langchain-ai/langchain-community) |
 | langchain-core | 1.4.9 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-core](https://pypi.org/project/langchain-core/1.4.9/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/core) |
-| langchain-openai | 1.3.0 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-openai](https://pypi.org/project/langchain-openai/1.3.0/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/partners/openai) |
+| langchain-openai | 1.3.5 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-openai](https://pypi.org/project/langchain-openai/1.3.5/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/partners/openai) |
 | langchain-text-splitters | 1.1.2 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-text-splitters](https://pypi.org/project/langchain-text-splitters/1.1.2/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/text-splitters) |
-| langgraph | 1.2.5 | [MIT](LICENSES/MIT.txt) | [pypi.org/langgraph](https://pypi.org/project/langgraph/1.2.5/) | [source](https://github.com/langchain-ai/langgraph/tree/main/libs/langgraph) |
+| langgraph | 1.2.9 | [MIT](LICENSES/MIT.txt) | [pypi.org/langgraph](https://pypi.org/project/langgraph/1.2.9/) | [source](https://github.com/langchain-ai/langgraph/tree/main/libs/langgraph) |
 | langgraph-checkpoint | 3.0.1 | [MIT](LICENSES/MIT.txt) | [pypi.org/langgraph-checkpoint](https://pypi.org/project/langgraph-checkpoint/3.0.1/) | [source](https://www.github.com/langchain-ai/langgraph) |
 | langgraph-prebuilt | 1.0.5 | [MIT](LICENSES/MIT.txt) | [pypi.org/langgraph-prebuilt](https://pypi.org/project/langgraph-prebuilt/1.0.5/) | [source](https://github.com/langchain-ai/langgraph/tree/main/libs/prebuilt) |
 | langgraph-sdk | 0.2.15 | [MIT](LICENSES/MIT.txt) | [pypi.org/langgraph-sdk](https://pypi.org/project/langgraph-sdk/0.2.15/) | [source](https://github.com/langchain-ai/langgraph/tree/main/libs/sdk-py) |
-| langsmith | 0.8.15 | [MIT](LICENSES/MIT.txt) | [pypi.org/langsmith](https://pypi.org/project/langsmith/0.8.15/) | [source](https://github.com/langchain-ai/langsmith-sdk) |
+| langsmith | 0.10.2 | [MIT](LICENSES/MIT.txt) | [pypi.org/langsmith](https://pypi.org/project/langsmith/0.10.2/) | [source](https://github.com/langchain-ai/langsmith-sdk) |
 | llama-index-core | 0.14.10 | [MIT](LICENSES/MIT.txt) | [pypi.org/llama-index-core](https://pypi.org/project/llama-index-core/0.14.10/) | [source](https://github.com/run-llama/llama_index) |
 | llama-index-embeddings-openai | 0.5.1 | [MIT](LICENSES/MIT.txt) | [pypi.org/llama-index-embeddings-openai](https://pypi.org/project/llama-index-embeddings-openai/0.5.1/) | [source](https://pypi.org/project/llama-index-embeddings-openai/) |
 | llama-index-embeddings-text-embeddings-inference | 0.4.2 | [MIT](LICENSES/MIT.txt) | [pypi.org/llama-index-embeddings-text-embeddings-inference](https://pypi.org/project/llama-index-embeddings-text-embeddings-inference/0.4.2/) | [source](https://pypi.org/project/llama-index-embeddings-text-embeddings-inference/) |
@@ -111,7 +111,7 @@ Total runtime packages: **177**. Full license texts are under [`LICENSES/`](LICE
 | numpy | 2.3.5 | [BSD-3-Clause](LICENSES/BSD-3-Clause.txt) | [pypi.org/numpy](https://pypi.org/project/numpy/2.3.5/) | [source](https://github.com/numpy/numpy) |
 | oauthlib | 3.3.1 | [BSD-3-Clause](LICENSES/BSD-3-Clause.txt) | [pypi.org/oauthlib](https://pypi.org/project/oauthlib/3.3.1/) | [source](https://github.com/oauthlib/oauthlib) |
 | onnxruntime | 1.23.2 | [MIT](LICENSES/MIT.txt) | [pypi.org/onnxruntime](https://pypi.org/project/onnxruntime/1.23.2/) | [source](https://onnxruntime.ai) |
-| openai | 2.9.0 | [Apache-2.0](LICENSES/Apache-2.0.txt) | [pypi.org/openai](https://pypi.org/project/openai/2.9.0/) | [source](https://github.com/openai/openai-python) |
+| openai | 2.45.0 | [Apache-2.0](LICENSES/Apache-2.0.txt) | [pypi.org/openai](https://pypi.org/project/openai/2.45.0/) | [source](https://github.com/openai/openai-python) |
 | opentelemetry-api | 1.39.1 | [Apache-2.0](LICENSES/Apache-2.0.txt) | [pypi.org/opentelemetry-api](https://pypi.org/project/opentelemetry-api/1.39.1/) | [source](https://github.com/open-telemetry/opentelemetry-python) |
 | opentelemetry-exporter-otlp-proto-common | 1.39.1 | [Apache-2.0](LICENSES/Apache-2.0.txt) | [pypi.org/opentelemetry-exporter-otlp-proto-common](https://pypi.org/project/opentelemetry-exporter-otlp-proto-common/1.39.1/) | [source](https://github.com/open-telemetry/opentelemetry-python) |
 | opentelemetry-exporter-otlp-proto-grpc | 1.39.1 | [Apache-2.0](LICENSES/Apache-2.0.txt) | [pypi.org/opentelemetry-exporter-otlp-proto-grpc](https://pypi.org/project/opentelemetry-exporter-otlp-proto-grpc/1.39.1/) | [source](https://github.com/open-telemetry/opentelemetry-python) |
@@ -5731,10 +5731,10 @@ Apache License
    limitations under the License.
 ```
 
-### langchain 1.3.12
+### langchain 1.3.13
 
 *License: MIT — SPDX text: [MIT](https://spdx.org/licenses/MIT.html)*  
-*Verify (PyPI): https://pypi.org/project/langchain/1.3.12/*  
+*Verify (PyPI): https://pypi.org/project/langchain/1.3.13/*  
 *Source: https://github.com/langchain-ai/langchain/tree/master/libs/langchain*
 
 ```
@@ -5807,10 +5807,10 @@ _No license file bundled in the wheel; see the license type text in [`LICENSES/M
 
 _No license file bundled in the wheel; see the license type text in [`LICENSES/MIT.txt`](LICENSES/MIT.txt) and the project page above._
 
-### langchain-openai 1.3.0
+### langchain-openai 1.3.5
 
 *License: MIT — SPDX text: [MIT](https://spdx.org/licenses/MIT.html)*  
-*Verify (PyPI): https://pypi.org/project/langchain-openai/1.3.0/*  
+*Verify (PyPI): https://pypi.org/project/langchain-openai/1.3.5/*  
 *Source: https://github.com/langchain-ai/langchain/tree/master/libs/partners/openai*
 
 ```
@@ -5845,10 +5845,10 @@ SOFTWARE.
 
 _No license file bundled in the wheel; see the license type text in [`LICENSES/MIT.txt`](LICENSES/MIT.txt) and the project page above._
 
-### langgraph 1.2.5
+### langgraph 1.2.9
 
 *License: MIT — SPDX text: [MIT](https://spdx.org/licenses/MIT.html)*  
-*Verify (PyPI): https://pypi.org/project/langgraph/1.2.5/*  
+*Verify (PyPI): https://pypi.org/project/langgraph/1.2.9/*  
 *Source: https://github.com/langchain-ai/langgraph/tree/main/libs/langgraph*
 
 ```
@@ -5965,10 +5965,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### langsmith 0.8.15
+### langsmith 0.10.2
 
 *License: MIT — SPDX text: [MIT](https://spdx.org/licenses/MIT.html)*  
-*Verify (PyPI): https://pypi.org/project/langsmith/0.8.15/*  
+*Verify (PyPI): https://pypi.org/project/langsmith/0.10.2/*  
 *Source: https://github.com/langchain-ai/langsmith-sdk*
 
 _No license file bundled in the wheel; see the license type text in [`LICENSES/MIT.txt`](LICENSES/MIT.txt) and the project page above._
@@ -8065,10 +8065,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### openai 2.9.0
+### openai 2.45.0
 
 *License: Apache-2.0 — SPDX text: [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html)*  
-*Verify (PyPI): https://pypi.org/project/openai/2.9.0/*  
+*Verify (PyPI): https://pypi.org/project/openai/2.45.0/*  
 *Source: https://github.com/openai/openai-python*
 
 ```
