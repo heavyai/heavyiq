@@ -75,7 +75,7 @@ function test_for_include_all_deps() {
     cp scripts/assets/pysqlite3_binary-0.5.3-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl ./packages/
 
     # Replace PyPika with a binary version found in scripts/assets
-    rm ./packages/PyPika-0.48.9.tar.gz
+    rm -f ./packages/PyPika-0.48.9.tar.gz
     cp scripts/assets/PyPika-0.48.9-py2.py3-none-any.whl ./packages/
   fi
 
