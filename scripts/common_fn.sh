@@ -74,8 +74,10 @@ function test_for_include_all_deps() {
     cp scripts/assets/chromadb-1.5.10.dev197-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl ./packages/
     cp scripts/assets/pysqlite3_binary-0.5.3-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl ./packages/
 
-    # Replace PyPika with a binary version found in scripts/assets
-    rm -f ./packages/PyPika-0.48.9.tar.gz
+    # Replace PyPika with a binary version found in scripts/assets.
+    # pip resolves pypika transitively (via chromadb), so the downloaded
+    # name/version/extension varies; remove any copy before adding ours.
+    rm -f ./packages/[Pp]y[Pp]ika-*.whl ./packages/[Pp]y[Pp]ika-*.tar.gz
     cp scripts/assets/PyPika-0.48.9-py2.py3-none-any.whl ./packages/
   fi
 
