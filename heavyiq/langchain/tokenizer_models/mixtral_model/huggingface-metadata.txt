@@ -1,0 +1,6 @@
+url: https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1
+revision: eba92302a2861cdc0098cc54bc9f17cb2c47eb61
+download date: 2026-07-20
+sha256sum:
+    fc4f0bd70b3709312d9d1d9e5ba674794b6bc5abc17429897a540f93882f25fc  tokenizer.json
+    747ec99bae3fd9d7bf9c3b9172e5ca0d82ca0d23d64a58ef1752b612f196817b  tokenizer_config.json
