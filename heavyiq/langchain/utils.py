@@ -543,8 +543,6 @@ def get_tokenizer() -> Any:
     model_local_path: str
     if "llama-3" in model_name:
         model_local_path = "./heavyiq/langchain/tokenizer_models/llama3_model"
-    elif "llama" in model_name:
-        model_local_path = "./heavyiq/langchain/tokenizer_models/llama_model"
     elif "deepseek" in model_name:
         model_local_path = "./heavyiq/langchain/tokenizer_models/deepseek_model"
     elif "starcoder-2" in model_name:
