@@ -1,0 +1,6 @@
+url: https://huggingface.co/deepseek-ai/deepseek-coder-6.7b-base
+revision: ce2207a8bfef3ee92bd7dd4cc31c52cfa0046912
+download date: 2026-07-20
+sha256sum:
+    5ea7c1cf401382d953c8a56df1786cefa9446bc6aa168571870063da9ecc7e89  tokenizer.json
+    de99190b2032477f888c488b69674c460c0054fc3f5305da11cd01b711d3de41  tokenizer_config.json

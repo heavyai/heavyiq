@@ -1,0 +1,6 @@
+url: https://huggingface.co/meta-llama/Meta-Llama-3-8B
+revision: 8cde5ca8380496c9a6cc7ef3a8b46a0372a1d920
+download date: 2026-07-20
+sha256sum:
+    0ac333c83e2d107910928928b5912d8ade91594d08c7c73c4606d05c032d7632  tokenizer.json
+    c058e1ff967585f08c1c4dc1577c68a825a482b38bc0b2bff059ab113bf603bf  tokenizer_config.json

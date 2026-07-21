@@ -1,0 +1,6 @@
+url: https://huggingface.co/Qwen/Qwen2.5-7B-Instruct
+revision: a09a35458c702b33eeacc393d103063234e8bc28
+download date: 2026-07-20
+sha256sum:
+    9c5ae00e602b8860cbd784ba82a8aa14e8feecec692e7076590d014d7b7fdafa  tokenizer.json
+    7d912f0f056762b8c43e2251c3a3b750c6a8cefc8dc20a6d145b6f6e76753cc9  tokenizer_config.json

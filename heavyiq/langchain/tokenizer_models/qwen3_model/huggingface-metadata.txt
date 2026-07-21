@@ -1,0 +1,6 @@
+url: https://huggingface.co/Qwen/Qwen3-8B
+revision: b968826d9c46dd6066d109eabc6255188de91218
+download date: 2026-07-20
+sha256sum:
+    bcfe42da0a4497e8b2b172c1f9f4ec423a46dc12907f4349c55025f670422ba9  tokenizer.json
+    c8f4ae7809a0d555cce69fa8632f03e1294c779f0103df48b2b1f85acb82d1d3  tokenizer_config.json
