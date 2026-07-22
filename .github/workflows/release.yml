@@ -83,7 +83,7 @@ jobs:
     steps:
       - name: Install git, Python 3.11, and gh CLI
         run: |
-          dnf install -y git python3.11
+          dnf install -y git python3.11 findutils
           dnf install -y 'dnf-command(config-manager)'
           dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
           dnf install -y gh
