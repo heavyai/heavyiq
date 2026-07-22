@@ -44,7 +44,7 @@ jobs:
         run: |
           source venv/bin/activate
           pip install -r requirements-dev.txt
-          pytest tests --no-heavydb
+          pytest tests --no-heavydb --config-path=config.pytest.toml
 
   build-ubuntu-arm64:
     if: ${{ inputs.build_arm64 }}
@@ -69,7 +69,7 @@ jobs:
         run: |
           source venv/bin/activate
           pip install -r requirements-dev.txt
-          pytest tests --no-heavydb
+          pytest tests --no-heavydb --config-path=config.pytest.toml
 
   build-rocky:
     if: ${{ inputs.build_rhel }}
@@ -100,4 +100,4 @@ jobs:
         run: |
           source venv/bin/activate
           pip install -r requirements-dev.txt
-          pytest tests --no-heavydb
+          pytest tests --no-heavydb --config-path=config.pytest.toml
