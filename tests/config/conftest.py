@@ -22,7 +22,7 @@ def conf_file(tmp_path: Path, request: FixtureRequest):
     custom_llm_azure_deployment_name = ""
     custom_llm_azure_openai_api_base = ""
     custom_llm_azure_openai_api_version = "1.2"
-    openai_api_key = ""
+    openai_api_key = "sk-test-dummy"
     """
     azure_config_with_options = """
     [iq]
@@ -30,7 +30,7 @@ def conf_file(tmp_path: Path, request: FixtureRequest):
     custom_llm_azure_deployment_name = "heavyai"
     custom_llm_azure_openai_api_base = "https://azure.heavyai/llm/api/v1"
     custom_llm_azure_openai_api_version = "0.1"
-    openai_api_key = ""
+    openai_api_key = "sk-test-dummy"
     """
     openai_config = """
     [iq]
@@ -45,31 +45,31 @@ def conf_file(tmp_path: Path, request: FixtureRequest):
     """
     custom_api_config_without_base = """
     [iq]
-    openai_api_key = ""
+    openai_api_key = "sk-test-dummy"
     custom_llm_type = "API"
     custom_llm_api_base = ""
     """
     custom_api_config_with_base = """
     [iq]
-    openai_api_key = ""
+    openai_api_key = "sk-test-dummy"
     custom_llm_type = "API"
     custom_llm_api_base = "http://localhost:9000/api/v1"
     """
     custom_api_vllm_config_without_base = """
     [iq]
-    openai_api_key = ""
+    openai_api_key = "sk-test-dummy"
     custom_llm_type = "API_VLLM"
     custom_llm_api_base = ""
     """
     custom_api_vllm_config_with_base = """
     [iq]
-    openai_api_key = ""
+    openai_api_key = "sk-test-dummy"
     custom_llm_type = "API_VLLM"
     custom_llm_api_base = "http://localhost:9000/api/v1"
     """
     custom_api_invalid = """
     [iq]
-    openai_api_key = ""
+    openai_api_key = "sk-test-dummy"
     custom_llm_type = "INVALID"
     """
 
