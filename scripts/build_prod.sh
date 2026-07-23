@@ -1,14 +1,12 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# ENV Requirements
-## python3.10 (Installed)
 set -e
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 source  $SCRIPT_DIR/common_fn.sh
 process_args "$@"
 # Create New Virtual Environment
-python3.10 -m venv venv
+python3 -m venv venv
 . venv/bin/activate
 
 
