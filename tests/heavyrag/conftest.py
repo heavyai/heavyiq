@@ -5,6 +5,15 @@ from collections.abc import Generator
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
+# Rocky Linux 8 ships sqlite3 3.26 which is below chromadb's 3.35 requirement.
+# pysqlite3-binary provides a newer sqlite3; swap it in before chromadb imports.
+try:
+    import pysqlite3
+    import sys
+    sys.modules["sqlite3"] = pysqlite3
+except ImportError:
+    pass
+
 import chromadb
 import pytest
 

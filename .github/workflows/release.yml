@@ -1,5 +1,5 @@
-name: Release
-run-name: ${{ inputs.description != '' && format('heavyiq — {0}', inputs.description) || 'heavyiq Release' }}
+name: CI
+run-name: ${{ inputs.description != '' && format('heavyiq — {0}', inputs.description) || 'heavyiq CI' }}
 
 on:
   workflow_dispatch:
@@ -8,28 +8,12 @@ on:
         description: 'Branch or SHA to build'
         type: string
         default: 'master'
-      pyheavydb_release_tag:
-        description: 'GitHub Release tag from heavyai/pyheavydb (e.g. pyheavydb-abc1234); leave blank to use PyPI version'
-        type: string
-        default: ''
-      include_all_deps:
-        description: 'Bundle all Python dependencies offline (--include_all_deps)'
-        type: boolean
-        default: false
       build_arm64:
         description: 'Also build Ubuntu ARM64 variant'
         type: boolean
         default: false
       build_rhel:
         description: 'Also build Rocky Linux (RHEL) variant'
-        type: boolean
-        default: false
-      make_release:
-        description: 'Create a GitHub Release with the built artifacts'
-        type: boolean
-        default: true
-      mark_as_latest:
-        description: 'Promote this release to the repo latest (enables RC builder auto-pull)'
         type: boolean
         default: false
       description:
@@ -42,8 +26,6 @@ jobs:
     runs-on: linux-amd64-cpu16
     permissions:
       contents: read
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,45 +37,21 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Download pyheavydb wheel from GitHub Release
-        if: ${{ inputs.pyheavydb_release_tag != '' }}
-        env:
-          GH_TOKEN: ${{ secrets.PRIVATE_PACKAGES_TOKEN }}
-        run: |
-          mkdir -p /tmp/pyheavydb-nfs
-          gh release download "${{ inputs.pyheavydb_release_tag }}" \
-            --repo heavyai/pyheavydb \
-            --pattern "*.whl" \
-            --dir /tmp/pyheavydb-nfs
-          WHL_NAME=$(ls /tmp/pyheavydb-nfs/*.whl | xargs basename)
-          echo "$WHL_NAME" > /tmp/pyheavydb-nfs/pyheavydb.whl.version
-          sed -i 's|NFS_PATH=.*|NFS_PATH=/tmp/pyheavydb-nfs|' scripts/common_fn.sh
-
       - name: Build (Ubuntu x86_64)
-        run: |
-          SCRIPT_OPTION=""
-          if [ -n "${{ inputs.pyheavydb_release_tag }}" ]; then
-            SCRIPT_OPTION="--internally-built-pyheavydb"
-          fi
-          if [ "${{ inputs.include_all_deps }}" = "true" ]; then
-            SCRIPT_OPTION="$SCRIPT_OPTION --include_all_deps"
-          fi
-          mkdir -p packages
-          bash ./scripts/build_prod.sh $SCRIPT_OPTION
+        run: bash ./scripts/build_prod.sh --include_all_deps
 
-      - name: Upload Ubuntu x86_64 artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: heavyiq-ubuntu-x86_64
-          path: dist.tgz
+      - name: Run tests
+        run: |
+          source venv/bin/activate
+          pip install -r requirements-dev.txt
+          cp config.pytest.toml config.toml
+          pytest tests --no-heavydb --config-path=config.pytest.toml
 
   build-ubuntu-arm64:
     if: ${{ inputs.build_arm64 }}
     runs-on: linux-arm64-cpu16
     permissions:
       contents: read
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -105,37 +63,15 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Download pyheavydb wheel from GitHub Release
-        if: ${{ inputs.pyheavydb_release_tag != '' }}
-        env:
-          GH_TOKEN: ${{ secrets.PRIVATE_PACKAGES_TOKEN }}
-        run: |
-          mkdir -p /tmp/pyheavydb-nfs
-          gh release download "${{ inputs.pyheavydb_release_tag }}" \
-            --repo heavyai/pyheavydb \
-            --pattern "*.whl" \
-            --dir /tmp/pyheavydb-nfs
-          WHL_NAME=$(ls /tmp/pyheavydb-nfs/*.whl | xargs basename)
-          echo "$WHL_NAME" > /tmp/pyheavydb-nfs/pyheavydb.whl.version
-          sed -i 's|NFS_PATH=.*|NFS_PATH=/tmp/pyheavydb-nfs|' scripts/common_fn.sh
-
       - name: Build (Ubuntu ARM64)
-        run: |
-          SCRIPT_OPTION=""
-          if [ -n "${{ inputs.pyheavydb_release_tag }}" ]; then
-            SCRIPT_OPTION="--internally-built-pyheavydb"
-          fi
-          if [ "${{ inputs.include_all_deps }}" = "true" ]; then
-            SCRIPT_OPTION="$SCRIPT_OPTION --include_all_deps"
-          fi
-          mkdir -p packages
-          bash ./scripts/build_prod.sh $SCRIPT_OPTION
+        run: bash ./scripts/build_prod.sh --include_all_deps
 
-      - name: Upload Ubuntu ARM64 artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: heavyiq-ubuntu-arm64
-          path: dist.tgz
+      - name: Run tests
+        run: |
+          source venv/bin/activate
+          pip install -r requirements-dev.txt
+          cp config.pytest.toml config.toml
+          pytest tests --no-heavydb --config-path=config.pytest.toml
 
   build-rocky:
     if: ${{ inputs.build_rhel }}
@@ -144,12 +80,10 @@ jobs:
       image: rockylinux/rockylinux:8
     permissions:
       contents: read
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Install git, Python 3.11, and gh CLI
         run: |
-          dnf install -y git python3.11
+          dnf install -y git python3.11 findutils
           dnf install -y 'dnf-command(config-manager)'
           dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
           dnf install -y gh
@@ -159,96 +93,15 @@ jobs:
         with:
           ref: ${{ inputs.release_candidate || github.sha }}
 
-      - name: Download pyheavydb wheel from GitHub Release
-        if: ${{ inputs.pyheavydb_release_tag != '' }}
-        env:
-          GH_TOKEN: ${{ secrets.PRIVATE_PACKAGES_TOKEN }}
-        run: |
-          mkdir -p /tmp/pyheavydb-nfs
-          gh release download "${{ inputs.pyheavydb_release_tag }}" \
-            --repo heavyai/pyheavydb \
-            --pattern "*.whl" \
-            --dir /tmp/pyheavydb-nfs
-          WHL_NAME=$(basename /tmp/pyheavydb-nfs/*.whl)
-          echo "$WHL_NAME" > /tmp/pyheavydb-nfs/pyheavydb.whl.version
-          sed -i 's|NFS_PATH=.*|NFS_PATH=/tmp/pyheavydb-nfs|' scripts/common_fn.sh
-
       - name: Build (Rocky Linux x86_64)
         run: |
           git config --global --add safe.directory "$(pwd)"
-          SCRIPT_OPTION=""
-          if [ -n "${{ inputs.pyheavydb_release_tag }}" ]; then
-            SCRIPT_OPTION="--internally-built-pyheavydb"
-          fi
-          if [ "${{ inputs.include_all_deps }}" = "true" ]; then
-            SCRIPT_OPTION="$SCRIPT_OPTION --include_all_deps"
-          fi
-          mkdir -p packages
-          bash ./scripts/build_prod_rhel.sh $SCRIPT_OPTION
+          bash ./scripts/build_prod_rhel.sh --include_all_deps
 
-      - name: Upload Rocky x86_64 artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: heavyiq-rocky-x86_64
-          path: dist.tgz
-
-  release:
-    needs: [build-ubuntu, build-ubuntu-arm64, build-rocky]
-    if: |
-      always() &&
-      inputs.make_release == true &&
-      needs.build-ubuntu.result == 'success' &&
-      (needs.build-ubuntu-arm64.result == 'success' || needs.build-ubuntu-arm64.result == 'skipped') &&
-      (needs.build-rocky.result == 'success' || needs.build-rocky.result == 'skipped')
-    runs-on: linux-amd64-cpu16
-    permissions:
-      contents: write
-    steps:
-      - name: Download Ubuntu x86_64 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: heavyiq-ubuntu-x86_64
-          path: artifacts/ubuntu-x86_64
-
-      - name: Download Ubuntu ARM64 artifact
-        if: ${{ inputs.build_arm64 }}
-        uses: actions/download-artifact@v4
-        with:
-          name: heavyiq-ubuntu-arm64
-          path: artifacts/ubuntu-arm64
-
-      - name: Download Rocky x86_64 artifact
-        if: ${{ inputs.build_rhel }}
-        uses: actions/download-artifact@v4
-        with:
-          name: heavyiq-rocky-x86_64
-          path: artifacts/rocky-x86_64
-
-      - name: Prepare release assets
+      - name: Run tests
         run: |
-          mkdir -p release-assets
-          cp artifacts/ubuntu-x86_64/dist.tgz release-assets/dist-ubuntu-x86_64.tgz
-          if [ -d artifacts/ubuntu-arm64 ]; then
-            cp artifacts/ubuntu-arm64/dist.tgz release-assets/dist-ubuntu-arm64.tgz
-          fi
-          if [ -d artifacts/rocky-x86_64 ]; then
-            cp artifacts/rocky-x86_64/dist.tgz release-assets/dist-rocky-x86_64.tgz
-          fi
-
-      - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          SHA="${{ github.sha }}"
-          TAG="heavyiq-${SHA::8}"
-          TITLE="heavyiq ${TAG}"
-          if [ -n "${{ inputs.description }}" ]; then
-            TITLE="$TITLE — ${{ inputs.description }}"
-          fi
-          gh release create "$TAG" release-assets/* \
-            --repo "${{ github.repository }}" \
-            --title "$TITLE" \
-            --notes "Built from \`${{ inputs.release_candidate || github.ref_name }}\` (${SHA}) — run [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-          if [ "${{ inputs.mark_as_latest }}" = "true" ]; then
-            gh release edit "$TAG" --repo "${{ github.repository }}" --latest
-          fi
+          source venv/bin/activate
+          pip install packages/pysqlite3_binary-*.whl
+          pip install -r requirements-dev.txt
+          cp config.pytest.toml config.toml
+          pytest tests --no-heavydb --config-path=config.pytest.toml
