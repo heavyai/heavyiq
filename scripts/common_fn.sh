@@ -81,6 +81,34 @@ function test_for_include_all_deps() {
     cp scripts/assets/PyPika-0.48.9-py2.py3-none-any.whl ./packages/
   fi
 
+  ## Some wheels (e.g. pybase64) stack multiple platform tags, producing a
+  ## filename longer than tar's 100-char ustar name limit. Such names rely on
+  ## GNU/PAX long-name extensions and can be dropped or mangled when the build
+  ## tarball is extracted at deploy time, causing "No such file" install errors.
+  ## For any over-long name, collapse the stacked platform tags down to the
+  ## first one; every tag in the set is satisfied by our glibc deploy target, so
+  ## keeping one is safe. Renaming only changes the advertised filename tags
+  ## (pip reads tags from the filename), it does not rebuild the wheel.
+  python3 - <<'PY'
+import pathlib
+import re
+
+pkg = pathlib.Path("./packages")
+for whl in pkg.glob("*.whl"):
+    name = whl.name
+    if len(name) <= 99:
+        continue
+    new = re.sub(r"(\.[a-z0-9_]+)+\.whl$", ".whl", name)
+    target = pkg / new
+    if new == name:
+        continue
+    if target.exists():
+        print(f"skipped; target exists: {target}")
+        continue
+    whl.rename(target)
+    print(f"{name} -> {new}")
+PY
+
   ## generate a new requirements file than will use the
   ## archives in the packages directory
   find ./packages -type f > ./dist/requirements.packages.txt
