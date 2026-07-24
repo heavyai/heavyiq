@@ -87,10 +87,10 @@ None of these folders currently carry recorded provenance metadata; each upstrea
 | jsonschema | 4.25.1 | [MIT](LICENSES/MIT.txt) | [pypi.org/jsonschema](https://pypi.org/project/jsonschema/4.25.1/) | [source](https://github.com/python-jsonschema/jsonschema) |
 | jsonschema-specifications | 2025.9.1 | [MIT](LICENSES/MIT.txt) | [pypi.org/jsonschema-specifications](https://pypi.org/project/jsonschema-specifications/2025.9.1/) | [source](https://github.com/python-jsonschema/jsonschema-specifications) |
 | kubernetes | 34.1.0 | [Apache-2.0](LICENSES/Apache-2.0.txt) | [pypi.org/kubernetes](https://pypi.org/project/kubernetes/34.1.0/) | [source](https://github.com/kubernetes-client/python) |
-| langchain | 1.3.13 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain](https://pypi.org/project/langchain/1.3.13/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/langchain) |
+| langchain | 1.3.14 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain](https://pypi.org/project/langchain/1.3.14/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/langchain) |
 | langchain-classic | 1.0.8 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-classic](https://pypi.org/project/langchain-classic/1.0.8/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/langchain) |
 | langchain-community | 0.4.2 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-community](https://pypi.org/project/langchain-community/0.4.2/) | [source](https://github.com/langchain-ai/langchain-community) |
-| langchain-core | 1.4.9 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-core](https://pypi.org/project/langchain-core/1.4.9/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/core) |
+| langchain-core | 1.5.0 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-core](https://pypi.org/project/langchain-core/1.5.0/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/core) |
 | langchain-openai | 1.3.5 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-openai](https://pypi.org/project/langchain-openai/1.3.5/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/partners/openai) |
 | langchain-text-splitters | 1.1.2 | [MIT](LICENSES/MIT.txt) | [pypi.org/langchain-text-splitters](https://pypi.org/project/langchain-text-splitters/1.1.2/) | [source](https://github.com/langchain-ai/langchain/tree/master/libs/text-splitters) |
 | langgraph | 1.2.9 | [MIT](LICENSES/MIT.txt) | [pypi.org/langgraph](https://pypi.org/project/langgraph/1.2.9/) | [source](https://github.com/langchain-ai/langgraph/tree/main/libs/langgraph) |
@@ -5746,10 +5746,10 @@ Apache License
    limitations under the License.
 ```
 
-### langchain 1.3.13
+### langchain 1.3.14
 
 *License: MIT — SPDX text: [MIT](https://spdx.org/licenses/MIT.html)*  
-*Verify (PyPI): https://pypi.org/project/langchain/1.3.13/*  
+*Verify (PyPI): https://pypi.org/project/langchain/1.3.14/*  
 *Source: https://github.com/langchain-ai/langchain/tree/master/libs/langchain*
 
 ```
@@ -5814,10 +5814,10 @@ SOFTWARE.
 
 _No license file bundled in the wheel; see the license type text in [`LICENSES/MIT.txt`](LICENSES/MIT.txt) and the project page above._
 
-### langchain-core 1.4.9
+### langchain-core 1.5.0
 
 *License: MIT — SPDX text: [MIT](https://spdx.org/licenses/MIT.html)*  
-*Verify (PyPI): https://pypi.org/project/langchain-core/1.4.9/*  
+*Verify (PyPI): https://pypi.org/project/langchain-core/1.5.0/*  
 *Source: https://github.com/langchain-ai/langchain/tree/master/libs/core*
 
 _No license file bundled in the wheel; see the license type text in [`LICENSES/MIT.txt`](LICENSES/MIT.txt) and the project page above._
