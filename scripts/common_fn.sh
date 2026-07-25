@@ -67,19 +67,40 @@ function test_for_include_all_deps() {
   ## Download from requirements.txt only
   pip download -r $requirements_file --dest ./packages/
 
-  ## For the "rhel" case, copy RHEL-specific files directly
+  ## For the "rhel" case, fetch the RHEL-specific artifacts straight from
+  ## PyPI / Test-PyPI (no vendored binaries or private mirror needed).
   if [[ $requirements_file_rhel == "rhel" ]]; then
-    # Replace the downloaded chromadb wheel with the one in scripts/assets
+    # chromadb ships an abi3 manylinux x86_64 wheel on Test-PyPI. Force it so the
+    # correct wheel is used regardless of the build host's OS/arch.
     rm -f ./packages/chromadb-*.whl
-    cp scripts/assets/chromadb-1.5.10.dev197-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl ./packages/
-    cp scripts/assets/pysqlite3_binary-0.5.3-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl ./packages/
+    pip download chromadb==1.5.10.dev197 \
+      --only-binary=:all: --platform manylinux2014_x86_64 \
+      --python-version 39 --abi abi3 --implementation cp \
+      --no-deps --dest ./packages \
+      --extra-index-url https://test.pypi.org/simple/
 
-    # Replace PyPika with a binary version found in scripts/assets.
-    # pip resolves pypika transitively (via chromadb), so the downloaded
-    # name/version/extension varies; remove any copy before adding ours.
+    # pysqlite3-binary is not a declared dependency; it provides a modern SQLite
+    # that chromadb needs on RHEL 8. Fetch the target's cp311 manylinux wheel.
+    pip download pysqlite3-binary==0.5.3 \
+      --only-binary=:all: --platform manylinux2014_x86_64 \
+      --python-version 311 --abi cp311 --implementation cp \
+      --no-deps --dest ./packages
+
+    # PyPI publishes only an sdist for PyPika 0.48.9; build the pure-Python wheel.
+    # (pip download -r may have pulled a newer pypika transitively; drop it first.)
     rm -f ./packages/[Pp]y[Pp]ika-*.whl ./packages/[Pp]y[Pp]ika-*.tar.gz
-    cp scripts/assets/PyPika-0.48.9-py2.py3-none-any.whl ./packages/
+    pip wheel PyPika==0.48.9 --no-deps -w ./packages
   fi
+
+  ## Some dependencies are published only as source distributions (e.g.
+  ## pyheavydb ships an sdist). Build them into wheels now, while the network is
+  ## available, so the offline deploy install never has to compile or fetch
+  ## build backends (which fails under `pip install --no-index`).
+  shopt -s nullglob
+  for sdist in ./packages/*.tar.gz ./packages/*.zip; do
+    pip wheel "$sdist" --no-deps -w ./packages && rm -f "$sdist"
+  done
+  shopt -u nullglob
 
   ## Some wheels (e.g. pybase64) stack multiple platform tags, producing a
   ## filename longer than tar's 100-char ustar name limit. Such names rely on
