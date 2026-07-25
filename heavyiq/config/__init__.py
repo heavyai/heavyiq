@@ -7,18 +7,30 @@ from typing import Any
 
 from confz import FileSource
 from heavydb.thrift.Heavy import Client  # type: ignore
-from heavydb.thrift.ttypes import TLicenseInfo
 from openai import OpenAI
 from thrift.protocol import TBinaryProtocol
 from thrift.transport import TSocket, TTransport
 
 from .config_schema import AppConfig, HeavyIQConfig
 
+try:
+    from heavydb.thrift.ttypes import TLicenseInfo
+except ImportError:
+    # pyheavydb 10 is generated from a HeavyDB thrift definition that no longer
+    # declares the licensing structs or the get_license_claims RPC. Stay
+    # importable against both 8 and 10; the absence is reported at call time.
+    TLicenseInfo = Any  # type: ignore[assignment,misc]
+
 _config: HeavyIQConfig | None = None
 _config_lock = threading.Lock()
 
 
 def get_heavydb_license_claims(config: HeavyIQConfig) -> TLicenseInfo:
+    if not hasattr(Client, "get_license_claims"):
+        raise ValueError(
+            "This HeavyDB client has no licensing support (pyheavydb >= 10); "
+            "license claims are unavailable."
+        )
     try:
         socket = TSocket.TSocket(config.heavydb_host, config.heavydb_port)
         socket.setTimeout(8000)  # try to connect for 8 seconds
