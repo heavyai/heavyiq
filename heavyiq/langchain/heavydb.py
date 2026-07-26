@@ -20,7 +20,8 @@ from typing import (Any, Callable, Iterator, NamedTuple, Optional, Sequence,
 
 import anyio
 from async_lru import alru_cache
-from heavyai import Connection, Cursor, connect
+from heavydb import Connection as _HeavyDBConnection
+from heavydb import Cursor
 from heavydb._parsers import ColumnDetails, _extract_column_details
 from heavydb.thrift.ttypes import TTableDetails
 from starlette.concurrency import run_in_threadpool
@@ -58,11 +59,33 @@ class CustomTableDetails(NamedTuple):
     comment: str
 
 
+class Connection(_HeavyDBConnection):
+    """
+    pyheavydb's Connection plus the two convenience methods heavyai layered on top.
+
+    These were the only reason HeavyIQ depended on heavyai. That package cannot be
+    imported against pyheavydb 10 at all: heavyai.connection pulls in TCreateParams
+    at module scope, and the struct went away with distributed mode.
+    """
+
+    def get_tables(self) -> list[str]:
+        return self._client.get_tables(self._session)
+
+    def get_column_details(self, table_name: str) -> list[ColumnDetails]:
+        details = self._client.get_table_details(self._session, table_name)
+        return _extract_column_details(details.row_desc)
+
+
+def connect(uri: Optional[str] = None, **kwargs: Any) -> Connection:
+    """heavydb.connect, but yielding the Connection subclass above."""
+    return Connection(uri=uri, **kwargs)
+
+
 class PersistantConnection(Connection):
     """
     Helps to establish heavydb connection which persists for atleast an hour.
 
-    Default heavyai.Connection gets closed once the corresponding __del__ method being called (ie. upon garbage collection).
+    Default Connection gets closed once the corresponding __del__ method being called (ie. upon garbage collection).
     So we can't re-use the same session_id on `/query`, `/question` endpoints.
 
     This class helps to overcome the above issue, and the created session gets auto expire after certain limit
