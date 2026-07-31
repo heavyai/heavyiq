@@ -73,7 +73,7 @@ function test_for_include_all_deps() {
     # chromadb ships an abi3 manylinux x86_64 wheel on Test-PyPI. Force it so the
     # correct wheel is used regardless of the build host's OS/arch.
     rm -f ./packages/chromadb-*.whl
-    pip download chromadb==1.5.10.dev197 \
+    pip download chromadb==1.5.10.dev239 \
       --only-binary=:all: --platform manylinux2014_x86_64 \
       --python-version 39 --abi abi3 --implementation cp \
       --no-deps --dest ./packages \
