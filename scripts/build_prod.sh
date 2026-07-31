@@ -11,14 +11,12 @@ python3 -m venv venv
 
 
 # Install Requirements
-rm -rf ./dist
+rm -rf ./dist ./packages
 mkdir -p ./dist
 cp requirements.txt ./dist/requirements.txt
 
-# if INTERNALLY_RELEASED_PYHEAVYDB is set
-# (see common_fn.sh argument processing)
-# 1. grab the whl and store in ./dist
-# 2. update the ./dist/requirements.txt file
+# If an explicit or legacy pyheavydb override was requested, stage the wheel
+# under packages and update only the generated ./dist/requirements.txt.
 test_for_internally_release_pyheavydb
 
 # if INCLUDE_ALL_DEPS is set
