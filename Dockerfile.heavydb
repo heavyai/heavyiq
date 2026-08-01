@@ -5,10 +5,8 @@ FROM  $BASE_HEAVYDB_IMG
 # the local heavyiq directory
 #
 SHELL ["/bin/bash", "-c"]
-#
-# Note the test/mv for pyheavydb whl is for backward compatability.
-# Once the packages directory change is in it could be removed
-RUN cd heavyiq && python3 -m venv venv && source venv/bin/activate ;\
-  [[ -f pyheavydb-8.0.0-py3-none-any.whl ]] && mkdir -p dist && mv pyheavydb-8.0.0-py3-none-any.whl dist/. ; \
-  pip install -r requirements.txt
+RUN cd heavyiq \
+  && python3 -m venv venv \
+  && source venv/bin/activate \
+  && pip install -r requirements.txt
 

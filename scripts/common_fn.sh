@@ -10,11 +10,16 @@ export HTTP_PYTHON_DEPS="https://dependencies.heavy.ai/python-deps"
 export NFS_PATH="/theHoard/export/home/www/dependencies.mapd.com/python-deps"
 export PKG_PATH=""
 export PYHEAVYDB_ARCHIVE=""
+export PYHEAVYDB_WHEEL=""
 
 function process_args(){
   while (( $# )); do
     case "$1" in
       --internally-built-pyheavydb)
+        INTERNALLY_RELEASED_PYHEAVYDB=true
+        ;;
+      --pyheavydb-wheel=*)
+        PYHEAVYDB_WHEEL="${1#*=}"
         INTERNALLY_RELEASED_PYHEAVYDB=true
         ;;
       --include_all_deps)
@@ -147,6 +152,8 @@ function copy_source_to_dist() {
   cp gunicorn.conf.py ./dist/gunicorn.conf.py
 }
 
+# Overrides apply only to generated staging manifests. requirements.txt in the
+# project remains the authoritative dependency declaration.
 function update_pyheavydb_reference() {
   if [[ $INTERNALLY_RELEASED_PYHEAVYDB == "false" ]]; then
     return
@@ -161,10 +168,9 @@ function update_pyheavydb_reference() {
     return
   fi
 
-  # 1. If any then remove any existing refence to pyheavydb
-  # 2. Add the relative file reference at the top of the file.
-  sed -i "/pyheavydb/d" ${requirements_file}
-  sed -i "1 i ${PKG_PATH}" ${requirements_file}
+  # Replace pyheavydb only in the generated build manifest.
+  sed -i "/pyheavydb/d" "${requirements_file}"
+  sed -i "1 i ${PKG_PATH}" "${requirements_file}"
 }
 
 function test_for_internally_release_pyheavydb() {
@@ -179,12 +185,20 @@ function test_for_internally_release_pyheavydb() {
       "the script is being run from the wrong place"
     return
   fi
-  # get_pyheavydb_for_local_install sets PYHEAVYDB_ARCHIVE
-  ##get_pyheavydb_for_local_install
-  get_pyheavydb_for_NFS_install
   mkdir -p ./packages
-  mv ${PYHEAVYDB_ARCHIVE} ./packages
-  PKG_PATH=./packages/${PYHEAVYDB_ARCHIVE}
+  if [[ -n $PYHEAVYDB_WHEEL ]]; then
+    if [[ ! -f $PYHEAVYDB_WHEEL ]]; then
+      echo "Error. pyheavydb wheel not found: ${PYHEAVYDB_WHEEL}" >&2
+      return 1
+    fi
+    PYHEAVYDB_ARCHIVE=$(basename "$PYHEAVYDB_WHEEL")
+    cp "$PYHEAVYDB_WHEEL" "./packages/$PYHEAVYDB_ARCHIVE"
+  else
+    # Legacy compatibility path for --internally-built-pyheavydb.
+    get_pyheavydb_for_NFS_install
+    mv "$PYHEAVYDB_ARCHIVE" ./packages
+  fi
+  PKG_PATH="./packages/${PYHEAVYDB_ARCHIVE}"
   update_pyheavydb_reference ./dist/requirements.txt
 }
 

@@ -104,7 +104,15 @@ pytest tests/api/test_lcel.py  -rs --config-path config.test.toml -n 0 --maxfail
 ### Create Production Build
 
 ```bash
-bash scripts/build_prod.sh
+bash scripts/build_prod.sh --include_all_deps
+```
+
+`requirements.txt` is the authoritative dependency manifest. To explicitly
+substitute a locally built pyheavydb wheel without changing that manifest:
+
+```bash
+bash scripts/build_prod.sh --include_all_deps \
+  --pyheavydb-wheel=/absolute/path/to/pyheavydb-10.0.0-py3-none-any.whl
 ```
 
 ### Run Production Server Process
