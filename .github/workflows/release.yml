@@ -42,9 +42,8 @@ jobs:
 
       - name: Run tests
         run: |
-          python -m venv venv
           source venv/bin/activate
-          python -m pip install -r requirements.txt -r requirements-dev.txt
+          pip install -r requirements-dev.txt
           cp config.pytest.toml config.toml
           pytest tests --no-heavydb --config-path=config.pytest.toml
 
@@ -69,9 +68,8 @@ jobs:
 
       - name: Run tests
         run: |
-          python -m venv venv
           source venv/bin/activate
-          python -m pip install -r requirements.txt -r requirements-dev.txt
+          pip install -r requirements-dev.txt
           cp config.pytest.toml config.toml
           pytest tests --no-heavydb --config-path=config.pytest.toml
 
@@ -102,9 +100,8 @@ jobs:
 
       - name: Run tests
         run: |
-          python3.11 -m venv venv
           source venv/bin/activate
-          python -m pip install -r requirements.txt -r requirements-dev.txt
-          python -m pip install pysqlite3-binary==0.5.3
+          pip install pysqlite3-binary==0.5.3
+          pip install -r requirements-dev.txt
           cp config.pytest.toml config.toml
           pytest tests --no-heavydb --config-path=config.pytest.toml

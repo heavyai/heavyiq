@@ -108,10 +108,19 @@ bash scripts/build_prod.sh
 ```
 
 The generated `dist.tgz` contains the HeavyIQ application and its authoritative
-`requirements.txt`. It does not contain third-party wheels or an offline
-dependency manifest. The deployment environment must be able to resolve the
+`requirements.txt`. It does not contain an offline dependency manifest or
+Python wheels by default. The deployment environment must be able to resolve the
 declared dependencies from its configured Python package indexes; air-gapped
 installation is not supported.
+
+HeavyDB can explicitly supply a selected pyheavydb wheel as the sole packaged
+exception. The wheel is stored under `packages/` without modifying
+`requirements.txt`:
+
+```bash
+bash scripts/build_prod.sh \
+  --pyheavydb-wheel=/absolute/path/to/pyheavydb-10.0.0-py3-none-any.whl
+```
 
 Extract the application and install its dependencies into a virtual environment:
 
@@ -121,6 +130,8 @@ tar -xzf dist.tgz -C heavyiq-dist
 cd heavyiq-dist
 python3.10 -m venv venv
 . venv/bin/activate
+# For artifacts built with --pyheavydb-wheel:
+python -m pip install --no-deps packages/pyheavydb-*.whl
 python -m pip install -r requirements.txt
 ```
 
