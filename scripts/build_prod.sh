@@ -15,24 +15,14 @@ rm -rf ./dist ./packages
 mkdir -p ./dist
 cp requirements.txt ./dist/requirements.txt
 
-# If an explicit or legacy pyheavydb override was requested, stage the wheel
-# under packages and update only the generated ./dist/requirements.txt.
+# If requested, package and install only the selected pyheavydb wheel.
+# requirements.txt remains unchanged and authoritative.
 test_for_internally_release_pyheavydb
-
-# if INCLUDE_ALL_DEPS is set
-# (see common_fn.sh argument processing)
-# 1. Download all of the deps and store in
-# ./packages
-# 2. Update ./dist/requirments to use the
-# packages stored in ./packages
-test_for_include_all_deps ./dist/requirements.txt
+if [[ -n $PYHEAVYDB_ARCHIVE ]]; then
+  pip install --no-deps "./packages/$PYHEAVYDB_ARCHIVE"
+fi
 
 pip install -r ./dist/requirements.txt
-pip freeze -l > ./dist/requirements.txt
-
-# pip freeze -l inserts an absolute path
-# for pyheavydb.  We need a relative path
-update_pyheavydb_reference ./dist/requirements.txt
 
 # Create production source build
 copy_source_to_dist
@@ -43,11 +33,13 @@ current_timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 commit_hash=$(git rev-parse --short HEAD)
 echo "${current_timestamp}-${commit_hash}" > dist/public/version.txt
 
-# Compress Build Dir adding the packages folder under
-# the dist so that the install for heavydb-internal
-# works
-mv packages dist/.
+# Include the explicitly selected pyheavydb wheel, when present.
+if [[ -d packages ]]; then
+  mv packages dist/.
+fi
 cd dist
 tar -czf ../dist.tgz  .
 cd ..
-mv dist/packages .
+if [[ -d dist/packages ]]; then
+  mv dist/packages .
+fi

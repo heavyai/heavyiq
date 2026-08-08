@@ -4,18 +4,19 @@
 # ENV Requirements
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 source  $SCRIPT_DIR/common_fn.sh
-process_args "$@"
+process_args "$@" || exit $?
 
 # Copy to dist
-rm -rf dist
+rm -rf dist packages
 mkdir -p dist
 cp -r heavyiq dist/heavyiq
 cp requirements.txt ./dist/requirements.txt
 
-# if INTERNALLY_RELEASED_PYHEAVYDB is set
-# 1. grab the whl and store in ./dist
-# 2. update the ./dist/requirements.txt file
-test_for_internally_released_pyheavydb
+# If requested, store only the selected pyheavydb wheel under dist/packages.
+test_for_internally_release_pyheavydb
+if [[ -d packages ]]; then
+  mv packages dist/.
+fi
 
 # Create version.txt
 mkdir -p dist/public

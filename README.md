@@ -104,15 +104,35 @@ pytest tests/api/test_lcel.py  -rs --config-path config.test.toml -n 0 --maxfail
 ### Create Production Build
 
 ```bash
-bash scripts/build_prod.sh --include_all_deps
+bash scripts/build_prod.sh
 ```
 
-`requirements.txt` is the authoritative dependency manifest. To explicitly
-substitute a locally built pyheavydb wheel without changing that manifest:
+The generated `dist.tgz` contains the HeavyIQ application and its authoritative
+`requirements.txt`. It does not contain an offline dependency manifest or
+Python wheels by default. The deployment environment must be able to resolve the
+declared dependencies from its configured Python package indexes; air-gapped
+installation is not supported.
+
+HeavyDB can explicitly supply a selected pyheavydb wheel as the sole packaged
+exception. The wheel is stored under `packages/` without modifying
+`requirements.txt`:
 
 ```bash
-bash scripts/build_prod.sh --include_all_deps \
+bash scripts/build_prod.sh \
   --pyheavydb-wheel=/absolute/path/to/pyheavydb-10.0.0-py3-none-any.whl
+```
+
+Extract the application and install its dependencies into a virtual environment:
+
+```bash
+mkdir heavyiq-dist
+tar -xzf dist.tgz -C heavyiq-dist
+cd heavyiq-dist
+python3.10 -m venv venv
+. venv/bin/activate
+# For artifacts built with --pyheavydb-wheel:
+python -m pip install --no-deps packages/pyheavydb-*.whl
+python -m pip install -r requirements.txt
 ```
 
 ### Run Production Server Process
@@ -135,4 +155,3 @@ Join the [HeavyAI GitHub Discussions](https://github.com/orgs/heavyai/discussion
   
 ## License
 Apache 2.0. See [LICENSE](https://github.com/heavyai/heavyiq/blob/main/LICENSE).
-
