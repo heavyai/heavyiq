@@ -1,6 +1,0 @@
-url: https://huggingface.co/bigcode/starcoder2-7b
-revision: bb9afde76d7945da5745592525db122d4d729eb1
-download date: 2026-07-20
-sha256sum:
-    6190a6649d90a7fe35bfed8bff990c3e7aafc3cfa5beea185045f03f0890402b  tokenizer.json
-    75f3881aad0ece9aa683066d3ac729a03cf873849449429223c4853fce6a8e6f  tokenizer_config.json

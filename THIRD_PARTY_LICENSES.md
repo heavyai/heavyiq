@@ -12,14 +12,11 @@ In addition to the PyPI packages below, the repository bundles tokenizer **data/
 
 | Folder | Upstream model | License | Notes |
 |---|---|---|---|
-| `mixtral_model/` | Mistral / Mixtral | [Apache-2.0](LICENSES/Apache-2.0.txt) | Permissive. |
+| `mixtral_model/` | Mistral / Mixtral | [Apache-2.0](LICENSES/Apache-2.0.txt) | Permissive. Also used as an approximate token-length fallback for Llama / DeepSeek / StarCoder2 (those tokenizer files are not redistributed). |
 | `qwen_model/` | Qwen2 / Qwen2.5 | [Apache-2.0](LICENSES/Apache-2.0.txt) | Permissive (confirm size variant; some Qwen weights use the Tongyi/Qwen license). |
 | `qwen3_model/` | Qwen3 | [Apache-2.0](LICENSES/Apache-2.0.txt) | Permissive. |
-| `llama3_model/` | Meta Llama 3 (base, 8B) | Meta Llama 3 Community License | Not OSI-approved; acceptable-use policy and >700M MAU clause apply. Confirmed as the **base** model (uses the `end_of_text` end token, not Instruct's `eot_id`). |
-| `deepseek_model/` | DeepSeek Coder | DeepSeek Model License (code: MIT) | Custom model license; permits commercial use with use-based restrictions. |
-| `starcoder2_model/` | StarCoder2 (BigCode) | BigCode OpenRAIL-M | RAIL license with behavioral-use restrictions. |
 
-None of these folders currently carry recorded provenance metadata; each upstream is identified by tokenizer signature (tokenizer class, vocab size, special tokens). Before a formal release, each folder should be confirmed against its exact source repository and commit, and a `huggingface-metadata.txt` (source URL, revision/commit, and per-file SHA-256) added to record it.
+Restricted-license tokenizer trees (Meta Llama 3 Community License, DeepSeek Model License, BigCode OpenRAIL-M) are **not** bundled. Runtime token counting for those model families uses `mixtral_model/` as an Apache-2.0 stand-in.
 
 ## Summary
 

@@ -532,6 +532,10 @@ async def apopulate_table_info_wrt_token_limit(
 def get_tokenizer() -> Any:
     """
     Get tokenizer from pretrained local files.
+
+    Only Apache-2.0 tokenizer configs are bundled under tokenizer_models/.
+    Restricted-license families (Llama, DeepSeek, StarCoder2) fall back to the
+    Mixtral tokenizer for approximate token-length checks — not exact parity.
     """
     from tokenizers import Tokenizer
 
@@ -541,15 +545,16 @@ def get_tokenizer() -> Any:
 
     model_name = get_vllm_model_name(api_base=config.custom_llm_api_base).lower()
     model_local_path: str
-    if "llama-3" in model_name:
-        model_local_path = "./heavyiq/langchain/tokenizer_models/llama3_model"
-    elif "deepseek" in model_name:
-        model_local_path = "./heavyiq/langchain/tokenizer_models/deepseek_model"
-    elif "starcoder-2" in model_name:
-        model_local_path = "./heavyiq/langchain/tokenizer_models/starcoder2_model"
-    elif ("mixtral" in model_name) or ("wizard" in model_name):
+    # Mixtral (Apache-2.0) covers Mixtral/Wizard and restricted Llama/DeepSeek/StarCoder2.
+    if (
+        "mixtral" in model_name
+        or "wizard" in model_name
+        or "llama" in model_name
+        or "deepseek" in model_name
+        or "starcoder" in model_name
+    ):
         model_local_path = "./heavyiq/langchain/tokenizer_models/mixtral_model"
-    elif "qwen-3" in model_name:
+    elif "qwen-3" in model_name or "qwen3" in model_name:
         model_local_path = "./heavyiq/langchain/tokenizer_models/qwen3_model"
     elif "qwen" in model_name:
         model_local_path = "./heavyiq/langchain/tokenizer_models/qwen_model"
