@@ -33,7 +33,7 @@ llama-index-llms-langchain==0.8.0
 llama-index-llms-vllm==0.7.0
 llama-index-embeddings-openai==0.6.0
 python-multipart==0.0.29
-sqlparse==0.5.5
+sqlparse==0.6.0
 faiss-cpu==1.14.2
 llama-index-vector-stores-faiss==0.6.0
 cachetools==7.1.4
