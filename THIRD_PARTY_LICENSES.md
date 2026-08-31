@@ -8,15 +8,7 @@ Total runtime packages: **177**. Full license texts are under [`LICENSES/`](LICE
 
 ## Bundled Model Tokenizer Artifacts
 
-In addition to the PyPI packages below, the repository bundles tokenizer **data/config files** (e.g. `tokenizer.json`, `tokenizer_config.json`, vocab/merges) under `heavyiq/langchain/tokenizer_models/`. These are used only for local token counting to fit prompts within a model's context window. They contain **no model weights and no executable code**, and are therefore not PyPI packages (they are not captured by the auto-generated table below and must be maintained here manually).
-
-| Folder | Upstream model | License | Notes |
-|---|---|---|---|
-| `mixtral_model/` | Mistral / Mixtral | [Apache-2.0](LICENSES/Apache-2.0.txt) | Permissive. Also used as an approximate token-length fallback for Llama / DeepSeek / StarCoder2 (those tokenizer files are not redistributed). |
-| `qwen_model/` | Qwen2 / Qwen2.5 | [Apache-2.0](LICENSES/Apache-2.0.txt) | Permissive (confirm size variant; some Qwen weights use the Tongyi/Qwen license). |
-| `qwen3_model/` | Qwen3 | [Apache-2.0](LICENSES/Apache-2.0.txt) | Permissive. |
-
-Restricted-license tokenizer trees (Meta Llama 3 Community License, DeepSeek Model License, BigCode OpenRAIL-M) are **not** bundled. Runtime token counting for those model families uses `mixtral_model/` as an Apache-2.0 stand-in.
+The repository does **not** bundle Hugging Face tokenizer configs. Custom-model prompt fitting and RAG chunking use tiktoken `cl100k_base` as an approximate length budget (not exact parity with Mixtral, Qwen, or Llama vocabs). OpenAI/Azure paths continue to use LangChain/`tiktoken` via `llm.get_num_tokens`.
 
 ## Summary
 

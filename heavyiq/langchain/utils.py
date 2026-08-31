@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import asyncio
-import json
 import os
 import re
 from datetime import datetime, timedelta
@@ -23,7 +22,7 @@ from langchain_core.tracers.schemas import Run
 from heavyiq.config import HeavyIQConfig, change_iq_config_for_free_edition, get_config
 from heavyiq.langchain import HeavyDB
 from heavyiq.langchain.heavydb import get_db
-from heavyiq.langchain.llms import LLMType, get_vllm_model_name
+from heavyiq.langchain.llms import LLMType
 from heavyiq.logging_utils import get_heavyiq_logger
 from heavyiq.utils import TABLES_CACHE, SharedDictSingleton
 
@@ -528,67 +527,18 @@ async def apopulate_table_info_wrt_token_limit(
     return prompt.format_prompt(table_info=table_info)
 
 
-@cached(cache=LRUCache(maxsize=1))  # Cache the tokenizer
+@cached(cache=LRUCache(maxsize=1))
 def get_tokenizer() -> Any:
     """
-    Get tokenizer from pretrained local files.
+    Approximate tokenizer for custom-model prompt fitting and RAG chunking.
 
-    Only Apache-2.0 tokenizer configs are bundled under tokenizer_models/.
-    Restricted-license families (Llama, DeepSeek, StarCoder2) fall back to the
-    Mixtral tokenizer for approximate token-length checks — not exact parity.
+    Uses tiktoken cl100k_base rather than per-model Hugging Face tokenizer
+    configs. Counts are not exact for Mixtral/Qwen/Llama; they are a
+    conservative length budget.
     """
-    from tokenizers import Tokenizer
+    import tiktoken
 
-    from heavyiq.config import get_config
-
-    config = get_config()
-
-    model_name = get_vllm_model_name(api_base=config.custom_llm_api_base).lower()
-    model_local_path: str
-    # Mixtral (Apache-2.0) covers Mixtral/Wizard and restricted Llama/DeepSeek/StarCoder2.
-    if (
-        "mixtral" in model_name
-        or "wizard" in model_name
-        or "llama" in model_name
-        or "deepseek" in model_name
-        or "starcoder" in model_name
-    ):
-        model_local_path = "./heavyiq/langchain/tokenizer_models/mixtral_model"
-    elif "qwen-3" in model_name or "qwen3" in model_name:
-        model_local_path = "./heavyiq/langchain/tokenizer_models/qwen3_model"
-    elif "qwen" in model_name:
-        model_local_path = "./heavyiq/langchain/tokenizer_models/qwen_model"
-    else:
-        raise ValueError("Unsupported model found for tokenization.")
-
-    tok_json = f"{model_local_path}/tokenizer.json"
-    tokenizer = Tokenizer.from_file(tok_json)
-
-    tok_config_json = f"{model_local_path}/tokenizer_config.json"
-    tok_config = {}
-    if os.path.exists(tok_config_json):
-        with open(tok_config_json, "r") as f:
-            tok_config = json.load(f)
-
-    # Add special tokens if specified in tokenizer_config
-    # Add additional_special_tokens
-    special_tokens = []
-
-    # Add additional_special_tokens
-    for token in tok_config.get("additional_special_tokens", []):
-        special_tokens.append(token)
-
-    # Add pad/eos/bos tokens only if defined
-    for key in ("pad_token", "eos_token", "bos_token"):
-        val = tok_config.get(key)
-        if val:
-            special_tokens.append(val)
-
-    # De-duplicate and add as special tokens
-    special_tokens = list(set(special_tokens))
-    tokenizer.add_special_tokens(special_tokens)
-
-    return tokenizer
+    return tiktoken.get_encoding("cl100k_base")
 
 
 def initialize_tokenizer():
@@ -607,24 +557,23 @@ def tokenizer():
 
 def custom_model_token_counter(text: str) -> int:
     """
-    Token counter method for custom models which helps to calculate tokens for the given text.
+    Approximate token count for custom models (tiktoken cl100k_base).
     """
     return len(custom_model_tokenizer_encode(text))
 
 
 def custom_model_tokenizer_encode(text: str) -> list[int]:
     """
-    Encode text str into list of input ids.
+    Encode text into token ids (approximate; not the serving model's vocab).
     """
-    return tokenizer().encode(text).ids
+    return tokenizer().encode(text)
 
 
 def custom_model_tokenizer_decode(token_ids: list[int]) -> str:
     """
-    Decode list of input ids back to the original text.
+    Decode token ids back to text.
     """
-    # skip_special_tokens=True, else <｜begin▁of▁sentence｜> gets prepended
-    return tokenizer().decode(token_ids, skip_special_tokens=True)
+    return tokenizer().decode(token_ids)
 
 
 @alru_cache(ttl=60)

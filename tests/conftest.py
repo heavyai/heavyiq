@@ -107,13 +107,11 @@ def pytest_collection_modifyitems(config, items):
 
 @pytest.fixture(scope="session", autouse=True)
 def _offline_vllm_discovery_for_tests():
-    """Avoid HTTP to custom_llm / vLLM /models when resolving tokenizer or embed model names."""
+    """Avoid HTTP to custom_llm / vLLM /models when resolving embed model names."""
     _name = "meta-llama/Meta-Llama-3-8B-Instruct"
     with (
         patch("heavyiq.langchain.llms.get_vllm_model_name", return_value=_name),
         patch("heavyiq.langchain.llms.get_vllm_max_model_len", return_value=8192),
-        # utils binds get_vllm_model_name at import time; patch the local reference too.
-        patch("heavyiq.langchain.utils.get_vllm_model_name", return_value=_name),
     ):
         yield
 
