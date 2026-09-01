@@ -173,7 +173,7 @@ Restricted-license tokenizer trees (Meta Llama 3 Community License, DeepSeek Mod
 | sniffio | 1.3.1 | [Apache-2.0](LICENSES/Apache-2.0.txt), [MIT](LICENSES/MIT.txt) | [pypi.org/sniffio](https://pypi.org/project/sniffio/1.3.1/) | [source](https://github.com/python-trio/sniffio) |
 | soupsieve | 2.8 | [MIT](LICENSES/MIT.txt) | [pypi.org/soupsieve](https://pypi.org/project/soupsieve/2.8/) | [source](https://github.com/facelessuser/soupsieve) |
 | SQLAlchemy | 2.0.44 | [MIT](LICENSES/MIT.txt) | [pypi.org/SQLAlchemy](https://pypi.org/project/SQLAlchemy/2.0.44/) | [source](https://www.sqlalchemy.org) |
-| sqlparse | 0.5.4 | [BSD-3-Clause](LICENSES/BSD-3-Clause.txt) | [pypi.org/sqlparse](https://pypi.org/project/sqlparse/0.5.4/) | [source](https://github.com/andialbrecht/sqlparse) |
+| sqlparse | 0.6.0 | [BSD-3-Clause](LICENSES/BSD-3-Clause.txt) | [pypi.org/sqlparse](https://pypi.org/project/sqlparse/0.6.0/) | [source](https://github.com/andialbrecht/sqlparse) |
 | sse-starlette | 3.0.3 | [BSD-3-Clause](LICENSES/BSD-3-Clause.txt) | [pypi.org/sse-starlette](https://pypi.org/project/sse-starlette/3.0.3/) | [source](https://github.com/sysid/sse-starlette) |
 | starlette | 0.50.0 | [BSD-3-Clause](LICENSES/BSD-3-Clause.txt) | [pypi.org/starlette](https://pypi.org/project/starlette/0.50.0/) | [source](https://github.com/Kludex/starlette) |
 | striprtf | 0.0.26 | [BSD-3-Clause](LICENSES/BSD-3-Clause.txt) | [pypi.org/striprtf](https://pypi.org/project/striprtf/0.0.26/) | [source](https://github.com/joshy/striprtf) |
@@ -15045,10 +15045,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### sqlparse 0.5.4
+### sqlparse 0.6.0
 
 *License: BSD-3-Clause — SPDX text: [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html)*  
-*Verify (PyPI): https://pypi.org/project/sqlparse/0.5.4/*  
+*Verify (PyPI): https://pypi.org/project/sqlparse/0.6.0/*  
 *Source: https://github.com/andialbrecht/sqlparse*
 
 ```
