@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 ARG BASE_HEAVYDB_IMG=docker-internal.mapd.com/mapd/mapd-render:master
 FROM  $BASE_HEAVYDB_IMG
 # Note this build expects all the required heavyiq pieces to already

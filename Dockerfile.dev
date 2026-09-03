@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # Pin OS so APT Python 3.10 stays available and builds stay reproducible (LangChain 1.x needs Python >= 3.10).
 FROM ubuntu:22.04
 
