@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Pin OS so APT Python 3.10 stays available and builds stay reproducible (LangChain 1.x needs Python >= 3.10).
+FROM ubuntu:22.04
+
+WORKDIR /app
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        python3.10 python3.10-venv python3.10-dev python3.10-distutils \
+        build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Use Python 3.10 explicitly — `/usr/bin/python3` may point at another version on newer Ubuntu images.
+RUN python3.10 -m venv /app/venv
+ENV PATH="/app/venv/bin:$PATH"
+
+COPY requirements.txt requirements-dev.txt gunicorn.conf.py ./
+
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r requirements-dev.txt
+
+COPY config.toml ./
+
+COPY ./heavyiq /app/heavyiq
+
+EXPOSE 8000
+
+CMD ["gunicorn", "-b", ":8000", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--preload", "heavyiq.api:create_app()"]
