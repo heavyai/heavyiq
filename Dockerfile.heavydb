@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+ARG BASE_HEAVYDB_IMG=docker-internal.mapd.com/mapd/mapd-render:master
+FROM  $BASE_HEAVYDB_IMG
+# Note this build expects all the required heavyiq pieces to already
+# exist inside the heavydb docker image. It doesn't use files from
+# the local heavyiq directory
+#
+SHELL ["/bin/bash", "-c"]
+RUN cd heavyiq \
+  && python3 -m venv venv \
+  && source venv/bin/activate \
+  && pip install -r requirements.txt
+
