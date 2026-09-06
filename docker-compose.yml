@@ -1,32 +1,39 @@
-version: '3'
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 services:
   heavyiq-api:
     container_name: heavyiq-api
     build:
       context: .
-      dockerfile: Dockerfile.dev  # Specify the custom Dockerfile name
+      dockerfile: Dockerfile.dev # Specify the custom Dockerfile name
     volumes:
       - ./table_documents:/app/table_documents
       - ./db:/app/db
       - ./storage:/app/storage
       - ./heavyiq:/app/heavyiq
-      - ./hf_models:/app/hf_models
+      # HuggingFace embedding model cache: a named volume so the download
+      # persists across runs without the daemon creating a root-owned
+      # ./hf_models in the source tree.
+      - hf_models:/app/hf_models
     network_mode: "bridge"
     ports:
       - "8000:8000"
-    command: ["gunicorn", "-b", ":8000", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--preload", "heavyiq.api:create_app('./config.toml')"]
+    command: [ "gunicorn", "-b", ":8000", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--preload", "heavyiq.api:create_app('./config.toml')" ]
 
   heavyiq-test:
     container_name: heavyiq-test
     build:
       context: .
-      dockerfile: Dockerfile.test  # Specify the custom Dockerfile name
+      dockerfile: Dockerfile.test # Specify the custom Dockerfile name
     volumes:
       - ./table_documents:/app/table_documents
       - ./db:/app/db
       - ./storage:/app/storage
-      - ./hf_models:/app/hf_models
+      - hf_models:/app/hf_models
       - ./config.pytest.toml:/app/config.toml
     network_mode: "bridge"
-    command: ['pytest', '/app/tests', '--disable-warnings', '-rs', '--config-path=./config.toml']
+    command: [ 'pytest', '/app/tests', '--disable-warnings', '-rs', '--config-path=./config.toml' ]
+
+volumes:
+  hf_models:
