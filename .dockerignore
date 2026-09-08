@@ -5,4 +5,3 @@ __pycache__/
 .chroma/
 .mypy_cache/
 db/
-experiments/
