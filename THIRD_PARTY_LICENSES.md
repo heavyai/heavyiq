@@ -149,8 +149,8 @@ Restricted-license tokenizer trees (Meta Llama 3 Community License, DeepSeek Mod
 | pydantic_core | 2.41.5 | [MIT](LICENSES/MIT.txt) | [pypi.org/pydantic_core](https://pypi.org/project/pydantic_core/2.41.5/) | [source](https://github.com/pydantic/pydantic-core) |
 | Pygments | 2.19.2 | [BSD-2-Clause](LICENSES/BSD-2-Clause.txt) | [pypi.org/Pygments](https://pypi.org/project/Pygments/2.19.2/) | [source](https://github.com/pygments/pygments) |
 | pyheavydb | 8.0.1.post1 | [Apache-2.0](LICENSES/Apache-2.0.txt) | [pypi.org/pyheavydb](https://pypi.org/project/pyheavydb/8.0.1.post1/) | [source](https://github.com/heavyai/pyheavydb) |
-| PyJWT | 2.10.1 | [MIT](LICENSES/MIT.txt) | [pypi.org/PyJWT](https://pypi.org/project/PyJWT/2.10.1/) | [source](https://github.com/jpadilla/pyjwt) |
-| pypdf | 6.4.0 | [BSD-3-Clause](LICENSES/BSD-3-Clause.txt) | [pypi.org/pypdf](https://pypi.org/project/pypdf/6.4.0/) | [source](https://github.com/py-pdf/pypdf) |
+| PyJWT | 2.15.1 | [MIT](LICENSES/MIT.txt) | [pypi.org/PyJWT](https://pypi.org/project/PyJWT/2.15.1/) | [source](https://github.com/jpadilla/pyjwt) |
+| pypdf | 6.21.4 | [BSD-3-Clause](LICENSES/BSD-3-Clause.txt) | [pypi.org/pypdf](https://pypi.org/project/pypdf/6.21.4/) | [source](https://github.com/py-pdf/pypdf) |
 | PyPika | 0.48.9 | [Apache-2.0](LICENSES/Apache-2.0.txt) | [pypi.org/PyPika](https://pypi.org/project/PyPika/0.48.9/) | [source](https://github.com/kayak/pypika) |
 | pyproject_hooks | 1.2.0 | [MIT](LICENSES/MIT.txt) | [pypi.org/pyproject_hooks](https://pypi.org/project/pyproject_hooks/1.2.0/) | [source](https://github.com/pypa/pyproject-hooks) |
 | python-dateutil | 2.9.0.post0 | [Apache-2.0](LICENSES/Apache-2.0.txt), [BSD-3-Clause](LICENSES/BSD-3-Clause.txt) | [pypi.org/python-dateutil](https://pypi.org/project/python-dateutil/2.9.0.post0/) | [source](https://github.com/dateutil/dateutil) |
@@ -13824,10 +13824,10 @@ Many thanks for all contributions!
 
 _No license file bundled in the wheel; see the license type text in [`LICENSES/Apache-2.0.txt`](LICENSES/Apache-2.0.txt) and the project page above._
 
-### PyJWT 2.10.1
+### PyJWT 2.15.1
 
 *License: MIT — SPDX text: [MIT](https://spdx.org/licenses/MIT.html)*  
-*Verify (PyPI): https://pypi.org/project/PyJWT/2.10.1/*  
+*Verify (PyPI): https://pypi.org/project/PyJWT/2.15.1/*  
 *Source: https://github.com/jpadilla/pyjwt*
 
 ```
@@ -13854,10 +13854,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### pypdf 6.4.0
+### pypdf 6.21.4
 
 *License: BSD-3-Clause — SPDX text: [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html)*  
-*Verify (PyPI): https://pypi.org/project/pypdf/6.4.0/*  
+*Verify (PyPI): https://pypi.org/project/pypdf/6.21.4/*  
 *Source: https://github.com/py-pdf/pypdf*
 
 ```

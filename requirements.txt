@@ -22,8 +22,8 @@ SQLAlchemy==2.0.44
 uvicorn==0.48.0
 asgi-correlation-id==4.3.4
 async-lru==2.3.0
-pypdf==6.12.2
-PyJWT==2.13.0
+pypdf==6.21.4
+PyJWT==2.15.1
 loguru==0.7.3
 llama-index-core==0.14.22
 llama-index-readers-file==0.6.0
